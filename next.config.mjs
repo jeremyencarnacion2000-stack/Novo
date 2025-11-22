@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbo: false,
+  turbopack: {
+    root: process.cwd(),
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
