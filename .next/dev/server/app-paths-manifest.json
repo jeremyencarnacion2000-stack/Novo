@@ -1,0 +1,7 @@
+{
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/auth/test-callback-url/route": "app/api/auth/test-callback-url/route.js",
+  "/api/auth/test-google/route": "app/api/auth/test-google/route.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
+  "/auth/signup/page": "app/auth/signup/page.js"
+}

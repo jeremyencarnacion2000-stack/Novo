@@ -1,0 +1,218 @@
+"use client"
+
+import type React from "react"
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Edit, Trash2, Calendar, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
+import type { Project, ProjectStatus } from "@/types/project"
+import { Progress } from "@/components/ui/progress"
+import { useState } from "react"
+
+interface KanbanBoardProps {
+  projects: Project[]
+  onEdit: (project: Project) => void
+  onDelete: (id: string) => void
+  onStatusChange: (id: string, status: ProjectStatus) => void
+}
+
+const columns: { status: ProjectStatus; title: string; color: string }[] = [
+  { status: "not-started", title: "Not Started", color: "bg-secondary text-secondary-foreground" },
+  { status: "in-progress", title: "In Progress", color: "bg-accent text-accent-foreground" },
+  { status: "completed", title: "Completed", color: "bg-primary/10 text-primary" },
+]
+
+export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: KanbanBoardProps) {
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+
+  const getNextStatus = (currentStatus: ProjectStatus): ProjectStatus | null => {
+    if (currentStatus === "not-started") return "in-progress"
+    if (currentStatus === "in-progress") return "completed"
+    return null
+  }
+
+  const getDaysRemaining = (dueDate: string): number => {
+    const due = new Date(dueDate)
+    const today = new Date()
+    const diffTime = due.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData("text/plain", id)
+    setDraggedId(id)
+    // Set drag image or effect if needed
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+  }
+
+  const handleDrop = (e: React.DragEvent, status: ProjectStatus) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData("text/plain")
+    if (id && id !== draggedId) {
+      // Prevent dropping on itself if logic allows, but here we just check id
+    }
+    if (id) {
+      onStatusChange(id, status)
+    }
+    setDraggedId(null)
+  }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-3">
+      {columns.map((column) => {
+        const columnProjects = projects.filter((p) => p.status === column.status)
+
+        return (
+          <div
+            key={column.status}
+            className="flex flex-col gap-4"
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, column.status)}
+          >
+            <div className={`rounded-lg border p-4 ${column.color} transition-all hover:shadow-sm`}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">{column.title}</h3>
+                <Badge variant="outline">{columnProjects.length}</Badge>
+              </div>
+            </div>
+
+            <div
+              className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""}`}
+            >
+              {columnProjects.map((project) => {
+                const nextStatus = getNextStatus(project.status)
+                const daysRemaining = getDaysRemaining(project.dueDate)
+                const isOverdue = daysRemaining < 0 && project.status !== "completed"
+                const completedSubtasks = project.subtasks.filter((st) => st.completed).length
+
+                return (
+                  <Card
+                    key={project.id}
+                    className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === project.id ? "opacity-50" : ""}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, project.id)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-base leading-tight line-clamp-2">{project.title}</CardTitle>
+                        <Badge
+                          variant={
+                            project.priority === "high"
+                              ? "destructive"
+                              : project.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                          }
+                          className="shrink-0 capitalize"
+                        >
+                          {project.priority}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+
+                      {project.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {project.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Progress</span>
+                          <span>{project.progress}%</span>
+                        </div>
+                        <Progress value={project.progress} className="h-2" />
+                      </div>
+
+                      {project.subtasks.length > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>
+                            {completedSubtasks}/{project.subtasks.length} tasks
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 text-xs">
+                        <Calendar className="h-3 w-3 shrink-0" />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-muted-foreground">
+                            Start:{" "}
+                            {new Date(project.startDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                            Due:{" "}
+                            {new Date(project.dueDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        {isOverdue && (
+                          <Badge variant="destructive" className="text-xs gap-1 ml-auto">
+                            <AlertCircle className="h-3 w-3" />
+                            {Math.abs(daysRemaining)}d overdue
+                          </Badge>
+                        )}
+                        {!isOverdue && daysRemaining >= 0 && daysRemaining <= 7 && project.status !== "completed" && (
+                          <Badge variant="secondary" className="text-xs ml-auto">
+                            {daysRemaining}d left
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        {nextStatus && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 bg-transparent"
+                            onClick={() => onStatusChange(project.id, nextStatus)}
+                          >
+                            Move
+                            <ChevronRight className="h-3 w-3 ml-1" />
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => onEdit(project)}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => onDelete(project.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+
+              {columnProjects.length === 0 && (
+                <Card className="border-dashed">
+                  <CardContent className="py-12">
+                    <p className="text-center text-sm text-muted-foreground">No projects yet</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}

@@ -1,0 +1,6 @@
+[build]
+  command = "pnpm install --unsafe-perm && pnpm run prisma:generate && pnpm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

@@ -1,0 +1,97 @@
+[00:01:25.760] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:27.851] Browser ERROR   A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+%s%s https://react.dev/link/hydration-mismatch 
+
+  ...
+    <NotificationProvider>
+      <SocketProvider>
+        <OuterLayoutRouter>
+        <CommandPalette>
+          <div>
+          <CommandDialog open={false} onOpenChange={function bound dispatchSetState}>
+            <Dialog open={false} onOpenChange={function bound dispatchSetState}>
+              <Dialog data-slot="dialog" open={false} onOpenChange={function bound dispatchSetState}>
+                <DialogProvider scope={undefined} triggerRef={{current:null}} contentRef={{current:null}} ...>
+                  <DialogHeader className="sr-only">
+                    <div data-slot="dialog-header" className="flex flex-...">
+                      <DialogTitle>
+                        <DialogTitle data-slot="dialog-title" className="text-lg le...">
+                          <Primitive.h2 id="radix-_R_i..." data-slot="dialog-title" className="text-lg le..." ref={null}>
+                            <h2
++                             id="radix-_R_ilbH1_"
+-                             id="radix-_R_29lbH1_"
+                              data-slot="dialog-title"
+                              className="text-lg leading-none font-semibold"
+                              ref={null}
+                            >
++                             Command Palette
+                      <DialogDescription>
+                        <DialogDescription data-slot="dialog-des..." className="text-muted...">
+                          <Primitive.p id="radix-_R_i..." data-slot="dialog-des..." className="text-muted..." ref={null}>
+                            <p
++                             id="radix-_R_ilbH2_"
+-                             id="radix-_R_29lbH2_"
+                              data-slot="dialog-description"
+                              className="text-muted-foreground text-sm"
+                              ref={null}
+                            >
++                             Search for a command to run...
+                  ...
+        ...
+
+[00:01:27.851] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:01:27.851] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:01:27.851] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763778428830}
+[00:03:24.638] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:03:25.619] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:03:25.619] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:03:25.620] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Ficon-dark-32x32.png&error=google color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Ficon-dark-32x32.png&error=google","r":"","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763778547155}
+[00:03:34.606] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:03:35.048] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:03:35.048] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:03:35.048] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763778556587}
+[00:05:32.360] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:05:33.414] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:05:33.414] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:05:33.414] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Ficon-dark-32x32.png&error=OAuthCallback color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Ficon-dark-32x32.png&error=OAuthCallback","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763778674924}
+[00:05:51.394] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:05:52.777] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:05:52.777] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:05:52.777] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763778694073}
+[00:29:36.305] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:29:37.522] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:29:37.522] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:29:37.522] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780118961}
+[00:30:21.051] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:30:21.639] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:30:21.639] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:30:21.639] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780163245}
+[00:38:56.723] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:38:57.312] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:38:57.312] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:38:57.312] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780678908}
+[00:39:12.780] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:39:13.349] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:39:13.349] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:39:13.349] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780694941}
+[00:39:50.117] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:39:50.765] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:39:50.765] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:39:50.765] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780732390}
+[00:43:22.011] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:43:27.613] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:43:27.613] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[00:43:27.613] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"https://accounts.google.com/","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763780946526}
+[10:57:53.446] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[10:58:05.636] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[10:58:05.636] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/auth/signin","route":"/auth/signin"}
+[10:58:05.636] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F color: rgb(120, 120, 120) color: inherit {"dp":"/auth/signin","o":"http://localhost:3000/auth/signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F","r":"","sdkn":"@vercel/analytics/next","sdkv":"1.5.0","sv":"0.1.3","ts":1763817825424}

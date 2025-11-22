@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "middleware": {
+    "/": {
+      "files": [
+        "server/edge/chunks/Downloads_novo-desktop-mvp (2)_71524440._.js",
+        "server/edge/chunks/[root-of-the-server]__9e2cf1b1._.js",
+        "server/edge/chunks/turbopack-Downloads_novo-desktop-mvp (2)_edge-wrapper_1d9e9e78.js"
+      ],
+      "name": "middleware",
+      "page": "/",
+      "matchers": [
+        {
+          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/((?!api\\/auth|_next\\/static|_next\\/image|favicon.ico|auth\\/signin|auth\\/signup).*))(\\\\.json)?[\\/#\\?]?$",
+          "originalSource": "/((?!api/auth|_next/static|_next/image|favicon.ico|auth/signin|auth/signup).*)"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "development",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "UUgFvNc2vltoQYKh7rkndEQIaGut+UCKHw59pIuVPkM=",
+        "__NEXT_PREVIEW_MODE_ID": "8eca5f644edbe62b39afdcd804b3d16d",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "36e370bcd12c94ef78efb07b890c9a439bdda72b487a7fd33ea761b9b254edf7",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "93185cb4d3dfe8b1e8f962ed6bb265042dd9976f7ee986ea02a582a0d1468c69"
+      }
+    }
+  },
+  "sortedMiddleware": [
+    "/"
+  ],
+  "functions": {}
+}

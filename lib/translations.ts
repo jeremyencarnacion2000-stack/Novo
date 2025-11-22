@@ -1,0 +1,193 @@
+export const translations = {
+  en: {
+    // Navigation
+    dashboard: 'Dashboard',
+    routines: 'Routines',
+    checklist: 'Daily Checklist',
+    projects: 'Projects',
+    trackers: 'Trackers',
+    settings: 'Settings',
+    school: 'School',
+    business: 'Business',
+    library: 'Library',
+    spiritual: 'Spiritual',
+    appearance: 'Appearance',
+    
+    // Dashboard
+    welcomeBack: 'Welcome back',
+    goodMorning: 'Good morning',
+    goodAfternoon: 'Good afternoon',
+    goodEvening: 'Good evening',
+    tasksCompleted: 'Tasks Completed',
+    activeProjects: 'Active Projects',
+    weeklyProgress: 'Weekly Progress',
+    currentStreak: 'Current Streak',
+    days: 'days',
+    quickActions: 'Quick Actions',
+    addTask: 'Add Task',
+    addProject: 'Add Project',
+    addRoutine: 'Add Routine',
+    logHabit: 'Log Habit',
+    recentActivity: 'Recent Activity',
+    
+    // Projects
+    notStarted: 'Not Started',
+    inProgress: 'In Progress',
+    completed: 'Completed',
+    noProjects: 'No projects yet',
+    
+    // Common
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    edit: 'Edit',
+    add: 'Add',
+    search: 'Search',
+    filter: 'Filter',
+    sort: 'Sort',
+  },
+  es: {
+    // Navigation
+    dashboard: 'Panel',
+    routines: 'Rutinas',
+    checklist: 'Lista Diaria',
+    projects: 'Proyectos',
+    trackers: 'Seguimiento',
+    settings: 'Configuración',
+    school: 'Escuela',
+    business: 'Negocios',
+    library: 'Biblioteca',
+    spiritual: 'Espiritual',
+    appearance: 'Apariencia',
+    
+    // Dashboard
+    welcomeBack: 'Bienvenido de nuevo',
+    goodMorning: 'Buenos días',
+    goodAfternoon: 'Buenas tardes',
+    goodEvening: 'Buenas noches',
+    tasksCompleted: 'Tareas Completadas',
+    activeProjects: 'Proyectos Activos',
+    weeklyProgress: 'Progreso Semanal',
+    currentStreak: 'Racha Actual',
+    days: 'días',
+    quickActions: 'Acciones Rápidas',
+    addTask: 'Agregar Tarea',
+    addProject: 'Agregar Proyecto',
+    addRoutine: 'Agregar Rutina',
+    logHabit: 'Registrar Hábito',
+    recentActivity: 'Actividad Reciente',
+    
+    // Projects
+    notStarted: 'Sin Iniciar',
+    inProgress: 'En Progreso',
+    completed: 'Completado',
+    noProjects: 'No hay proyectos aún',
+    
+    // Common
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    delete: 'Eliminar',
+    edit: 'Editar',
+    add: 'Agregar',
+    search: 'Buscar',
+    filter: 'Filtrar',
+    sort: 'Ordenar',
+  },
+  fr: {
+    // Navigation
+    dashboard: 'Tableau de bord',
+    routines: 'Routines',
+    checklist: 'Liste quotidienne',
+    projects: 'Projets',
+    trackers: 'Suivi',
+    settings: 'Paramètres',
+    school: 'École',
+    business: 'Entreprise',
+    library: 'Bibliothèque',
+    spiritual: 'Spirituel',
+    appearance: 'Apparence',
+    
+    // Dashboard
+    welcomeBack: 'Bienvenue',
+    goodMorning: 'Bonjour',
+    goodAfternoon: 'Bon après-midi',
+    goodEvening: 'Bonsoir',
+    tasksCompleted: 'Tâches terminées',
+    activeProjects: 'Projets actifs',
+    weeklyProgress: 'Progrès hebdomadaire',
+    currentStreak: 'Série actuelle',
+    days: 'jours',
+    quickActions: 'Actions rapides',
+    addTask: 'Ajouter une tâche',
+    addProject: 'Ajouter un projet',
+    addRoutine: 'Ajouter une routine',
+    logHabit: 'Enregistrer une habitude',
+    recentActivity: 'Activité récente',
+    
+    // Projects
+    notStarted: 'Non commencé',
+    inProgress: 'En cours',
+    completed: 'Terminé',
+    noProjects: 'Pas encore de projets',
+    
+    // Common
+    save: 'Enregistrer',
+    cancel: 'Annuler',
+    delete: 'Supprimer',
+    edit: 'Modifier',
+    add: 'Ajouter',
+    search: 'Rechercher',
+    filter: 'Filtrer',
+    sort: 'Trier',
+  },
+  de: {
+    // Navigation
+    dashboard: 'Dashboard',
+    routines: 'Routinen',
+    checklist: 'Tägliche Checkliste',
+    projects: 'Projekte',
+    trackers: 'Tracker',
+    settings: 'Einstellungen',
+    school: 'Schule',
+    business: 'Geschäft',
+    library: 'Bibliothek',
+    spiritual: 'Spirituell',
+    appearance: 'Aussehen',
+    
+    // Dashboard
+    welcomeBack: 'Willkommen zurück',
+    goodMorning: 'Guten Morgen',
+    goodAfternoon: 'Guten Tag',
+    goodEvening: 'Guten Abend',
+    tasksCompleted: 'Erledigte Aufgaben',
+    activeProjects: 'Aktive Projekte',
+    weeklyProgress: 'Wöchentlicher Fortschritt',
+    currentStreak: 'Aktuelle Serie',
+    days: 'Tage',
+    quickActions: 'Schnelle Aktionen',
+    addTask: 'Aufgabe hinzufügen',
+    addProject: 'Projekt hinzufügen',
+    addRoutine: 'Routine hinzufügen',
+    logHabit: 'Gewohnheit protokollieren',
+    recentActivity: 'Letzte Aktivität',
+    
+    // Projects
+    notStarted: 'Nicht begonnen',
+    inProgress: 'In Bearbeitung',
+    completed: 'Abgeschlossen',
+    noProjects: 'Noch keine Projekte',
+    
+    // Common
+    save: 'Speichern',
+    cancel: 'Abbrechen',
+    delete: 'Löschen',
+    edit: 'Bearbeiten',
+    add: 'Hinzufügen',
+    search: 'Suchen',
+    filter: 'Filtern',
+    sort: 'Sortieren',
+  },
+}
+
+export type Language = keyof typeof translations
+export type TranslationKey = keyof typeof translations.en
