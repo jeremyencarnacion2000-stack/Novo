@@ -16,7 +16,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const result = await grokAPI.generateResponse(message, '', history, systemPrompt, tools);
+    // Verificar si la API key está configurada
+    if (!process.env.GROK_API_KEY && !process.env.KILO_API_KEY && !process.env.XAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'API key no está configurada. Configure GROK_API_KEY, KILO_API_KEY o XAI_API_KEY.' },
+        { status: 500 }
+      );
+    }
+
+    let result;
+    try {
+      result = await grokAPI.generateResponse(message, '', history, systemPrompt, tools);
+    } catch (error) {
+      console.error('Error durante la llamada a grokAPI.generateResponse():', error);
+      return NextResponse.json(
+        { error: `Error al generar respuesta de IA: ${error instanceof Error ? error.message : 'Error desconocido'}` },
+        { status: 500 }
+      );
+    }
 
     console.log('Ruta generate: Resultado de Grok', {
       longitudContenido: result.content.length,
