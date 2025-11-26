@@ -1,5 +1,6 @@
 "use client"
 
+import './focus-mode.css'
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,16 +13,30 @@ import {
 } from "@/components/ui/dialog"
 import { Timer, Play, Pause, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useFocus } from "@/lib/focus-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function FocusMode() {
+  const {
+    setIsFocusModeActive,
+    time,
+    setTime,
+    isActive,
+    setIsActive,
+    initialTime,
+    setInitialTime,
+    mode,
+    setMode,
+    selectedTask,
+    setSelectedTask,
+    tasks,
+    setTasks,
+    toggleTimer,
+    resetTimer,
+    setTimerMode,
+    formatTime
+  } = useFocus()
   const [isOpen, setIsOpen] = React.useState(false)
-  const [isActive, setIsActive] = React.useState(false)
-  const [time, setTime] = React.useState(25 * 60) // 25 minutes in seconds
-  const [initialTime, setInitialTime] = React.useState(25 * 60)
-  const [mode, setMode] = React.useState<"work" | "shortBreak" | "longBreak">("work")
-  const [selectedTask, setSelectedTask] = React.useState<string>("")
-  const [tasks, setTasks] = React.useState<{ id: string; text: string }[]>([])
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
 
   React.useEffect(() => {
@@ -31,29 +46,6 @@ export function FocusMode() {
   }, [])
 
   React.useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
-
-    if (isActive && time > 0) {
-      interval = setInterval(() => {
-        setTime((prevTime) => prevTime - 1)
-      }, 1000)
-    } else if (time === 0) {
-      setIsActive(false)
-      if (interval) clearInterval(interval)
-
-      if (audioRef.current) {
-        audioRef.current.play().catch((e) => console.log("Audio play failed:", e))
-      }
-
-      new Notification("Focus Timer Finished!", { body: "Time to take a break or get back to work." })
-    }
-
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [isActive, time])
-
-  React.useEffect(() => {
     if (isOpen) {
       const checklistItems = JSON.parse(localStorage.getItem("checklist-items") || "[]")
       const activeTasks = checklistItems
@@ -61,30 +53,7 @@ export function FocusMode() {
         .map((item: any) => ({ id: item.id, text: item.text }))
       setTasks(activeTasks)
     }
-  }, [isOpen])
-
-  const toggleTimer = () => setIsActive(!isActive)
-
-  const resetTimer = () => {
-    setIsActive(false)
-    setTime(initialTime)
-  }
-
-  const setTimerMode = (newMode: "work" | "shortBreak" | "longBreak") => {
-    setMode(newMode)
-    setIsActive(false)
-    let newTime = 25 * 60
-    if (newMode === "shortBreak") newTime = 5 * 60
-    if (newMode === "longBreak") newTime = 15 * 60
-    setInitialTime(newTime)
-    setTime(newTime)
-  }
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+  }, [isOpen, setTasks])
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

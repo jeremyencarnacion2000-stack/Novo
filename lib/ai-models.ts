@@ -1,6 +1,4 @@
 import { AIModel, ConversationMessage } from '@/types/ai';
-import { kiloAPI } from './kilo';
-import { grokAPI } from './grok';
 
 // Storage key for models
 const MODELS_STORAGE_KEY = 'novo_ai_models';
@@ -16,27 +14,8 @@ const DEFAULT_MODEL: AIModel = {
   isActive: false
 };
 
-// Kilo AI model
-const KILO_MODEL: AIModel = {
-  id: 'kilo',
-  name: 'Kilo AI',
-  type: 'api',
-  filePath: '',
-  uploadedAt: '',
-  size: 0,
-  isActive: true
-};
 
-// Grok AI model
-const GROK_MODEL: AIModel = {
-  id: 'grok',
-  name: 'Grok AI',
-  type: 'api',
-  filePath: '',
-  uploadedAt: '',
-  size: 0,
-  isActive: false
-};
+
 
 export class AIModelManager {
   private static instance: AIModelManager;
@@ -68,17 +47,6 @@ export class AIModelManager {
       this.saveModels();
     }
 
-    // Ensure Kilo model exists
-    if (!this.models.find(m => m.id === 'kilo')) {
-      this.models.push(KILO_MODEL);
-      this.saveModels();
-    }
-
-    // Ensure Grok model exists
-    if (!this.models.find(m => m.id === 'grok')) {
-      this.models.push(GROK_MODEL);
-      this.saveModels();
-    }
   }
 
   private saveModels(): void {
@@ -236,15 +204,6 @@ export class AIModelManager {
       return this.generateMockResponse(message, context);
     }
 
-    if (activeModel.id === 'kilo') {
-      // Call Kilo API
-      return this.callKiloAPI(message, context, history);
-    }
-
-    if (activeModel.id === 'grok') {
-      // Call Grok API
-      return this.callGrokAPI(message, context, history);
-    }
 
     if (!this.loadedModel) {
       throw new Error('Model not loaded');
@@ -279,14 +238,6 @@ export class AIModelManager {
       // Fallback to mock
       return this.generateMockResponse(message, context);
     }
-  }
-
-  private async callKiloAPI(message: string, context: string, history: ConversationMessage[]): Promise<string> {
-    return kiloAPI.generateResponse(message, context, history);
-  }
-
-  private async callGrokAPI(message: string, context: string, history: ConversationMessage[]): Promise<string> {
-    return grokAPI.generateResponse(message, context, history);
   }
 
   private generateMockResponse(message: string, context: string): string {

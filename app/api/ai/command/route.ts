@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { message, conversationId } = await request.json();
+    const { message, conversationId, model } = await request.json();
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -125,6 +125,10 @@ export async function POST(request: NextRequest) {
 
     // Get user context
     const context = await getAIContext(session.user.id);
+    // Set active model if provided
+    if (model) {
+      await aiModelManager.setActiveModel(model);
+    }
     const contextSummary = summarizeContext(context);
 
     // Store user message in database

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
+  console.log('GET /api/routines called')
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

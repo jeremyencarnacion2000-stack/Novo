@@ -1,13 +1,10 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { Toaster } from '@/components/ui/toaster'
-import { Providers } from '@/components/providers'
-import { CommandPalette } from '@/components/command-palette'
-import { NetworkStatus } from '@/components/network-status'
+import ClientLayout from './client-layout'
+import { SpotifyProvider } from '@/lib/spotify-context'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Novo - Productivity Hub',
@@ -40,12 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <Providers>
-          {children}
-          <CommandPalette />
-          <NetworkStatus />
-          <Toaster />
-        </Providers>
+        <SpotifyProvider>
+          <ClientLayout>{children}</ClientLayout>
+        </SpotifyProvider>
       </body>
     </html>
   )

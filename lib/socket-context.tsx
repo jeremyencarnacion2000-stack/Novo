@@ -19,28 +19,35 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const { data: session } = useSession()
 
-  useEffect(() => {
-    const socketInstance = io(window.location.origin, {
-      transports: ['websocket', 'polling']
-    })
+  // Temporarily disabled socket initialization until server is deployed
+  // useEffect(() => {
+  //   const socketInstance = io(window.location.origin, {
+  //     transports: ['polling']
+  //   })
 
-    socketInstance.on('connect', () => {
-      setIsConnected(true)
-      if (session?.user?.id) {
-        socketInstance.emit('authenticate', session.user.id)
-      }
-    })
+  //   socketInstance.on('connect', () => {
+  //     console.log('Socket connected')
+  //     setIsConnected(true)
+  //     if (session?.user?.id) {
+  //       socketInstance.emit('authenticate', session.user.id)
+  //     }
+  //   })
 
-    socketInstance.on('disconnect', () => {
-      setIsConnected(false)
-    })
+  //   socketInstance.on('connect_error', (error) => {
+  //     console.error('Socket connection error:', error)
+  //   })
 
-    setSocket(socketInstance)
+  //   socketInstance.on('disconnect', () => {
+  //     console.log('Socket disconnected')
+  //     setIsConnected(false)
+  //   })
 
-    return () => {
-      socketInstance.disconnect()
-    }
-  }, [session?.user?.id])
+  //   setSocket(socketInstance)
+
+  //   return () => {
+  //     socketInstance.disconnect()
+  //   }
+  // }, [session?.user?.id])
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

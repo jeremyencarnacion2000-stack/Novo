@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CLIENT_ID = '5034558b7e60460d90d61876ae407dbf'
 const REDIRECT_URI = process.env.NODE_ENV === 'production'
-  ? 'https://astabot.netlify.app/auth/callback'
+  ? 'https://novo-desktop-mvp.vercel.app/api/spotify/callback'
   : 'http://localhost:3000/api/spotify/callback'
+
+console.log('Redirect URI usado en auth:', REDIRECT_URI)
 
 const SCOPES = [
   'streaming',

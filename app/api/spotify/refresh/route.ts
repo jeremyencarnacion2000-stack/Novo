@@ -8,11 +8,15 @@ export async function POST() {
   const cookieStore = await cookies()
   const refreshToken = cookieStore.get('spotify_refresh_token')?.value
 
+  console.log('POST /api/spotify/refresh: Refresh token exists:', !!refreshToken)
+
   if (!refreshToken) {
+    console.log('POST /api/spotify/refresh: No refresh token found, returning 401')
     return NextResponse.json({ error: 'No refresh token' }, { status: 401 })
   }
 
   try {
+    console.log('POST /api/spotify/refresh: Attempting to refresh token')
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -27,9 +31,15 @@ export async function POST() {
 
     const data = await response.json()
 
+    console.log('POST /api/spotify/refresh: Spotify response status:', response.status)
+    console.log('POST /api/spotify/refresh: Response data:', data)
+
     if (!response.ok) {
+      console.log('POST /api/spotify/refresh: Failed to refresh token, status:', response.status)
       return NextResponse.json({ error: 'Failed to refresh token' }, { status: response.status })
     }
+
+    console.log('POST /api/spotify/refresh: Token refreshed successfully, updating cookies')
 
     // Update cookies
     const res = NextResponse.json({ access_token: data.access_token })
@@ -37,6 +47,7 @@ export async function POST() {
     res.cookies.set('spotify_access_token', data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
       maxAge: data.expires_in
     })
 
@@ -44,6 +55,7 @@ export async function POST() {
       res.cookies.set('spotify_refresh_token', data.refresh_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
+        sameSite: 'none',
         maxAge: 60 * 60 * 24 * 30 // 30 days
       })
     }

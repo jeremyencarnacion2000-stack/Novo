@@ -6,6 +6,8 @@ declare global {
 
 const connectionString = process.env.DATABASE_URL!
 
+console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL)
+
 export const prisma = global.__prisma ?? new PrismaClient()
 
 if (process.env.NODE_ENV !== 'production') global.__prisma = prisma

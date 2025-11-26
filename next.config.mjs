@@ -1,15 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbopack: {
-    root: process.cwd(),
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
+    unoptimized: false,
   },
-  serverExternalPackages: ['bcrypt'],
+  experimental: {
+    optimizePackageImports: ['@xenova/transformers'],
+  },
+  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma'],
+  // Optimize for Vercel serverless functions
+  poweredByHeader: false,
+  webpack: (config) => {
+    config.resolve.alias['sharp$'] = false;
+    return config;
+  },
 }
 
 export default nextConfig

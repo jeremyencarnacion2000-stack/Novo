@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  engineType = "binary"
 }
 
 datasource db {
@@ -59,6 +59,7 @@ model User {
   userSessions   UserSession[]
   dailyAnalytics DailyAnalytics[]
   conversations  Conversation[]
+  aiConversations AIConversation[]
 }
 
 model VerificationToken {
@@ -257,7 +258,8 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages  Message[]
+  messages    Message[]
+  attachments Attachment[]
 }
 
 model Message {
@@ -267,4 +269,33 @@ model Message {
   role           String      // 'user' or 'assistant'
   content        String
   createdAt      DateTime    @default(now())
+
+  attachments Attachment[]
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  messages  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id             String      @id @default(cuid())
+  name           String
+  type           String      // MIME type
+  size           Int         // Size in bytes
+  url            String
+  metadata       Json?       // Additional metadata as JSON
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@map("attachments")
 }

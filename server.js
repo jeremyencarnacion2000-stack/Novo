@@ -1,66 +1,39 @@
-const { createServer } = require('http')
-const { parse } = require('url')
-const next = require('next')
-const { Server } = require('socket.io')
+const express = require('express');
+const axios = require('axios');
 
-const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
-const port = process.env.PORT || 3000
+const app = express();
+app.use(express.json());
 
-const app = next({ dev, hostname, port })
-const handle = app.getRequestHandler()
+const XAI_API_KEY = process.env.XAI_API_KEY; // Clave API de xAI proporcionada
 
-app.prepare().then(() => {
-  const httpServer = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true)
-    handle(req, res, parsedUrl)
-  })
+app.post('/api/generate', async (req, res) => {
+  const { prompt } = req.body;
 
-  const io = new Server(httpServer, {
-    cors: {
-      origin: "http://localhost:3000",
-      methods: ["GET", "POST"]
-    }
-  })
-
-  // Store connected users
-  const connectedUsers = new Map()
-
-  io.on('connection', (socket) => {
-    console.log('User connected:', socket.id)
-
-    // Authenticate user
-    socket.on('authenticate', (userId) => {
-      connectedUsers.set(socket.id, userId)
-      socket.join(`user-${userId}`)
-      console.log(`User ${userId} authenticated`)
-    })
-
-    // Handle data updates
-    socket.on('data-update', (data) => {
-      const userId = connectedUsers.get(socket.id)
-      if (userId) {
-        // Broadcast to all user's devices
-        socket.to(`user-${userId}`).emit('data-update', data)
+  try {
+    const response = await axios.post('https://api.x.ai/v1/chat/completions', {
+      model: 'grok-3',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.7
+    }, {
+      headers: {
+        'Authorization': `Bearer ${XAI_API_KEY}`,
+        'Content-Type': 'application/json'
       }
-    })
+    });
 
-    // Handle task completion
-    socket.on('task-completed', (data) => {
-      const userId = connectedUsers.get(socket.id)
-      if (userId) {
-        socket.to(`user-${userId}`).emit('task-completed', data)
-      }
-    })
+    res.json({ output: response.data.choices[0].message.content });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error generating response' });
+  }
+});
 
-    socket.on('disconnect', () => {
-      connectedUsers.delete(socket.id)
-      console.log('User disconnected:', socket.id)
-    })
-  })
-
-  httpServer.listen(port, (err) => {
-    if (err) throw err
-    console.log(`> Ready on http://${hostname}:${port}`)
-  })
-})
+app.listen(3001, () => {
+  console.log('Server running on port 3001');
+});

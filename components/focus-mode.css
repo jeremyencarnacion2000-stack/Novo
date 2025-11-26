@@ -1,0 +1,17 @@
+.focus-mode-minimized {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1000;
+  transform: scale(0.8);
+  right: 10px;
+  top: 10px;
+}

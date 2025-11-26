@@ -4,16 +4,21 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { DashboardShell } from "@/components/dashboard-shell"
 
 export default function ProfilePage() {
   const { data: session } = useSession()
 
   if (!session) {
-    return <div>Please sign in to view your profile.</div>
+    return (
+      <DashboardShell>
+        <div>Please sign in to view your profile.</div>
+      </DashboardShell>
+    )
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <DashboardShell>
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardHeader>
@@ -56,6 +61,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DashboardShell>
   )
 }

@@ -7,10 +7,14 @@ import { RecentActivity } from '@/components/recent-activity'
 import { DashboardHabits } from '@/components/dashboard-habits'
 import { useSettings } from '@/lib/settings-context'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
   const { settings } = useSettings()
   const [greeting, setGreeting] = useState('Welcome back')
+  const { data: session, status } = useSession()
+  const router = useRouter()
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -22,6 +26,14 @@ export default function DashboardPage() {
       setGreeting('Good evening')
     }
   }, [])
+
+  useEffect(() => {
+    if (status !== 'loading' && !session) {
+      router.push('/auth/signup')
+    }
+  }, [session, status, router])
+
+  if (!session) return null
 
   return (
     <DashboardShell>

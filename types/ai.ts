@@ -3,6 +3,14 @@ export interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  attachments?: FileAttachment[];
+}
+
+export interface FileAttachment {
+  name: string;
+  size: number;
+  type: string;
+  url: string;
 }
 
 export interface AIModel {

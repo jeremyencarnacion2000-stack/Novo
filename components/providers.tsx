@@ -3,8 +3,10 @@
 import { useEffect } from "react"
 import { SessionProvider } from "next-auth/react"
 import { SettingsProvider } from "@/lib/settings-context"
+import { FocusProvider } from "@/lib/focus-context"
 import { SocketProvider } from "@/lib/socket-context"
 import { NotificationProvider } from "@/lib/notification-context"
+import { FocusTimerWidget } from "@/components/focus-timer-widget"
 
 function ServiceWorkerProvider() {
   useEffect(() => {
@@ -28,7 +30,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <SettingsProvider>
         <NotificationProvider>
           <SocketProvider>
-            {children}
+            <FocusProvider>
+              <FocusTimerWidget />
+              {children}
+            </FocusProvider>
           </SocketProvider>
         </NotificationProvider>
       </SettingsProvider>

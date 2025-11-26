@@ -26,3 +26,51 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { title, messages } = await request.json()
+
+    // Crear la conversación
+    const conversation = await prisma.conversation.create({
+      data: {
+        userId: session.user.id,
+        title: title || 'Nueva Conversación'
+      }
+    })
+
+    // Si hay mensajes, crearlos
+    if (messages && Array.isArray(messages)) {
+      const messageData = messages.map((msg: any) => ({
+        conversationId: conversation.id,
+        role: msg.role,
+        content: msg.content,
+        createdAt: new Date(msg.timestamp || Date.now())
+      }))
+
+      await prisma.message.createMany({
+        data: messageData
+      })
+    }
+
+    // Retornar la conversación completa
+    const fullConversation = await prisma.conversation.findUnique({
+      where: { id: conversation.id },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    })
+
+    return NextResponse.json(fullConversation)
+  } catch (error) {
+    console.error('Error creating conversation:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

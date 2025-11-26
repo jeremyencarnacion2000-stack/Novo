@@ -1,0 +1,28 @@
+.chatbot-panel {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  width: 400px;
+  height: 600px;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.chatbot-panel.minimized {
+  transform: scale(0.7);
+  right: 10px;
+  top: 10px;
+  width: 280px;
+  height: 420px;
+}
+
+.chatbot-panel.open {
+  display: flex;
+}
