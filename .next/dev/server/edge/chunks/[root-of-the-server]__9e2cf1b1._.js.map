@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 16, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/Downloads/novo-desktop-mvp (2)/middleware.ts"],"sourcesContent":["import { withAuth } from \"next-auth/middleware\"\r\n\r\nexport default withAuth(\r\n  function middleware(req) {\r\n    // Add any additional middleware logic here\r\n  },\r\n  {\r\n    callbacks: {\r\n      authorized: ({ token }) => !!token\r\n    },\r\n  }\r\n)\r\n\r\nexport const config = {\r\n  matcher: [\r\n    \"/((?!api/auth|_next/static|_next/image|favicon.ico|auth/signin|auth/signup).*)\",\r\n  ]\r\n}"],"names":[],"mappings":";;;;;;AAAA;;uCAEe,IAAA,0TAAQ,EACrB,SAAS,WAAW,GAAG;AACrB,2CAA2C;AAC7C,GACA;IACE,WAAW;QACT,YAAY,CAAC,EAAE,KAAK,EAAE,GAAK,CAAC,CAAC;IAC/B;AACF;AAGK,MAAM,SAAS;IACpB,SAAS;QACP;KACD;AACH"}}]
-}
