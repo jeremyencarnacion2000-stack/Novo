@@ -121,34 +121,34 @@
   * {
     @apply border-border outline-ring/50;
   }
-  
-  html, body {
+
+  html,
+  body {
     height: 100%;
-    overflow: hidden;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-  
+
   /* Add compact mode styles */
   .compact-mode .dashboard-shell {
     @apply gap-4;
   }
-  
+
   .compact-mode .card {
     @apply p-4;
   }
-  
+
   .compact-mode h1 {
     @apply text-2xl;
   }
-  
+
   .compact-mode h2 {
     @apply text-xl;
   }
-  
+
   /* Add animation control */
   .no-animations * {
     animation-duration: 0s !important;
