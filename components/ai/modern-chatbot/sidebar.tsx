@@ -27,7 +27,7 @@ export function Sidebar() {
                 }`}
         >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
                 {!sidebarCollapsed && (
                     <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>
                 )}
@@ -47,7 +47,7 @@ export function Sidebar() {
             {!sidebarCollapsed && (
                 <>
                     {/* Search */}
-                    <div className="p-3">
+                    <div className="p-3 flex-shrink-0">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
@@ -61,7 +61,7 @@ export function Sidebar() {
                     </div>
 
                     {/* New Conversation Button */}
-                    <div className="px-3 pb-3">
+                    <div className="px-3 pb-3 flex-shrink-0">
                         <button
                             onClick={createConversation}
                             className="w-full flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
@@ -71,8 +71,8 @@ export function Sidebar() {
                         </button>
                     </div>
 
-                    {/* Conversations List */}
-                    <div className="flex-1 overflow-y-auto px-3 space-y-1">
+                    {/* Conversations List - NOW WITH INDEPENDENT SCROLL */}
+                    <div className="flex-1 overflow-y-auto px-3 space-y-1 min-h-0">
                         {filteredConversations.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground text-sm">
                                 {searchQuery ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
@@ -82,8 +82,8 @@ export function Sidebar() {
                                 <div
                                     key={conv.id}
                                     className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${currentConversationId === conv.id
-                                            ? 'bg-accent text-accent-foreground'
-                                            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                                        ? 'bg-accent text-accent-foreground'
+                                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                                         }`}
                                     onClick={() => setCurrentConversationId(conv.id)}
                                 >
