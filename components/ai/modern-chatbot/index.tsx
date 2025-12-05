@@ -10,8 +10,8 @@ import { ModelSelector } from './model-selector';
 export function ModernChatbot() {
     return (
         <ChatbotProvider>
-            <div className="flex h-full bg-background text-foreground overflow-hidden">
-                {/* Sidebar - Con scroll independiente */}
+            <div className="flex h-screen bg-background text-foreground overflow-hidden">
+                {/* Sidebar - Con scroll independiente - FIXED */}
                 <Sidebar />
 
                 {/* Main Chat Area - Con scroll independiente */}
