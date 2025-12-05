@@ -3,6 +3,7 @@
 import React from 'react';
 import { Send, Paperclip, Mic, MicOff, Loader2, Camera, Image, FileText, X, Globe } from 'lucide-react';
 import { useChatbot } from './context';
+import { useToast } from '@/hooks/use-toast';
 
 const SUGGESTIONS = [
     'Crear una tarea',
@@ -17,17 +18,23 @@ const SUGGESTIONS = [
 
 export function ChatInput() {
     const { sendMessage, isLoading, currentConversationId, createConversation } = useChatbot();
+    const { toast } = useToast();
     const [input, setInput] = React.useState('');
     const [showAttachments, setShowAttachments] = React.useState(false);
     const [isRecording, setIsRecording] = React.useState(false);
     const [webSearchEnabled, setWebSearchEnabled] = React.useState(false);
     const [showVoiceAnimation, setShowVoiceAnimation] = React.useState(false);
     const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
+    const [audioBlob, setAudioBlob] = React.useState<Blob | null>(null);
+    const [recordingTime, setRecordingTime] = React.useState(0);
 
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const cameraInputRef = React.useRef<HTMLInputElement>(null);
     const photoInputRef = React.useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+    const audioChunksRef = React.useRef<Blob[]>([]);
+    const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
     // Auto-resize textarea
     React.useEffect(() => {
@@ -36,6 +43,18 @@ export function ChatInput() {
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
     }, [input]);
+
+    // Cleanup on unmount
+    React.useEffect(() => {
+        return () => {
+            if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+            }
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                mediaRecorderRef.current.stop();
+            }
+        };
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -50,6 +69,8 @@ export function ChatInput() {
         const message = input;
         setInput('');
         setAttachedFiles([]);
+        setAudioBlob(null);
+
         await sendMessage(message);
     };
 
@@ -67,25 +88,89 @@ export function ChatInput() {
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        setAttachedFiles(prev => [...prev, ...files]);
-        setShowAttachments(false);
+        if (files.length > 0) {
+            setAttachedFiles(prev => [...prev, ...files]);
+            setShowAttachments(false);
+            toast({
+                title: "Archivos adjuntados",
+                description: `${files.length} archivo(s) agregado(s)`,
+            });
+        }
     };
 
     const removeFile = (index: number) => {
         setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    const toggleVoiceRecording = () => {
-        if (!isRecording) {
-            // Start recording
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                setAudioBlob(audioBlob);
+
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+
+                toast({
+                    title: "Grabación completada",
+                    description: `${recordingTime}s grabados. La transcripción estará disponible pronto.`,
+                });
+
+                setRecordingTime(0);
+                if (recordingIntervalRef.current) {
+                    clearInterval(recordingIntervalRef.current);
+                }
+            };
+
+            mediaRecorder.start();
             setIsRecording(true);
             setShowVoiceAnimation(true);
-            // TODO: Implement actual voice recording
-        } else {
-            // Stop recording
+
+            // Start timer
+            setRecordingTime(0);
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+
+            toast({
+                title: "Grabando audio",
+                description: "Presiona el micrófono nuevamente para detener",
+            });
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            toast({
+                title: "Error de permisos",
+                description: "No se pudo acceder al micrófono. Verifica los permisos del navegador.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
             setIsRecording(false);
             setShowVoiceAnimation(false);
-            // TODO: Process voice recording
+        }
+    };
+
+    const toggleVoiceRecording = () => {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
         }
     };
 
@@ -115,7 +200,7 @@ export function ChatInput() {
 
                 {/* Voice Animation */}
                 {showVoiceAnimation && (
-                    <div className="mb-4 flex justify-center">
+                    <div className="mb-4 flex flex-col items-center gap-2">
                         <div className={`w-32 h-32 rounded-full bg-destructive/20 flex items-center justify-center ${isRecording ? 'animate-pulse' : ''}`}>
                             <div className="w-24 h-24 rounded-full bg-destructive/40 flex items-center justify-center">
                                 <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center">
@@ -127,6 +212,11 @@ export function ChatInput() {
                                 </div>
                             </div>
                         </div>
+                        {isRecording && (
+                            <div className="text-destructive font-mono text-lg font-bold">
+                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -199,8 +289,8 @@ export function ChatInput() {
                                     type="button"
                                     onClick={toggleVoiceRecording}
                                     className={`p-2 rounded-lg transition-all ${isRecording
-                                            ? 'bg-destructive/20 hover:bg-destructive/30'
-                                            : 'hover:bg-accent'
+                                        ? 'bg-destructive/20 hover:bg-destructive/30'
+                                        : 'hover:bg-accent'
                                         }`}
                                     title={isRecording ? 'Detener grabación' : 'Grabar voz'}
                                     disabled={isLoading}
