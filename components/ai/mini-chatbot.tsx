@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useChatbot } from './modern-chatbot/context';
 import './mini-chatbot.css';
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -10,7 +9,7 @@ export function MiniChatbot() {
     const [isExpanded, setIsExpanded] = useState(false);
     const [input, setInput] = useState('');
     const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
-    const { sendMessage, isLoading } = useChatbot();
+    const [isLoading, setIsLoading] = useState(false);
 
     // Detectar hora del día
     useEffect(() => {
@@ -36,13 +35,40 @@ export function MiniChatbot() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isLoading || timeOfDay === 'night') return;
 
         const message = input;
         setInput('');
-        await sendMessage(message);
-        // Colapsar después de enviar
-        setTimeout(() => setIsExpanded(false), 2000);
+        setIsLoading(true);
+
+        try {
+            // Llamar directamente al API del chatbot
+            const response = await fetch('/api/ai/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    model: 'grok-beta', // Usar Grok por defecto
+                    conversationHistory: [], // Sin historial por ahora
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('AI Response:', data);
+                // Aquí podrías mostrar la respuesta en un toast o notificación
+            } else {
+                console.error('Error from API:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+        } finally {
+            setIsLoading(false);
+            // Colapsar después de enviar
+            setTimeout(() => setIsExpanded(false), 2000);
+        }
     };
 
     const getPlaceholder = () => {
