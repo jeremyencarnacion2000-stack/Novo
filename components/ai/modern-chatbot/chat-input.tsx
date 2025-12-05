@@ -116,17 +116,49 @@ export function ChatInput() {
                 }
             };
 
-            mediaRecorder.onstop = () => {
+            mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 setAudioBlob(audioBlob);
 
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
 
+                // Transcribe audio automatically
                 toast({
-                    title: "Grabación completada",
-                    description: `${recordingTime}s grabados. La transcripción estará disponible pronto.`,
+                    title: "Transcribiendo audio...",
+                    description: "Un momento por favor",
                 });
+
+                try {
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob);
+
+                    const response = await fetch('/api/ai/transcribe', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.text) {
+                            setInput(prev => prev + (prev ? ' ' : '') + data.text);
+                            toast({
+                                title: "¡Transcripción completada!",
+                                description: `Texto agregado al chat`,
+                            });
+                            textareaRef.current?.focus();
+                        }
+                    } else {
+                        throw new Error('Error en la transcripción');
+                    }
+                } catch (error) {
+                    console.error('Transcription error:', error);
+                    toast({
+                        title: "Error de transcripción",
+                        description: "No se pudo transcribir el audio. Intenta de nuevo.",
+                        variant: "destructive"
+                    });
+                }
 
                 setRecordingTime(0);
                 if (recordingIntervalRef.current) {
