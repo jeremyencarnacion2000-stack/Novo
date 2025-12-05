@@ -224,43 +224,19 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             const data = await response.json();
             const fullContent = data.content;
 
-            // Iniciar typing indicator
+            // Stop typing indicator
             setIsTyping(false);
 
-            // Crear mensaje streaming
-            const messageId = crypto.randomUUID();
-            const baseMessage: Message = {
-                id: messageId,
+            // Create and show response instantly (no slow streaming)
+            const assistantMessage: Message = {
+                id: crypto.randomUUID(),
                 role: 'assistant',
-                content: '',
+                content: fullContent,
                 timestamp: new Date().toISOString(),
                 model: selectedModel
             };
 
-            // Simular efecto de typing letra por letra
-            const words = fullContent.split(' ');
-            let currentText = '';
-
-            for (let i = 0; i < words.length; i++) {
-                currentText += (i > 0 ? ' ' : '') + words[i];
-                setStreamingMessage({
-                    ...baseMessage,
-                    content: currentText
-                });
-
-                // Delay entre palabras (más rápido para textos largos)
-                const delay = words.length > 100 ? 15 : 30;
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-
-            // Mensaje final completo
-            const assistantMessage: Message = {
-                ...baseMessage,
-                content: fullContent
-            };
-
-            // Limpiar streaming y agregar mensaje final
-            setStreamingMessage(null);
+            // Add message instantly
             updateConversation(currentConversationId, {
                 messages: [...messages, userMessage, assistantMessage]
             });
