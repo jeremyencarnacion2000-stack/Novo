@@ -73,6 +73,7 @@ model User {
   grades Grade[]
   focusSessions FocusSession[]
   deals Deal[]
+  templates Template[]
 }
 
 model VerificationToken {
@@ -582,3 +583,22 @@ model FocusSession {
   @@map("focus_sessions")
 }
 
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // 'routine' | 'project' | 'checklist'
+  category    String?  // 'productivity' | 'health' | 'business' | 'personal' | 'custom'
+  content     Json     // Stores the template data structure
+  isPublic    Boolean  @default(false)
+  usageCount  Int      @default(0)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([isPublic])
+  @@map("templates")
+}
