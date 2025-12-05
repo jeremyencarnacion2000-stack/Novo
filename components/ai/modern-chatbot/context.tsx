@@ -26,6 +26,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
 
     const availableModels: AIModel[] = [
         {
@@ -221,21 +222,52 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             }
 
             const data = await response.json();
+            const fullContent = data.content;
 
-            const assistantMessage: Message = {
-                id: crypto.randomUUID(),
+            // Iniciar typing indicator
+            setIsTyping(false);
+
+            // Crear mensaje streaming
+            const messageId = crypto.randomUUID();
+            const baseMessage: Message = {
+                id: messageId,
                 role: 'assistant',
-                content: data.content,
+                content: '',
                 timestamp: new Date().toISOString(),
                 model: selectedModel
             };
 
+            // Simular efecto de typing letra por letra
+            const words = fullContent.split(' ');
+            let currentText = '';
+
+            for (let i = 0; i < words.length; i++) {
+                currentText += (i > 0 ? ' ' : '') + words[i];
+                setStreamingMessage({
+                    ...baseMessage,
+                    content: currentText
+                });
+
+                // Delay entre palabras (más rápido para textos largos)
+                const delay = words.length > 100 ? 15 : 30;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+
+            // Mensaje final completo
+            const assistantMessage: Message = {
+                ...baseMessage,
+                content: fullContent
+            };
+
+            // Limpiar streaming y agregar mensaje final
+            setStreamingMessage(null);
             updateConversation(currentConversationId, {
                 messages: [...messages, userMessage, assistantMessage]
             });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error desconocido');
             console.error('Send message error:', err);
+            setStreamingMessage(null);
         } finally {
             setIsLoading(false);
             setIsTyping(false);
@@ -292,6 +324,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         availableModels,
         isLoading,
         isTyping,
+        streamingMessage,
         error
     };
 

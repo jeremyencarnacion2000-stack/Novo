@@ -10,14 +10,14 @@ import { ModelSelector } from './model-selector';
 export function ModernChatbot() {
     return (
         <ChatbotProvider>
-            <div className="flex h-full bg-background text-foreground">
-                {/* Sidebar */}
+            <div className="flex h-full bg-background text-foreground overflow-hidden">
+                {/* Sidebar - Con scroll independiente */}
                 <Sidebar />
 
-                {/* Main Chat Area */}
-                <div className="flex-1 flex flex-col relative">
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
+                {/* Main Chat Area - Con scroll independiente */}
+                <div className="flex-1 flex flex-col relative min-w-0">
+                    {/* Header - Fijo */}
+                    <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                             <h1 className="text-lg font-semibold">AI Chat</h1>
                         </div>
@@ -25,10 +25,10 @@ export function ModernChatbot() {
                         <ModelSelector />
                     </div>
 
-                    {/* Messages */}
+                    {/* Messages - Scrollable independiente */}
                     <ChatArea />
 
-                    {/* Input */}
+                    {/* Input - Fijo en bottom */}
                     <ChatInput />
                 </div>
 

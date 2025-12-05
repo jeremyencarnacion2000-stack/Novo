@@ -6,13 +6,13 @@ import { useChatbot } from './context';
 import { Message } from './message';
 
 export function ChatArea() {
-    const { messages, isTyping, retryMessage, likeMessage, dislikeMessage } = useChatbot();
+    const { messages, isTyping, streamingMessage, retryMessage, likeMessage, dislikeMessage } = useChatbot();
     const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom
     React.useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping]);
+    }, [messages, isTyping, streamingMessage]);
 
     const handleCopy = async (content: string) => {
         try {
@@ -23,8 +23,8 @@ export function ChatArea() {
     };
 
     return (
-        <div className="flex-1 overflow-y-auto">
-            {messages.length === 0 ? (
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+            {messages.length === 0 && !streamingMessage ? (
                 <div className="flex items-center justify-center h-full">
                     <div className="text-center max-w-md px-6">
                         <h2 className="text-2xl font-bold text-foreground mb-2">¡Bienvenido!</h2>
@@ -46,7 +46,20 @@ export function ChatArea() {
                         />
                     ))}
 
-                    {isTyping && (
+                    {/* Streaming message (mensaje que está siendo escrito) */}
+                    {streamingMessage && (
+                        <Message
+                            key="streaming"
+                            message={streamingMessage}
+                            onCopy={() => { }}
+                            onRetry={() => { }}
+                            onLike={() => { }}
+                            onDislike={() => { }}
+                        />
+                    )}
+
+                    {/* Typing indicator (cuando está pensando, antes de empezar a escribir) */}
+                    {isTyping && !streamingMessage && (
                         <div className="flex gap-4 px-6 py-6 bg-accent/20">
                             <div className="flex-shrink-0">
                                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">

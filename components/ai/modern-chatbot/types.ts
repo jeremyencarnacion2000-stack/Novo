@@ -65,6 +65,7 @@ export interface ChatbotContextType {
     // Loading states
     isLoading: boolean;
     isTyping: boolean;
+    streamingMessage: Message | null;
     error: string | null;
 }
 
