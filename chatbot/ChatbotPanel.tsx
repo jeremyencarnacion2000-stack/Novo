@@ -1,3 +1,5 @@
+'use client';
+
 import './chat-styles.css';
 import React, { useState, useEffect } from 'react';
 import { ConversationMessage } from '@/types/ai';
