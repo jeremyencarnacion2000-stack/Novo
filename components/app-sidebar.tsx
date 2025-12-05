@@ -33,6 +33,11 @@ const navigation = [
         icon: LayoutDashboard,
       },
       {
+        title: 'Today',
+        href: '/today',
+        icon: Calendar,
+      },
+      {
         title: 'Analytics',
         href: '/analytics',
         icon: BarChart3,

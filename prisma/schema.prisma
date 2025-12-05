@@ -96,6 +96,9 @@ model ChecklistItem {
   text      String
   completed Boolean  @default(false)
   priority  String   // 'low' | 'medium' | 'high'
+  source    String   @default("manual") // 'manual' | 'routine' | 'project' | 'school'
+  sourceId  String?  // ID of source item (routineId, projectId, etc.)
+  dueDate   DateTime? // For sorting and filtering by date
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   taskId    String?
@@ -159,6 +162,8 @@ model Subtask {
   id        String   @id @default(cuid())
   title     String
   completed Boolean  @default(false)
+  dueDate   DateTime? // For showing in Today view
+  priority  String?   // Inherited from project or custom
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedAt DateTime @updatedAt
