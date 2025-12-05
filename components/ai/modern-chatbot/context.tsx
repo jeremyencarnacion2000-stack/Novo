@@ -22,7 +22,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
-    const [selectedModel, setSelectedModel] = useState('grok-beta');
+    const [selectedModel, setSelectedModel] = useState('qwen3-next-80b'); // Changed to HuggingFace Qwen3 as default
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
