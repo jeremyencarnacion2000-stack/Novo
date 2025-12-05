@@ -1,4 +1,4 @@
-/* Mini Chatbot 3D Effects - Smaller version */
+/* Mini Chatbot 3D Effects - Smaller version with time-based expressions */
 .mini-chatbot-container {
   --perspective: 1000px;
   --translateY: 35px;
@@ -82,6 +82,10 @@
   opacity: 0;
 }
 
+.container-wrap input:checked+.card .sleeping-z {
+  opacity: 0;
+}
+
 .container-wrap input:checked+.card .content-card {
   width: 200px;
   height: 130px;
@@ -115,6 +119,11 @@
   box-shadow:
     0 10px 40px rgba(0, 0, 60, 0.25),
     inset 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Night mode - darker background */
+.card.night .background-blur-balls {
+  background-color: rgba(20, 20, 40, 0.9);
 }
 
 .background-blur-balls {
@@ -194,6 +203,7 @@
   backdrop-filter: blur(50px);
 }
 
+/* Different eye expressions based on time of day */
 .eyes {
   position: absolute;
   left: 50%;
@@ -214,6 +224,59 @@
   border-radius: 12px;
   animation: animate-eyes 10s infinite linear;
   transition: all 0.3s ease;
+}
+
+/* Morning - wide awake eyes */
+.eyes.morning .eye {
+  height: 40px;
+  animation: animate-eyes-morning 8s infinite linear;
+}
+
+/* Afternoon - normal eyes */
+.eyes.afternoon .eye {
+  height: 36px;
+}
+
+/* Evening - slightly tired */
+.eyes.evening .eye {
+  height: 30px;
+  animation: animate-eyes-tired 6s infinite linear;
+}
+
+/* Sleeping Z's for night */
+.sleeping-z {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+}
+
+.sleeping-z .z {
+  position: absolute;
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+  opacity: 0;
+  left: 20px;
+  bottom: 20px;
+}
+
+.sleeping-z .z-1 {
+  animation: swayUpToRight 2s ease-out infinite;
+}
+
+.sleeping-z .z-2 {
+  animation: swayUpToRight 2s ease-out 0.5s infinite;
+}
+
+.sleeping-z .z-3 {
+  animation: swayUpToRight 2s ease-out 1s infinite;
+}
+
+.sleeping-z .z-4 {
+  animation: swayUpToRight 2s ease-out 1.5s infinite;
 }
 
 .eyes.happy {
@@ -276,6 +339,11 @@
   padding: 8px;
   resize: none;
   outline: none;
+}
+
+.card .chat .chat-bot textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .card .chat .chat-bot textarea::-webkit-scrollbar {
@@ -350,6 +418,11 @@
   transition: all 0.15s ease;
 }
 
+.card .chat .options .btn-submit:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .card .chat .options .btn-submit i {
   width: 24px;
   height: 24px;
@@ -369,11 +442,11 @@
   height: 100%;
 }
 
-.card .chat .options .btn-submit:hover {
+.card .chat .options .btn-submit:hover:not(:disabled) {
   opacity: 1;
 }
 
-.card .chat .options .btn-submit:hover svg {
+.card .chat .options .btn-submit:hover:not(:disabled) svg {
   color: #f3f6fd;
   filter: drop-shadow(0 0 5px #ffffff);
 }
@@ -384,7 +457,7 @@
   transform: scale(1.2) rotate(45deg) translateX(-2px) translateY(1px);
 }
 
-.card .chat .options .btn-submit:active {
+.card .chat .options .btn-submit:active:not(:disabled) {
   transform: scale(0.92);
 }
 
@@ -496,7 +569,7 @@
 }
 
 .mini-chatbot-container .hover-area:nth-child(7):hover~.container-wrap .card .container-ai-chat .chat .options button,
-.mini-chatbot-container .hover-area:nth-child(7):hover~.container-wrap .card .container-ai-chat .chat .chat-bot {
+.mini-chatbot-container .hover-area:nth-child(7):hover~.container-wrap .card .container-ai-chat .chat .chat {
   transform: perspective(var(--perspective)) rotateX(0deg) rotateY(-4deg) translateZ(var(--translateY)) scale3d(1, 1, 1);
 }
 
@@ -562,5 +635,55 @@
   48%,
   98% {
     height: 16px;
+  }
+}
+
+@keyframes animate-eyes-morning {
+
+  0%,
+  100% {
+    height: 40px;
+  }
+
+  50% {
+    height: 42px;
+  }
+}
+
+@keyframes animate-eyes-tired {
+
+  0%,
+  100% {
+    height: 30px;
+  }
+
+  50% {
+    height: 26px;
+  }
+}
+
+@keyframes swayUpToRight {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(60px, -80px) rotate(30deg);
+    opacity: 0;
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }
