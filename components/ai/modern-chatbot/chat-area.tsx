@@ -27,8 +27,8 @@ export function ChatArea() {
             {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                     <div className="text-center max-w-md px-6">
-                        <h2 className="text-2xl font-bold text-white mb-2">¡Bienvenido!</h2>
-                        <p className="text-zinc-400">
+                        <h2 className="text-2xl font-bold text-foreground mb-2">¡Bienvenido!</h2>
+                        <p className="text-muted-foreground">
                             Comienza una conversación para empezar a chatear con la IA.
                         </p>
                     </div>
@@ -47,21 +47,21 @@ export function ChatArea() {
                     ))}
 
                     {isTyping && (
-                        <div className="flex gap-4 px-6 py-6 bg-zinc-900/20">
+                        <div className="flex gap-4 px-6 py-6 bg-accent/20">
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center">
-                                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                                    <Loader2 className="w-5 h-5 text-primary-foreground animate-spin" />
                                 </div>
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-semibold text-white">AI</span>
-                                    <span className="text-xs text-zinc-500">pensando...</span>
+                                    <span className="text-sm font-semibold text-foreground">AI</span>
+                                    <span className="text-xs text-muted-foreground">pensando...</span>
                                 </div>
                                 <div className="flex gap-1">
-                                    <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                    <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
                             </div>
                         </div>

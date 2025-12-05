@@ -154,8 +154,64 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 body: JSON.stringify({
                     message: content,
                     history: messages,
-                    systemPrompt: 'Eres un asistente útil y profesional. Responde en español de manera clara y concisa.',
-                    tools: [],
+                    systemPrompt: 'Eres un asistente útil y profesional que puede ayudar a gestionar tareas, proyectos y rutinas. Responde en español de manera clara y concisa. Cuando el usuario te pida crear una tarea, proyecto o rutina, usa las herramientas disponibles para hacerlo.',
+                    tools: [
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'create_task',
+                                description: 'Crear una nueva tarea en el sistema',
+                                parameters: {
+                                    type: 'object',
+                                    properties: {
+                                        title: { type: 'string', description: 'Título de la tarea' },
+                                        status: { type: 'string', enum: ['todo', 'in-progress', 'done'], description: 'Estado de la tarea' },
+                                        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Prioridad de la tarea' },
+                                        dueDate: { type: 'string', description: 'Fecha de vencimiento en formato ISO' },
+                                        projectId: { type: 'string', description: 'ID del proyecto asociado' },
+                                        tags: { type: 'array', items: { type: 'string' }, description: 'Etiquetas de la tarea' }
+                                    },
+                                    required: ['title']
+                                }
+                            }
+                        },
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'create_project',
+                                description: 'Crear un nuevo proyecto en el sistema',
+                                parameters: {
+                                    type: 'object',
+                                    properties: {
+                                        title: { type: 'string', description: 'Título del proyecto' },
+                                        description: { type: 'string', description: 'Descripción del proyecto' },
+                                        status: { type: 'string', enum: ['not-started', 'in-progress', 'completed'], description: 'Estado del proyecto' },
+                                        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Prioridad del proyecto' },
+                                        dueDate: { type: 'string', description: 'Fecha de vencimiento en formato ISO' },
+                                        tags: { type: 'array', items: { type: 'string' }, description: 'Etiquetas del proyecto' }
+                                    },
+                                    required: ['title']
+                                }
+                            }
+                        },
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'create_routine',
+                                description: 'Crear una nueva rutina en el sistema',
+                                parameters: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string', description: 'Nombre de la rutina' },
+                                        description: { type: 'string', description: 'Descripción de la rutina' },
+                                        timeOfDay: { type: 'string', enum: ['morning', 'afternoon', 'evening', 'night'], description: 'Momento del día para la rutina' },
+                                        duration: { type: 'number', description: 'Duración en minutos' }
+                                    },
+                                    required: ['name', 'timeOfDay', 'duration']
+                                }
+                            }
+                        }
+                    ],
                     model: selectedModel
                 })
             });

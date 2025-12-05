@@ -21,16 +21,16 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
     const isUser = message.role === 'user';
 
     return (
-        <div className={`group flex gap-4 px-6 py-6 hover:bg-zinc-900/30 transition-colors ${isUser ? '' : 'bg-zinc-900/20'
+        <div className={`group flex gap-4 px-6 py-6 hover:bg-accent/30 transition-colors ${isUser ? '' : 'bg-accent/10'
             }`}>
             {/* Avatar */}
             <div className="flex-shrink-0">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isUser ? 'bg-zinc-700' : 'bg-orange-600'
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isUser ? 'bg-secondary' : 'bg-primary'
                     }`}>
                     {isUser ? (
-                        <User className="w-5 h-5 text-white" />
+                        <User className="w-5 h-5 text-secondary-foreground" />
                     ) : (
-                        <Bot className="w-5 h-5 text-white" />
+                        <Bot className="w-5 h-5 text-primary-foreground" />
                     )}
                 </div>
             </div>
@@ -38,24 +38,24 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
             {/* Content */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold text-white">
+                    <span className="text-sm font-semibold text-foreground">
                         {isUser ? 'Tú' : 'AI'}
                     </span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-muted-foreground">
                         {new Date(message.timestamp).toLocaleTimeString('es-ES', {
                             hour: '2-digit',
                             minute: '2-digit'
                         })}
                     </span>
                     {message.model && (
-                        <span className="text-xs text-zinc-600 px-2 py-0.5 bg-zinc-800 rounded">
+                        <span className="text-xs text-muted-foreground px-2 py-0.5 bg-secondary rounded">
                             {message.model}
                         </span>
                     )}
                 </div>
 
                 {/* Message content with markdown */}
-                <div className="prose prose-invert prose-sm max-w-none">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -72,32 +72,32 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                         {String(children).replace(/\n$/, '')}
                                     </SyntaxHighlighter>
                                 ) : (
-                                    <code className="px-1.5 py-0.5 bg-zinc-800 rounded text-orange-400" {...props}>
+                                    <code className="px-1.5 py-0.5 bg-secondary rounded text-primary" {...props}>
                                         {children}
                                     </code>
                                 );
                             },
                             p({ children }) {
-                                return <p className="mb-4 last:mb-0 leading-7 text-zinc-200">{children}</p>;
+                                return <p className="mb-4 last:mb-0 leading-7 text-foreground">{children}</p>;
                             },
                             ul({ children }) {
-                                return <ul className="list-disc list-inside mb-4 space-y-1 text-zinc-200">{children}</ul>;
+                                return <ul className="list-disc list-inside mb-4 space-y-1 text-foreground">{children}</ul>;
                             },
                             ol({ children }) {
-                                return <ol className="list-decimal list-inside mb-4 space-y-1 text-zinc-200">{children}</ol>;
+                                return <ol className="list-decimal list-inside mb-4 space-y-1 text-foreground">{children}</ol>;
                             },
                             h1({ children }) {
-                                return <h1 className="text-2xl font-bold mb-4 mt-6 text-white">{children}</h1>;
+                                return <h1 className="text-2xl font-bold mb-4 mt-6 text-foreground">{children}</h1>;
                             },
                             h2({ children }) {
-                                return <h2 className="text-xl font-bold mb-3 mt-5 text-white">{children}</h2>;
+                                return <h2 className="text-xl font-bold mb-3 mt-5 text-foreground">{children}</h2>;
                             },
                             h3({ children }) {
-                                return <h3 className="text-lg font-bold mb-2 mt-4 text-white">{children}</h3>;
+                                return <h3 className="text-lg font-bold mb-2 mt-4 text-foreground">{children}</h3>;
                             },
                             blockquote({ children }) {
                                 return (
-                                    <blockquote className="border-l-4 border-orange-600 pl-4 italic my-4 text-zinc-300">
+                                    <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-muted-foreground">
                                         {children}
                                     </blockquote>
                                 );
@@ -105,19 +105,19 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                             table({ children }) {
                                 return (
                                     <div className="overflow-x-auto my-4">
-                                        <table className="min-w-full divide-y divide-zinc-700">{children}</table>
+                                        <table className="min-w-full divide-y divide-border">{children}</table>
                                     </div>
                                 );
                             },
                             th({ children }) {
                                 return (
-                                    <th className="px-4 py-2 bg-zinc-800 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">
+                                    <th className="px-4 py-2 bg-secondary text-left text-xs font-medium text-secondary-foreground uppercase tracking-wider">
                                         {children}
                                     </th>
                                 );
                             },
                             td({ children }) {
-                                return <td className="px-4 py-2 text-sm text-zinc-200 border-t border-zinc-700">{children}</td>;
+                                return <td className="px-4 py-2 text-sm text-foreground border-t border-border">{children}</td>;
                             },
                             a({ href, children }) {
                                 return (
@@ -125,7 +125,7 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                         href={href}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-orange-400 hover:text-orange-300 underline"
+                                        className="text-primary hover:text-primary/80 underline"
                                     >
                                         {children}
                                     </a>
