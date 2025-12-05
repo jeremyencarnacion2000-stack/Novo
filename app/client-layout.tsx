@@ -1,23 +1,21 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { SessionProvider, useSession } from 'next-auth/react'
 import { Toaster } from '@/components/ui/toaster'
 import { CommandPalette } from '@/components/command-palette'
 import { NetworkStatus } from '@/components/network-status'
-import { FloatingChatButton } from '@/components/FloatingChatButton'
 import { useFocus, FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
 import { NotificationProvider } from '@/lib/notification-context'
 import { PomodoroProvider } from '@/lib/pomodoro-context'
 import { PomodoroWidget } from '@/components/pomodoro-widget'
 import { FocusTimerWidget } from '@/components/focus-timer-widget'
-import ChatbotPanel from '@/chatbot/ChatbotPanel'
-import FloatingChatbot from '@/components/ai/floating-chatbot'
 import '@/lib/storage'
 import { FloatingMusicWidget } from '@/components/music/floating-music-widget'
 import { GlobalPlayer } from '@/components/music/global-player'
+import { MiniChatbot } from '@/components/ai/mini-chatbot'
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
@@ -48,7 +46,6 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
   return (
@@ -64,14 +61,10 @@ export default function ClientLayout({
                     <CommandPalette />
                     <NetworkStatus />
                     <Toaster />
-                    <FloatingChatButton isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
-                    {isOpen && <ChatbotPanel isOpen={isOpen} />}
                     <FloatingMusicWidget />
                     <FocusTimerWidget />
                     <PomodoroWidget />
-                    <React.Suspense fallback={null}>
-                      <FloatingChatbot />
-                    </React.Suspense>
+                    <MiniChatbot />
                   </>
                 </GlobalPlayer>
               </AuthWrapper>
