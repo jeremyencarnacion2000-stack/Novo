@@ -69,6 +69,8 @@ model User {
   activityHistories ActivityHistory[]
   fitnessEntries FitnessEntry[]
   workoutEntries WorkoutEntry[]
+  courses Course[]
+  grades Grade[]
 }
 
 model VerificationToken {
@@ -467,3 +469,47 @@ model WorkoutEntry {
   @@index([userId, date])
   @@map("workout_entries")
 }
+
+// School Module - Advanced GPA tracking
+model Course {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  code        String
+  credits     Float
+  semester    String   // e.g., "Fall 2024", "Spring 2025"
+  year        Int
+  professor   String?
+  color       String   @default("#3b82f6")
+  finalGrade  Float?   // Calculated final grade percentage
+  letterGrade String?  // Calculated letter grade (A, B+, etc.)
+  grades      Grade[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([userId, semester, year])
+  @@map("courses")
+}
+
+model Grade {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name        String   // e.g., "Midterm", "Final", "Assignment 1"
+  score       Float    // actual score
+  maxScore    Float    // maximum possible score
+  weight      Float    // percentage weight (0-100)
+  category    String   // "Exam", "Assignment", "Quiz", "Project", "Participation"
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([courseId])
+  @@index([userId])
+  @@map("grades")
+}
+
