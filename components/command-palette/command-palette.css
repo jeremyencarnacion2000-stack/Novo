@@ -1,0 +1,167 @@
+/* Command Palette Styles */
+
+.command-palette {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+    max-width: 640px;
+    width: calc(100vw - 32px);
+    max-height: 500px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Overlay */
+[cmdk-overlay] {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Header */
+.command-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.command-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 16px;
+    color: hsl(var(--foreground));
+}
+
+.command-input::placeholder {
+    color: hsl(var(--muted-foreground));
+}
+
+/* List */
+.command-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+}
+
+.command-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.command-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.command-list::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+}
+
+/* Group */
+.command-group {
+    padding: 4px 0;
+}
+
+[cmdk-group-heading] {
+    padding: 8px 12px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Item */
+.command-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    color: hsl(var(--foreground));
+}
+
+.command-item:hover {
+    background: hsl(var(--accent));
+}
+
+.command-item[aria-selected="true"] {
+    background: hsl(var(--accent));
+}
+
+.command-item svg {
+    flex-shrink: 0;
+}
+
+/* Empty */
+.command-empty {
+    padding: 32px;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Separator */
+.command-separator {
+    height: 1px;
+    background: hsl(var(--border));
+    margin: 8px 0;
+}
+
+/* Footer */
+.command-footer {
+    padding: 12px 16px;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--muted) / 0.3);
+}
+
+.command-footer kbd {
+    padding: 2px 6px;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+}
+
+/* Animations */
+[cmdk-dialog] {
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translate(-50%, -48%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translate(-50%, -50%);
+        opacity: 1;
+    }
+}

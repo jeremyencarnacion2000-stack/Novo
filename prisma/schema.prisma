@@ -72,6 +72,7 @@ model User {
   courses Course[]
   grades Grade[]
   focusSessions FocusSession[]
+  deals Deal[]
 }
 
 model VerificationToken {
@@ -346,16 +347,45 @@ model Attachment {
 }
 
 model BusinessClient {
-  id        String   @id @default(cuid())
-  name      String
-  status    String   // 'active' | 'proposal' | 'inactive'
-  projects  Int      @default(0)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  updatedAt DateTime @updatedAt
-  version   Int      @default(1)
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  status      String   // 'lead' | 'prospect' | 'active' | 'inactive'
+  source      String?  // 'referral' | 'website' | 'social' | 'cold' | 'other'
+  projects    Int      @default(0)
+  totalRevenue Float   @default(0)
+  notes       String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deals       Deal[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
 
+  @@index([userId])
   @@map("business_clients")
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  title       String
+  value       Float    // deal value in dollars
+  stage       String   // 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
+  probability Int      @default(50) // 0-100 percent
+  expectedClose DateTime?
+  notes       String?
+  clientId    String
+  client      BusinessClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([clientId])
+  @@map("deals")
 }
 
 model BusinessContentIdea {

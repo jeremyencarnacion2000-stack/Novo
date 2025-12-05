@@ -6,7 +6,7 @@ import { SessionProvider, useSession } from 'next-auth/react'
 import { Toaster } from '@/components/ui/toaster'
 import { CommandPalette } from '@/components/command-palette'
 import { NetworkStatus } from '@/components/network-status'
-import { useFocus, FocusProvider } from '@/lib/focus-context'
+import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
 import { NotificationProvider } from '@/lib/notification-context'
 import { PomodoroProvider } from '@/lib/pomodoro-context'
@@ -30,7 +30,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [status, router, pathname])
 
   if (status === 'loading') {
-    return <div>Loading...</div> // Or a proper loading spinner/component
+    return <div>Loading...</div>
   }
 
   // Only render children if authenticated or on the sign-in page
@@ -46,8 +46,6 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
-
   return (
     <SessionProvider>
       <SettingsProvider>
