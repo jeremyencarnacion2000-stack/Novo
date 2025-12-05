@@ -1,0 +1,71 @@
+/* Mini Chatbot 3D Effects */
+@keyframes spin-slow {
+  from { transform: translate(-50%, -50%) rotate(360deg); }
+  to { transform: translate(-50%, -50%) rotate(0deg); }
+}
+
+@keyframes blink {
+  46%, 50%, 96%, 100% { height: 52px; }
+  48%, 98% { height: 20px; }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 10s linear infinite;
+}
+
+label.mini-chatbot-label:hover .animate-spin-slow {
+  animation-play-state: paused;
+}
+
+.animate-blink {
+  animation: blink 10s infinite linear;
+}
+
+/* 3D Hover Effects for Grid Areas */
+.mini-chatbot-container .hover-area-1:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(15deg) rotateY(-15deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-2:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(15deg) rotateY(-7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-3:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(15deg) rotateY(0) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-4:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(15deg) rotateY(7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-5:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(15deg) rotateY(15deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+
+.mini-chatbot-container .hover-area-6:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(0) rotateY(-15deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-7:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(0) rotateY(-7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-8:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(0) rotateY(0) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-9:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(0) rotateY(7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-10:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(0) rotateY(15deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+
+.mini-chatbot-container .hover-area-11:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(-15deg) rotateY(-15deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-12:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(-15deg) rotateY(-7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-13:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(-15deg) rotateY(0) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-14:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(-15deg) rotateY(7deg) translateZ(95px) scale3d(1,1,1) !important;
+}
+.mini-chatbot-container .hover-area-15:hover ~ label .mini-chatbot-card {
+  transform: perspective(1000px) rotateX(-15deg) rotateY(15deg) translateZ(95px) scale3d(1,1,1) !important;
+}

@@ -2,27 +2,27 @@
 
 import React, { useState } from 'react';
 import { Send, Paperclip, Image as ImageIcon, Globe } from 'lucide-react';
+import './mini-chatbot.css';
 
 export function MiniChatbot() {
     const [isExpanded, setIsExpanded] = useState(false);
     const [input, setInput] = useState('');
 
     return (
-        <>
+        <div className="mini-chatbot-container">
             {/* 15 invisible hover areas for 3D effect */}
             <div className="fixed inset-0 z-[998] pointer-events-none grid grid-cols-5 grid-rows-3">
                 {[...Array(15)].map((_, i) => (
                     <div
                         key={i}
                         className={`hover-area-${i + 1} pointer-events-auto`}
-                        data-index={i + 1}
                     />
                 ))}
             </div>
 
             {/* Mini Chatbot Container */}
             <label
-                className="fixed bottom-8 right-8 z-[999] cursor-pointer group"
+                className="mini-chatbot-label fixed bottom-8 right-8 z-[999] cursor-pointer group"
                 style={{ perspective: '1000px' }}
             >
                 <input
@@ -111,10 +111,6 @@ export function MiniChatbot() {
                     placeholder-muted-foreground/30
                     rounded-2xl
                   "
-                                    style={{
-                                        scrollbarWidth: 'thin',
-                                        scrollbarColor: '#dedfe0 transparent'
-                                    }}
                                 />
                             </div>
 
@@ -143,7 +139,7 @@ export function MiniChatbot() {
                     transition-all active:scale-95
                   "
                                 >
-                                    <div className="w-[30px] h-[30px] p-1.5 bg-black/10 backdrop-blur-sm rounded-[10px] flex items-center justify-content text-gray-300 hover:text-white">
+                                    <div className="w-[30px] h-[30px] p-1.5 bg-black/10 backdrop-blur-sm rounded-[10px] flex items-center justify-center text-gray-300 hover:text-white">
                                         <Send className="w-full h-full hover:drop-shadow-[0_0_5px_#ffffff] transition-all" />
                                     </div>
                                 </button>
@@ -152,83 +148,6 @@ export function MiniChatbot() {
                     </div>
                 </div>
             </label>
-
-            <style jsx>{`
-        @keyframes spin-slow {
-          from { transform: translate(-50%, -50%) rotate(360deg); }
-          to { transform: translate(-50%, -50%) rotate(0deg); }
-        }
-
-        @keyframes blink {
-          46% { height: 52px; }
-          48% { height: 20px; }
-          50% { height: 52px; }
-          96% { height: 52px; }
-          98% { height: 20px; }
-          100% { height: 52px; }
-        }
-
-        .animate-spin-slow {
-          animation: spin-slow 10s linear infinite;
-        }
-
-        .group:hover .animate-spin-slow {
-          animation-play-state: paused;
-        }
-
-        .animate-blink {
-          animation: blink 10s infinite linear;
-        }
-
-        /* 3D Hover Effects */
-        .hover-area-1:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(15deg) rotateY(-15deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-2:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(15deg) rotateY(-7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-3:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(15deg) rotateY(0) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-4:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(15deg) rotateY(7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-5:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(15deg) rotateY(15deg) translateZ(95px) scale3d(1,1,1);
-        }
-
-        .hover-area-6:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(0) rotateY(-15deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-7:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(0) rotateY(-7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-8:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(0) rotateY(0) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-9:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(0) rotateY(7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-10:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(0) rotateY(15deg) translateZ(95px) scale3d(1,1,1);
-        }
-
-        .hover-area-11:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(-15deg) rotateY(-15deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-12:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(-15deg) rotateY(-7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-13:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(-15deg) rotateY(0) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-14:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(-15deg) rotateY(7deg) translateZ(95px) scale3d(1,1,1);
-        }
-        .hover-area-15:hover ~ label .mini-chatbot-card {
-          transform: perspective(1000px) rotateX(-15deg) rotateY(15deg) translateZ(95px) scale3d(1,1,1);
-        }
-      `}</style>
-        </>
+        </div>
     );
 }
