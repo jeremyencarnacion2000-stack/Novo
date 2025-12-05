@@ -1,9 +1,10 @@
 'use client'
 
+import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, Bot, Music, LogOut, User, BarChart3 } from 'lucide-react'
-import { useSession, signOut } from 'next-auth/react'
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +16,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { FocusMode } from '@/components/focus-mode'
@@ -73,7 +75,7 @@ const navigation = [
     ],
   },
   {
-    title: 'Life & Growth',
+    title: 'Life &amp; Growth',
     items: [
       {
         title: 'School',
@@ -112,6 +114,14 @@ const navigation = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  // Close sidebar on mobile after navigation
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
 
   return (
     <Sidebar>
@@ -125,20 +135,6 @@ export function AppSidebar() {
             <p className="text-xs text-muted-foreground">Productivity Hub</p>
           </div>
         </div>
-        {session?.user && (
-          <div className="mt-4 flex items-center gap-3 px-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={session.user.image || ''} />
-              <AvatarFallback>
-                {session.user.name?.charAt(0) || session.user.email?.charAt(0) || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{session.user.name || 'User'}</p>
-              <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
-            </div>
-          </div>
-        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -156,7 +152,7 @@ export function AppSidebar() {
                         isActive={isActive}
                         tooltip={item.title}
                       >
-                        <Link href={item.href}>
+                        <Link href={item.href} onClick={handleLinkClick}>
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </Link>
@@ -177,10 +173,16 @@ export function AppSidebar() {
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Profile">
-              <Link href="/profile">
-                <User className="h-4 w-4" />
-                <span>Profile</span>
+            <SidebarMenuButton asChild tooltip="Profile" className="h-12">
+              <Link href="/profile" className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
+                  <AvatarFallback>{session?.user?.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col items-start text-sm">
+                  <span className="font-medium">{session?.user?.name || 'User'}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">{session?.user?.email}</span>
+                </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -192,17 +194,14 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {session && (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-                tooltip="Sign Out"
-              >
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Log out">
+              <Link href="/api/auth/signout">
                 <LogOut className="h-4 w-4" />
-                <span>Sign Out</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
+                <span>Log out</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

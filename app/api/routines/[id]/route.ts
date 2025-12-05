@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { updateRoutineSchema } from '@/lib/schemas/routine'
+import { z } from 'zod'
 
 export async function GET(
   request: NextRequest,
@@ -47,48 +49,37 @@ export async function PUT(
     const { id } = await params
 
     const body = await request.json()
-    const { name, description, timeOfDay, duration, isActive, tasks } = body
+    const parsedBody = updateRoutineSchema.safeParse(body)
 
-    const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (description !== undefined) updateData.description = description
-    if (timeOfDay !== undefined) updateData.timeOfDay = timeOfDay
-    if (duration !== undefined) updateData.duration = duration
-    if (isActive !== undefined) updateData.isActive = isActive
-    updateData.version = { increment: 1 }
-
-    if (tasks) {
-      // Delete existing tasks and create new ones
-      await prisma.routineTask.deleteMany({
-        where: { routineId: id }
-      })
-      updateData.tasks = {
-        create: tasks.map((task: any) => ({
-          text: task.text,
-          completed: task.completed || false
-        }))
-      }
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
 
-    const routine = await prisma.routine.updateMany({
+    const { tasks, ...routineData } = parsedBody.data
+
+    const updatedRoutine = await prisma.routine.update({
       where: {
         id,
         userId: session.user.id
       },
-      data: updateData
-    })
-
-    if (routine.count === 0) {
-      return NextResponse.json({ error: 'Routine not found' }, { status: 404 })
-    }
-
-    const updatedRoutine = await prisma.routine.findUnique({
-      where: { id },
+      data: {
+        ...routineData,
+        tasks: {
+          upsert: tasks?.map((task) => ({
+            where: { id: task.id || '' },
+            update: { text: task.text, completed: task.completed },
+            create: { text: task.text, completed: task.completed },
+          })),
+        },
+      },
       include: { tasks: true }
     })
 
     return NextResponse.json(updatedRoutine)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error updating routine:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

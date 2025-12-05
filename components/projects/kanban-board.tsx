@@ -119,9 +119,9 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
                     <CardContent className="space-y-3">
                       <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
 
-                      {project.tags.length > 0 && (
+                      {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {project.tags.map((tag) => (
+                          {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
                             </Badge>

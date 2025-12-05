@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { projectSchema } from '@/lib/schemas/project'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,28 +33,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, description, status, priority, startDate, dueDate, progress, tags, subtasks = [], notes } = body
+    console.log('Creating project with body:', JSON.stringify(body, null, 2))
 
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const parsedBody = projectSchema.safeParse(body)
+
+    if (!parsedBody.success) {
+      console.error('Project validation failed:', parsedBody.error.format())
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { title, description, status, priority, startDate, dueDate, progress, tags, subtasks, notes } = parsedBody.data
 
     const project = await prisma.project.create({
       data: {
         title,
         description,
-        status: status || 'not-started',
-        priority: priority || 'medium',
+        status,
+        priority,
         startDate,
         dueDate,
-        progress: progress || 0,
-        tags: tags || [],
-        notes: notes || '',
+        progress,
+        tags: JSON.stringify(tags),
+        notes,
         userId: session.user.id,
         subtasks: {
-          create: subtasks.map((subtask: any) => ({
+          create: subtasks.map((subtask) => ({
             title: subtask.title,
-            completed: subtask.completed || false
+            completed: subtask.completed
           }))
         }
       },
@@ -61,7 +68,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(project, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('Zod validation error:', error.issues)
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating project:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error details:', error instanceof Error ? error.message : String(error))
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

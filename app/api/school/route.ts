@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { subjectSchema } from '@/lib/schemas/school'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const subjects = await prisma.schoolSubject.findMany({
       where: { userId: session.user.id },
-      include: { events: true },
+      include: { events: true, grades: true },
       orderBy: { updatedAt: 'desc' }
     })
 
@@ -31,30 +33,41 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, events = [] } = body
+    const parsedBody = subjectSchema.safeParse(body)
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { name, events = [], grades = [] } = parsedBody.data
 
     const subject = await prisma.schoolSubject.create({
       data: {
         name,
         userId: session.user.id,
         events: {
-          create: events.map((event: any) => ({
+          create: events.map((event) => ({
             title: event.title,
             date: event.date,
             type: event.type,
-            completed: event.completed || false
+            completed: event.completed
+          }))
+        },
+        grades: {
+          create: grades.map((grade) => ({
+            period: grade.period,
+            grade: grade.grade
           }))
         }
       },
-      include: { events: true }
+      include: { events: true, grades: true }
     })
 
     return NextResponse.json(subject, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating school subject:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

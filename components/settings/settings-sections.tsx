@@ -16,6 +16,8 @@ import { DataIntegrator } from '@/lib/data-integrator'
 import { aiModelManager } from '@/lib/ai-models'
 import { AIModel } from '@/types/ai'
 import { useState, useRef, useEffect } from 'react'
+import { signIn, signOut, useSession } from 'next-auth/react' // New: signIn, signOut, useSession
+import { SiSpotify } from 'react-icons/si' // New: Spotify Icon
 
 export function SettingsSections() {
   const { toast } = useToast()
@@ -25,6 +27,7 @@ export function SettingsSections() {
   const [isImporting, setIsImporting] = useState(false)
   const [availableBackups, setAvailableBackups] = useState<{ date: string, data: any }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { data: session } = useSession() // New: useSession hook
 
   // AI Models state
   const [models, setModels] = useState<AIModel[]>([])
@@ -495,9 +498,9 @@ export function SettingsSections() {
                     disabled={permission !== 'granted'}
                   />
                 </div>
-     
+
                 <Separator />
-     
+
                 {settings.theme === 'auto' && (
                   <>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -521,11 +524,11 @@ export function SettingsSections() {
                         </SelectContent>
                       </Select>
                     </div>
-     
+
                     <Separator />
                   </>
                 )}
-     
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Task Notifications</Label>
@@ -758,14 +761,48 @@ export function SettingsSections() {
 
           <div className="space-y-2">
             <Label className="text-destructive">Danger Zone</Label>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               className="w-full"
               onClick={handleDeleteAllData}
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete All Data
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Integrations */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <SiSpotify className="h-4 w-4 text-[#1DB954]" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl">Integrations</CardTitle>
+              <CardDescription className="text-sm">Connect with other services</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 md:space-y-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5">
+              <Label>Spotify</Label>
+              <p className="text-sm text-muted-foreground">
+                Connect your Spotify account to play music
+              </p>
+            </div>
+            {session?.accessToken ? (
+              <Button variant="outline" onClick={() => signOut()} className="text-red-500 hover:text-red-600">
+                Disconnect
+              </Button>
+            ) : (
+              <Button onClick={() => signIn('spotify')} className="bg-[#1DB954] hover:bg-[#1ed760] text-white">
+                Connect Spotify
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1023,6 +1060,50 @@ export function SettingsSections() {
                 </div>
               ))}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Spotify Integration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <SiSpotify className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl">Spotify Integration</CardTitle>
+              <CardDescription className="text-sm">Connect to Spotify to manage your music and playlists</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 md:space-y-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5">
+              <Label>Connect Spotify</Label>
+              <p className="text-sm text-muted-foreground">
+                Link your Spotify account to access your music library and control playback.
+              </p>
+            </div>
+            {session?.provider === 'spotify' && session?.accessToken ? ( // Check if Spotify session exists
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => signOut({ callbackUrl: '/' })} // Sign out from all providers and redirect to home
+              >
+                <SiSpotify className="mr-2 h-4 w-4" />
+                Disconnect Spotify
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => signIn('spotify')}
+              >
+                <SiSpotify className="mr-2 h-4 w-4" />
+                Connect Spotify
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

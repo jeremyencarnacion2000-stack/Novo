@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useSession } from 'next-auth/react'
 
 export interface AppSettings {
   // Appearance
@@ -9,22 +10,22 @@ export interface AppSettings {
   autoThemeMode: 'system' | 'time' | 'both'
   compactMode: boolean
   showAnimations: boolean
-  
+
   // Notifications
   dailyReminder: boolean
   routineNotifications: boolean
   projectDeadlines: boolean
   reminderTime: string
-  
+
   // Profile
   displayName: string
   email: string
-  
+
   // Data & Privacy
   autoBackup: boolean
   backupFrequency: 'daily' | 'weekly' | 'monthly'
   exportFormat: 'json' | 'csv' | 'pdf'
-  
+
   // General
   startOfWeek: 'sunday' | 'monday' | 'saturday'
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
@@ -62,22 +63,40 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession()
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Load settings from localStorage on mount
+  // Load settings from database when user logs in
   useEffect(() => {
-    const stored = localStorage.getItem('novo-settings')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setSettings({ ...defaultSettings, ...parsed })
-      } catch (e) {
-        console.error('Failed to parse settings:', e)
+    const loadSettings = async () => {
+      if (status === 'loading') return
+
+      if (status === 'authenticated' && session?.user?.id) {
+        try {
+          const response = await fetch('/api/user-settings')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.settings) {
+              setSettings({ ...defaultSettings, ...data.settings })
+            } else {
+              setSettings(defaultSettings)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load settings from database:', error)
+          // Fallback to default settings
+          setSettings(defaultSettings)
+        }
+      } else {
+        // User not logged in, use default settings
+        setSettings(defaultSettings)
       }
+      setIsLoaded(true)
     }
-    setIsLoaded(true)
-  }, [])
+
+    loadSettings()
+  }, [session?.user?.id, status])
 
   // Helper function to determine if it's daytime
   const isDaytime = () => {
@@ -113,7 +132,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     }
 
-    root.classList.toggle('dark', isDark)
+    if (isDark) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
 
     // Set up listeners for auto themes
     if (settings.theme === 'auto' && settings.autoThemeEnabled) {
@@ -195,20 +218,44 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timerId)
   }, [settings.dailyReminder, settings.reminderTime, isLoaded])
 
-  // Save settings to localStorage
+  // Save settings to database
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('novo-settings', JSON.stringify(settings))
+    if (isLoaded && session?.user?.id && status === 'authenticated') {
+      const saveSettings = async () => {
+        try {
+          await fetch('/api/user-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings })
+          })
+        } catch (error) {
+          console.error('Failed to save settings to database:', error)
+        }
+      }
+
+      // Debounce saving to avoid too many API calls
+      const timeoutId = setTimeout(saveSettings, 500)
+      return () => clearTimeout(timeoutId)
     }
-  }, [settings, isLoaded])
+  }, [settings, isLoaded, session?.user?.id, status])
 
   const updateSettings = (updates: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...updates }))
   }
 
-  const resetSettings = () => {
+  const resetSettings = async () => {
     setSettings(defaultSettings)
-    localStorage.removeItem('novo-settings')
+    if (session?.user?.id) {
+      try {
+        await fetch('/api/user-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: defaultSettings })
+        })
+      } catch (error) {
+        console.error('Failed to reset settings in database:', error)
+      }
+    }
   }
 
   return (
@@ -221,7 +268,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 export function useSettings() {
   const context = useContext(SettingsContext)
   if (!context) {
-    throw new Error('useSettings must be used within SettingsProvider')
+    return {
+      settings: defaultSettings,
+      updateSettings: () => { },
+      resetSettings: () => { }
+    }
   }
   return context
 }

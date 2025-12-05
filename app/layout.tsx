@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import React from 'react'
 import './globals.css'
 import ClientLayout from './client-layout'
-import { SpotifyProvider } from '@/lib/spotify-context'
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,10 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <SpotifyProvider>
-          <ClientLayout>{children}</ClientLayout>
-        </SpotifyProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   )
 }
+

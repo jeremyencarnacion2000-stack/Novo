@@ -55,12 +55,12 @@ class OfflineStorage {
     })
   }
 
-  async addToQueue(operation: Omit<OfflineOperation, 'id' | 'timestamp'>): Promise<void> {
+  async addToQueue(operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'status'>): Promise<void> {
     if (!this.db) await this.init()
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['queue'], 'readwrite')
       const store = transaction.objectStore('queue')
-      const request = store.add({ ...operation, timestamp: Date.now() })
+      const request = store.add({ ...operation, timestamp: Date.now(), status: 'pending' })
 
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
@@ -86,6 +86,28 @@ class OfflineStorage {
 
     ids.forEach(id => store.delete(id))
   }
+
+  async updateQueueItem(id: number, updates: Partial<OfflineOperation>): Promise<void> {
+    if (!this.db) await this.init()
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['queue'], 'readwrite')
+      const store = transaction.objectStore('queue')
+      const request = store.get(id)
+
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const item = request.result
+        if (item) {
+          const updatedItem = { ...item, ...updates }
+          const updateRequest = store.put(updatedItem)
+          updateRequest.onerror = () => reject(updateRequest.error)
+          updateRequest.onsuccess = () => resolve()
+        } else {
+          reject(new Error(`Item with id ${id} not found in queue.`))
+        }
+      }
+    })
+  }
 }
 
 interface OfflineOperation {
@@ -95,20 +117,56 @@ interface OfflineOperation {
   data: any
   method: 'POST' | 'PUT' | 'DELETE'
   timestamp: number
+  status: 'pending' | 'conflicted'
+  serverData?: any
 }
 
 const offlineStorage = new OfflineStorage()
 
 // Network status detection
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
-    isOnline = true
-    syncPendingOperations()
-  })
-  window.addEventListener('offline', () => {
-    isOnline = false
-  })
+
+// Sync data to cloud or queue for offline
+const syncToCloud = async (url: string, data: any, method: 'POST' | 'PUT' | 'DELETE' = 'POST') => {
+  if (!isOnline) {
+    // Queue for later sync
+    await offlineStorage.addToQueue({
+      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
+      endpoint: url,
+      data,
+      method
+    })
+    return
+  }
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      // If server error (5xx), throw to queue for retry
+      if (response.status >= 500) {
+        throw new Error(`Server error: ${response.statusText}`)
+      } else {
+        // 4xx error - likely validation or logic error. 
+        // We shouldn't retry blindly, but we should log it.
+        console.error(`Sync failed with ${response.status}: ${response.statusText}`, await response.text())
+        return // Don't queue
+      }
+    }
+  } catch (error) {
+    // Queue for later sync if network fails or server error
+    console.error('Sync failed, queuing for later:', error)
+    await offlineStorage.addToQueue({
+      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
+      endpoint: url,
+      data,
+      method
+    })
+  }
 }
 
 // Sync pending operations when back online
@@ -117,10 +175,12 @@ async function syncPendingOperations(): Promise<void> {
 
   try {
     const queue = await offlineStorage.getQueue()
-    const successfulIds: number[] = []
-    const conflicts: Conflict[] = []
+    const pendingOperations = queue.filter(op => op.status === 'pending')
+    if (pendingOperations.length === 0) return
 
-    for (const operation of queue) {
+    const successfulIds: number[] = []
+
+    for (const operation of pendingOperations) {
       try {
         const response = await fetch(operation.endpoint, {
           method: operation.method,
@@ -131,32 +191,35 @@ async function syncPendingOperations(): Promise<void> {
         if (response.ok) {
           successfulIds.push(operation.id)
         } else if (response.status === 409) {
-          // Conflict detected
-          const conflictData = await response.json()
-          conflicts.push({
-            operation,
-            serverData: conflictData,
-            localData: operation.data
+          // Conflict
+          const serverData = await response.json()
+          await offlineStorage.updateQueueItem(operation.id, {
+            status: 'conflicted',
+            serverData
           })
-          successfulIds.push(operation.id) // Remove from queue even with conflict
+
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sync-conflict', { detail: { operation, serverData } }))
+          }
+        } else if (response.status >= 400 && response.status < 500) {
+          // Client error, remove from queue as it will likely fail again
+          console.error(`Removing invalid operation ${operation.id} from queue: ${response.status}`)
+          successfulIds.push(operation.id) // Treat as "handled" to remove it
         }
+        // 5xx errors will be left in queue (pending)
       } catch (error) {
-        console.error('Failed to sync operation:', operation, error)
+        console.error(`Failed to sync operation ${operation.id}:`, error)
+        // Network error, leave in queue
       }
     }
 
     if (successfulIds.length > 0) {
       await offlineStorage.clearQueue(successfulIds)
     }
-
-    // Handle conflicts - for now, notify user and use server version
-    if (conflicts.length > 0) {
-      console.warn('Conflicts detected during sync:', conflicts)
-      // In a real app, you might want to show a UI notification
-      // For now, we'll emit an event that components can listen to
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sync-conflicts', { detail: conflicts }))
-      }
+    // For now, we'll emit an event that components can listen to
+    if (typeof window !== 'undefined') {
+      const updatedConflicts = await offlineStorage.getQueue()
+      window.dispatchEvent(new CustomEvent('sync-conflicts', { detail: updatedConflicts.filter(op => op.status === 'conflicted') }))
     }
   } catch (error) {
     console.error('Error syncing pending operations:', error)
@@ -171,9 +234,10 @@ interface Conflict {
 
 // Types for our integrated data
 export interface IntegratedTask extends ChecklistItem {
-  source: "manual" | "routine" | "project" | "school" | "standalone"
+  source: "manual" | "routine" | "project" | "school" | "standalone" | "project-task"
   sourceId?: string // ID of the routine, project, or subject
   originalId?: string // ID of the task within the source
+  task?: Task // For linked tasks
   metadata?: {
     routineName?: string
     projectName?: string
@@ -186,7 +250,7 @@ export interface CalendarEvent {
   id: string
   title: string
   date: Date
-  type: "task" | "project" | "routine" | "school" | "habit"
+  type: "task" | "project" | "routine" | "school" | "habit" | "google"
   completed: boolean
   metadata?: Record<string, unknown>
 }
@@ -247,48 +311,29 @@ const fetchWithCache = async <T,>(
         ...options?.headers
       }
     })
-    if (!response.ok) throw new Error('API error')
+    if (!response.ok) {
+      // Throw an error with status to be caught by the caller
+      const error = new Error(`API error: ${response.statusText}`)
+        ; (error as any).status = response.status
+      throw error
+    }
     const data = await response.json()
     await setCachedData(cacheKey, userId, data)
     return data
   } catch (error) {
-    // Fallback to cache if offline
-    const cached = await getCachedData<T>(cacheKey, userId)
-    if (cached) return cached.data
+    // Only fallback to cache if it's a network error (e.g., offline)
+    // We can identify network errors because they don't have a `status` property
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.warn(`Network error for ${url}. Falling back to cache.`)
+      const cached = await getCachedData<T>(cacheKey, userId)
+      if (cached) return cached.data
+    }
+    // For other errors (like 500, 404, etc.), re-throw so the UI can handle it
     throw error
   }
 }
 
-// Sync data to cloud or queue for offline
-const syncToCloud = async (url: string, data: any, method: 'POST' | 'PUT' | 'DELETE' = 'POST') => {
-  if (!isOnline) {
-    // Queue for later sync
-    await offlineStorage.addToQueue({
-      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
-      endpoint: url,
-      data,
-      method
-    })
-    return
-  }
 
-  try {
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-  } catch (error) {
-    // Queue for later sync if network fails
-    console.error('Sync failed, queuing for later:', error)
-    await offlineStorage.addToQueue({
-      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
-      endpoint: url,
-      data,
-      method
-    })
-  }
-}
 
 export interface BackupData {
   version: string
@@ -303,6 +348,24 @@ export interface BackupData {
 }
 
 export const DataIntegrator = {
+  // Initialize sync listeners and run initial sync
+  initialize: () => {
+    if (typeof window !== 'undefined') {
+      // Run initial sync if online
+      if (navigator.onLine) {
+        syncPendingOperations()
+      }
+
+      window.addEventListener('online', () => {
+        isOnline = true
+        syncPendingOperations()
+      })
+      window.addEventListener('offline', () => {
+        isOnline = false
+      })
+    }
+  },
+
   // Get network status
   getNetworkStatus: () => isOnline,
 
@@ -661,10 +724,21 @@ export const DataIntegrator = {
         'checklist'
       )
       manualItems.forEach((item: ChecklistItem) => {
-        tasks.push({
-          ...item,
-          source: 'manual'
-        })
+        if (item.task) {
+          // Linked to a project task
+          tasks.push({
+            ...item,
+            source: 'project-task',
+            metadata: {
+              projectName: item.task.project?.title || 'Project Task'
+            }
+          })
+        } else {
+          tasks.push({
+            ...item,
+            source: 'manual'
+          })
+        }
       })
     } catch (error) {
       console.error('Failed to fetch checklist items:', error)
@@ -846,6 +920,48 @@ export const DataIntegrator = {
       console.error('Failed to fetch school subjects for calendar:', error)
     }
 
+    try {
+      // 3. Google Calendar Events
+      const googleEvents = await fetchWithCache<any[]>('/api/calendar/google', userId, 'google-calendar')
+      googleEvents.forEach((event: any) => {
+        if (event.start?.dateTime || event.start?.date) {
+          events.push({
+            id: `google-${event.id}`,
+            title: event.summary || '(No Title)',
+            date: parseISO(event.start.dateTime || event.start.date),
+            type: 'google', // New type
+            completed: false,
+            metadata: {
+              description: event.description,
+              location: event.location,
+              htmlLink: event.htmlLink
+            }
+          })
+        }
+      })
+    } catch (error) {
+      console.error('Failed to fetch Google Calendar events:', error)
+    }
+
+    try {
+      // 4. Standalone Tasks
+      const tasks = await fetchWithCache<Task[]>('/api/tasks', userId, 'tasks')
+      tasks.forEach((task: Task) => {
+        if (task.dueDate) {
+          events.push({
+            id: `task-${task.id}`,
+            title: task.title,
+            date: parseISO(task.dueDate),
+            type: 'task',
+            completed: task.status === 'done',
+            metadata: { priority: task.priority }
+          })
+        }
+      })
+    } catch (error) {
+      console.error('Failed to fetch tasks for calendar:', error)
+    }
+
     return events
   },
 
@@ -927,6 +1043,26 @@ export const DataIntegrator = {
           )
           await setCachedData('tasks', userId, updatedTasks)
         }
+      } else if (task.source === "project-task") {
+        // Update both checklist item and the linked task
+        await syncToCloud(`/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
+        const newStatus = updatedTask.completed ? "done" : "todo"
+        await syncToCloud(`/api/tasks/${task.task?.id}`, { status: newStatus }, 'PUT')
+        // Update local caches
+        const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
+        if (checklist) {
+          const updatedChecklist = checklist.data.map(item =>
+            item.id === task.id ? { ...item, completed: updatedTask.completed } : item
+          )
+          await setCachedData('checklist', userId, updatedChecklist)
+        }
+        const tasks = await getCachedData<Task[]>('tasks', userId)
+        if (tasks) {
+          const updatedTasks = tasks.data.map(t =>
+            t.id === task.task?.id ? { ...t, status: newStatus } : t
+          )
+          await setCachedData('tasks', userId, updatedTasks)
+        }
       }
 
       // Emit WebSocket event for real-time sync
@@ -940,5 +1076,90 @@ export const DataIntegrator = {
     }
 
     return updatedTask
+  },
+
+  // Create a new manual task
+  createManualTask: async (userId: string, taskData: any) => {
+    // Optimistic local update
+    const tempId = `temp-${Date.now()}`
+    const newTask = { ...taskData, id: tempId, source: 'manual' }
+
+    try {
+      const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
+      if (checklist) {
+        await setCachedData('checklist', userId, [...checklist.data, newTask])
+      }
+
+      await syncToCloud('/api/checklist', taskData, 'POST')
+    } catch (error) {
+      console.error('Failed to create manual task:', error)
+    }
+    return newTask
+  },
+
+  // Delete a manual task
+  deleteManualTask: async (userId: string, taskId: string) => {
+    try {
+      // Optimistic local update
+      const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
+      if (checklist) {
+        const updatedChecklist = checklist.data.filter(item => item.id !== taskId)
+        await setCachedData('checklist', userId, updatedChecklist)
+      }
+
+      await syncToCloud(`/api/checklist/${taskId}`, {}, 'DELETE')
+    } catch (error) {
+      console.error('Failed to delete manual task:', error)
+    }
+  },
+
+  // Get standalone tasks
+  getTasks: async (userId: string) => {
+    return await fetchWithCache<Task[]>('/api/tasks', userId, 'tasks')
+  },
+
+  // Create standalone task
+  createTask: async (userId: string, taskData: any) => {
+    const tempId = `temp-${Date.now()}`
+    const newTask = { ...taskData, id: tempId, createdAt: new Date().toISOString() }
+
+    try {
+      const tasks = await getCachedData<Task[]>('tasks', userId)
+      if (tasks) {
+        await setCachedData('tasks', userId, [...tasks.data, newTask])
+      }
+      await syncToCloud('/api/tasks', taskData, 'POST')
+    } catch (error) {
+      console.error('Failed to create task:', error)
+    }
+    return newTask
+  },
+
+  // Update standalone task
+  updateTask: async (userId: string, taskId: string, updates: any) => {
+    try {
+      const tasks = await getCachedData<Task[]>('tasks', userId)
+      if (tasks) {
+        const updatedTasks = tasks.data.map(t => t.id === taskId ? { ...t, ...updates } : t)
+        await setCachedData('tasks', userId, updatedTasks)
+      }
+      await syncToCloud(`/api/tasks/${taskId}`, updates, 'PUT')
+    } catch (error) {
+      console.error('Failed to update task:', error)
+    }
+  },
+
+  // Delete standalone task
+  deleteTask: async (userId: string, taskId: string) => {
+    try {
+      const tasks = await getCachedData<Task[]>('tasks', userId)
+      if (tasks) {
+        const updatedTasks = tasks.data.filter(t => t.id !== taskId)
+        await setCachedData('tasks', userId, updatedTasks)
+      }
+      await syncToCloud(`/api/tasks/${taskId}`, {}, 'DELETE')
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+    }
   },
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DashboardShell } from '@/components/dashboard-shell'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -9,91 +9,135 @@ import { HabitTrackers } from '@/components/trackers/habit-trackers'
 import { MetricTrackers } from '@/components/trackers/metric-trackers'
 import { TrackerDialog } from '@/components/trackers/tracker-dialog'
 import { Tracker } from '@/types/tracker'
-import { useAnalyticsSession } from '@/hooks/use-analytics-session'
+import { useTrackers } from '@/hooks/use-swr'
+import { useToast } from '@/hooks/use-toast'
 
 export default function TrackersPage() {
-  useAnalyticsSession('trackers')
-  const [trackers, setTrackers] = useState<Tracker[]>([
-    {
-      id: '1',
-      name: 'Water Intake',
-      type: 'metric',
-      unit: 'glasses',
-      goal: 8,
-      entries: [
-        { date: '2024-11-15', value: 7 },
-        { date: '2024-11-16', value: 8 },
-        { date: '2024-11-17', value: 6 },
-        { date: '2024-11-18', value: 8 },
-        { date: '2024-11-19', value: 9 },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Exercise',
-      type: 'habit',
-      unit: 'sessions',
-      goal: 5,
-      entries: [
-        { date: '2024-11-15', value: 1 },
-        { date: '2024-11-16', value: 1 },
-        { date: '2024-11-18', value: 1 },
-        { date: '2024-11-19', value: 1 },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Reading',
-      type: 'metric',
-      unit: 'pages',
-      goal: 30,
-      entries: [
-        { date: '2024-11-15', value: 25 },
-        { date: '2024-11-16', value: 32 },
-        { date: '2024-11-17', value: 28 },
-        { date: '2024-11-18', value: 35 },
-        { date: '2024-11-19', value: 30 },
-      ],
-    },
-    {
-      id: '4',
-      name: 'Meditation',
-      type: 'habit',
-      unit: 'sessions',
-      goal: 7,
-      entries: [
-        { date: '2024-11-15', value: 1 },
-        { date: '2024-11-16', value: 1 },
-        { date: '2024-11-17', value: 1 },
-        { date: '2024-11-18', value: 1 },
-        { date: '2024-11-19', value: 1 },
-      ],
-    },
-  ])
+  const { data: trackers, error, isLoading, mutate } = useTrackers()
+  const { toast } = useToast()
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTracker, setEditingTracker] = useState<Tracker | undefined>()
   const [activeTab, setActiveTab] = useState('habits')
 
-  const habitTrackers = trackers.filter((t) => t.type === 'habit')
-  const metricTrackers = trackers.filter((t) => t.type === 'metric')
+  const habitTrackers = Array.isArray(trackers) ? trackers.filter((t) => t && typeof t === 'object' && t.type === 'habit') : []
+  const metricTrackers = Array.isArray(trackers) ? trackers.filter((t) => t && typeof t === 'object' && t.type === 'metric') : []
 
-  const handleCreate = (tracker: Omit<Tracker, 'id'>) => {
-    const newTracker = {
-      ...tracker,
-      id: Date.now().toString(),
+  useEffect(() => {
+    if(error) {
+      toast({
+        title: 'Error fetching trackers',
+        description: 'Could not fetch trackers. Please try again later.',
+        variant: 'destructive',
+      })
     }
-    setTrackers([...trackers, newTracker])
-    setDialogOpen(false)
+  }, [error, toast])
+
+
+  const handleCreate = async (tracker: Omit<Tracker, 'id'>) => {
+    try {
+      const response = await fetch('/api/trackers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tracker),
+      })
+
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        toast({
+          title: 'Tracker created',
+          description: 'Your new tracker has been created successfully.',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+            title: 'Error creating tracker',
+            description: error.error || 'Could not create tracker. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error creating tracker:', error)
+      toast({
+        title: 'Error creating tracker',
+        description: 'Could not create tracker. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
-  const handleUpdate = (tracker: Tracker) => {
-    setTrackers(trackers.map((t) => (t.id === tracker.id ? tracker : t)))
-    setDialogOpen(false)
-    setEditingTracker(undefined)
+  const handleUpdate = async (tracker: Tracker) => {
+    try {
+      const response = await fetch(`/api/trackers/${tracker.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: tracker.name,
+          type: tracker.type,
+          unit: tracker.unit,
+          goal: tracker.goal,
+        }),
+      })
+
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        setEditingTracker(undefined)
+        toast({
+            title: 'Tracker updated',
+            description: 'Your tracker has been updated successfully.',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+            title: 'Error updating tracker',
+            description: error.error || 'Could not update tracker. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error updating tracker:', error)
+      toast({
+        title: 'Error updating tracker',
+        description: 'Could not update tracker. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setTrackers(trackers.filter((t) => t.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/trackers/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        mutate()
+        toast({
+            title: 'Tracker deleted',
+            description: 'Your tracker has been deleted successfully.',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+            title: 'Error deleting tracker',
+            description: error.error || 'Could not delete tracker. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting tracker:', error)
+      toast({
+        title: 'Error deleting tracker',
+        description: 'Could not delete tracker. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleEdit = (tracker: Tracker) => {
@@ -106,28 +150,39 @@ export default function TrackersPage() {
     setEditingTracker(undefined)
   }
 
-  const handleLogEntry = (id: string, value: number) => {
+  const handleLogEntry = async (id: string, value: number) => {
     const today = new Date().toISOString().split('T')[0]
-    setTrackers(
-      trackers.map((tracker) => {
-        if (tracker.id === id) {
-          const existingEntryIndex = tracker.entries.findIndex(
-            (e) => e.date === today
-          )
-          if (existingEntryIndex >= 0) {
-            const updatedEntries = [...tracker.entries]
-            updatedEntries[existingEntryIndex] = { date: today, value }
-            return { ...tracker, entries: updatedEntries }
-          } else {
-            return {
-              ...tracker,
-              entries: [...tracker.entries, { date: today, value }],
-            }
-          }
-        }
-        return tracker
+    try {
+      const response = await fetch(`/api/trackers/${id}/entries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ date: today, value }),
       })
-    )
+
+      if (response.ok) {
+        mutate()
+        toast({
+            title: 'Entry logged',
+            description: 'Your entry has been logged successfully.',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+            title: 'Error logging entry',
+            description: error.error || 'Could not log entry. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error logging entry:', error)
+      toast({
+        title: 'Error logging entry',
+        description: 'Could not log entry. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleSave = (tracker: Tracker | Omit<Tracker, 'id'>) => {
@@ -136,6 +191,16 @@ export default function TrackersPage() {
     } else {
       handleCreate(tracker as Omit<Tracker, 'id'>)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardShell>
+        <div className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Loading trackers...</p>
+        </div>
+      </DashboardShell>
+    )
   }
 
   return (
@@ -159,18 +224,18 @@ export default function TrackersPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="habits" className="flex-1 sm:flex-none">
-              <span className="hidden sm:inline">Habits ({habitTrackers.length})</span>
+              <span className="hidden sm:inline">Habits ({habitTrackers?.length})</span>
               <span className="sm:hidden">Habits</span>
             </TabsTrigger>
             <TabsTrigger value="metrics" className="flex-1 sm:flex-none">
-              <span className="hidden sm:inline">Metrics ({metricTrackers.length})</span>
+              <span className="hidden sm:inline">Metrics ({metricTrackers?.length})</span>
               <span className="sm:hidden">Metrics</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="habits" className="mt-6">
             <HabitTrackers
-              trackers={habitTrackers}
+              trackers={habitTrackers || []}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onLogEntry={handleLogEntry}
@@ -179,7 +244,7 @@ export default function TrackersPage() {
 
           <TabsContent value="metrics" className="mt-6">
             <MetricTrackers
-              trackers={metricTrackers}
+              trackers={metricTrackers || []}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onLogEntry={handleLogEntry}

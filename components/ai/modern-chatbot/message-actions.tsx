@@ -25,38 +25,38 @@ export function MessageActions({ message, onCopy, onRetry, onLike, onDislike }: 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
                 onClick={handleCopy}
-                className="p-1.5 hover:bg-zinc-700 rounded transition-colors"
+                className="p-1.5 hover:bg-accent rounded transition-colors"
                 title="Copiar"
             >
-                <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                <Copy className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
 
             {message.role === 'assistant' && (
                 <>
                     <button
                         onClick={onRetry}
-                        className="p-1.5 hover:bg-zinc-700 rounded transition-colors"
+                        className="p-1.5 hover:bg-accent rounded transition-colors"
                         title="Regenerar"
                     >
-                        <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                        <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
 
                     <button
                         onClick={onLike}
-                        className={`p-1.5 hover:bg-zinc-700 rounded transition-colors ${message.liked ? 'bg-zinc-700' : ''
+                        className={`p-1.5 hover:bg-accent rounded transition-colors ${message.liked ? 'bg-accent' : ''
                             }`}
                         title="Me gusta"
                     >
-                        <ThumbsUp className={`w-3.5 h-3.5 ${message.liked ? 'text-green-500' : 'text-zinc-400'}`} />
+                        <ThumbsUp className={`w-3.5 h-3.5 ${message.liked ? 'text-green-500' : 'text-muted-foreground'}`} />
                     </button>
 
                     <button
                         onClick={onDislike}
-                        className={`p-1.5 hover:bg-zinc-700 rounded transition-colors ${message.disliked ? 'bg-zinc-700' : ''
+                        className={`p-1.5 hover:bg-accent rounded transition-colors ${message.disliked ? 'bg-accent' : ''
                             }`}
                         title="No me gusta"
                     >
-                        <ThumbsDown className={`w-3.5 h-3.5 ${message.disliked ? 'text-red-500' : 'text-zinc-400'}`} />
+                        <ThumbsDown className={`w-3.5 h-3.5 ${message.disliked ? 'text-red-500' : 'text-muted-foreground'}`} />
                     </button>
                 </>
             )}

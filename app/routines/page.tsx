@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DashboardShell } from '@/components/dashboard-shell'
 import { Button } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
@@ -9,117 +9,119 @@ import { RoutineDialog } from '@/components/routines/routine-dialog'
 import { ImportRoutineDialog } from '@/components/routines/import-routine-dialog'
 import { Routine } from '@/types/routine'
 import { RoutineDetailDialog } from '@/components/routines/routine-detail-dialog'
-import { useAnalyticsSession } from '@/hooks/use-analytics-session'
+import { useRoutines } from '@/hooks/use-swr'
+import { useToast } from '@/hooks/use-toast'
+import { FitnessTracker } from '@/components/fitness/fitness-tracker'
 
 export default function RoutinesPage() {
-  useAnalyticsSession('routines')
-  const [routines, setRoutines] = useState<Routine[]>([
-    {
-      id: 'hypertrophy-1',
-      name: 'DÍA 1 – Pecho Superior • Hombros • Tríceps',
-      description: 'Rutina de hipertrofia estética con calistenia avanzada + mochila. Tempo: 3s bajada – 1s subida',
-      timeOfDay: 'morning',
-      duration: 60,
-      tasks: [
-        { id: 't1', text: 'Flexiones con pies elevados + mochila - 4× 6–12 reps (Drop set)', completed: false },
-        { id: 't2', text: 'Pseudo Planche Push Ups - 3× 6–12 reps (Drop set)', completed: false },
-        { id: 't3', text: 'Flexiones "squeeze" con mochila - 3× 6–12 reps (Drop set)', completed: false },
-        { id: 't4', text: 'Press militar con mochila - 4× 6–12 reps (Drop set)', completed: false },
-        { id: 't5', text: 'Elevaciones laterales con mochila - 3× 10–15 reps (Drop set)', completed: false },
-        { id: 't6', text: 'Pike push ups pies elevados - 3× 8–12 reps (Drop set)', completed: false },
-        { id: 't7', text: 'Fondos entre sillas con mochila - 4× 6–12 (Drop set)', completed: false },
-        { id: 't8', text: 'Extensión overhead con mochila - 3× 8–12 (Drop set)', completed: false },
-        { id: 't9', text: 'Flexiones diamante - 3 series al fallo', completed: false },
-      ],
-      isActive: true,
-    },
-    {
-      id: 'hypertrophy-2',
-      name: 'DÍA 2 – Espalda • Bíceps • Core',
-      description: 'Rutina de hipertrofia estética con calistenia avanzada + mochila. Tempo: 3s bajada – 1s subida',
-      timeOfDay: 'morning',
-      duration: 60,
-      tasks: [
-        { id: 't1', text: 'Remo con mochila (torso inclinado) - 4× 6–12 (Drop set)', completed: false },
-        { id: 't2', text: 'Dominadas (ancho → neutro → supino) - 4 series al fallo (Drop set)', completed: false },
-        { id: 't3', text: 'Remo unilateral con mochila - 3× 10–12 por lado', completed: false },
-        { id: 't4', text: 'Face pulls con mochila - 3× 12–15 (Drop set)', completed: false },
-        { id: 't5', text: 'Curl con mochila tipo barra - 4× 6–12 (Drop set)', completed: false },
-        { id: 't6', text: 'Curl concentrado apoyado en pierna - 3× 10–12', completed: false },
-        { id: 't7', text: 'Curl martillo con mochila - 3× 10–12', completed: false },
-        { id: 't8', text: 'Plancha con mochila - 3× 30–60 s (Drop set)', completed: false },
-        { id: 't9', text: 'Elevaciones de piernas con mochila - 3× 10–15', completed: false },
-        { id: 't10', text: 'Rollout improvisado con mochila - 3× 8–12', completed: false },
-      ],
-      isActive: true,
-    },
-    {
-      id: 'hypertrophy-3',
-      name: 'DÍA 3 – Piernas • Glúteos • Core',
-      description: 'Rutina de hipertrofia estética con calistenia avanzada + mochila. Tempo: 3s bajada – 1s subida',
-      timeOfDay: 'morning',
-      duration: 60,
-      tasks: [
-        { id: 't1', text: 'Sentadillas con mochila - 4× 10–15 (Drop set)', completed: false },
-        { id: 't2', text: 'Zancadas con mochila - 3× 10–12 por pierna', completed: false },
-        { id: 't3', text: 'Bulgarian Split Squat - 3× 8–10 por pierna', completed: false },
-        { id: 't4', text: 'Hip Thrust con mochila - 4× 12–15', completed: false },
-        { id: 't5', text: 'Plancha lateral con mochila - 3× 30–45 s por lado', completed: false },
-        { id: 't6', text: 'Elevaciones de piernas con mochila - 3× 10–15', completed: false },
-        { id: 't7', text: 'Crunch con mochila - 3× 12–20', completed: false },
-      ],
-      isActive: true,
-    },
-    {
-      id: '1',
-      name: 'Morning Routine',
-      description: 'Start the day right',
-      timeOfDay: 'morning',
-      duration: 30,
-      tasks: [
-        { id: '1', text: 'Meditation', completed: false },
-        { id: '2', text: 'Exercise', completed: false },
-        { id: '3', text: 'Healthy breakfast', completed: false },
-      ],
-      isActive: true,
-    },
-    {
-      id: '2',
-      name: 'Evening Wind Down',
-      description: 'Prepare for restful sleep',
-      timeOfDay: 'evening',
-      duration: 45,
-      tasks: [
-        { id: '1', text: 'Review day', completed: false },
-        { id: '2', text: 'Plan tomorrow', completed: false },
-        { id: '3', text: 'Reading', completed: false },
-      ],
-      isActive: true,
-    },
-  ])
+  const { data: routines, error, isLoading, mutate } = useRoutines()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: 'Error fetching routines',
+        description: 'Could not fetch routines. Please try again later.',
+        variant: 'destructive',
+      })
+    }
+  }, [error, toast])
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRoutine, setEditingRoutine] = useState<Routine | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null)
 
-  const handleCreate = (routine: Omit<Routine, 'id'>) => {
-    const newRoutine = {
-      ...routine,
-      id: Date.now().toString(),
+  const handleCreate = async (routine: Omit<Routine, 'id'>) => {
+    try {
+      const response = await fetch('/api/routines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routine),
+      })
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        toast({
+          title: 'Routine created',
+          description: 'Your new routine has been created successfully.',
+        })
+      } else {
+        toast({
+          title: 'Error creating routine',
+          description: 'Could not create routine. Please try again later.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error creating routine:', error)
+      toast({
+        title: 'Error creating routine',
+        description: 'Could not create routine. Please try again later.',
+        variant: 'destructive',
+      })
     }
-    setRoutines([...routines, newRoutine])
-    setDialogOpen(false)
   }
 
-  const handleUpdate = (routine: Routine) => {
-    setRoutines(routines.map((r) => (r.id === routine.id ? routine : r)))
-    setDialogOpen(false)
-    setEditingRoutine(undefined)
+  const handleUpdate = async (routine: Routine) => {
+    try {
+      const response = await fetch(`/api/routines/${routine.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routine),
+      })
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        setEditingRoutine(undefined)
+        toast({
+          title: 'Routine updated',
+          description: 'Your routine has been updated successfully.',
+        })
+      } else {
+        toast({
+          title: 'Error updating routine',
+          description: 'Could not update routine. Please try again later.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error updating routine:', error)
+      toast({
+        title: 'Error updating routine',
+        description: 'Could not update routine. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setRoutines(routines.filter((r) => r.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/routines/${id}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        mutate()
+        toast({
+          title: 'Routine deleted',
+          description: 'Your routine has been deleted successfully.',
+        })
+      } else {
+        toast({
+          title: 'Error deleting routine',
+          description: 'Could not delete routine. Please try again later.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting routine:', error)
+      toast({
+        title: 'Error deleting routine',
+        description: 'Could not delete routine. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleEdit = (routine: Routine) => {
@@ -132,13 +134,35 @@ export default function RoutinesPage() {
     setEditingRoutine(undefined)
   }
 
-  const handleImport = (routine: Omit<Routine, 'id'>) => {
-    const newRoutine = {
-      ...routine,
-      id: Date.now().toString(),
+  const handleImport = async (routine: Omit<Routine, 'id'>) => {
+    try {
+      const response = await fetch('/api/routines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routine),
+      })
+      if (response.ok) {
+        mutate()
+        setImportDialogOpen(false)
+        toast({
+          title: 'Routine imported',
+          description: 'Your routine has been imported successfully.',
+        })
+      } else {
+        toast({
+          title: 'Error importing routine',
+          description: 'Could not import routine. Please try again later.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error importing routine:', error)
+      toast({
+        title: 'Error importing routine',
+        description: 'Could not import routine. Please try again later.',
+        variant: 'destructive',
+      })
     }
-    setRoutines([...routines, newRoutine])
-    setImportDialogOpen(false)
   }
 
   const handleView = (routine: Routine) => {
@@ -146,24 +170,51 @@ export default function RoutinesPage() {
     setDetailDialogOpen(true)
   }
 
-  const handleUpdateProgress = (routineId: string, taskId: string, completed: boolean) => {
-    setRoutines(
-      routines.map((r) => {
-        if (r.id === routineId) {
-          return {
-            ...r,
-            tasks: r.tasks.map((t) => (t.id === taskId ? { ...t, completed } : t)),
-          }
+  const handleUpdateProgress = async (routineId: string, taskId: string, completed: boolean) => {
+    const optimisticRoutines = routines?.map((r) => {
+      if (r.id === routineId) {
+        return {
+          ...r,
+          tasks: r.tasks.map((t) => (t.id === taskId ? { ...t, completed } : t)),
         }
-        return r
-      })
-    )
+      }
+      return r
+    })
+
+    if (optimisticRoutines) {
+      mutate(optimisticRoutines, false)
+    }
+
     // Update the viewing routine to reflect changes
     if (viewingRoutine?.id === routineId) {
       setViewingRoutine({
         ...viewingRoutine,
         tasks: viewingRoutine.tasks.map((t) => (t.id === taskId ? { ...t, completed } : t)),
       })
+    }
+
+    // Persist to API
+    const routine = optimisticRoutines?.find(r => r.id === routineId)
+    if (routine) {
+      try {
+        const response = await fetch(`/api/routines/${routineId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(routine),
+        })
+        if (!response.ok) {
+          throw new Error("Failed to update routine")
+        }
+        mutate()
+      } catch (error) {
+        console.error('Error updating routine progress:', error)
+        toast({
+          title: 'Error updating routine progress',
+          description: 'Could not update routine progress. Please try again later.',
+          variant: 'destructive',
+        })
+        mutate() // Revert optimistic update
+      }
     }
   }
 
@@ -173,6 +224,10 @@ export default function RoutinesPage() {
     } else {
       handleCreate(routine as Omit<Routine, 'id'>)
     }
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
   return (
@@ -200,11 +255,16 @@ export default function RoutinesPage() {
         </div>
 
         <RoutinesList
-          routines={routines}
+          routines={routines || []}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onView={handleView}
         />
+
+        {/* Fitness Tracker Section */}
+        <div className="mt-8">
+          <FitnessTracker />
+        </div>
 
         <RoutineDialog
           open={dialogOpen}

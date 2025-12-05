@@ -26,7 +26,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
       last7Days.push(date.toISOString().split('T')[0])
     }
 
-    const weekEntries = tracker.entries.filter((e) =>
+    const weekEntries = (Array.isArray(tracker.entries) ? tracker.entries : []).filter((e) =>
       last7Days.includes(e.date)
     )
     if (weekEntries.length === 0) return 0
@@ -36,8 +36,9 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
   }
 
   const getTrend = (tracker: Tracker) => {
-    if (tracker.entries.length < 2) return 'neutral'
-    const sorted = [...tracker.entries].sort(
+    const entries = tracker.entries || []
+    if (entries.length < 2) return 'neutral'
+    const sorted = [...entries].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     )
     const latest = sorted[0].value
@@ -51,7 +52,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
     const value = parseFloat(inputValues[trackerId] || '0')
     if (value > 0) {
       const tracker = trackers.find(t => t.id === trackerId)
-      const hadTodayEntry = tracker?.entries.some(
+      const hadTodayEntry = (Array.isArray(tracker?.entries) ? tracker.entries : []).some(
         (e) => e.date === new Date().toISOString().split('T')[0]
       )
 
@@ -85,7 +86,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
       {trackers.map((tracker) => {
         const weeklyAvg = getWeeklyAverage(tracker)
         const trend = getTrend(tracker)
-        const todayEntry = tracker.entries.find(
+        const todayEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).find(
           (e) => e.date === new Date().toISOString().split('T')[0]
         )
 
@@ -130,7 +131,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
 
               {todayEntry ? (
                 <div className="rounded-lg bg-muted p-3">
-                  <p className="text-sm text-muted-foreground">Today's Entry</p>
+                  <p className="text-sm text-muted-foreground">Today&apos;s Entry</p>
                   <p className="text-lg font-semibold">
                     {todayEntry.value} {tracker.unit}
                   </p>

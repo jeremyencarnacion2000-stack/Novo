@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const checklistItemSchema = z.object({
+  text: z.string().min(1, 'Text is required'),
+  completed: z.boolean().optional().default(false),
+  priority: z.enum(['low', 'medium', 'high']).optional().default('medium')
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +19,13 @@ export async function GET(request: NextRequest) {
 
     const items = await prisma.checklistItem.findMany({
       where: { userId: session.user.id },
+      include: {
+        task: {
+          include: {
+            project: true
+          }
+        }
+      },
       orderBy: { updatedAt: 'desc' }
     })
 
@@ -30,11 +44,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { text, completed = false, priority = 'medium' } = body
+    const parsedBody = checklistItemSchema.safeParse(body)
 
-    if (!text) {
-      return NextResponse.json({ error: 'Text is required' }, { status: 400 })
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { text, completed, priority } = parsedBody.data
 
     const item = await prisma.checklistItem.create({
       data: {
@@ -47,6 +63,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(item, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating checklist item:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

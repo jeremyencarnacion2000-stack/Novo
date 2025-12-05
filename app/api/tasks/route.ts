@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isSameDay, parseISO } from 'date-fns'
+import { taskSchema } from '@/lib/schemas/task'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,11 +33,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, status, priority, dueDate, projectId, tags } = body
+    console.log('Creating task with body:', JSON.stringify(body, null, 2))
 
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const parsedBody = taskSchema.safeParse(body)
+
+    if (!parsedBody.success) {
+      console.error('Task validation failed:', parsedBody.error.format())
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { title, status, priority, dueDate, projectId, tags } = parsedBody.data
 
     const task = await prisma.task.create({
       data: {
@@ -43,14 +51,38 @@ export async function POST(request: NextRequest) {
         priority: priority || 'medium',
         dueDate,
         projectId,
-        tags: tags || [],
+        tags: JSON.stringify(tags || []),
         userId: session.user.id
       }
     })
 
+    // If task has dueDate today, create a linked checklist item
+    if (dueDate && isSameDay(parseISO(dueDate), new Date())) {
+      try {
+        await prisma.checklistItem.create({
+          data: {
+            text: title,
+            completed: false,
+            priority: priority || 'medium',
+            userId: session.user.id,
+            taskId: task.id
+          }
+        })
+      } catch (checklistError) {
+        console.error('Failed to create linked checklist item:', checklistError)
+      }
+    }
+
     return NextResponse.json(task, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating task:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error details:', error instanceof Error ? error.message : String(error))
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

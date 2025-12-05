@@ -11,36 +11,42 @@ export function DashboardHabits() {
   const [habits, setHabits] = useState<Tracker[]>([])
 
   useEffect(() => {
-    const savedTrackers = localStorage.getItem('novo_trackers')
-    if (savedTrackers) {
-      const allTrackers: Tracker[] = JSON.parse(savedTrackers)
-      // Filter only habit type trackers
-      setHabits(allTrackers.filter(t => t.type === 'habit').slice(0, 3))
-    }
+    fetch('/api/trackers')
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        // Filter only habit type trackers
+        const allTrackers = ok && Array.isArray(data) ? data : []
+        const trackersArray = Array.isArray(allTrackers) ? allTrackers.filter((t) => t && typeof t === 'object') : []
+        setHabits(trackersArray.filter(t => t.type === 'habit').slice(0, 3))
+      })
+      .catch(console.error)
   }, [])
 
-  const handleToggleHabit = (id: string) => {
+  const handleToggleHabit = async (id: string) => {
     const today = new Date().toISOString().split('T')[0]
-    const savedTrackers = localStorage.getItem('novo_trackers')
-    
-    if (savedTrackers) {
-      const allTrackers: Tracker[] = JSON.parse(savedTrackers)
-      const updatedTrackers = allTrackers.map(tracker => {
-        if (tracker.id === id) {
-          const hasEntry = tracker.entries.some(e => e.date === today)
-          let newEntries
-          if (hasEntry) {
-            newEntries = tracker.entries.filter(e => e.date !== today)
-          } else {
-            newEntries = [...tracker.entries, { date: today, value: 1 }]
-          }
-          return { ...tracker, entries: newEntries }
-        }
-        return tracker
-      })
-      
-      localStorage.setItem('novo_trackers', JSON.stringify(updatedTrackers))
-      setHabits(updatedTrackers.filter(t => t.type === 'habit').slice(0, 3))
+    const hasEntry = habits.find(h => h.id === id)?.entries ? (Array.isArray(habits.find(h => h.id === id)?.entries) ? habits.find(h => h.id === id)?.entries : []).some(e => e.date === today) : false
+
+    try {
+      if (hasEntry) {
+        // Delete entry
+        await fetch(`/api/trackers/${id}/entries?date=${today}`, { method: 'DELETE' })
+      } else {
+        // Add entry
+        await fetch(`/api/trackers/${id}/entries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: today, value: 1 })
+        })
+      }
+
+      // Refresh habits
+      const res = await fetch('/api/trackers')
+      const data = await res.json()
+      const allTrackers = res.ok && Array.isArray(data) ? data : []
+      const trackersArray = Array.isArray(allTrackers) ? allTrackers.filter((t) => t && typeof t === 'object') : []
+      setHabits(trackersArray.filter(t => t.type === 'habit').slice(0, 3))
+    } catch (error) {
+      console.error('Failed to toggle habit:', error)
     }
   }
 
@@ -59,7 +65,7 @@ export function DashboardHabits() {
       <CardContent className="space-y-2">
         {habits.map(habit => {
           const today = new Date().toISOString().split('T')[0]
-          const isCompleted = habit.entries.some(e => e.date === today)
+          const isCompleted = Array.isArray(habit.entries) ? habit.entries.some(e => e.date === today) : false
           
           return (
             <div key={habit.id} className="flex items-center justify-between p-2 rounded-md hover:bg-secondary/50 transition-colors">

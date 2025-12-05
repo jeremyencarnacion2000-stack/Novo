@@ -209,7 +209,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 export function useNotifications() {
   const context = useContext(NotificationContext)
   if (!context) {
-    throw new Error('useNotifications must be used within NotificationProvider')
+    return {
+      isSupported: false,
+      permission: 'denied' as NotificationPermission,
+      requestPermission: () => Promise.resolve('denied' as NotificationPermission),
+      showNotification: () => {},
+      scheduleNotification: () => {},
+      settings: defaultNotificationSettings,
+      updateSettings: () => {}
+    }
   }
   return context
 }

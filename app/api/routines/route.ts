@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { routineSchema } from '@/lib/schemas/routine'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
-  console.log('GET /api/routines called')
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -32,11 +33,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, timeOfDay, duration, tasks = [] } = body
+    const parsedBody = routineSchema.safeParse(body)
 
-    if (!name || !timeOfDay || !duration) {
-      return NextResponse.json({ error: 'Name, timeOfDay, and duration are required' }, { status: 400 })
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { name, description, timeOfDay, duration, tasks = [] } = parsedBody.data
 
     const routine = await prisma.routine.create({
       data: {
@@ -57,6 +60,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(routine, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating routine:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

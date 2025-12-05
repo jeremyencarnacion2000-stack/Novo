@@ -1,5 +1,7 @@
-
-
+/**
+ * Client-side Analytics Tracking Functions
+ * Use these to track user events from client components
+ */
 
 export async function trackEvent(
   userId: string,
@@ -45,7 +47,6 @@ export async function endSession(sessionId: string) {
   }
 }
 
-
 export async function trackCompletion(
   userId: string,
   type: 'task' | 'routine' | 'habit',
@@ -62,32 +63,7 @@ export async function trackCompletion(
   }
 }
 
-export async function getAnalyticsData(userId: string, days: number = 30) {
-  try {
-    const res = await fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getAnalyticsData', userId, days })
-    })
-    const data = await res.json()
-    return data
-  } catch (error) {
-    console.error('Failed to get analytics data:', error)
-    return { dailyData: [], events: [] }
-  }
-}
-
-export async function calculateProductivityMetrics(userId: string, days: number = 30) {
-  try {
-    const res = await fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'calculateProductivityMetrics', userId, days })
-    })
-    const data = await res.json()
-    return data
-  } catch (error) {
-    console.error('Failed to calculate productivity metrics:', error)
-    return null
-  }
-}
+/**
+ * Note: getAnalyticsData and calculateProductivityMetrics have been moved to lib/analytics-server.ts
+ * These functions should only be used in Server Components for direct Prisma access
+ */

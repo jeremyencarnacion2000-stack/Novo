@@ -46,7 +46,6 @@ model User {
   image         String?
   password      String?
   role          String    @default("user") // "user" or "admin"
-  kiloUserId    String?
   accounts      Account[]
   sessions      Session[]
   checklistItems ChecklistItem[]
@@ -60,6 +59,16 @@ model User {
   dailyAnalytics DailyAnalytics[]
   conversations  Conversation[]
   aiConversations AIConversation[]
+  businessClients BusinessClient[]
+  businessContentIdeas BusinessContentIdea[]
+  books Book[]
+  gratitudes Gratitude[]
+  goals Goal[]
+  clients Client[]
+  subjects Subject[]
+  activityHistories ActivityHistory[]
+  fitnessEntries FitnessEntry[]
+  workoutEntries WorkoutEntry[]
 }
 
 model VerificationToken {
@@ -70,6 +79,16 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model UserSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  settings  Json     // Store all user settings as JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
 model ChecklistItem {
   id        String   @id @default(cuid())
   text      String
@@ -77,6 +96,8 @@ model ChecklistItem {
   priority  String   // 'low' | 'medium' | 'high'
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
@@ -125,6 +146,7 @@ model Project {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   subtasks  Subtask[]
+  tasks     Task[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
@@ -150,9 +172,11 @@ model Task {
   priority  String   // 'low' | 'medium' | 'high'
   dueDate   String?
   projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   tags      String   // JSON array
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistItems ChecklistItem[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
@@ -193,6 +217,7 @@ model SchoolSubject {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   events    SchoolEvent[]
+  grades    SchoolGrade[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
@@ -211,6 +236,18 @@ model SchoolEvent {
   version   Int      @default(1)
 
   @@map("school_events")
+}
+
+model SchoolGrade {
+  id        String   @id @default(cuid())
+  period    String
+  grade     Float
+  subjectId String
+  subject   SchoolSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("school_grades")
 }
 
 model AnalyticsEvent {
@@ -298,4 +335,135 @@ model Attachment {
   updatedAt      DateTime    @updatedAt
 
   @@map("attachments")
+}
+
+model BusinessClient {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   // 'active' | 'proposal' | 'inactive'
+  projects  Int      @default(0)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("business_clients")
+}
+
+model BusinessContentIdea {
+  id        String   @id @default(cuid())
+  title     String
+  platform  String
+  status    String   // 'draft' | 'scheduled' | 'published'
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("business_content_ideas")
+}
+
+model Book {
+  id        String   @id @default(cuid())
+  title     String
+  author    String?
+  status    String   // 'read' | 'reading' | 'to-read'
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("books")
+}
+
+model Gratitude {
+  id        String   @id @default(cuid())
+  content   String
+  date      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("gratitudes")
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   // 'active' | 'completed' | 'paused'
+  deadline    String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
+
+  @@map("goals")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  status    String   // 'active' | 'inactive'
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("clients")
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
+
+  @@map("subjects")
+}
+
+model ActivityHistory {
+  id        String   @id @default(cuid())
+  activity  String
+  date      String
+  duration  Int?     // in minutes
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  @@map("activity_history")
+}
+
+model FitnessEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @default(now())
+  steps     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("fitness_entries")
+}
+
+model WorkoutEntry {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String   // "Running", "Yoga", "Weightlifting", etc.
+  durationMinutes Int
+  date            DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("workout_entries")
 }

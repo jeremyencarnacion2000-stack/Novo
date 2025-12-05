@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const updateChecklistItemSchema = z.object({
+  text: z.string().min(1, 'Text cannot be empty').optional(),
+  completed: z.boolean().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  version: z.number().optional()
+})
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +54,13 @@ export async function PUT(
     const { id } = await params
 
     const body = await request.json()
-    const { text, completed, priority, version } = body
+    const parsedBody = updateChecklistItemSchema.safeParse(body)
+
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
+    }
+
+    const { text, completed, priority, version } = parsedBody.data
 
     // Check for conflicts
     const currentItem = await prisma.checklistItem.findFirst({
@@ -68,7 +82,10 @@ export async function PUT(
     }
 
     const updatedItem = await prisma.checklistItem.update({
-      where: { id },
+      where: {
+        id,
+        userId: session.user.id
+      },
       data: {
         ...(text !== undefined && { text }),
         ...(completed !== undefined && { completed }),
@@ -76,6 +93,25 @@ export async function PUT(
         version: { increment: 1 }
       }
     })
+
+    // Sincronizar con la task relacionada si se actualizó 'completed' y existe taskId
+    if (completed !== undefined) {
+      const itemWithTaskId = await prisma.checklistItem.findUnique({
+        where: { id },
+        select: { taskId: true }
+      })
+      if (itemWithTaskId?.taskId) {
+        await prisma.task.update({
+          where: {
+            id: itemWithTaskId.taskId,
+            userId: session.user.id
+          },
+          data: {
+            status: completed ? 'completed' : 'pending'
+          }
+        })
+      }
+    }
 
     return NextResponse.json(updatedItem)
   } catch (error) {

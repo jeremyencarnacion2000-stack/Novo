@@ -23,23 +23,23 @@ export function Sidebar() {
 
     return (
         <div
-            className={`relative h-full bg-zinc-900 border-r border-zinc-800 transition-all duration-300 flex flex-col ${sidebarCollapsed ? 'w-0 lg:w-16' : 'w-64 lg:w-72'
+            className={`relative h-full bg-card border-r border-border transition-all duration-300 flex flex-col ${sidebarCollapsed ? 'w-0 lg:w-16' : 'w-64 lg:w-72'
                 }`}
         >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between p-4 border-b border-border">
                 {!sidebarCollapsed && (
-                    <h2 className="text-lg font-semibold text-white">Conversaciones</h2>
+                    <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>
                 )}
                 <button
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                    className="p-2 hover:bg-accent rounded-lg transition-colors"
                     aria-label={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
                 >
                     {sidebarCollapsed ? (
-                        <ChevronRight className="w-5 h-5 text-zinc-400" />
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     ) : (
-                        <ChevronLeft className="w-5 h-5 text-zinc-400" />
+                        <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                     )}
                 </button>
             </div>
@@ -49,13 +49,13 @@ export function Sidebar() {
                     {/* Search */}
                     <div className="p-3">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 type="text"
                                 placeholder="Buscar conversaciones..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                         </div>
                     </div>
@@ -64,7 +64,7 @@ export function Sidebar() {
                     <div className="px-3 pb-3">
                         <button
                             onClick={createConversation}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
                         >
                             <Plus className="w-4 h-4" />
                             <span className="text-sm font-medium">Nueva conversación</span>
@@ -74,7 +74,7 @@ export function Sidebar() {
                     {/* Conversations List */}
                     <div className="flex-1 overflow-y-auto px-3 space-y-1">
                         {filteredConversations.length === 0 ? (
-                            <div className="text-center py-8 text-zinc-500 text-sm">
+                            <div className="text-center py-8 text-muted-foreground text-sm">
                                 {searchQuery ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
                             </div>
                         ) : (
@@ -82,8 +82,8 @@ export function Sidebar() {
                                 <div
                                     key={conv.id}
                                     className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${currentConversationId === conv.id
-                                            ? 'bg-zinc-800 text-white'
-                                            : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                                         }`}
                                     onClick={() => setCurrentConversationId(conv.id)}
                                 >
@@ -96,10 +96,10 @@ export function Sidebar() {
                                                 deleteConversation(conv.id);
                                             }
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-700 rounded transition-opacity"
+                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/20 rounded transition-opacity"
                                         aria-label="Eliminar conversación"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                     </button>
                                 </div>
                             ))

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { trackerSchema } from '@/lib/schemas/tracker'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,11 +33,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, type, unit, goal, entries = [] } = body
+    const parsedBody = trackerSchema.safeParse(body)
 
-    if (!name || !type || !unit || goal === undefined) {
-      return NextResponse.json({ error: 'Name, type, unit, and goal are required' }, { status: 400 })
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
+
+    const { name, type, unit, goal, entries = [] } = parsedBody.data
 
     const tracker = await prisma.tracker.create({
       data: {
@@ -56,6 +60,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(tracker, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating tracker:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

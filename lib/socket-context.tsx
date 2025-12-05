@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useSession } from 'next-auth/react'
 
@@ -57,5 +57,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useSocket() {
-  return useContext(SocketContext)
+  const context = useContext(SocketContext)
+  if (!context) {
+    return {
+      socket: null,
+      isConnected: false
+    }
+  }
+  return context
 }

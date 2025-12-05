@@ -8,82 +8,116 @@ import { KanbanBoard } from "@/components/projects/kanban-board"
 import { ProjectDialog } from "@/components/projects/project-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TasksView } from "@/components/projects/tasks-view"
-import { useAnalyticsSession } from "@/hooks/use-analytics-session"
 import type { Project, ProjectStatus } from "@/types/project"
+import { useToast } from "@/hooks/use-toast"
+import { useProjects } from "@/hooks/use-swr"
 
 export default function ProjectsPage() {
-  useAnalyticsSession('projects')
-  const [projects, setProjects] = useState<Project[]>([])
+  const { data: projects, error, isLoading, mutate } = useProjects()
+  const { toast } = useToast()
 
   useEffect(() => {
-    const stored = localStorage.getItem("novo-projects")
-    if (stored) {
-      setProjects(JSON.parse(stored))
-    } else {
-      // Initial sample projects with new structure
-      const initialProjects: Project[] = [
-        {
-          id: "1",
-          title: "Website Redesign",
-          description: "Modernize the company website with new design system",
-          status: "in-progress",
-          priority: "high",
-          startDate: "2024-11-01",
-          dueDate: "2024-12-31",
-          progress: 45,
-          tags: ["design", "web"],
-          subtasks: [
-            { id: "1", title: "Create wireframes", completed: true },
-            { id: "2", title: "Design mockups", completed: true },
-            { id: "3", title: "Develop frontend", completed: false },
-          ],
-          notes: "Using React and Tailwind CSS",
-        },
-        {
-          id: "2",
-          title: "Mobile App Development",
-          description: "Build iOS and Android apps",
-          status: "not-started",
-          priority: "high",
-          startDate: "2025-01-01",
-          dueDate: "2025-03-15",
-          progress: 0,
-          tags: ["mobile", "development"],
-          subtasks: [],
-          notes: "",
-        },
-      ]
-      setProjects(initialProjects)
-      localStorage.setItem("novo-projects", JSON.stringify(initialProjects))
+    if (error) {
+      toast({
+        title: "Error fetching projects",
+        description: "Could not fetch projects. Please try again later.",
+        variant: "destructive",
+      })
     }
-  }, [])
-
-  useEffect(() => {
-    if (projects.length > 0) {
-      localStorage.setItem("novo-projects", JSON.stringify(projects))
-    }
-  }, [projects])
+  }, [error, toast])
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | undefined>()
 
-  const handleCreate = (project: Project | Omit<Project, "id">) => {
-    const newProject = {
-      ...project,
-      id: Date.now().toString(),
-    } as Project
-    setProjects([...projects, newProject])
-    setDialogOpen(false)
+  const handleCreate = async (project: Project | Omit<Project, "id">) => {
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      })
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        toast({
+          title: "Project created",
+          description: "Your new project has been created successfully.",
+        })
+      } else {
+        toast({
+          title: "Error creating project",
+          description: "Could not create project. Please try again later.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error creating project:', error)
+      toast({
+        title: "Error creating project",
+        description: "Could not create project. Please try again later.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleUpdate = (project: Project | Omit<Project, "id">) => {
-    setProjects(projects.map((p) => (p.id === (project as Project).id ? project as Project : p)))
-    setDialogOpen(false)
-    setEditingProject(undefined)
+  const handleUpdate = async (project: Project | Omit<Project, "id">) => {
+    try {
+      const response = await fetch(`/api/projects/${(project as Project).id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      })
+      if (response.ok) {
+        mutate()
+        setDialogOpen(false)
+        setEditingProject(undefined)
+        toast({
+          title: "Project updated",
+          description: "Your project has been updated successfully.",
+        })
+      } else {
+        toast({
+          title: "Error updating project",
+          description: "Could not update project. Please try again later.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating project:', error)
+      toast({
+        title: "Error updating project",
+        description: "Could not update project. Please try again later.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setProjects(projects.filter((p) => p.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        mutate()
+        toast({
+          title: "Project deleted",
+          description: "Your project has been deleted successfully.",
+        })
+      } else {
+        toast({
+          title: "Error deleting project",
+          description: "Could not delete project. Please try again later.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error)
+      toast({
+        title: "Error deleting project",
+        description: "Could not delete project. Please try again later.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEdit = (project: Project) => {
@@ -96,8 +130,41 @@ export default function ProjectsPage() {
     setEditingProject(undefined)
   }
 
-  const handleStatusChange = (id: string, status: ProjectStatus) => {
-    setProjects(projects.map((p) => (p.id === id ? { ...p, status } : p)))
+  const handleStatusChange = async (id: string, status: ProjectStatus) => {
+    try {
+      const project = projects?.find(p => p.id === id)
+      if (project) {
+        const response = await fetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...project, status })
+        })
+        if (response.ok) {
+          mutate()
+          toast({
+            title: "Project status updated",
+            description: "Your project's status has been updated successfully.",
+          })
+        } else {
+          toast({
+            title: "Error updating project status",
+            description: "Could not update project status. Please try again later.",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error updating project status:', error)
+      toast({
+        title: "Error updating project status",
+        description: "Could not update project status. Please try again later.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
   return (
@@ -126,7 +193,7 @@ export default function ProjectsPage() {
               </Button>
             </div>
             <KanbanBoard
-              projects={projects}
+              projects={projects || []}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}

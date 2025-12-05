@@ -12,6 +12,8 @@ import { Plus, Search, Calendar, Trash2, Edit2, AlertCircle, ChevronRight } from
 import { TaskDialog } from "./task-dialog"
 import { format, parseISO, isPast, isToday, differenceInDays } from "date-fns"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
+import { DataIntegrator } from "@/lib/data-integrator"
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
   { status: "todo", title: "Not Started", color: "bg-secondary text-secondary-foreground" },
@@ -20,6 +22,7 @@ const columns: { status: Task["status"]; title: string; color: string }[] = [
 ]
 
 export function TasksView() {
+  const { data: session } = useSession()
   const [tasks, setTasks] = useState<Task[]>([])
   const [search, setSearch] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -27,42 +30,89 @@ export function TasksView() {
   const [draggedId, setDraggedId] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem("novo_standalone_tasks")
-    if (stored) {
-      setTasks(JSON.parse(stored))
+    if (session?.user?.id) {
+      DataIntegrator.getTasks(session.user.id)
+        .then((tasksData) => {
+          const tasksArray = Array.isArray(tasksData) ? tasksData : []
+          // Parse tags from JSON string to array and ensure it's always an array
+          const parsedTasks = tasksArray.map(task => ({
+            ...task,
+            tags: Array.isArray(task.tags)
+              ? task.tags
+              : typeof task.tags === 'string'
+                ? (task.tags ? JSON.parse(task.tags) : [])
+                : []
+          }))
+          setTasks(parsedTasks)
+        })
+        .catch(console.error)
     }
-  }, [])
+  }, [session?.user?.id])
 
-  useEffect(() => {
-    localStorage.setItem("novo_standalone_tasks", JSON.stringify(tasks))
-  }, [tasks])
-
-  const handleCreate = (taskData: Omit<Task, "id" | "createdAt">) => {
-    const newTask: Task = {
-      ...taskData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
+  const handleCreate = async (taskData: Omit<Task, "id" | "createdAt">) => {
+    if (!session?.user?.id) return
+    try {
+      const newTask = await DataIntegrator.createTask(session.user.id, taskData)
+      const parsedTask = {
+        ...newTask,
+        tags: typeof newTask.tags === 'string' ? JSON.parse(newTask.tags) : newTask.tags
+      }
+      setTasks([...tasks, parsedTask as Task])
+      toast.success("Task created")
+    } catch (error) {
+      console.error('Failed to create task:', error)
+      toast.error("Failed to create task")
     }
-    setTasks([...tasks, newTask])
-    toast.success("Task created")
   }
 
-  const handleUpdate = (taskData: Omit<Task, "id" | "createdAt">) => {
-    if (!editingTask) return
-    const updatedTasks = tasks.map((t) => (t.id === editingTask.id ? { ...t, ...taskData } : t))
-    setTasks(updatedTasks)
-    setEditingTask(undefined)
-    toast.success("Task updated")
+  const handleUpdate = async (taskData: Omit<Task, "id" | "createdAt">) => {
+    if (!editingTask || !session?.user?.id) return
+    try {
+      await DataIntegrator.updateTask(session.user.id, editingTask.id, taskData)
+
+      // Optimistic update in UI
+      const updatedTask = { ...editingTask, ...taskData }
+      const parsedTask = {
+        ...updatedTask,
+        tags: typeof updatedTask.tags === 'string' ? JSON.parse(updatedTask.tags) : updatedTask.tags
+      }
+      const updatedTasks = tasks.map((t) => (t.id === editingTask.id ? parsedTask : t))
+      setTasks(updatedTasks as Task[])
+      setEditingTask(undefined)
+      toast.success("Task updated")
+    } catch (error) {
+      console.error('Failed to update task:', error)
+      toast.error("Failed to update task")
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setTasks(tasks.filter((t) => t.id !== id))
-    toast.success("Task deleted")
+  const handleDelete = async (id: string) => {
+    if (!session?.user?.id) return
+    try {
+      await DataIntegrator.deleteTask(session.user.id, id)
+      setTasks(tasks.filter((t) => t.id !== id))
+      toast.success("Task deleted")
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+      toast.error("Failed to delete task")
+    }
   }
 
-  const handleStatusChange = (id: string, status: Task["status"]) => {
-    const updatedTasks = tasks.map((t) => (t.id === id ? { ...t, status } : t))
-    setTasks(updatedTasks)
+  const handleStatusChange = async (id: string, status: Task["status"]) => {
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      })
+      if (res.ok) {
+        const updatedTask = await res.json()
+        const updatedTasks = tasks.map((t) => (t.id === id ? updatedTask : t))
+        setTasks(updatedTasks)
+      }
+    } catch (error) {
+      console.error('Failed to update task status:', error)
+    }
   }
 
   const getNextStatus = (currentStatus: Task["status"]): Task["status"] | null => {
@@ -150,9 +200,8 @@ export function TasksView() {
               </div>
 
               <div
-                className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${
-                  draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""
-                }`}
+                className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""
+                  }`}
               >
                 {columnTasks.map((task) => {
                   const nextStatus = getNextStatus(task.status)
@@ -165,18 +214,16 @@ export function TasksView() {
                   return (
                     <Card
                       key={task.id}
-                      className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${
-                        draggedId === task.id ? "opacity-50" : ""
-                      }`}
+                      className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === task.id ? "opacity-50" : ""
+                        }`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
                     >
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <span
-                            className={`font-medium leading-tight ${
-                              task.status === "done" ? "line-through text-muted-foreground" : ""
-                            }`}
+                            className={`font-medium leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""
+                              }`}
                           >
                             {task.title}
                           </span>
@@ -188,7 +235,7 @@ export function TasksView() {
                           </Badge>
                         </div>
 
-                        {task.tags.length > 0 && (
+                        {Array.isArray(task.tags) && task.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {task.tags.map((tag) => (
                               <Badge key={tag} variant="outline" className="text-[10px] px-1 h-5">

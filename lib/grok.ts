@@ -39,7 +39,7 @@ export interface GrokAPIResponse {
 export class GrokAPIClient {
   private static instance: GrokAPIClient;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): GrokAPIClient {
     if (!GrokAPIClient.instance) {
@@ -55,10 +55,14 @@ export class GrokAPIClient {
     systemPrompt?: string,
     tools?: GrokTool[]
   ): Promise<{ content: string; functionCalls: GrokFunctionCall[] }> {
-    const apiKey = process.env.GROK_API_KEY || process.env.KILO_API_KEY || process.env.XAI_API_KEY;
+    const apiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     console.log('Grok API: Clave API presente:', !!apiKey);
     if (!apiKey) {
-      throw new Error('GROK_API_KEY, KILO_API_KEY, or XAI_API_KEY is required for Grok API');
+      console.warn('GROK_API_KEY missing, returning mock response');
+      return {
+        content: "I'm sorry, I can't process your request right now because my API key is missing. Please check your configuration.",
+        functionCalls: []
+      };
     }
 
     // Build messages array for xAI API
@@ -73,12 +77,14 @@ export class GrokAPIClient {
     }
 
     // Add history
-    history.forEach(h => {
-      messages.push({
-        role: h.role,
-        content: h.content
+    if (Array.isArray(history) && history.length > 0) {
+      history.forEach(h => {
+        messages.push({
+          role: h.role,
+          content: h.content
+        });
       });
-    });
+    }
 
     // Add current message
     messages.push({
@@ -89,8 +95,19 @@ export class GrokAPIClient {
     try {
       console.log('Grok API: Enviando solicitud', {
         cantidadMensajes: messages.length,
-        cantidadHerramientas: tools?.length || 0
+        cantidadHerramientas: tools?.length || 0,
+        modelo: 'grok-2-1212'
       });
+
+      const requestBody = {
+        model: 'grok-2-1212',
+        messages: messages,
+        max_tokens: 1024,
+        temperature: 0.7,
+        stream: false,
+        ...(tools && tools.length > 0 && { tools })
+      };
+      console.log('DEBUG: Request body model:', requestBody.model);
 
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
@@ -98,18 +115,16 @@ export class GrokAPIClient {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: 'grok-3',
-          messages: messages,
-          max_tokens: 1024,
-          temperature: 0.7,
-          stream: false,
-          ...(tools && tools.length > 0 && { tools })
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('DEBUG: API response status:', response.status);
+      console.log('DEBUG: API response statusText:', response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Grok API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('DEBUG: API error response body:', errorText);
+        throw new Error(`Grok API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data: GrokAPIResponse = await response.json();
@@ -148,12 +163,15 @@ export class GrokAPIClient {
       return { content, functionCalls };
     } catch (error) {
       console.error('Grok API error:', error);
+      console.error('DEBUG: Error type:', typeof error);
+      console.error('DEBUG: Error message:', error instanceof Error ? error.message : String(error));
+      console.error('DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack available');
       throw new Error(`Grok API error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async getModels(): Promise<string[]> {
-    return ['grok-3'];
+    return ['grok-2-1212'];
   }
 }
 

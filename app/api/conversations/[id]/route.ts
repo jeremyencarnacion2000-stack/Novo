@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { updateConversationSchema, conversationMessageSchema } from '@/lib/schemas/conversation'
+import { z } from 'zod'
 
 export async function PUT(
   request: NextRequest,
@@ -13,7 +15,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, messages } = await request.json()
+    const { id } = params
+    const body = await request.json()
+    const parsedBody = updateConversationSchema.safeParse(body)
+
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
+    }
+
+    const { title, messages } = parsedBody.data
 
     // Verificar que la conversación pertenece al usuario
     const existingConversation = await prisma.conversation.findFirst({
@@ -32,7 +42,14 @@ export async function PUT(
       where: { id: params.id },
       data: {
         title: title || existingConversation.title,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        messages: {
+          upsert: messages?.map((msg) => ({
+            where: { id: msg.id || '' },
+            update: { role: msg.role, content: msg.content, createdAt: msg.createdAt ? new Date(msg.createdAt) : undefined },
+            create: { role: msg.role, content: msg.content, createdAt: msg.createdAt ? new Date(msg.createdAt) : undefined },
+          })),
+        },
       },
       include: {
         messages: {
@@ -41,42 +58,11 @@ export async function PUT(
       }
     })
 
-    // Si hay mensajes nuevos, actualizarlos
-    if (messages && Array.isArray(messages)) {
-      // Primero eliminar mensajes existentes
-      await prisma.message.deleteMany({
-        where: { conversationId: params.id }
-      })
-
-      // Crear nuevos mensajes
-      const messageData = messages.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content,
-        createdAt: new Date(msg.timestamp || Date.now())
-      }))
-
-      await prisma.message.createMany({
-        data: messageData.map(msg => ({
-          ...msg,
-          conversationId: params.id
-        }))
-      })
-
-      // Recargar la conversación con mensajes
-      const finalConversation = await prisma.conversation.findUnique({
-        where: { id: params.id },
-        include: {
-          messages: {
-            orderBy: { createdAt: 'asc' }
-          }
-        }
-      })
-
-      return NextResponse.json(finalConversation)
-    }
-
     return NextResponse.json(updatedConversation)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error updating conversation:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

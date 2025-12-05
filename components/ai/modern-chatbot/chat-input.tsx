@@ -41,10 +41,10 @@ export function ChatInput() {
     };
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pt-8 pb-6">
-            <div className="max-w-4xl mx-auto px-6">
+        <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-8 pb-6 px-6">
+            <div className="max-w-4xl mx-auto">
                 <form onSubmit={handleSubmit} className="relative">
-                    <div className="relative flex items-end gap-2 bg-zinc-800 border border-zinc-700 rounded-2xl p-2 focus-within:border-zinc-600 transition-colors">
+                    <div className="relative flex items-end gap-2 bg-secondary border border-input rounded-2xl p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring transition-all">
                         {/* Textarea */}
                         <textarea
                             ref={textareaRef}
@@ -52,7 +52,7 @@ export function ChatInput() {
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder="Escribe tu mensaje..."
-                            className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none resize-none px-3 py-2 max-h-40 min-h-[2.5rem]"
+                            className="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none px-3 py-2 max-h-40 min-h-[2.5rem]"
                             rows={1}
                             disabled={isLoading}
                         />
@@ -61,32 +61,32 @@ export function ChatInput() {
                         <div className="flex items-center gap-1 pb-2">
                             <button
                                 type="button"
-                                className="p-2 hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
+                                className="p-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
                                 title="Adjuntar archivo"
                                 disabled={isLoading}
                             >
-                                <Paperclip className="w-5 h-5 text-zinc-400" />
+                                <Paperclip className="w-5 h-5 text-muted-foreground" />
                             </button>
 
                             <button
                                 type="button"
-                                className="p-2 hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
+                                className="p-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
                                 title="Grabación de voz"
                                 disabled={isLoading}
                             >
-                                <Mic className="w-5 h-5 text-zinc-400" />
+                                <Mic className="w-5 h-5 text-muted-foreground" />
                             </button>
 
                             <button
                                 type="submit"
                                 disabled={!input.trim() || isLoading}
-                                className="p-2 bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-2 bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Enviar mensaje"
                             >
                                 {isLoading ? (
-                                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                                    <Loader2 className="w-5 h-5 text-primary-foreground animate-spin" />
                                 ) : (
-                                    <Send className="w-5 h-5 text-white" />
+                                    <Send className="w-5 h-5 text-primary-foreground" />
                                 )}
                             </button>
                         </div>
@@ -94,7 +94,7 @@ export function ChatInput() {
 
                     {/* Character count */}
                     {input.length > 0 && (
-                        <div className="absolute -bottom-6 right-0 text-xs text-zinc-600">
+                        <div className="absolute -bottom-6 right-0 text-xs text-muted-foreground">
                             {input.length} caracteres
                         </div>
                     )}

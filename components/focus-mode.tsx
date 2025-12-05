@@ -1,141 +1,212 @@
-"use client"
+'use client'
 
-import './focus-mode.css'
-import * as React from "react"
-import { Button } from "@/components/ui/button"
+import React, { useState, useEffect } from 'react'
+import { Focus, Timer, Volume2, StickyNote, Play, Pause, RotateCcw, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Timer, Play, Pause, RotateCcw } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useFocus } from "@/lib/focus-context"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Slider } from '@/components/ui/slider'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { usePomodoro } from '@/lib/pomodoro-context'
+
+const AMBIENT_SOUNDS = [
+  { id: 'rain', name: 'Rain', emoji: '🌧️' },
+  { id: 'coffee', name: 'Coffee Shop', emoji: '☕' },
+  { id: 'ocean', name: 'Ocean Waves', emoji: '🌊' },
+  { id: 'forest', name: 'Forest', emoji: '🌲' },
+  { id: 'fire', name: 'Fireplace', emoji: '🔥' },
+]
 
 export function FocusMode() {
-  const {
-    setIsFocusModeActive,
-    time,
-    setTime,
-    isActive,
-    setIsActive,
-    initialTime,
-    setInitialTime,
-    mode,
-    setMode,
-    selectedTask,
-    setSelectedTask,
-    tasks,
-    setTasks,
-    toggleTimer,
-    resetTimer,
-    setTimerMode,
-    formatTime
-  } = useFocus()
-  const [isOpen, setIsOpen] = React.useState(false)
-  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
 
-  React.useEffect(() => {
-    // Initialize audio with a pleasant notification sound
-    audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3")
-    audioRef.current.volume = 0.5
+  // Use Pomodoro Context
+  const { mode, timeLeft, isRunning, completedPomodoros, startTimer, pauseTimer, resetTimer } = usePomodoro()
+
+  // Ambient Sounds State
+  const [selectedSound, setSelectedSound] = useState<string | null>(null)
+  const [volume, setVolume] = useState([50])
+
+  // Quick Notes State
+  const [notes, setNotes] = useState('')
+
+  // Load notes from localStorage
+  useEffect(() => {
+    const savedNotes = localStorage.getItem('focus-quick-notes')
+    if (savedNotes) setNotes(savedNotes)
   }, [])
 
-  React.useEffect(() => {
-    if (isOpen) {
-      const checklistItems = JSON.parse(localStorage.getItem("checklist-items") || "[]")
-      const activeTasks = checklistItems
-        .filter((item: any) => !item.completed)
-        .map((item: any) => ({ id: item.id, text: item.text }))
-      setTasks(activeTasks)
+  // Save notes to localStorage
+  useEffect(() => {
+    if (notes) {
+      localStorage.setItem('focus-quick-notes', notes)
     }
-  }, [isOpen, setTasks])
+  }, [notes])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const getModeLabel = () => {
+    switch (mode) {
+      case 'work': return 'Trabajo'
+      case 'shortBreak': return 'Descanso Corto'
+      case 'longBreak': return 'Descanso Largo'
+    }
+  }
+
+  const getModeColor = () => {
+    switch (mode) {
+      case 'work': return 'bg-red-500'
+      case 'shortBreak': return 'bg-green-500'
+      case 'longBreak': return 'bg-blue-500'
+    }
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="h-8 w-8 bg-transparent" title="Focus Mode">
-          <Timer className="h-4 w-4" />
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0"
+        >
+          <Focus className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Focus Mode</DialogTitle>
-          <DialogDescription>Select a task and stay productive with the Pomodoro technique.</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col items-center gap-6 py-4">
-          {mode === "work" && (
-            <div className="w-full max-w-xs">
-              <Select value={selectedTask} onValueChange={setSelectedTask}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a task to focus on..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {tasks.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No active tasks
-                    </SelectItem>
-                  ) : (
-                    tasks.map((task) => (
-                      <SelectItem key={task.id} value={task.id}>
-                        {task.text}
-                      </SelectItem>
-                    ))
-                  )}
-                  <SelectItem value="custom">Custom Task</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button variant={mode === "work" ? "default" : "outline"} size="sm" onClick={() => setTimerMode("work")}>
-              Work
-            </Button>
-            <Button
-              variant={mode === "shortBreak" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimerMode("shortBreak")}
-            >
-              Short Break
-            </Button>
-            <Button
-              variant={mode === "longBreak" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimerMode("longBreak")}
-            >
-              Long Break
-            </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[380px]" align="end" side="top">
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h4 className="font-medium leading-none flex items-center gap-2">
+              <Focus className="h-4 w-4" />
+              Focus Tools
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Herramientas para maximizar tu productividad
+            </p>
           </div>
 
-          <div className="text-7xl font-bold tracking-tighter font-mono tabular-nums">{formatTime(time)}</div>
+          <Tabs defaultValue="pomodoro" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="pomodoro" className="text-xs">
+                <Timer className="h-3 w-3 mr-1" />
+                Pomodoro
+              </TabsTrigger>
+              <TabsTrigger value="sounds" className="text-xs">
+                <Volume2 className="h-3 w-3 mr-1" />
+                Sonidos
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="text-xs">
+                <StickyNote className="h-3 w-3 mr-1" />
+                Notas
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="flex gap-4">
-            <Button
-              size="lg"
-              className={cn("w-32", isActive ? "bg-amber-500 hover:bg-amber-600" : "bg-green-500 hover:bg-green-600")}
-              onClick={toggleTimer}
-            >
-              {isActive ? (
-                <>
-                  <Pause className="mr-2 h-5 w-5" /> Pause
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-5 w-5" /> Start
-                </>
-              )}
-            </Button>
-            <Button size="lg" variant="outline" onClick={resetTimer}>
-              <RotateCcw className="h-5 w-5" />
-            </Button>
-          </div>
+            {/* Pomodoro Timer */}
+            <TabsContent value="pomodoro" className="space-y-4">
+              <div className="text-center space-y-3">
+                <Badge className={getModeColor()}>
+                  {getModeLabel()}
+                </Badge>
+
+                <div className="text-5xl font-bold tabular-nums">
+                  {formatTime(timeLeft)}
+                </div>
+
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={isRunning ? pauseTimer : startTimer}
+                  >
+                    {isRunning ? (
+                      <>
+                        <Pause className="h-4 w-4 mr-1" />
+                        Pausar
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-1" />
+                        Iniciar
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetTimer}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Reiniciar
+                  </Button>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 inline mr-1" />
+                  Pomodoros completados: {completedPomodoros}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Ambient Sounds */}
+            <TabsContent value="sounds" className="space-y-4">
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {AMBIENT_SOUNDS.map((sound) => (
+                    <Button
+                      key={sound.id}
+                      variant={selectedSound === sound.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedSound(selectedSound === sound.id ? null : sound.id)}
+                      className="justify-start"
+                    >
+                      <span className="mr-2">{sound.emoji}</span>
+                      {sound.name}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Volumen</label>
+                  <Slider
+                    value={volume}
+                    onValueChange={setVolume}
+                    max={100}
+                    step={1}
+                    disabled={!selectedSound}
+                  />
+                </div>
+
+                {selectedSound && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    🎵 Reproduciendo: {AMBIENT_SOUNDS.find(s => s.id === selectedSound)?.name}
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Quick Notes */}
+            <TabsContent value="notes" className="space-y-3">
+              <Textarea
+                placeholder="Escribe tus ideas rápidas aquí..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="min-h-[150px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Tus notas se guardan automáticamente
+              </p>
+            </TabsContent>
+          </Tabs>
         </div>
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   )
 }

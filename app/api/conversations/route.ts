@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getConversationsSchema, createConversationSchema } from '@/lib/schemas/conversation'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +12,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const parsedParams = getConversationsSchema.safeParse(Object.fromEntries(searchParams))
+
+    if (!parsedParams.success) {
+      return NextResponse.json({ error: parsedParams.error.format() }, { status: 400 })
+    }
+
+    const { skip, take } = parsedParams.data
+
     const conversations = await prisma.conversation.findMany({
       where: { userId: session.user.id },
       include: {
@@ -17,11 +28,16 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: 'asc' }
         }
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take
     })
 
     return NextResponse.json(conversations)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error fetching conversations:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -34,7 +50,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, messages } = await request.json()
+    const body = await request.json()
+    const parsedBody = createConversationSchema.safeParse(body)
+
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
+    }
+
+    const { title, messages } = parsedBody.data
 
     // Crear la conversación
     const conversation = await prisma.conversation.create({
@@ -45,12 +68,12 @@ export async function POST(request: NextRequest) {
     })
 
     // Si hay mensajes, crearlos
-    if (messages && Array.isArray(messages)) {
-      const messageData = messages.map((msg: any) => ({
+    if (messages && messages.length > 0) {
+      const messageData = messages.map((msg) => ({
         conversationId: conversation.id,
         role: msg.role,
         content: msg.content,
-        createdAt: new Date(msg.timestamp || Date.now())
+        createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date()
       }))
 
       await prisma.message.createMany({
@@ -70,6 +93,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(fullConversation)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
     console.error('Error creating conversation:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

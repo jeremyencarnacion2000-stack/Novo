@@ -4,7 +4,7 @@ import { DashboardShell } from '@/components/dashboard-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { useAnalyticsSession } from '@/hooks/use-analytics-session'
+import { FitnessStats } from '@/components/analytics/fitness-stats'
 
 interface DailyData {
   date: string
@@ -45,8 +45,6 @@ const chartConfig = {
 }
 
 export default function ClientAnalytics({ dailyData, metrics }: ClientAnalyticsProps) {
-  useAnalyticsSession('analytics')
-
   // Prepare module usage data for pie chart
   const moduleUsage = dailyData.reduce((acc, day) => {
     day.modulesUsed.forEach(module => {

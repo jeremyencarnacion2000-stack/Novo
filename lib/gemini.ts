@@ -1,104 +1,120 @@
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { ConversationMessage } from '@/types/ai';
-import Replicate from 'replicate';
 
-export interface ReplicateFunctionCall {
+// Use the key provided by the user
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
+
+export interface GeminiFunctionCall {
   name: string;
   args: Record<string, any>;
 }
 
-export interface ReplicateAPIResponse {
-  output: string;
+export interface GeminiTool {
+  functionDeclarations: {
+    name: string;
+    description: string;
+    parameters?: {
+      type: string;
+      properties: Record<string, any>;
+      required?: string[];
+    };
+  }[];
 }
 
-export class ReplicateAPIClient {
-  private static instance: ReplicateAPIClient;
-  private replicate: Replicate | null = null;
+export class GeminiAPIClient {
+  private static instance: GeminiAPIClient;
+  private genAI: GoogleGenerativeAI;
 
-  private constructor() {}
-
-  static getInstance(): ReplicateAPIClient {
-    if (!ReplicateAPIClient.instance) {
-      ReplicateAPIClient.instance = new ReplicateAPIClient();
-    }
-    return ReplicateAPIClient.instance;
+  private constructor() {
+    this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   }
 
-  /**
-     * Call Replicate API
-     */
+  static getInstance(): GeminiAPIClient {
+    if (!GeminiAPIClient.instance) {
+      GeminiAPIClient.instance = new GeminiAPIClient();
+    }
+    return GeminiAPIClient.instance;
+  }
+
   async generateResponse(
     message: string,
     context: string,
     history: ConversationMessage[] = [],
-    systemPrompt?: string
-  ): Promise<{ content: string; functionCalls: ReplicateFunctionCall[] }> {
-    if (!this.replicate) {
-      const REPLICATE_API_KEY = process.env.NEXT_PUBLIC_REPLICATE_API_KEY;
-      if (!REPLICATE_API_KEY) {
-        throw new Error('NEXT_PUBLIC_REPLICATE_API_KEY is required for Replicate API');
-      }
-      this.replicate = new Replicate({
-        auth: REPLICATE_API_KEY,
-      });
-    }
-
-    // Build conversation history for Replicate
-    let conversationText = '';
-
-    // Add system prompt
-    if (systemPrompt) {
-      conversationText += `System: ${systemPrompt}\n\n`;
-    }
-
-    // Add history
-    history.forEach(h => {
-      const role = h.role === 'user' ? 'User' : 'Assistant';
-      conversationText += `${role}: ${h.content}\n`;
-    });
-
-    // Add current message
-    conversationText += `User: ${message}\nAssistant:`;
-
+    systemPrompt?: string,
+    tools?: any[] // Function declarations
+  ): Promise<{ content: string; functionCalls: GeminiFunctionCall[] }> {
     try {
-      // Use Gemini 3 Pro model for chat
-      const output = await this.replicate.run(
-        "google/gemini-3-pro",
-        {
-          input: {
-            prompt: conversationText,
-            max_tokens: 1024,
-            temperature: 0.7,
-            top_p: 0.9,
-            system_prompt: systemPrompt || "Eres un asistente útil que responde en español.",
-          }
-        }
-      );
+      // Configure model with tools if provided
+      const modelConfig: any = { model: 'gemini-2.5-flash' };
 
-      let content = '';
-      if (typeof output === 'string') {
-        content = output;
-      } else if (Array.isArray(output)) {
-        content = output.join('');
-      } else {
-        content = String(output);
+      // Add tools if provided
+      if (tools && tools.length > 0) {
+        modelConfig.tools = [{
+          functionDeclarations: tools
+        }];
       }
 
-      // For now, no function calls support in this simple implementation
-      const functionCalls: ReplicateFunctionCall[] = [];
+      const model = this.genAI.getGenerativeModel(modelConfig);
 
-      return { content: content || 'Lo siento, no pude generar una respuesta.', functionCalls };
+      // Convert history to Gemini format, adding system prompt as first user message if provided
+      const chatHistory = [];
+
+      // If there's a system prompt, add it as the first exchange
+      if (systemPrompt) {
+        chatHistory.push({
+          role: 'user',
+          parts: [{ text: systemPrompt }]
+        });
+        chatHistory.push({
+          role: 'model',
+          parts: [{ text: 'Understood. I will follow these instructions.' }]
+        });
+      }
+
+      // Add conversation history
+      history.forEach(msg => {
+        chatHistory.push({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        });
+      });
+
+      // Start chat
+      const chat = model.startChat({
+        history: chatHistory,
+        generationConfig: {
+          maxOutputTokens: 2000,
+        },
+      });
+
+      // Send message
+      const result = await chat.sendMessage(message);
+      const response = await result.response;
+
+      // Handle function calls if any
+      const functionCalls: GeminiFunctionCall[] = [];
+      const calls = response.functionCalls();
+      if (calls && calls.length > 0) {
+        calls.forEach(call => {
+          functionCalls.push({
+            name: call.name,
+            args: call.args as Record<string, any>
+          });
+        });
+
+        // Return empty content if there are function calls
+        // The API will handle function execution and send results back
+        return { content: '', functionCalls };
+      }
+
+      const text = response.text();
+      return { content: text, functionCalls };
+
     } catch (error) {
-      console.error('Replicate API error:', error);
-      throw new Error(`Replicate API error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Gemini API error:', error);
+      throw new Error(`Gemini API error: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  /**
-     * Get available Replicate models
-     */
-  async getModels(): Promise<string[]> {
-    return ['google/gemini-3-pro'];
   }
 }
 
-export const replicateAPI = ReplicateAPIClient.getInstance();
+export const geminiAPI = GeminiAPIClient.getInstance();

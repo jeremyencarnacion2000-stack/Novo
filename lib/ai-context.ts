@@ -10,12 +10,12 @@ const getLocalData = <T,>(key: string, defaultValue?: T) => {
 };
 
 export const getAIContext = async (userId: string): Promise<AIContext> => {
-  const projects = getLocalData('novo_projects', []);
-  const routines = getLocalData('novo_routines', []);
-  const trackers = getLocalData('novo_trackers', []);
-  const checklistItems = getLocalData('novo_checklist_items', []);
-  const schoolSubjects = getLocalData('novo_school_subjects', []);
-  const standaloneTasks = getLocalData('novo_standalone_tasks', []);
+  const projects = Array.isArray(getLocalData('novo_projects', [])) ? getLocalData('novo_projects', []) : [];
+  const routines = Array.isArray(getLocalData('novo_routines', [])) ? getLocalData('novo_routines', []) : [];
+  const trackers = Array.isArray(getLocalData('novo_trackers', [])) ? getLocalData('novo_trackers', []) : [];
+  const checklistItems = Array.isArray(getLocalData('novo_checklist_items', [])) ? getLocalData('novo_checklist_items', []) : [];
+  const schoolSubjects = Array.isArray(getLocalData('novo_school_subjects', [])) ? getLocalData('novo_school_subjects', []) : [];
+  const standaloneTasks = Array.isArray(getLocalData('novo_standalone_tasks', [])) ? getLocalData('novo_standalone_tasks', []) : [];
   const dailyTasks = await DataIntegrator.getDailyTasks(userId);
 
   return {

@@ -1,268 +1,446 @@
 'use client'
 
-import { useSpotifyPlayer } from '@/lib/use-spotify-player'
-import { useSpotify } from '@/lib/spotify-context'
 import { DashboardShell } from '@/components/dashboard-shell'
+import { useSession, signIn } from 'next-auth/react'
+import { Search, Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { fetchSpotifyData, SpotifyUser, SpotifyPlaylist, SpotifyTrack, SpotifyAlbum, SpotifyPaging } from '@/lib/spotify'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ExternalLink } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { SpotifyAuthInvitation } from '@/components/music/spotify-auth-invitation'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { usePlayerStore, CurrentTrack, Playlist } from '@/lib/player-store'
+import { PlaylistView } from '@/components/music/playlist-view'
 
 export default function MusicPage() {
-  const { playerState, play, pause, seek } = useSpotifyPlayer()
-  const { accessToken, isAuthenticated, isPremium } = useSpotify()
-  const [playlists, setPlaylists] = useState<any[]>([])
-  const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const { data: session, status } = useSession()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [userProfile, setUserProfile] = useState<SpotifyUser | null>(null)
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[] | null>(null)
+  const [savedTracks, setSavedTracks] = useState<SpotifyTrack[] | null>(null)
+  const [savedAlbums, setSavedAlbums] = useState<SpotifyAlbum[] | null>(null)
+  const [hasToken, setHasToken] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [selectedTrack, setSelectedTrack] = useState<any>(null)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const lastSentIsPlaying = useRef<boolean | null>(null)
-  const lastSentPosition = useRef<number | null>(null)
-
-  const fetchPlaylists = async () => {
-    if (!accessToken) return
-    setLoading(true)
-    try {
-      const response = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPlaylists(data.items)
-        if (data.items.length > 0 && !selectedPlaylist) {
-          setSelectedPlaylist(data.items[0])
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching playlists:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-  const fetchSearchResults = async () => {
-    if (!searchQuery.trim()) return
-    setSearchLoading(true)
-    try {
-      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}`)
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data)
-      } else {
-        console.error('Search failed')
-        setSearchResults([])
-      }
-    } catch (error) {
-      console.error('Search error:', error)
-      setSearchResults([])
-    } finally {
-      setSearchLoading(false)
-    }
-  }
+  const { playTrack, playPlaylist } = usePlayerStore()
 
   useEffect(() => {
-    if (isAuthenticated && accessToken) {
-      fetchPlaylists()
+    async function loadSpotifyData() {
+      if (!hasToken) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const profileResponse = await fetch('/api/spotify/me')
+        if (!profileResponse.ok) throw new Error('Failed to fetch user profile')
+        const profile = await profileResponse.json()
+        setUserProfile(profile)
+
+        // Fetch more items for better search experience (limit=50)
+        const playlistsResponse = await fetch('/api/spotify/playlists?limit=50')
+        if (!playlistsResponse.ok) throw new Error('Failed to fetch playlists')
+        const playlistsData = await playlistsResponse.json()
+        setPlaylists(playlistsData.items)
+
+        const tracksResponse = await fetch('/api/spotify/tracks?limit=50')
+        if (!tracksResponse.ok) throw new Error('Failed to fetch tracks')
+        const tracksData = await tracksResponse.json()
+        setSavedTracks(tracksData.items.map((item: { track: SpotifyTrack }) => item.track))
+
+        const albumsResponse = await fetch('/api/spotify/albums?limit=50')
+        if (!albumsResponse.ok) throw new Error('Failed to fetch albums')
+        const albumsData = await albumsResponse.json()
+        setSavedAlbums(albumsData.items.map((item: { album: SpotifyAlbum }) => item.album))
+
+      } catch (err: any) {
+        console.error('Failed to fetch Spotify data:', err)
+        setError(err.message || 'Failed to load Spotify data.')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [isAuthenticated, accessToken])
+
+    loadSpotifyData()
+  }, [hasToken])
 
   useEffect(() => {
-    const saved = localStorage.getItem('selectedPlaylist')
-    if (saved) {
-      setSelectedPlaylist(JSON.parse(saved))
+    async function checkToken() {
+      try {
+        const response = await fetch('/api/spotify/has-token')
+        const data = await response.json()
+        console.log('DEBUG: Has token:', data.hasToken, 'isPremium:', data.isPremium)
+        setHasToken(data.hasToken)
+        setIsPremium(data.isPremium || false)
+      } catch (error) {
+        console.error('DEBUG: Error checking token:', error)
+        setHasToken(false)
+        setIsPremium(false)
+      }
     }
+    checkToken()
   }, [])
 
+  // Filter items based on search query
+  const filteredPlaylists = playlists?.filter(playlist =>
+    playlist.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const filteredTracks = savedTracks?.filter(track =>
+    track.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    track.artists.some(artist => artist.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    track.album.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const filteredAlbums = savedAlbums?.filter(album =>
+    album.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    album.artists.some(artist => artist.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
+  const [searchResults, setSearchResults] = useState<{
+    tracks: { items: SpotifyTrack[] }
+    albums: { items: SpotifyAlbum[] }
+    playlists: { items: SpotifyPlaylist[] }
+  } | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Debounce search
   useEffect(() => {
-    if (selectedPlaylist) {
-      localStorage.setItem('selectedPlaylist', JSON.stringify(selectedPlaylist))
-    }
-  }, [selectedPlaylist])
-
-  // URI por defecto si no hay reproducción activa
-  const defaultPlaylistUri = 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M' // Today's Top Hits
-
-  // Determinar la URI a usar
-  const uri = !isAuthenticated ? defaultPlaylistUri : (selectedTrack ? `spotify:track:${selectedTrack.id}` : selectedPlaylist ? `spotify:playlist:${selectedPlaylist.id}` : playerState.currentTrack ? `spotify:track:${playerState.currentTrack.id}` : defaultPlaylistUri)
-  console.log('[MUSIC PAGE] URI calculada:', uri, 'currentTrack:', playerState.currentTrack)
-
-  // Construir la URL del embed
-  const embedUrl = `https://open.spotify.com/embed/${uri.split(':')[1]}/${uri.split(':')[2]}?theme=0&autoplay=1`
-  console.log('[MUSIC PAGE] Embed URL:', embedUrl)
-
-  // Enviar comandos al iframe cuando cambie el estado del player
-  useEffect(() => {
-    if (!iframeRef.current?.contentWindow) return
-
-    if (playerState.isPlaying !== lastSentIsPlaying.current) {
-      const iframeWindow = iframeRef.current.contentWindow
-
-      if (playerState.isPlaying) {
-        console.log('[MUSIC PAGE] Enviando comando PLAY al iframe - playerState:', playerState)
-        iframeWindow.postMessage({ method: 'play' }, '*')
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim().length > 2) {
+        setIsSearching(true)
+        try {
+          const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}&type=track,album,playlist&limit=10`)
+          if (res.ok) {
+            const data = await res.json()
+            setSearchResults(data)
+          }
+        } catch (e) {
+          console.error('Search failed', e)
+        } finally {
+          setIsSearching(false)
+        }
       } else {
-        console.log('[MUSIC PAGE] Enviando comando PAUSE al iframe - playerState:', playerState)
-        iframeWindow.postMessage({ method: 'pause' }, '*')
+        setSearchResults(null)
       }
-      lastSentIsPlaying.current = playerState.isPlaying
-    }
-  }, [playerState.isPlaying])
+    }, 500)
 
-  // Enviar seek al iframe cuando cambie la posición
-  useEffect(() => {
-    if (!iframeRef.current?.contentWindow) return
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
-    if (Math.abs(playerState.position - (lastSentPosition.current || 0)) > 1000) {
-      console.log('[MUSIC PAGE] Enviando comando SEEK al iframe - position:', playerState.position)
-      const iframeWindow = iframeRef.current.contentWindow
-      iframeWindow.postMessage({ method: 'seek', value: playerState.position }, '*')
-      lastSentPosition.current = playerState.position
-    }
-  }, [playerState.position])
-
-  // Escuchar eventos del iframe
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      console.log('[MUSIC PAGE] Mensaje recibido del iframe:', event.data, 'origin:', event.origin)
-
-      // Solo aceptar mensajes de Spotify
-      if (event.origin !== 'https://open.spotify.com') return
-
-      const { type, payload } = event.data
-
-      switch (type) {
-        case 'ready':
-          console.log('[MUSIC PAGE] Spotify embed ready')
-          break
-        case 'playback_update':
-          console.log('[MUSIC PAGE] Playback update from embed - payload:', payload, 'playerState:', playerState)
-          // Si el embed está reproduciendo y el SDK no, sincronizar
-          if (payload && !payload.isPaused && !playerState.isPlaying) {
-            console.log('[MUSIC PAGE] Sincronizando: embed playing, SDK not playing - llamando play()')
-            play()
-          }
-          // Si el embed está pausado y el SDK está reproduciendo, sincronizar
-          else if (payload && payload.isPaused && playerState.isPlaying) {
-            console.log('[MUSIC PAGE] Sincronizando: embed paused, SDK playing - llamando pause()')
-            pause()
-          }
-          // Sincronizar posición si hay diferencia significativa
-          if (payload && Math.abs(payload.position - playerState.position) > 1000) {
-            console.log('[MUSIC PAGE] Sincronizando posición: embed', payload.position, 'SDK', playerState.position)
-            seek(payload.position)
-          }
-          break
+  const handleSaveTrack = async (trackId: string) => {
+    try {
+      const res = await fetch('/api/spotify/me/tracks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [trackId] })
+      })
+      if (res.ok) {
+        // Refresh saved tracks
+        const tracksResponse = await fetch('/api/spotify/tracks?limit=50')
+        if (tracksResponse.ok) {
+          const tracksData = await tracksResponse.json()
+          setSavedTracks(tracksData.items.map((item: { track: SpotifyTrack }) => item.track))
+        }
       }
+    } catch (e) {
+      console.error('Failed to save track', e)
     }
+  }
 
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [playerState.isPlaying, playerState.position, play, pause, seek])
+  // ... (loading and error states)
+
+  const [selectedPlaylist, setSelectedPlaylist] = useState<{
+    id: string
+    type: 'playlist' | 'album' | 'saved-tracks'
+    title: string
+    description?: string
+    image?: string
+  } | null>(null)
 
   return (
     <DashboardShell>
-      <div className="space-y-6 h-full">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Music</h1>
-          <Button onClick={() => window.open('https://open.spotify.com', '_blank')} variant="outline" size="sm">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open Spotify
-          </Button>
-        </div>
-        {!isAuthenticated && <SpotifyAuthInvitation />}
-        {isAuthenticated && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Search Songs</h2>
-            <div className="flex space-x-2">
+      <div className="space-y-6">
+        {/* ... (existing header and search) ... */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Your Spotify Music</h1>
+            {!hasToken && (
+              <Button onClick={() => signIn('spotify')} className="bg-[#1DB954] hover:bg-[#1ed760] text-white">
+                Connect Spotify
+              </Button>
+            )}
+          </div>
+
+          {hasToken && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                type="text"
-                placeholder="Search for songs..."
+                placeholder="Search for new songs, albums, or playlists..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && fetchSearchResults()}
+                className="pl-10"
               />
-              <Button onClick={fetchSearchResults} disabled={searchLoading}>
-                {searchLoading ? 'Searching...' : 'Search'}
-              </Button>
+              {isSearching && <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
-            {searchResults.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Results</h3>
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {searchResults.map((track) => (
-                    <button
-                      key={track.id}
-                      onClick={() => {
-                        setSelectedTrack(track)
-                        setSelectedPlaylist(null)
-                      }}
-                      className="w-full text-left p-2 rounded hover:bg-gray-100 flex items-center space-x-3"
-                    >
-                      <img src={track.album.images[0]?.url} alt={track.name} className="w-10 h-10 rounded" />
-                      <div>
-                        <p className="font-medium">{track.name}</p>
-                        <p className="text-sm text-gray-600">{track.artists.map(a => a.name).join(', ')}</p>
-                      </div>
-                    </button>
+          )}
+        </div>
+
+        {/* Search Results */}
+        {searchResults && (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Search Results</h2>
+              <Button variant="ghost" onClick={() => setSearchQuery('')} size="sm">Clear Search</Button>
+            </div>
+
+            {/* Tracks Results */}
+            {searchResults.tracks?.items.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold">Songs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {searchResults.tracks.items.map((track) => (
+                    <Card key={track.id}>
+                      <CardHeader className="flex-row items-center space-x-4 space-y-0 p-4">
+                        {track.album.images?.[0]?.url && (
+                          <img src={track.album.images[0].url} alt={track.album.name} className="w-12 h-12 rounded-md" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-sm font-medium truncate">{track.name}</CardTitle>
+                          <CardDescription className="text-xs truncate">{track.artists.map(a => a.name).join(', ')}</CardDescription>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleSaveTrack(track.id)}
+                          title="Save to Liked Songs"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => playTrack({
+                            id: track.id,
+                            uri: track.uri,
+                            name: track.name,
+                            artist: track.artists.map(a => a.name).join(', '),
+                            image: track.album.images?.[0]?.url,
+                            duration_ms: track.duration_ms,
+                          })}
+                        >
+                          Play
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Albums Results */}
+            {searchResults.albums?.items.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold">Albums</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {searchResults.albums.items.map((album) => (
+                    <Card key={album.id} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setSelectedPlaylist({
+                      id: album.id,
+                      type: 'album',
+                      title: album.name,
+                      description: album.artists.map(a => a.name).join(', '),
+                      image: album.images?.[0]?.url
+                    })}>
+                      <CardHeader className="flex-row items-center space-x-4 space-y-0 p-4">
+                        {album.images?.[0]?.url && (
+                          <img src={album.images[0].url} alt={album.name} className="w-12 h-12 rounded-md" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-sm font-medium truncate">{album.name}</CardTitle>
+                          <CardDescription className="text-xs truncate">{album.artists.map(a => a.name).join(', ')}</CardDescription>
+                        </div>
+                      </CardHeader>
+                    </Card>
                   ))}
                 </div>
               </div>
             )}
           </div>
         )}
-        {isAuthenticated && (
+
+        {/* Default View (when not searching) */}
+        {!searchResults && !searchQuery && (
           <>
-            {loading && <p>Loading playlists...</p>}
-            {playlists.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Your Playlists</h2>
-                <div className="flex space-x-4 overflow-x-auto pb-4">
-                  {playlists.map((playlist) => (
-                    <button
-                      key={playlist.id}
-                      onClick={() => setSelectedPlaylist(playlist)}
-                      className={`flex-shrink-0 p-4 rounded-lg border transition-colors ${
-                        selectedPlaylist?.id === playlist.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      <img src={playlist.images[0]?.url} alt={playlist.name} className="w-20 h-20 rounded mb-2" />
-                      <p className="text-sm font-medium truncate w-20">{playlist.name}</p>
-                    </button>
-                  ))}
+            {userProfile && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {userProfile.images?.[0]?.url && (
+                      <img src={userProfile.images[0].url} alt={userProfile.display_name} className="w-8 h-8 rounded-full" />
+                    )}
+                    Welcome, {userProfile.display_name}
+                  </CardTitle>
+                  <CardDescription>Your Spotify Profile</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm">Email: {userProfile.email}</p>
+                  <p className="text-sm">
+                    <Link href={userProfile.external_urls.spotify} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      View Profile on Spotify
+                    </Link>
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {playlists && playlists.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold">Your Playlists</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {playlists.map((playlist) => (
+                      <Card
+                        key={playlist.id}
+                        className="cursor-pointer hover:bg-accent/50 transition-colors group"
+                        onClick={() => setSelectedPlaylist({
+                          id: playlist.id,
+                          type: 'playlist',
+                          title: playlist.name,
+                          description: playlist.description,
+                          image: playlist.images?.[0]?.url
+                        })}
+                      >
+                        <CardHeader className="flex-row items-center space-x-4 space-y-0">
+                          {playlist.images?.[0]?.url && (
+                            <img src={playlist.images[0].url} alt={playlist.name} className="w-16 h-16 rounded-md shadow-sm group-hover:shadow-md transition-shadow" />
+                          )}
+                          <div>
+                            <CardTitle className="text-lg group-hover:text-primary transition-colors">{playlist.name}</CardTitle>
+                            <CardDescription className="line-clamp-2">{playlist.description || 'No description'} • By {playlist.owner.display_name} • {playlist.tracks.total} songs</CardDescription>
+                          </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
+            )}
+
+            {savedTracks && savedTracks.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold">Your Saved Tracks</h2>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setSelectedPlaylist({
+                        id: 'saved-tracks',
+                        type: 'saved-tracks',
+                        title: 'Liked Songs',
+                        description: 'Your saved tracks from Spotify',
+                        image: savedTracks[0]?.album.images?.[0]?.url
+                      })}
+                    >
+                      View All Liked Songs
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {savedTracks.slice(0, 6).map((track) => (
+                      <Card key={track.id}>
+                        <CardHeader className="flex-row items-center space-x-4 space-y-0">
+                          {track.album.images?.[0]?.url && (
+                            <img src={track.album.images[0].url} alt={track.album.name} className="w-12 h-12 rounded-md" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-sm font-medium truncate">{track.name}</CardTitle>
+                            <CardDescription className="text-xs truncate">{track.artists.map(artist => artist.name).join(', ')}</CardDescription>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0 flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => playTrack({
+                              id: track.id,
+                              uri: track.uri,
+                              name: track.name,
+                              artist: track.artists.map(a => a.name).join(', '),
+                              image: track.album.images?.[0]?.url,
+                              duration_ms: track.duration_ms,
+                            })}
+                          >
+                            <Plus className="h-4 w-4 rotate-45" /> {/* Play icon placeholder */}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {savedAlbums && savedAlbums.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold">Your Saved Albums</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {savedAlbums.map((album) => (
+                      <Card
+                        key={album.id}
+                        className="cursor-pointer hover:bg-accent/50 transition-colors group"
+                        onClick={() => setSelectedPlaylist({
+                          id: album.id,
+                          type: 'album',
+                          title: album.name,
+                          description: album.artists.map(a => a.name).join(', '),
+                          image: album.images?.[0]?.url
+                        })}
+                      >
+                        <CardHeader className="flex-row items-center space-x-4 space-y-0">
+                          {album.images?.[0]?.url && (
+                            <img src={album.images[0].url} alt={album.name} className="w-16 h-16 rounded-md shadow-sm group-hover:shadow-md transition-shadow" />
+                          )}
+                          <div>
+                            <CardTitle className="text-lg group-hover:text-primary transition-colors">{album.name}</CardTitle>
+                            <CardDescription>{album.artists.map(artist => artist.name).join(', ')}</CardDescription>
+                          </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </>
         )}
-        {!isPremium && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-yellow-800">
-              Nota: Como no tienes Spotify Premium, solo puedes escuchar previews de 30 segundos por canción.
-            </p>
-          </div>
-        )}
-        <div className="flex-1 min-h-0">
-          {!isAuthenticated && (
-            <h2 className="text-xl font-semibold mb-4">Explora tendencias musicales mientras tanto</h2>
-          )}
-          <iframe
-            ref={iframeRef}
-            src={embedUrl}
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            className="rounded-lg"
-            style={{ minHeight: isAuthenticated ? '600px' : '400px' }}
-          ></iframe>
-        </div>
       </div>
+
+      {selectedPlaylist && (
+        <PlaylistView
+          isOpen={!!selectedPlaylist}
+          onClose={() => setSelectedPlaylist(null)}
+          playlistId={selectedPlaylist.id}
+          type={selectedPlaylist.type}
+          title={selectedPlaylist.title}
+          description={selectedPlaylist.description}
+          image={selectedPlaylist.image}
+        />
+      )}
     </DashboardShell>
   )
 }

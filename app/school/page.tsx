@@ -24,6 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useSchool } from '@/hooks/use-swr'
+import { useToast } from '@/hooks/use-toast'
 
 interface SchoolEvent {
   id: string
@@ -42,7 +44,20 @@ interface Subject {
 }
 
 export default function SchoolPage() {
-  const [subjects, setSubjects] = useState<Subject[]>([])
+  const { data: subjects, error, isLoading, mutate } = useSchool()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: 'Error fetching school subjects',
+        description: 'Could not fetch school subjects. Please try again later.',
+        variant: 'destructive',
+      })
+    }
+  }, [error, toast])
+
+
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false)
   const [gradeDialogOpen, setGradeDialogOpen] = useState(false)
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
@@ -53,43 +68,6 @@ export default function SchoolPage() {
   const [newEventTitle, setNewEventTitle] = useState('')
   const [newEventDate, setNewEventDate] = useState('')
   const [newEventType, setNewEventType] = useState<'exam' | 'assignment' | 'project'>('assignment')
-
-  useEffect(() => {
-    const stored = localStorage.getItem('novo_school_subjects')
-    if (stored) {
-      setSubjects(JSON.parse(stored))
-    } else {
-      // Default subjects
-      setSubjects([
-        {
-          id: '1',
-          name: 'Computer Science',
-          grades: [
-            { period: 'Period 1', grade: 95 },
-            { period: 'Period 2', grade: 92 },
-          ],
-          events: [],
-          color: 'bg-blue-500',
-        },
-        {
-          id: '2',
-          name: 'Mathematics',
-          grades: [
-            { period: 'Period 1', grade: 88 },
-            { period: 'Period 2', grade: 90 },
-          ],
-          events: [],
-          color: 'bg-green-500',
-        },
-      ])
-    }
-  }, [])
-
-  useEffect(() => {
-    if (subjects.length > 0) {
-      localStorage.setItem('novo_school_subjects', JSON.stringify(subjects))
-    }
-  }, [subjects])
 
   const colors = [
     'bg-blue-500',
@@ -109,31 +87,77 @@ export default function SchoolPage() {
   }
 
   const calculateOverallGPA = () => {
-    if (subjects.length === 0) return '0.0'
+    if (!subjects || subjects.length === 0) return '0.0'
     const totalAverage = subjects.reduce((acc, subject) => {
       return acc + calculateAverage(subject.grades)
     }, 0)
     return (totalAverage / subjects.length).toFixed(1)
   }
 
-  const handleAddSubject = () => {
+  const handleAddSubject = async () => {
     if (!newSubjectName.trim()) return
 
-    const newSubject: Subject = {
-      id: Date.now().toString(),
-      name: newSubjectName,
-      grades: [],
-      events: [],
-      color: colors[subjects.length % colors.length],
+    try {
+      const response = await fetch('/api/school', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newSubjectName,
+          events: [],
+          grades: []
+        })
+      })
+      if (response.ok) {
+        mutate()
+        setNewSubjectName('')
+        setSubjectDialogOpen(false)
+        toast({
+          title: 'Subject added',
+          description: 'Your new subject has been added successfully.',
+        })
+      } else {
+        toast({
+            title: 'Error adding subject',
+            description: 'Could not add subject. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error adding subject:', error)
+      toast({
+        title: 'Error adding subject',
+        description: 'Could not add subject. Please try again later.',
+        variant: 'destructive',
+      })
     }
-
-    setSubjects([...subjects, newSubject])
-    setNewSubjectName('')
-    setSubjectDialogOpen(false)
   }
 
-  const handleDeleteSubject = (id: string) => {
-    setSubjects(subjects.filter((s) => s.id !== id))
+  const handleDeleteSubject = async (id: string) => {
+    try {
+      const response = await fetch(`/api/school/${id}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        mutate()
+        toast({
+            title: 'Subject deleted',
+            description: 'Your subject has been deleted successfully.',
+        })
+      } else {
+        toast({
+            title: 'Error deleting subject',
+            description: 'Could not delete subject. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting subject:', error)
+      toast({
+        title: 'Error deleting subject',
+        description: 'Could not delete subject. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleOpenGradeDialog = (subject: Subject) => {
@@ -141,28 +165,48 @@ export default function SchoolPage() {
     setGradeDialogOpen(true)
   }
 
-  const handleAddGrade = () => {
+  const handleAddGrade = async () => {
     if (!selectedSubject || !newGradePeriod || !newGradeValue) return
 
     const gradeNum = parseFloat(newGradeValue)
     if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) return
 
-    setSubjects(
-      subjects.map((s) => {
-        if (s.id === selectedSubject.id) {
-          return {
-            ...s,
-            grades: [...s.grades, { period: newGradePeriod, grade: gradeNum }],
-          }
-        }
-        return s
-      })
-    )
+    const updatedSubject = {
+      ...selectedSubject,
+      grades: [...selectedSubject.grades, { period: newGradePeriod, grade: gradeNum }]
+    }
 
-    setNewGradePeriod('')
-    setNewGradeValue('')
-    setGradeDialogOpen(false)
-    setSelectedSubject(null)
+    try {
+      const response = await fetch(`/api/school/${selectedSubject.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSubject)
+      })
+      if (response.ok) {
+        mutate()
+        setNewGradePeriod('')
+        setNewGradeValue('')
+        setGradeDialogOpen(false)
+        setSelectedSubject(null)
+        toast({
+            title: 'Grade added',
+            description: 'Your grade has been added successfully.',
+        })
+      } else {
+        toast({
+            title: 'Error adding grade',
+            description: 'Could not add grade. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error adding grade:', error)
+      toast({
+        title: 'Error adding grade',
+        description: 'Could not add grade. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleOpenEventDialog = (subject: Subject) => {
@@ -170,7 +214,7 @@ export default function SchoolPage() {
     setEventDialogOpen(true)
   }
 
-  const handleAddEvent = () => {
+  const handleAddEvent = async () => {
     if (!selectedSubject || !newEventTitle || !newEventDate) return
 
     const newEvent: SchoolEvent = {
@@ -181,36 +225,84 @@ export default function SchoolPage() {
       completed: false
     }
 
-    setSubjects(
-      subjects.map((s) => {
-        if (s.id === selectedSubject.id) {
-          return {
-            ...s,
-            events: [...(s.events || []), newEvent],
-          }
-        }
-        return s
-      })
-    )
+    const updatedSubject = {
+      ...selectedSubject,
+      events: [...(selectedSubject.events || []), newEvent]
+    }
 
-    setNewEventTitle('')
-    setNewEventDate('')
-    setEventDialogOpen(false)
-    setSelectedSubject(null)
+    try {
+      const response = await fetch(`/api/school/${selectedSubject.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSubject)
+      })
+      if (response.ok) {
+        mutate()
+        setNewEventTitle('')
+        setNewEventDate('')
+        setEventDialogOpen(false)
+        setSelectedSubject(null)
+        toast({
+            title: 'Event added',
+            description: 'Your event has been added successfully.',
+        })
+      } else {
+        toast({
+            title: 'Error adding event',
+            description: 'Could not add event. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error adding event:', error)
+      toast({
+        title: 'Error adding event',
+        description: 'Could not add event. Please try again later.',
+        variant: 'destructive',
+      })
+    }
   }
 
-  const handleDeleteEvent = (subjectId: string, eventId: string) => {
-    setSubjects(
-      subjects.map((s) => {
-        if (s.id === subjectId) {
-          return {
-            ...s,
-            events: s.events.filter((e) => e.id !== eventId),
-          }
-        }
-        return s
+  const handleDeleteEvent = async (subjectId: string, eventId: string) => {
+    const subject = subjects?.find(s => s.id === subjectId)
+    if (!subject) return
+
+    const updatedSubject = {
+      ...subject,
+      events: (Array.isArray(subject.events) ? subject.events : []).filter((e) => e.id !== eventId)
+    }
+
+    try {
+      const response = await fetch(`/api/school/${subjectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSubject)
       })
-    )
+      if (response.ok) {
+        mutate()
+        toast({
+            title: 'Event deleted',
+            description: 'Your event has been deleted successfully.',
+        })
+      } else {
+        toast({
+            title: 'Error deleting event',
+            description: 'Could not delete event. Please try again later.',
+            variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      toast({
+        title: 'Error deleting event',
+        description: 'Could not delete event. Please try again later.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
   return (
@@ -240,7 +332,7 @@ export default function SchoolPage() {
               <div className="flex-1">
                 <Progress value={parseFloat(calculateOverallGPA())} className="h-3" />
                 <p className="text-sm text-muted-foreground mt-2">
-                  Based on {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}
+                  Based on {subjects?.length} {subjects?.length === 1 ? 'subject' : 'subjects'}
                 </p>
               </div>
             </div>
@@ -248,7 +340,7 @@ export default function SchoolPage() {
         </Card>
 
         <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((subject) => {
+          {subjects?.map((subject) => {
             const average = calculateAverage(subject.grades)
             const lastGrade = subject.grades[subject.grades.length - 1]
             const previousGrade = subject.grades[subject.grades.length - 2]

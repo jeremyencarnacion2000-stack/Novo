@@ -33,7 +33,7 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
     const tracker = trackers.find(t => t.id === trackerId)
     if (!tracker) return
 
-    const wasCompletedToday = tracker.entries.some(
+    const wasCompletedToday = (Array.isArray(tracker.entries) ? tracker.entries : []).some(
       (e) => e.date === new Date().toISOString().split('T')[0]
     )
 
@@ -61,7 +61,7 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
   }
 
   const getWeeklyProgress = (tracker: Tracker) => {
-    const completed = tracker.entries.filter((e) =>
+    const completed = (Array.isArray(tracker.entries) ? tracker.entries : []).filter((e) =>
       last7Days.includes(e.date)
     ).length
     return { completed, total: 7 }
@@ -83,7 +83,7 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
     <div className="grid gap-4 md:grid-cols-2">
       {trackers.map((tracker) => {
         const progress = getWeeklyProgress(tracker)
-        const todayEntry = tracker.entries.find(
+        const todayEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).find(
           (e) => e.date === new Date().toISOString().split('T')[0]
         )
 
@@ -100,7 +100,7 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
             <CardContent className="space-y-4">
               <div className="flex gap-1">
                 {last7Days.map((date) => {
-                  const hasEntry = tracker.entries.some((e) => e.date === date)
+                  const hasEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).some((e) => e.date === date)
                   const isToday = date === new Date().toISOString().split('T')[0]
                   
                   return (

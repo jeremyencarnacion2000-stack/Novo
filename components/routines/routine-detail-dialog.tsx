@@ -19,8 +19,8 @@ interface RoutineDetailDialogProps {
 export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }: RoutineDetailDialogProps) {
   if (!routine) return null
 
-  const completedTasks = routine.tasks.filter((t) => t.completed).length
-  const totalTasks = routine.tasks.length
+  const completedTasks = (routine.tasks || []).filter((t) => t && typeof t === 'object' && t.completed).length
+  const totalTasks = (routine.tasks || []).length
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
   const handleTaskToggle = (taskId: string, completed: boolean) => {
