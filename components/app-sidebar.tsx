@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, Bot, Music, LogOut, User, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, Bot, Music, LogOut, User, BarChart3, Timer } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -51,6 +51,11 @@ const navigation = [
         title: 'AI Assistant',
         href: '/ai',
         icon: Bot,
+      },
+      {
+        title: 'Focus Mode',
+        href: '/focus',
+        icon: Timer,
       },
     ],
   },
