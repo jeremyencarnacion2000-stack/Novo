@@ -1,0 +1,120 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { prisma } from '@/lib/prisma';
+
+// GET /api/profile - Get user profile with stats
+export async function GET(request: NextRequest) {
+    try {
+        const session = await getServerSession();
+
+        if (!session?.user?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            include: {
+                goals: true,
+            },
+        });
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        // Get activity counts
+        const [
+            tasksCount,
+            projectsCount,
+            focusMinutes,
+            habitsCount,
+            streakDays,
+        ] = await Promise.all([
+            prisma.checklistItem.count({
+                where: { userId: user.id, completed: true },
+            }),
+            prisma.project.count({
+                where: { userId: user.id },
+            }),
+            prisma.focusSession.aggregate({
+                where: { userId: user.id, completed: true },
+                _sum: { duration: true },
+            }),
+            prisma.habitTracker.count({
+                where: { userId: user.id },
+            }),
+            calculateStreak(user.id),
+        ]);
+
+        // Calculate member since
+        const memberSince = user.createdAt || new Date();
+        const daysSinceMember = Math.floor(
+            (Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        return NextResponse.json({
+            profile: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                image: user.image,
+                memberSince: memberSince.toISOString(),
+                daysSinceMember,
+            },
+            stats: {
+                tasksCompleted: tasksCount,
+                projectsCreated: projectsCount,
+                focusHours: Math.round((focusMinutes._sum.duration || 0) / 60),
+                habitsTracked: habitsCount,
+                currentStreak: streakDays,
+            },
+            goals: user.goals.map(g => ({
+                id: g.id,
+                title: g.title,
+                description: g.description,
+                category: g.category,
+                progress: g.progress,
+                targetDate: g.targetDate,
+                status: g.status,
+                createdAt: g.createdAt,
+            })),
+        });
+    } catch (error) {
+        console.error('Error fetching profile:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
+
+async function calculateStreak(userId: string): Promise<number> {
+    const tasks = await prisma.checklistItem.findMany({
+        where: { userId, completed: true },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+    });
+
+    if (tasks.length === 0) return 0;
+
+    let streak = 0;
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i <= 365; i++) {
+        const checkDate = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
+        const hasActivity = tasks.some(t => {
+            const taskDate = new Date(t.createdAt);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate.getTime() === checkDate.getTime();
+        });
+
+        if (hasActivity) {
+            streak++;
+        } else if (i > 0) {
+            break;
+        }
+    }
+
+    return streak;
+}
