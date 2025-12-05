@@ -74,6 +74,7 @@ model User {
   focusSessions FocusSession[]
   deals Deal[]
   templates Template[]
+  quickNotes QuickNote[]
 }
 
 model VerificationToken {
@@ -601,4 +602,23 @@ model Template {
   @@index([type])
   @@index([isPublic])
   @@map("templates")
+}
+
+model QuickNote {
+  id          String   @id @default(cuid())
+  content     String
+  type        String   @default("note") // 'note' | 'idea' | 'task' | 'reminder'
+  tags        String[] // Array of tag strings
+  isPinned    Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  color       String?  // Optional color for the note
+  convertedTo String?  // If converted to task/project, store the ID
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isPinned])
+  @@map("quick_notes")
 }

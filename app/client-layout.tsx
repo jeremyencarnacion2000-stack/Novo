@@ -16,6 +16,7 @@ import '@/lib/storage'
 import { FloatingMusicWidget } from '@/components/music/floating-music-widget'
 import { GlobalPlayer } from '@/components/music/global-player'
 import { MiniChatbot } from '@/components/ai/mini-chatbot'
+import { QuickCapture } from '@/components/quick-capture'
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
@@ -63,6 +64,7 @@ export default function ClientLayout({
                     <FocusTimerWidget />
                     <PomodoroWidget />
                     <MiniChatbot />
+                    <QuickCapture />
                   </>
                 </GlobalPlayer>
               </AuthWrapper>
