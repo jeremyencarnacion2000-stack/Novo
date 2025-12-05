@@ -71,6 +71,7 @@ model User {
   workoutEntries WorkoutEntry[]
   courses Course[]
   grades Grade[]
+  focusSessions FocusSession[]
 }
 
 model VerificationToken {
@@ -516,5 +517,38 @@ model Grade {
   @@index([courseId])
   @@index([userId])
   @@map("grades")
+}
+
+model FocusSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Session info
+  startTime      DateTime
+  endTime        DateTime?
+  duration       Int      // planned duration in minutes
+  actualDuration Int?     // actual duration if stopped early
+  
+  // Session type
+  sessionType    String   // 'work' | 'break'
+  
+  // Task association
+  taskId         String?
+  taskSource     String?  // 'project' | 'checklist' | 'routine' | 'manual'
+  taskTitle      String?  // snapshot of task title
+  
+  // Tracking
+  completed      Boolean  @default(false)
+  interrupted    Boolean  @default(false)
+  interruptions  Int      @default(0)
+  focusQuality   Int?     // 1-5 rating
+  notes          String?
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([userId])
+  @@index([userId, startTime])
+  @@map("focus_sessions")
 }
 
