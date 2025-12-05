@@ -1,4 +1,3 @@
-import { replicateAPI } from '../lib/gemini';
 import { ConversationMessage } from '@/types/ai';
 
 export interface ChatAPIResponse {
@@ -24,7 +23,7 @@ const DEFAULT_SYSTEM_PROMPT = `Eres un asistente inteligente con acceso completo
 - Calendario: Eventos, recordatorios y planificación temporal
 - Checklists: Listas de verificación para organización
 - Analytics: Análisis de datos y estadísticas de uso
-- Música: Integración con Spotify para reproducción y playlists
+- Música: Reproductor de música integrado
 - Autenticación: Gestión de usuarios y perfiles
 
 **Instrucciones para usar herramientas disponibles:**
@@ -36,7 +35,7 @@ const DEFAULT_SYSTEM_PROMPT = `Eres un asistente inteligente con acceso completo
 - Para checklists: API /api/checklist
 - Para calendario: API /api/calendar (si existe) o consulta eventos
 - Para analytics: API /api/analytics
-- Para música: APIs de Spotify en /api/spotify/
+- Para música: API /api/music (si existe)
 - Para conversaciones: API /api/conversations
 
 **Comandos disponibles:**
@@ -59,23 +58,32 @@ export async function sendChatMessage(
   message: string,
   context: string,
   history: ConversationMessage[],
-  systemPrompt?: string
+  systemPrompt?: string,
+  model: string = 'grok-beta'
 ): Promise<ChatAPIResponse> {
   try {
     const finalSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
-    const response = await replicateAPI.generateResponse(message, context, history, finalSystemPrompt);
-    return { content: response.content, functionCalls: response.functionCalls };
+
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        history,
+        systemPrompt: finalSystemPrompt,
+        tools: [],
+        model
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { content: data.content, functionCalls: data.functionCalls || [] };
   } catch (error) {
     console.error('Error in chat API:', error);
     return { content: 'Lo siento, ocurrió un error al procesar tu mensaje.', error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-export async function getAvailableModels(): Promise<string[]> {
-  try {
-    return await replicateAPI.getModels();
-  } catch (error) {
-    console.error('Error getting models:', error);
-    return [];
   }
 }

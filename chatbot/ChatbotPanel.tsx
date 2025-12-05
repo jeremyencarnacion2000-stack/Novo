@@ -39,6 +39,13 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen = false, isFocusMode
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('grok-beta');
+
+  // Available AI models
+  const availableModels = [
+    { id: 'grok-beta', name: 'Grok Beta', provider: 'xAI' },
+    { id: 'chutes/openai/gpt-oss-20b', name: 'GPT OSS 20B', provider: 'Chutes' }
+  ];
 
   // Load conversations and tasks from Firebase on mount
   useEffect(() => {
@@ -155,7 +162,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen = false, isFocusMode
     setError(null);
 
     try {
-      const response = await sendChatMessage(message, '', updatedConv.messages, SYSTEM_PROMPT);
+      const response = await sendChatMessage(message, '', updatedConv.messages, SYSTEM_PROMPT, selectedModel);
 
       const assistantMessage: ConversationMessage = {
         id: (Date.now() + 1).toString(),
@@ -218,6 +225,17 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen = false, isFocusMode
     <div className={`chatbot-panel ${isOpen ? 'open' : ''}`}>
       <div className="chatbot-header">
         <h3>Chatbot AI</h3>
+        <select
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value)}
+          className="model-selector"
+        >
+          {availableModels.map(model => (
+            <option key={model.id} value={model.id}>
+              {model.name} ({model.provider})
+            </option>
+          ))}
+        </select>
       </div>
       <div className="chatbot-content">
         <div className="conversation-sidebar">
