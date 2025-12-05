@@ -37,6 +37,20 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             enabled: true
         },
         {
+            id: 'qwen3-next-80b',
+            name: 'Qwen3-Next-80B',
+            provider: 'Hugging Face',
+            description: 'Advanced thinking model by Qwen',
+            enabled: true
+        },
+        {
+            id: 'gemma-3-4b',
+            name: 'Gemma 3 4B',
+            provider: 'Chutes AI',
+            description: 'Efficient Gemma model via Chutes',
+            enabled: true
+        },
+        {
             id: 'chutes/openai/gpt-oss-20b',
             name: 'GPT OSS 20B',
             provider: 'Chutes',
@@ -227,16 +241,40 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             // Stop typing indicator
             setIsTyping(false);
 
-            // Create and show response instantly (no slow streaming)
-            const assistantMessage: Message = {
-                id: crypto.randomUUID(),
+            // Create streaming message with ULTRA-FAST animation
+            const messageId = crypto.randomUUID();
+            const baseMessage: Message = {
+                id: messageId,
                 role: 'assistant',
-                content: fullContent,
+                content: '',
                 timestamp: new Date().toISOString(),
                 model: selectedModel
             };
 
-            // Add message instantly
+            // Ultra-fast streaming effect (1-3ms per word)
+            const words = fullContent.split(' ');
+            let currentText = '';
+
+            for (let i = 0; i < words.length; i++) {
+                currentText += (i > 0 ? ' ' : '') + words[i];
+                setStreamingMessage({
+                    ...baseMessage,
+                    content: currentText
+                });
+
+                // Ultra-fast delay (1-3ms per word for smooth effect)
+                const delay = words.length > 100 ? 1 : 3;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+
+            // Final message
+            const assistantMessage: Message = {
+                ...baseMessage,
+                content: fullContent
+            };
+
+            // Clear streaming and add final message
+            setStreamingMessage(null);
             updateConversation(currentConversationId, {
                 messages: [...messages, userMessage, assistantMessage]
             });

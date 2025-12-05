@@ -21,8 +21,58 @@ export async function POST(request: NextRequest) {
     let result;
 
     // Determine which API to use based on model
-    if (model.startsWith('chutes/')) {
-      // Use Chutes API
+    if (model === 'qwen3-next-80b') {
+      // Use Hugging Face API for Qwen3
+      const { huggingFaceAPI } = await import('@/lib/huggingface');
+
+      if (!process.env.HF_TOKEN) {
+        return NextResponse.json(
+          { error: 'HF_TOKEN no está configurada' },
+          { status: 500 }
+        );
+      }
+
+      try {
+        result = await huggingFaceAPI.generateResponse(
+          message,
+          '',
+          history,
+          systemPrompt,
+          'Qwen/Qwen3-Next-80B-A3B-Thinking:novita'
+        );
+      } catch (error) {
+        console.error('Error durante la llamada a huggingFaceAPI.generateResponse():', error);
+        return NextResponse.json(
+          { error: `Error al generar respuesta de Hugging Face: ${error instanceof Error ? error.message : 'Error desconocido'}` },
+          { status: 500 }
+        );
+      }
+    } else if (model === 'gemma-3-4b') {
+      // Use Chutes AI for Gemma
+      if (!process.env.CHUTES_API_TOKEN) {
+        return NextResponse.json(
+          { error: 'CHUTES_API_TOKEN no está configurada' },
+          { status: 500 }
+        );
+      }
+
+      try {
+        result = await chutesAPI.generateResponse(
+          message,
+          '',
+          history,
+          systemPrompt,
+          'unsloth/gemma-3-4b-it'
+        );
+      } catch (error) {
+        console.error('Error durante la llamada a chutesAPI (Gemma):', error);
+        return NextResponse.json(
+          { error: `Error al generar respuesta de Gemma: ${error instanceof Error ? error.message : 'Error desconocido'}` },
+          { status: 500 }
+        );
+      }
+    } else if (model.startsWith('chutes/')) {
+      // Use Chutes API for other Chutes models
       const chutesModel = model.replace('chutes/', ''); // e.g., "openai/gpt-oss-20b"
 
       if (!process.env.CHUTES_API_TOKEN) {
