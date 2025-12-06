@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    // First check cookies (our custom auth flow)
-    const cookieStore = await cookies();
-    const spotifyAccessToken = cookieStore.get('spotify_access_token')?.value;
+    // Read cookies from the request directly
+    const rawCookieToken = request.cookies.get('spotify_access_token')?.value;
+
+    // URL decode the token (in case it was encoded)
+    const spotifyAccessToken = rawCookieToken ? decodeURIComponent(rawCookieToken) : null;
+
+    console.log('has-token: checking for Spotify token');
+    console.log('has-token: cookie value exists:', !!spotifyAccessToken);
+    console.log('has-token: token length:', spotifyAccessToken?.length || 0);
 
     if (spotifyAccessToken) {
       // Verify token is still valid by checking user profile
@@ -17,30 +22,35 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      console.log('has-token: Spotify API response status:', response.status);
+
       if (response.ok) {
         const userData = await response.json();
         const isPremium = userData.product === 'premium';
 
-        console.log('DEBUG: Spotify user (cookie auth):', userData.display_name, '- isPremium:', isPremium);
+        console.log('has-token: Spotify user verified:', userData.display_name);
 
         return NextResponse.json({
           hasToken: true,
           isPremium
         });
       } else {
-        // Token is invalid/expired - clear cookies
-        console.log('DEBUG: Spotify cookie token invalid, status:', response.status);
-        // Cookie is invalid, we should tell the client
+        const errorData = await response.json().catch(() => ({}));
+        console.log('has-token: Cookie token invalid, status:', response.status, 'error:', errorData);
         return NextResponse.json({
           hasToken: false,
           isPremium: false,
-          tokenExpired: true
+          tokenExpired: true,
+          spotifyError: errorData.error?.message || 'Unknown error'
         });
       }
     }
 
     // Fallback to NextAuth session
     const session = await getServerSession(authOptions);
+
+    console.log('has-token: No cookie token, checking NextAuth session');
+    console.log('has-token: session provider:', session?.provider);
 
     if (!session?.accessToken || session.provider !== 'spotify') {
       return NextResponse.json({
@@ -58,7 +68,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      console.log('DEBUG: NextAuth Spotify token invalid, status:', response.status);
+      console.log('has-token: NextAuth Spotify token invalid');
       return NextResponse.json({
         hasToken: false,
         isPremium: false,
@@ -69,17 +79,18 @@ export async function GET(request: NextRequest) {
     const userData = await response.json();
     const isPremium = userData.product === 'premium';
 
-    console.log('DEBUG: Spotify user (session auth):', userData.display_name, '- isPremium:', isPremium);
+    console.log('has-token: NextAuth Spotify user verified:', userData.display_name);
 
     return NextResponse.json({
       hasToken: true,
       isPremium
     });
   } catch (error) {
-    console.error('Error checking Spotify token:', error);
+    console.error('has-token: Error:', error);
     return NextResponse.json({
       hasToken: false,
-      isPremium: false
+      isPremium: false,
+      error: 'Internal server error'
     });
   }
 }

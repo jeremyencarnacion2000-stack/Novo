@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { cookies } from 'next/headers';
 
-async function getSpotifyToken(): Promise<string | null> {
+async function getSpotifyToken(request: NextRequest): Promise<string | null> {
   // First check cookies (our custom auth flow)
-  const cookieStore = await cookies();
-  const cookieToken = cookieStore.get('spotify_access_token')?.value;
-  if (cookieToken) {
-    return cookieToken;
+  const rawCookieToken = request.cookies.get('spotify_access_token')?.value;
+  if (rawCookieToken) {
+    // Decode URL-encoded token
+    return decodeURIComponent(rawCookieToken);
   }
 
   // Fallback to NextAuth session
@@ -22,7 +21,7 @@ async function getSpotifyToken(): Promise<string | null> {
 
 export async function GET(request: NextRequest) {
   try {
-    const accessToken = await getSpotifyToken();
+    const accessToken = await getSpotifyToken(request);
 
     if (!accessToken) {
       return NextResponse.json({

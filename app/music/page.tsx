@@ -2,7 +2,7 @@
 
 import { DashboardShell } from '@/components/dashboard-shell'
 import { useSession } from 'next-auth/react'
-import { Search, Plus, Home as HomeIcon, Library, Heart, Clock, Play, Shuffle, MoreHorizontal, List, ChevronLeft, ChevronRight, Music } from 'lucide-react'
+import { Search, Plus, Home as HomeIcon, Library, Heart, Clock, Play, Shuffle, MoreHorizontal, List, ChevronLeft, ChevronRight, Music, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { fetchSpotifyData, SpotifyUser, SpotifyPlaylist, SpotifyTrack, SpotifyAlbum } from '@/lib/spotify'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,21 @@ import { Slider } from '@/components/ui/slider'
 import { Loader2 } from 'lucide-react'
 import { usePlayerStore, CurrentTrack, Playlist } from '@/lib/player-store'
 import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface PlaylistTrack {
   added_at: string
@@ -40,6 +55,11 @@ export default function MusicPage() {
   const [searching, setSearching] = useState(false)
   const [recommendations, setRecommendations] = useState<any>(null)
 
+  // Add to playlist state
+  const [trackToAdd, setTrackToAdd] = useState<SpotifyTrack | null>(null)
+  const [isPlaylistDialogOpen, setIsPlaylistDialogOpen] = useState(false)
+  const [addingToPlaylist, setAddingToPlaylist] = useState(false)
+
   const {
     playTrack,
     playPlaylist,
@@ -58,6 +78,56 @@ export default function MusicPage() {
     setProgress,
     currentPlaylist
   } = usePlayerStore()
+
+  const handleDisconnect = async () => {
+    try {
+      await fetch('/api/spotify/disconnect', { method: 'POST' })
+      setHasToken(false)
+      setUserProfile(null)
+      setPlaylists(null)
+      setSavedTracks(null)
+      setRecommendations(null)
+      // Reload to clear state completely
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to disconnect:', error)
+    }
+  }
+
+  const openAddToPlaylistDialog = (track: SpotifyTrack, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent playing the track
+    setTrackToAdd(track)
+    setIsPlaylistDialogOpen(true)
+  }
+
+  const handleAddToPlaylist = async (playlistId: string) => {
+    if (!trackToAdd) return
+
+    setAddingToPlaylist(true)
+    try {
+      const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uris: [trackToAdd.uri]
+        }),
+      })
+
+      if (response.ok) {
+        setIsPlaylistDialogOpen(false)
+        setTrackToAdd(null)
+        // Optional: Show success toast
+      } else {
+        console.error('Failed to add track to playlist')
+      }
+    } catch (error) {
+      console.error('Error adding track to playlist:', error)
+    } finally {
+      setAddingToPlaylist(false)
+    }
+  }
 
   // Check for Spotify token
   useEffect(() => {
@@ -107,13 +177,11 @@ export default function MusicPage() {
         const tracks = tracksData.items?.map((item: { track: SpotifyTrack }) => item.track) || []
         setSavedTracks(tracks)
 
-        // Load recommendations if user has no playlists or saved tracks
-        if ((playlistsData.items?.length === 0 || !playlistsData.items) && tracks.length === 0) {
-          const recsResponse = await fetch('/api/spotify/recommendations?limit=20')
-          if (recsResponse.ok) {
-            const recsData = await recsResponse.json()
-            setRecommendations(recsData)
-          }
+        // Always load recommendations for discovery
+        const recsResponse = await fetch('/api/spotify/recommendations?limit=20')
+        if (recsResponse.ok) {
+          const recsData = await recsResponse.json()
+          setRecommendations(recsData)
         }
 
       } catch (err: any) {
@@ -349,23 +417,39 @@ export default function MusicPage() {
               />
             </div>
             {/* User Profile */}
+            {/* User Profile */}
             {userProfile && (
-              <div className="flex items-center gap-2 bg-black/30 hover:bg-black/50 rounded-full p-1 pr-3 cursor-pointer transition-colors">
-                {userProfile.images?.[0]?.url ? (
-                  <img
-                    src={userProfile.images[0].url}
-                    alt={userProfile.display_name}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {userProfile.display_name?.charAt(0)?.toUpperCase() || '?'}
-                    </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center gap-2 bg-black/30 hover:bg-black/50 rounded-full p-1 pr-3 cursor-pointer transition-colors">
+                    {userProfile.images?.[0]?.url ? (
+                      <img
+                        src={userProfile.images[0].url}
+                        alt={userProfile.display_name}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {userProfile.display_name?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      </div>
+                    )}
+                    <span className="text-white text-sm font-medium">{userProfile.display_name}</span>
                   </div>
-                )}
-                <span className="text-white text-sm font-medium">{userProfile.display_name}</span>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-[#282828] border-[#3e3e3e] text-white">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-[#3e3e3e]" />
+                  <DropdownMenuItem
+                    className="cursor-pointer hover:bg-[#3e3e3e] focus:bg-[#3e3e3e] text-red-400 focus:text-red-400"
+                    onClick={handleDisconnect}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Disconnect Spotify</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
@@ -426,7 +510,7 @@ export default function MusicPage() {
               <section className="mb-8">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold text-white">Your Playlists</h2>
-                  <Button variant="link" className="text-gray-400 hover:text-white">Show all</Button>
+                  <Button variant="link" className="text-gray-400 hover:text-white" onClick={() => setCurrentView('library')}>Show all</Button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                   {playlists?.slice(0, 5).map((playlist) => (
@@ -487,34 +571,47 @@ export default function MusicPage() {
                 </div>
               </section>
 
-              {/* Recommendations Section - Show when user has no playlists/tracks */}
-              {recommendations && (playlists?.length === 0 && savedTracks?.length === 0) && (
+              {/* Recommendations Section - Always show for discovery */}
+              {/* Recommendations Section - Always show for discovery */}
+              {recommendations && (
                 <section className="mb-8">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-white">{recommendations.message || 'Discover New Music'}</h2>
                   </div>
-                  {recommendations.albums && (
+
+                  {/* Recommended Tracks */}
+                  {recommendations.tracks && (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                      {recommendations.albums.slice(0, 10).map((album: any) => (
+                      {recommendations.tracks.slice(0, 10).map((track: any) => (
                         <div
-                          key={album.id}
+                          key={track.id}
                           className="p-4 bg-[#181818] hover:bg-[#282828] rounded-lg cursor-pointer transition-colors group"
+                          onClick={() => playTrack(track)}
                         >
                           <div className="relative mb-4">
                             <img
-                              src={album.images?.[0]?.url || '/placeholder-album.png'}
-                              alt={album.name}
+                              src={track.album?.images?.[0]?.url || '/placeholder-album.png'}
+                              alt={track.name}
                               className="w-full aspect-square object-cover rounded shadow-lg"
                             />
-                            <Button
-                              size="icon"
-                              className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-green-500 text-black opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all shadow-lg"
-                            >
-                              <Play className="h-5 w-5 fill-black ml-0.5" />
-                            </Button>
+                            <div className="absolute bottom-2 right-2 flex gap-2">
+                              <Button
+                                size="icon"
+                                className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm"
+                                onClick={(e) => openAddToPlaylistDialog(track, e)}
+                              >
+                                <Plus className="h-5 w-5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                className="w-10 h-10 rounded-full bg-green-500 text-black opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all shadow-lg"
+                              >
+                                <Play className="h-5 w-5 fill-black ml-0.5" />
+                              </Button>
+                            </div>
                           </div>
-                          <h3 className="font-semibold text-white truncate">{album.name}</h3>
-                          <p className="text-sm text-gray-400 truncate">{album.artists?.map((a: any) => a.name).join(', ')}</p>
+                          <h3 className="font-semibold text-white truncate">{track.name}</h3>
+                          <p className="text-sm text-gray-400 truncate">{track.artists?.map((a: any) => a.name).join(', ')}</p>
                         </div>
                       ))}
                     </div>
@@ -831,6 +928,42 @@ export default function MusicPage() {
           </div>
         )}
       </div>
+      {/* Add to Playlist Dialog */}
+      <Dialog open={isPlaylistDialogOpen} onOpenChange={setIsPlaylistDialogOpen}>
+        <DialogContent className="bg-[#282828] border-[#3e3e3e] text-white">
+          <DialogHeader>
+            <DialogTitle>Add to Playlist</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-2">
+                {playlists?.map((playlist) => (
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
+                    className="w-full justify-start text-left hover:bg-[#3e3e3e] text-white"
+                    onClick={() => handleAddToPlaylist(playlist.id)}
+                    disabled={addingToPlaylist}
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={playlist.images?.[0]?.url || '/placeholder-album.png'}
+                        alt={playlist.name}
+                        className="w-10 h-10 rounded object-cover"
+                      />
+                      <div className="flex-1 truncate">
+                        <div className="font-medium truncate">{playlist.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{playlist.tracks.total} tracks</div>
+                      </div>
+                      {addingToPlaylist && <Loader2 className="h-4 w-4 animate-spin" />}
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   )
 }
