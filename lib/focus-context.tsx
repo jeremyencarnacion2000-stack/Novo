@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { useSession } from 'next-auth/react'
 
 interface FocusContextType {
   isFocusModeActive: boolean
