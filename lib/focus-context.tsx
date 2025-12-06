@@ -27,155 +27,156 @@ interface FocusContextType {
 
 const FocusContext = createContext<FocusContextType | undefined>(undefined)
 
-const { data: session } = useSession()
-const [isFocusModeActive, setIsFocusModeActive] = useState(false)
-const [time, setTime] = useState(25 * 60) // 25 minutes in seconds
-const [isActive, setIsActive] = useState(false)
-const [initialTime, setInitialTime] = useState(25 * 60)
-const [mode, setMode] = useState<"work" | "shortBreak" | "longBreak">("work")
-const [selectedTask, setSelectedTask] = useState<string>("")
-const [tasks, setTasks] = useState<{ id: string; text: string }[]>([])
-const audioRef = useRef<HTMLAudioElement | null>(null)
-const [sessionId, setSessionId] = useState<string | null>(null)
-const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
+export function FocusProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession()
+  const [isFocusModeActive, setIsFocusModeActive] = useState(false)
+  const [time, setTime] = useState(25 * 60) // 25 minutes in seconds
+  const [isActive, setIsActive] = useState(false)
+  const [initialTime, setInitialTime] = useState(25 * 60)
+  const [mode, setMode] = useState<"work" | "shortBreak" | "longBreak">("work")
+  const [selectedTask, setSelectedTask] = useState<string>("")
+  const [tasks, setTasks] = useState<{ id: string; text: string }[]>([])
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
 
-useEffect(() => {
-  // Initialize audio with a pleasant notification sound
-  audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3")
-  audioRef.current.volume = 0.5
-}, [])
+  useEffect(() => {
+    // Initialize audio with a pleasant notification sound
+    audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3")
+    audioRef.current.volume = 0.5
+  }, [])
 
-useEffect(() => {
-  setIsFocusModeActive(isActive)
-}, [isActive])
+  useEffect(() => {
+    setIsFocusModeActive(isActive)
+  }, [isActive])
 
-// Save focus session when timer completes
-const saveFocusSession = async (duration: number) => {
-  if (!session?.user?.id) return
+  // Save focus session when timer completes
+  const saveFocusSession = async (duration: number) => {
+    if (!session?.user?.id) return
 
-  try {
-    const response = await fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'trackEvent',
-        userId: session.user.id,
-        eventType: 'focus_session_complete',
-        module: `focus-${mode}`,
-      })
-    })
-
-    // Also update daily analytics with focus time
-    await fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'startSession',
-        userId: session.user.id,
-        module: 'focus-timer'
-      })
-    }).then(res => res.json()).then(async (data) => {
-      // Immediately end it with the actual duration
-      if (data.sessionId) {
-        await fetch('/api/analytics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'endSession',
-            sessionId: data.sessionId,
-          })
+    try {
+      const response = await fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'trackEvent',
+          userId: session.user.id,
+          eventType: 'focus_session_complete',
+          module: `focus-${mode}`,
         })
+      })
+
+      // Also update daily analytics with focus time
+      await fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'startSession',
+          userId: session.user.id,
+          module: 'focus-timer'
+        })
+      }).then(res => res.json()).then(async (data) => {
+        // Immediately end it with the actual duration
+        if (data.sessionId) {
+          await fetch('/api/analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'endSession',
+              sessionId: data.sessionId,
+            })
+          })
+        }
+      })
+
+      console.log('Focus session saved successfully')
+    } catch (error) {
+      console.error('Failed to save focus session:', error)
+    }
+  }
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (isActive && time > 0) {
+      // Track session start time
+      if (!sessionStartTime) {
+        setSessionStartTime(Date.now())
       }
-    })
 
-    console.log('Focus session saved successfully')
-  } catch (error) {
-    console.error('Failed to save focus session:', error)
-  }
-}
+      interval = setInterval(() => {
+        setTime((prevTime) => prevTime - 1)
+      }, 1000)
+    } else if (time === 0) {
+      setIsActive(false)
+      if (interval) clearInterval(interval)
 
-useEffect(() => {
-  let interval: NodeJS.Timeout | null = null
+      // Calculate actual duration and save session
+      const actualDuration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : initialTime
+      saveFocusSession(actualDuration)
+      setSessionStartTime(null)
 
-  if (isActive && time > 0) {
-    // Track session start time
-    if (!sessionStartTime) {
-      setSessionStartTime(Date.now())
+      if (audioRef.current) {
+        audioRef.current.play().catch((e) => console.log("Audio play failed:", e))
+      }
+
+      new Notification("Focus Timer Finished!", { body: "Time to take a break or get back to work." })
     }
 
-    interval = setInterval(() => {
-      setTime((prevTime) => prevTime - 1)
-    }, 1000)
-  } else if (time === 0) {
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isActive, time, sessionStartTime, initialTime, mode])
+
+  const toggleTimer = () => setIsActive(!isActive)
+
+  const resetTimer = () => {
     setIsActive(false)
-    if (interval) clearInterval(interval)
-
-    // Calculate actual duration and save session
-    const actualDuration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : initialTime
-    saveFocusSession(actualDuration)
-    setSessionStartTime(null)
-
-    if (audioRef.current) {
-      audioRef.current.play().catch((e) => console.log("Audio play failed:", e))
-    }
-
-    new Notification("Focus Timer Finished!", { body: "Time to take a break or get back to work." })
+    setTime(initialTime)
+    setSessionStartTime(null) // Reset session tracking
   }
 
-  return () => {
-    if (interval) clearInterval(interval)
+  const setTimerMode = (newMode: "work" | "shortBreak" | "longBreak") => {
+    setMode(newMode)
+    setIsActive(false)
+    setSessionStartTime(null) // Reset session tracking
+    let newTime = 25 * 60
+    if (newMode === "shortBreak") newTime = 5 * 60
+    if (newMode === "longBreak") newTime = 15 * 60
+    setInitialTime(newTime)
+    setTime(newTime)
   }
-}, [isActive, time, sessionStartTime, initialTime, mode])
 
-const toggleTimer = () => setIsActive(!isActive)
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
 
-const resetTimer = () => {
-  setIsActive(false)
-  setTime(initialTime)
-  setSessionStartTime(null) // Reset session tracking
-}
-
-const setTimerMode = (newMode: "work" | "shortBreak" | "longBreak") => {
-  setMode(newMode)
-  setIsActive(false)
-  setSessionStartTime(null) // Reset session tracking
-  let newTime = 25 * 60
-  if (newMode === "shortBreak") newTime = 5 * 60
-  if (newMode === "longBreak") newTime = 15 * 60
-  setInitialTime(newTime)
-  setTime(newTime)
-}
-
-const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-}
-
-return (
-  <FocusContext.Provider value={{
-    isFocusModeActive,
-    setIsFocusModeActive,
-    time,
-    setTime,
-    isActive,
-    setIsActive,
-    initialTime,
-    setInitialTime,
-    mode,
-    setMode,
-    selectedTask,
-    setSelectedTask,
-    tasks,
-    setTasks,
-    toggleTimer,
-    resetTimer,
-    setTimerMode,
-    formatTime
-  }}>
-    {children}
-  </FocusContext.Provider>
-)
+  return (
+    <FocusContext.Provider value={{
+      isFocusModeActive,
+      setIsFocusModeActive,
+      time,
+      setTime,
+      isActive,
+      setIsActive,
+      initialTime,
+      setInitialTime,
+      mode,
+      setMode,
+      selectedTask,
+      setSelectedTask,
+      tasks,
+      setTasks,
+      toggleTimer,
+      resetTimer,
+      setTimerMode,
+      formatTime
+    }}>
+      {children}
+    </FocusContext.Provider>
+  )
 }
 
 export function useFocus() {
