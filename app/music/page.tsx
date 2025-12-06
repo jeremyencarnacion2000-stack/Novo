@@ -8,6 +8,7 @@ import { fetchSpotifyData, SpotifyUser, SpotifyPlaylist, SpotifyTrack, SpotifyAl
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Slider } from '@/components/ui/slider'
 import { Loader2 } from 'lucide-react'
 import { usePlayerStore, CurrentTrack, Playlist } from '@/lib/player-store'
 import { cn } from '@/lib/utils'
@@ -37,7 +38,24 @@ export default function MusicPage() {
   const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([])
   const [searching, setSearching] = useState(false)
 
-  const { playTrack, playPlaylist, currentTrack, isPlaying, togglePlayPause } = usePlayerStore()
+  const {
+    playTrack,
+    playPlaylist,
+    currentTrack,
+    isPlaying,
+    togglePlayPause,
+    nextTrack,
+    previousTrack,
+    toggleShuffle,
+    toggleRepeat,
+    isShuffle,
+    repeatMode,
+    volume,
+    setVolume,
+    progress,
+    setProgress,
+    currentPlaylist
+  } = usePlayerStore()
 
   // Check for Spotify token
   useEffect(() => {
@@ -575,7 +593,8 @@ export default function MusicPage() {
 
         {/* Bottom Player Bar */}
         {currentTrack && (
-          <div className="h-20 bg-[#181818] border-t border-white/10 px-4 flex items-center justify-between shrink-0">
+          <div className="h-24 bg-[#181818] border-t border-white/10 px-4 flex items-center justify-between shrink-0">
+            {/* Left: Now Playing */}
             <div className="flex items-center gap-3 w-[30%]">
               {currentTrack.image && (
                 <img src={currentTrack.image} alt={currentTrack.name} className="w-14 h-14 rounded" />
@@ -589,19 +608,39 @@ export default function MusicPage() {
               </Button>
             </div>
 
+            {/* Center: Controls */}
             <div className="flex flex-col items-center w-[40%]">
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                {/* Shuffle */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleShuffle}
+                  className={cn("hover:text-white", isShuffle ? "text-green-500" : "text-gray-400")}
+                  title={isShuffle ? "Shuffle On" : "Shuffle Off"}
+                >
                   <Shuffle className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                
+                {/* Previous */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={previousTrack}
+                  disabled={!currentPlaylist}
+                  className="text-gray-400 hover:text-white disabled:opacity-50"
+                  title="Previous"
+                >
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.3 1a.7.7 0 01.7.7v5.15l9.95-5.744a.7.7 0 011.05.606v12.575a.7.7 0 01-1.05.607L4 9.149V14.3a.7.7 0 01-.7.7H1.7a.7.7 0 01-.7-.7V1.7a.7.7 0 01.7-.7h1.6z" />
                   </svg>
                 </Button>
+                
+                {/* Play/Pause */}
                 <Button
                   onClick={togglePlayPause}
                   className="w-8 h-8 rounded-full bg-white hover:scale-105 transition-transform"
+                  title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
                     <svg className="h-4 w-4 text-black" viewBox="0 0 16 16" fill="currentColor">
@@ -611,35 +650,77 @@ export default function MusicPage() {
                     <Play className="h-4 w-4 text-black fill-black ml-0.5" />
                   )}
                 </Button>
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                
+                {/* Next */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={nextTrack}
+                  disabled={!currentPlaylist}
+                  className="text-gray-400 hover:text-white disabled:opacity-50"
+                  title="Next"
+                >
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M12.7 1a.7.7 0 00-.7.7v5.15L2.05 1.107A.7.7 0 001 1.712v12.575a.7.7 0 001.05.607L12 9.149V14.3a.7.7 0 00.7.7h1.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-1.6z" />
                   </svg>
                 </Button>
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                
+                {/* Repeat */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleRepeat}
+                  className={cn("hover:text-white relative", repeatMode !== 'off' ? "text-green-500" : "text-gray-400")}
+                  title={`Repeat: ${repeatMode}`}
+                >
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M0 4.75A3.75 3.75 0 013.75 1h8.5A3.75 3.75 0 0116 4.75v5a3.75 3.75 0 01-3.75 3.75H9.81l1.018 1.018a.75.75 0 11-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 111.06 1.06L9.81 12h2.44a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25h-8.5A2.25 2.25 0 001.5 4.75v5A2.25 2.25 0 003.75 12H5v1.5H3.75A3.75 3.75 0 010 9.75v-5z" />
                   </svg>
+                  {repeatMode === 'track' && (
+                    <span className="absolute -top-1 -right-1 text-[8px] bg-green-500 text-black rounded-full w-3 h-3 flex items-center justify-center font-bold">1</span>
+                  )}
                 </Button>
               </div>
-              <div className="w-full max-w-md flex items-center gap-2 mt-1">
-                <span className="text-xs text-gray-400">0:00</span>
-                <div className="flex-1 h-1 bg-gray-600 rounded-full">
-                  <div className="h-full w-0 bg-white rounded-full" />
-                </div>
-                <span className="text-xs text-gray-400">{currentTrack.duration_ms ? formatDuration(currentTrack.duration_ms) : '0:00'}</span>
+              
+              {/* Progress Bar */}
+              <div className="w-full max-w-md flex items-center gap-2 mt-2">
+                <span className="text-xs text-gray-400 w-10 text-right">{formatDuration(progress)}</span>
+                <Slider
+                  value={[progress]}
+                  max={currentTrack.duration_ms || 100}
+                  step={1000}
+                  onValueChange={(value) => setProgress(value[0])}
+                  className="flex-1 cursor-pointer"
+                />
+                <span className="text-xs text-gray-400 w-10">{currentTrack.duration_ms ? formatDuration(currentTrack.duration_ms) : '0:00'}</span>
               </div>
             </div>
 
+            {/* Right: Volume */}
             <div className="flex items-center gap-2 w-[30%] justify-end">
-              <div className="flex items-center gap-1 w-24">
-                <svg className="h-4 w-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z" />
-                </svg>
-                <div className="flex-1 h-1 bg-gray-600 rounded-full">
-                  <div className="h-full w-2/3 bg-white rounded-full" />
-                </div>
-              </div>
+              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                {volume === 0 ? (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M13.86 5.47a.75.75 0 00-1.061 0l-1.47 1.47-1.47-1.47A.75.75 0 008.8 6.53L10.269 8l-1.47 1.47a.75.75 0 101.06 1.06l1.47-1.47 1.47 1.47a.75.75 0 001.06-1.06L12.39 8l1.47-1.47a.75.75 0 000-1.06z"/>
+                    <path d="M10.116 1.5A.75.75 0 008.991.85l-6.925 4a3.642 3.642 0 00-1.33 4.967 3.639 3.639 0 001.33 1.332l6.925 4a.75.75 0 001.125-.649v-13a.75.75 0 00-.001-.001z"/>
+                  </svg>
+                ) : volume < 0.5 ? (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35z"/>
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
+                  </svg>
+                )}
+              </Button>
+              <Slider
+                value={[volume * 100]}
+                max={100}
+                step={1}
+                onValueChange={(value) => setVolume(value[0] / 100)}
+                className="w-24 cursor-pointer"
+              />
             </div>
           </div>
         )}

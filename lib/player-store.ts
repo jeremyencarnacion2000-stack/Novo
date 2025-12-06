@@ -30,6 +30,8 @@ export interface PlayerState {
   progress: number; // Current position in milliseconds
   deviceId: string | null; // Spotify Web Playback SDK device ID
   isReady: boolean; // Whether the Spotify SDK is ready
+  isShuffle: boolean; // Shuffle mode
+  repeatMode: 'off' | 'track' | 'playlist'; // Repeat mode
 }
 
 interface PlayerActions {
@@ -40,6 +42,9 @@ interface PlayerActions {
   previousTrack: () => void;
   setVolume: (volume: number) => void;
   setProgress: (progress: number) => void;
+  seekTo: (position: number) => void;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
   toggleOpen: () => void;
   setOpen: (isOpen: boolean) => void;
   setDeviceId: (deviceId: string) => void;
@@ -57,6 +62,8 @@ const initialState: PlayerState = {
   progress: 0,
   deviceId: null,
   isReady: false,
+  isShuffle: false,
+  repeatMode: 'off',
 }
 
 export const usePlayerStore = create<PlayerState & PlayerActions>()(
@@ -88,7 +95,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             };
             console.log('playTrack updatedState:', { isOpen: updatedState.isOpen, currentTrack: updatedState.currentTrack?.name })
             if (playerChannel) {
-              // Only send serializable state data (no functions)
               playerChannel.postMessage({
                 type: 'PLAYER_STATE_UPDATE',
                 payload: {
@@ -119,7 +125,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             };
             console.log('playPlaylist updatedState:', { isOpen: updatedState.isOpen, currentTrack: updatedState.currentTrack?.name })
             if (playerChannel) {
-              // Only send serializable state data (no functions)
               playerChannel.postMessage({
                 type: 'PLAYER_STATE_UPDATE',
                 payload: {
@@ -139,7 +144,18 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         nextTrack: () => {
           const state = get();
           if (state.currentPlaylist && state.currentPlaylist.tracks.length > 0) {
-            const nextIndex = (state.currentTrackIndex + 1) % state.currentPlaylist.tracks.length;
+            let nextIndex: number;
+
+            if (state.isShuffle) {
+              // Random track (excluding current)
+              const availableIndices = state.currentPlaylist.tracks
+                .map((_, i) => i)
+                .filter(i => i !== state.currentTrackIndex);
+              nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)] || 0;
+            } else {
+              nextIndex = (state.currentTrackIndex + 1) % state.currentPlaylist.tracks.length;
+            }
+
             set({
               currentTrack: state.currentPlaylist.tracks[nextIndex],
               currentTrackIndex: nextIndex,
@@ -150,6 +166,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         },
         previousTrack: () => {
           const state = get();
+          // If more than 3 seconds into track, restart it
+          if (state.progress > 3000) {
+            set({ progress: 0 });
+            return;
+          }
+
           if (state.currentPlaylist && state.currentPlaylist.tracks.length > 0) {
             const prevIndex = state.currentTrackIndex === 0
               ? state.currentPlaylist.tracks.length - 1
@@ -166,7 +188,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           set((state) => {
             const updatedState = { ...state, isPlaying: !state.isPlaying };
             if (playerChannel) {
-              // Only send serializable state data (no functions)
               playerChannel.postMessage({
                 type: 'PLAYER_STATE_UPDATE',
                 payload: {
@@ -189,6 +210,20 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         setProgress: (progress) => {
           set({ progress });
         },
+        seekTo: (position) => {
+          set({ progress: position });
+        },
+        toggleShuffle: () => {
+          set((state) => ({ isShuffle: !state.isShuffle }));
+        },
+        toggleRepeat: () => {
+          set((state) => {
+            const modes: Array<'off' | 'track' | 'playlist'> = ['off', 'playlist', 'track'];
+            const currentIndex = modes.indexOf(state.repeatMode);
+            const nextIndex = (currentIndex + 1) % modes.length;
+            return { repeatMode: modes[nextIndex] };
+          });
+        },
         toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
         setOpen: (isOpen) => set({ isOpen }),
         setDeviceId: (deviceId) => set({ deviceId }),
@@ -204,6 +239,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         currentTrackIndex: state.currentTrackIndex,
         volume: state.volume,
         isOpen: state.isOpen,
+        isShuffle: state.isShuffle,
+        repeatMode: state.repeatMode,
       }),
     }
   )
