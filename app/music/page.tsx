@@ -29,6 +29,7 @@ export default function MusicPage() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[] | null>(null)
   const [savedTracks, setSavedTracks] = useState<SpotifyTrack[] | null>(null)
   const [hasToken, setHasToken] = useState(false)
+  const [tokenChecked, setTokenChecked] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
@@ -68,6 +69,8 @@ export default function MusicPage() {
       } catch (error) {
         setHasToken(false)
         setIsPremium(false)
+      } finally {
+        setTokenChecked(true)
       }
     }
     checkToken()
@@ -76,6 +79,9 @@ export default function MusicPage() {
   // Load Spotify data
   useEffect(() => {
     async function loadSpotifyData() {
+      // Wait for token check to complete
+      if (!tokenChecked) return
+
       if (!hasToken) {
         setLoading(false)
         return
@@ -108,7 +114,7 @@ export default function MusicPage() {
     }
 
     loadSpotifyData()
-  }, [hasToken])
+  }, [hasToken, tokenChecked])
 
   // Load playlist tracks when a playlist is selected
   useEffect(() => {

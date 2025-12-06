@@ -1,15 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { cookies } from 'next/headers';
+
+async function getSpotifyToken(): Promise<string | null> {
+  // First check cookies (our custom auth flow)
+  const cookieStore = await cookies();
+  const cookieToken = cookieStore.get('spotify_access_token')?.value;
+  if (cookieToken) {
+    return cookieToken;
+  }
+
+  // Fallback to NextAuth session
+  const session = await getServerSession(authOptions);
+  if (session?.accessToken && session.provider === 'spotify') {
+    return session.accessToken as string;
+  }
+
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const accessToken = await getSpotifyToken();
 
-    if (!session?.accessToken || session.provider !== 'spotify') {
+    if (!accessToken) {
       return NextResponse.json({
-        error: 'Not authenticated with Spotify. Please sign in with Spotify.',
-        provider: session?.provider || 'none'
+        error: 'Not authenticated with Spotify',
+        notConnected: true
       }, { status: 401 });
     }
 
@@ -17,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`
+        'Authorization': `Bearer ${accessToken}`
       }
     });
 
