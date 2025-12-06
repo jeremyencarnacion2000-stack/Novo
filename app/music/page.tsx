@@ -217,6 +217,25 @@ export default function MusicPage() {
     <div className="h-screen bg-black flex flex-col overflow-hidden">
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Mini Navigation Sidebar */}
+        <div className="w-16 flex flex-col items-center py-4 bg-black gap-4">
+          <a href="/" className="w-12 h-12 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors" title="Go to Dashboard">
+            <Home className="h-6 w-6 text-white" />
+          </a>
+          <a href="/music" className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center" title="Music">
+            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+            </svg>
+          </a>
+          <div className="flex-1" />
+          <a href="/settings" className="w-10 h-10 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors" title="Settings">
+            <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
+          </a>
+        </div>
+
         {/* Left Sidebar - Library */}
         <div className="w-80 flex flex-col bg-black p-2 gap-2">
           {/* Library Card */}
