@@ -11,6 +11,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['@xenova/transformers'],
   },
+  turbopack: {},
   serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma'],
   // Optimize for Vercel serverless functions
   poweredByHeader: false,
