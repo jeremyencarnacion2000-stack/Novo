@@ -209,8 +209,13 @@ export class AIModelManager {
       throw new Error('Model not loaded');
     }
 
+    // Only run transformers on client side
+    if (typeof window === 'undefined') {
+      return this.generateMockResponse(message, context);
+    }
+
     try {
-      // Use transformers.js for inference
+      // Dynamic import to avoid SSR issues with onnxruntime-node
       const { pipeline } = await import('@xenova/transformers');
 
       let generator;

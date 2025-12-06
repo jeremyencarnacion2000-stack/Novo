@@ -13,8 +13,7 @@ import { Moon, Sun, Bell, Database, User, Lock, Globe, Download, Trash2, Refresh
 import { useSettings } from '@/lib/settings-context'
 import { useNotifications } from '@/lib/notification-context'
 import { DataIntegrator } from '@/lib/data-integrator'
-import { aiModelManager } from '@/lib/ai-models'
-import { AIModel } from '@/types/ai'
+import type { AIModel } from '@/types/ai'
 import { useState, useRef, useEffect } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react' // New: signIn, signOut, useSession
 import { SiSpotify } from 'react-icons/si' // New: Spotify Icon
@@ -46,8 +45,11 @@ export function SettingsSections() {
 
   // Load AI models on mount
   useEffect(() => {
-    const loadedModels = aiModelManager.getModels()
-    setModels(loadedModels)
+    // Dynamic import to avoid SSR issues with @xenova/transformers
+    import('@/lib/ai-models').then(({ aiModelManager }) => {
+      const loadedModels = aiModelManager.getModels()
+      setModels(loadedModels)
+    }).catch(console.error)
   }, [])
 
   // Handle auto-backup toggle
