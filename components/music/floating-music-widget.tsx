@@ -40,8 +40,9 @@ const FloatingMusicWidgetComponent = () => {
           const widgetHeight = 200
           const maxX = window.innerWidth - widgetWidth - 20
           const maxY = window.innerHeight - widgetHeight - 20
+          const minY = 80 // Minimum Y to avoid overlapping header
 
-          if (parsed.x >= 0 && parsed.x <= maxX && parsed.y >= 0 && parsed.y <= maxY) {
+          if (parsed.x >= 0 && parsed.x <= maxX && parsed.y >= minY && parsed.y <= maxY) {
             return parsed
           }
         }
