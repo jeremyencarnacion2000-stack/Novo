@@ -228,6 +228,17 @@ export default function MusicPage() {
     setCurrentView('playlist')
   }
 
+  // Still checking token - show loading
+  if (!tokenChecked) {
+    return (
+      <DashboardShell>
+        <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-[#1a1a1a] to-black rounded-lg">
+          <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+        </div>
+      </DashboardShell>
+    )
+  }
+
   // Not connected to Spotify
   if (!hasToken) {
     return (

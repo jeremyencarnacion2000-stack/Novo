@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    // First check for Spotify cookies (our custom auth flow)
+    // First check cookies (our custom auth flow)
     const cookieStore = await cookies();
     const spotifyAccessToken = cookieStore.get('spotify_access_token')?.value;
 
@@ -27,6 +27,15 @@ export async function GET(request: NextRequest) {
           hasToken: true,
           isPremium
         });
+      } else {
+        // Token is invalid/expired - clear cookies
+        console.log('DEBUG: Spotify cookie token invalid, status:', response.status);
+        // Cookie is invalid, we should tell the client
+        return NextResponse.json({
+          hasToken: false,
+          isPremium: false,
+          tokenExpired: true
+        });
       }
     }
 
@@ -41,7 +50,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch user profile to check product type
+    // Verify NextAuth token is still valid
     const response = await fetch('https://api.spotify.com/v1/me', {
       headers: {
         'Authorization': `Bearer ${session.accessToken}`
@@ -49,9 +58,11 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      console.log('DEBUG: NextAuth Spotify token invalid, status:', response.status);
       return NextResponse.json({
-        hasToken: true,
-        isPremium: false
+        hasToken: false,
+        isPremium: false,
+        tokenExpired: true
       });
     }
 
