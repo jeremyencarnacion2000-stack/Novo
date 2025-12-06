@@ -4,16 +4,16 @@ import { authOptions } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { albumId: string } }
+    { params }: { params: Promise<{ albumId: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions);
+        const { albumId } = await params;
 
         if (!session?.accessToken) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { albumId } = params;
         const response = await fetch(`https://api.spotify.com/v1/albums/${albumId}/tracks?limit=50`, {
             headers: {
                 'Authorization': `Bearer ${session.accessToken}`

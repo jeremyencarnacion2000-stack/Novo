@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-export async function GET(request: NextRequest, { params }: { params: { playlistId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ playlistId: string }> }) {
     try {
         const session = await getServerSession(authOptions);
+        const { playlistId } = await params;
 
         if (!session?.accessToken) {
             return NextResponse.json({ error: 'No Spotify access token found' }, { status: 401 });
         }
 
-        const url = `https://api.spotify.com/v1/playlists/${params.playlistId}/tracks`;
+        const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
 
         const response = await fetch(url, {
             headers: {
