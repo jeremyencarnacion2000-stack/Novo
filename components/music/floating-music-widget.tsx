@@ -212,13 +212,18 @@ const FloatingMusicWidgetComponent = () => {
 
           {/* Playback info */}
           <div className="px-3 py-2 bg-black/40 border-t border-white/5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="text-left flex-1">
                 <p className="text-[10px] text-green-400 font-medium">
                   🎵 Reproducción continua activa
                 </p>
                 <p className="text-[9px] text-gray-500">
                   {currentPlaylist ? `Playlist: ${currentPlaylist.name}` : 'Spotify Free • Con anuncios'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-gray-400">
+                  🔀 Activa shuffle en el reproductor
                 </p>
               </div>
             </div>
