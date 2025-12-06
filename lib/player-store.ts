@@ -9,6 +9,7 @@ export interface CurrentTrack {
   uri: string; // Spotify URI for playback
   name: string;
   artist: string;
+  artistId?: string; // Spotify artist ID for continuous playback
   image: string | undefined;
   duration_ms?: number;
 }

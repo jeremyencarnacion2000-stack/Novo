@@ -156,11 +156,18 @@ const FloatingMusicWidgetComponent = () => {
 
   // Use embed for Free users
   if (!isPremium) {
-    // Use playlist embed for continuous playback, or track embed if no playlist
-    // Playlist embed will auto-advance through songs with ads
-    const embedUrl = currentPlaylist
-      ? `https://open.spotify.com/embed/playlist/${currentPlaylist.id}?utm_source=generator&theme=0`
-      : `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0`
+    // Use playlist embed for playlists, or artist embed for single tracks
+    // Artist embed will auto-play related songs from the artist
+    let embedUrl: string
+    if (currentPlaylist) {
+      embedUrl = `https://open.spotify.com/embed/playlist/${currentPlaylist.id}?utm_source=generator&theme=0`
+    } else if (currentTrack.artistId) {
+      // Use artist embed for continuous related songs playback
+      embedUrl = `https://open.spotify.com/embed/artist/${currentTrack.artistId}?utm_source=generator&theme=0`
+    } else {
+      // Fallback to track embed if no artistId
+      embedUrl = `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0`
+    }
 
     return (
       <div

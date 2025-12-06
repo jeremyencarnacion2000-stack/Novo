@@ -235,6 +235,7 @@ export default function MusicPage() {
                             uri: track.uri,
                             name: track.name,
                             artist: track.artists.map(a => a.name).join(', '),
+                            artistId: track.artists[0]?.id,
                             image: track.album.images?.[0]?.url,
                             duration_ms: track.duration_ms,
                           })}
@@ -379,6 +380,7 @@ export default function MusicPage() {
                               uri: track.uri,
                               name: track.name,
                               artist: track.artists.map(a => a.name).join(', '),
+                              artistId: track.artists[0]?.id,
                               image: track.album.images?.[0]?.url,
                               duration_ms: track.duration_ms,
                             })}
