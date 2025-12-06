@@ -72,7 +72,7 @@ export default function MusicPage() {
         const playlistsData = await playlistsResponse.json()
         setPlaylists(playlistsData.items)
 
-        const tracksResponse = await fetch('/api/spotify/me/tracks?limit=50')
+        const tracksResponse = await fetch('/api/spotify/tracks?limit=50')
         if (!tracksResponse.ok) throw new Error('Failed to fetch tracks')
         const tracksData = await tracksResponse.json()
         setSavedTracks(tracksData.items?.map((item: { track: SpotifyTrack }) => item.track) || [])
