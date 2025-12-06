@@ -221,12 +221,12 @@ export default function MusicPage() {
             </div>
             <h1 className="text-2xl font-bold text-white">Connect to Spotify</h1>
             <p className="text-gray-400">Link your Spotify account to access your music</p>
-            <Button
-              onClick={() => window.location.href = '/api/auth/spotify/login'}
-              className="bg-green-500 hover:bg-green-400 text-black font-semibold px-8 py-3 rounded-full"
+            <a
+              href="/api/auth/spotify/login"
+              className="inline-block bg-green-500 hover:bg-green-400 text-black font-semibold px-8 py-3 rounded-full transition-colors"
             >
               Connect Spotify
-            </Button>
+            </a>
           </div>
         </div>
       </DashboardShell>
@@ -612,20 +612,20 @@ export default function MusicPage() {
             <div className="flex flex-col items-center w-[40%]">
               <div className="flex items-center gap-4">
                 {/* Shuffle */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={toggleShuffle}
                   className={cn("hover:text-white", isShuffle ? "text-green-500" : "text-gray-400")}
                   title={isShuffle ? "Shuffle On" : "Shuffle Off"}
                 >
                   <Shuffle className="h-4 w-4" />
                 </Button>
-                
+
                 {/* Previous */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={previousTrack}
                   disabled={!currentPlaylist}
                   className="text-gray-400 hover:text-white disabled:opacity-50"
@@ -635,7 +635,7 @@ export default function MusicPage() {
                     <path d="M3.3 1a.7.7 0 01.7.7v5.15l9.95-5.744a.7.7 0 011.05.606v12.575a.7.7 0 01-1.05.607L4 9.149V14.3a.7.7 0 01-.7.7H1.7a.7.7 0 01-.7-.7V1.7a.7.7 0 01.7-.7h1.6z" />
                   </svg>
                 </Button>
-                
+
                 {/* Play/Pause */}
                 <Button
                   onClick={togglePlayPause}
@@ -650,11 +650,11 @@ export default function MusicPage() {
                     <Play className="h-4 w-4 text-black fill-black ml-0.5" />
                   )}
                 </Button>
-                
+
                 {/* Next */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={nextTrack}
                   disabled={!currentPlaylist}
                   className="text-gray-400 hover:text-white disabled:opacity-50"
@@ -664,11 +664,11 @@ export default function MusicPage() {
                     <path d="M12.7 1a.7.7 0 00-.7.7v5.15L2.05 1.107A.7.7 0 001 1.712v12.575a.7.7 0 001.05.607L12 9.149V14.3a.7.7 0 00.7.7h1.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-1.6z" />
                   </svg>
                 </Button>
-                
+
                 {/* Repeat */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={toggleRepeat}
                   className={cn("hover:text-white relative", repeatMode !== 'off' ? "text-green-500" : "text-gray-400")}
                   title={`Repeat: ${repeatMode}`}
@@ -681,7 +681,7 @@ export default function MusicPage() {
                   )}
                 </Button>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="w-full max-w-md flex items-center gap-2 mt-2">
                 <span className="text-xs text-gray-400 w-10 text-right">{formatDuration(progress)}</span>
@@ -701,16 +701,16 @@ export default function MusicPage() {
               <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
                 {volume === 0 ? (
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M13.86 5.47a.75.75 0 00-1.061 0l-1.47 1.47-1.47-1.47A.75.75 0 008.8 6.53L10.269 8l-1.47 1.47a.75.75 0 101.06 1.06l1.47-1.47 1.47 1.47a.75.75 0 001.06-1.06L12.39 8l1.47-1.47a.75.75 0 000-1.06z"/>
-                    <path d="M10.116 1.5A.75.75 0 008.991.85l-6.925 4a3.642 3.642 0 00-1.33 4.967 3.639 3.639 0 001.33 1.332l6.925 4a.75.75 0 001.125-.649v-13a.75.75 0 00-.001-.001z"/>
+                    <path d="M13.86 5.47a.75.75 0 00-1.061 0l-1.47 1.47-1.47-1.47A.75.75 0 008.8 6.53L10.269 8l-1.47 1.47a.75.75 0 101.06 1.06l1.47-1.47 1.47 1.47a.75.75 0 001.06-1.06L12.39 8l1.47-1.47a.75.75 0 000-1.06z" />
+                    <path d="M10.116 1.5A.75.75 0 008.991.85l-6.925 4a3.642 3.642 0 00-1.33 4.967 3.639 3.639 0 001.33 1.332l6.925 4a.75.75 0 001.125-.649v-13a.75.75 0 00-.001-.001z" />
                   </svg>
                 ) : volume < 0.5 ? (
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35z"/>
+                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35z" />
                   </svg>
                 ) : (
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
+                    <path d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z" />
                   </svg>
                 )}
               </Button>
