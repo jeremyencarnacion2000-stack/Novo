@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,11 +15,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const parsedBody = trackerEntrySchema.safeParse(body)
 
     if (!parsedBody.success) {
-        return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
+      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
 
     const { date, value } = parsedBody.data
@@ -27,7 +28,7 @@ export async function POST(
     // Verify tracker belongs to user
     const tracker = await prisma.tracker.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -39,7 +40,7 @@ export async function POST(
     // Check if entry already exists for this date
     const existingEntry = await prisma.trackerEntry.findFirst({
       where: {
-        trackerId: params.id,
+        trackerId: id,
         date: date
       }
     })
@@ -55,7 +56,7 @@ export async function POST(
       // Create new entry
       entry = await prisma.trackerEntry.create({
         data: {
-          trackerId: params.id,
+          trackerId: id,
           date,
           value
         }
@@ -65,7 +66,7 @@ export async function POST(
     return NextResponse.json(entry, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: error.issues }, { status: 400 })
     }
     console.error('Error creating/updating tracker entry:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -74,7 +75,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -82,6 +83,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
 
@@ -92,7 +94,7 @@ export async function DELETE(
     // Verify tracker belongs to user
     const tracker = await prisma.tracker.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -103,7 +105,7 @@ export async function DELETE(
 
     await prisma.trackerEntry.deleteMany({
       where: {
-        trackerId: params.id,
+        trackerId: id,
         date: date
       }
     })
