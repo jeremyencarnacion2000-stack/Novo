@@ -6,10 +6,16 @@ function createSpotifyAuthUrl(request: NextRequest) {
     return null;
   }
 
-  // Get the actual URL from the request headers
+  // Use stable production domain or localhost for development
   const host = request.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const baseUrl = `${protocol}://${host}`;
+  let baseUrl: string;
+
+  if (host.includes('localhost')) {
+    baseUrl = 'http://localhost:3000';
+  } else {
+    // Use stable Vercel domain that's registered in Spotify
+    baseUrl = 'https://novo-desktop-mvp.vercel.app';
+  }
 
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
   const scopes = 'user-read-email user-read-private playlist-read-private user-library-read user-read-playback-state';

@@ -18,10 +18,16 @@ export async function GET(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'Spotify credentials not configured' }), { status: 500 });
   }
 
-  // Get the actual URL from the request headers (must match what was sent in login)
+  // Use stable production domain or localhost for development
   const host = request.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const baseUrl = `${protocol}://${host}`;
+  let baseUrl: string;
+
+  if (host.includes('localhost')) {
+    baseUrl = 'http://localhost:3000';
+  } else {
+    // Use stable Vercel domain that's registered in Spotify
+    baseUrl = 'https://novo-desktop-mvp.vercel.app';
+  }
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
 
   console.log('Spotify callback redirect URI:', redirectUri);
