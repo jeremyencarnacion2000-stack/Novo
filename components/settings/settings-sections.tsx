@@ -54,9 +54,8 @@ export function SettingsSections() {
 
   // Handle auto-backup toggle
   useEffect(() => {
-    if (settings.autoBackup) {
-      const userId = 'current-user' // Placeholder
-      DataIntegrator.scheduleAutoBackup(userId, settings.backupFrequency)
+    if (settings.autoBackup && session?.user?.id) {
+      DataIntegrator.scheduleAutoBackup(session.user.id, settings.backupFrequency)
     } else {
       // Clear existing timer
       const existingTimer = localStorage.getItem('novo-auto-backup-timer')
@@ -98,8 +97,15 @@ export function SettingsSections() {
     setIsExporting(true)
 
     try {
-      // For now, use a placeholder userId. In a real app, this would come from auth context
-      const userId = 'current-user'
+      if (!session?.user?.id) {
+        toast({
+          title: 'Export failed',
+          description: 'You must be logged in to export data.',
+          variant: 'destructive',
+        })
+        return
+      }
+      const userId = session.user.id
       const backupData = await DataIntegrator.exportData(userId)
 
       const dataStr = JSON.stringify(backupData, null, 2)
@@ -142,8 +148,15 @@ export function SettingsSections() {
         const content = e.target?.result as string
         const backupData = JSON.parse(content)
 
-        // For now, use a placeholder userId. In a real app, this would come from auth context
-        const userId = 'current-user'
+        if (!session?.user?.id) {
+          toast({
+            title: 'Import failed',
+            description: 'You must be logged in to import data.',
+            variant: 'destructive',
+          })
+          return
+        }
+        const userId = session.user.id
 
         const result = await DataIntegrator.importData(userId, backupData, { overwrite: true })
 
@@ -179,7 +192,8 @@ export function SettingsSections() {
 
   const handleRestoreFromBackup = async (backupDate: string) => {
     try {
-      const userId = 'current-user' // Placeholder
+      if (!session?.user?.id) return
+      const userId = session.user.id
       const result = await DataIntegrator.restoreFromBackup(userId, backupDate, { overwrite: true })
 
       toast({
