@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
 <body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
   <h1>Configuration Error</h1>
   <p>Spotify credentials not configured on server.</p>
+  <p>Client ID: ${clientId ? 'Set' : 'Not set'}</p>
+  <p>Client Secret: ${clientSecret ? 'Set' : 'Not set'}</p>
 </body></html>`;
     return new Response(html, { status: 500, headers: { 'Content-Type': 'text/html' } });
   }
@@ -45,7 +47,6 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
 
   console.log('Spotify callback - exchanging code for tokens');
-  console.log('Redirect URI:', redirectUri);
 
   try {
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
   <p>Error: ${tokenData.error || 'Unknown'}</p>
   <p>Description: ${tokenData.error_description || 'No description'}</p>
   <p>Redirect URI used: ${redirectUri}</p>
+  <p>Status: ${tokenResponse.status}</p>
   <p><a href="/music" style="color: #1DB954;">Go back to Music</a></p>
 </body></html>`;
       return new Response(html, { status: tokenResponse.status, headers: { 'Content-Type': 'text/html' } });
@@ -79,13 +81,47 @@ export async function GET(request: NextRequest) {
 
     console.log('Spotify tokens obtained successfully');
 
-    // Set cookies and redirect to music
-    const headers = new Headers();
-    headers.set('Location', '/music');
-    headers.set('Set-Cookie', `spotify_access_token=${tokenData.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${tokenData.expires_in}`);
-    headers.append('Set-Cookie', `spotify_refresh_token=${tokenData.refresh_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`);
+    // Show success page with auto-redirect
+    const successHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Spotify Connected!</title>
+  <meta http-equiv="refresh" content="2;url=/music">
+</head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white; text-align: center;">
+  <h1 style="color: #1DB954;">✓ Spotify Connected!</h1>
+  <p>Token received successfully.</p>
+  <p>Redirecting to music page...</p>
+  <p style="margin-top: 20px;"><a href="/music" style="color: #1DB954;">Click here if not redirected</a></p>
+</body>
+</html>`;
 
-    return new Response(null, { status: 302, headers });
+    // Create response with success page
+    const response = new NextResponse(successHtml, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' }
+    });
+
+    // Set cookies
+    response.cookies.set('spotify_access_token', tokenData.access_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: tokenData.expires_in
+    });
+
+    if (tokenData.refresh_token) {
+      response.cookies.set('spotify_refresh_token', tokenData.refresh_token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 31536000 // 1 year
+      });
+    }
+
+    return response;
   } catch (err: any) {
     console.error('Spotify callback error:', err);
     const html = `<!DOCTYPE html>
