@@ -156,8 +156,11 @@ const FloatingMusicWidgetComponent = () => {
 
   // Use embed for Free users
   if (!isPremium) {
-    // Spotify embed with autoplay - note: browsers may block autoplay until user interaction
-    const embedUrl = `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0`
+    // Use playlist embed for continuous playback, or track embed if no playlist
+    // Playlist embed will auto-advance through songs with ads
+    const embedUrl = currentPlaylist
+      ? `https://open.spotify.com/embed/playlist/${currentPlaylist.id}?utm_source=generator&theme=0`
+      : `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0`
 
     return (
       <div
@@ -192,13 +195,13 @@ const FloatingMusicWidgetComponent = () => {
             </Button>
           </div>
 
-          {/* Spotify Embed - Larger size for better playback experience */}
+          {/* Spotify Embed - Playlist for continuous playback */}
           <div className="relative">
             <iframe
-              key={currentTrack.id}
+              key={currentPlaylist?.id || currentTrack.id}
               src={embedUrl}
               width="100%"
-              height="80"
+              height="152"
               frameBorder="0"
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="eager"
@@ -207,35 +210,15 @@ const FloatingMusicWidgetComponent = () => {
             />
           </div>
 
-          {/* Playback hint + controls */}
+          {/* Playback info */}
           <div className="px-3 py-2 bg-black/40 border-t border-white/5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={previousTrack}
-                  disabled={!currentPlaylist}
-                  className="h-8 w-8 text-white hover:bg-white/10 disabled:opacity-30"
-                >
-                  <SkipBack className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={nextTrack}
-                  disabled={!currentPlaylist}
-                  className="h-8 w-8 text-white hover:bg-white/10 disabled:opacity-30"
-                >
-                  <SkipForward className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="text-right">
+              <div className="text-left flex-1">
                 <p className="text-[10px] text-green-400 font-medium">
-                  ▶ Haz clic en el reproductor para iniciar
+                  🎵 Reproducción continua activa
                 </p>
                 <p className="text-[9px] text-gray-500">
-                  Spotify Free • Con anuncios
+                  {currentPlaylist ? `Playlist: ${currentPlaylist.name}` : 'Spotify Free • Con anuncios'}
                 </p>
               </div>
             </div>
