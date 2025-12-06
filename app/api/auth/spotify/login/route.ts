@@ -1,55 +1,39 @@
 import { NextRequest } from 'next/server';
 
-function getSpotifyAuthUrl(): string | null {
+export async function GET(request: NextRequest) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
+
   if (!clientId) {
-    console.log('SPOTIFY_CLIENT_ID not configured');
-    return null;
+    return new Response('Spotify client ID not configured', { status: 500 });
   }
 
   const baseUrl = 'https://novo-desktop-mvp.vercel.app';
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
   const scopes = 'user-read-email user-read-private playlist-read-private user-library-read user-read-playback-state';
-
   const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  console.log('Spotify auth URL:', authUrl);
-  return authUrl;
-}
+  // Return HTML page with meta refresh and JavaScript redirect
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="refresh" content="0;url=${authUrl}">
+  <title>Redirecting to Spotify...</title>
+</head>
+<body>
+  <p>Redirecting to Spotify...</p>
+  <p>If you are not redirected, <a href="${authUrl}">click here</a>.</p>
+  <script>window.location.href = "${authUrl}";</script>
+</body>
+</html>`;
 
-export async function GET(request: NextRequest) {
-  const authUrl = getSpotifyAuthUrl();
-
-  if (!authUrl) {
-    return new Response(JSON.stringify({ error: 'Spotify client ID not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  // Use manual redirect with Response
-  return new Response(null, {
-    status: 302,
+  return new Response(html, {
+    status: 200,
     headers: {
-      'Location': authUrl,
+      'Content-Type': 'text/html',
     },
   });
 }
 
 export async function POST(request: NextRequest) {
-  const authUrl = getSpotifyAuthUrl();
-
-  if (!authUrl) {
-    return new Response(JSON.stringify({ error: 'Spotify client ID not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      'Location': authUrl,
-    },
-  });
+  return GET(request);
 }
