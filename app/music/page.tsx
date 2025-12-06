@@ -2,7 +2,7 @@
 
 import { DashboardShell } from '@/components/dashboard-shell'
 import { useSession } from 'next-auth/react'
-import { Search, Plus, Home as HomeIcon, Library, Heart, Clock, Play, Shuffle, MoreHorizontal, List, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, Home as HomeIcon, Library, Heart, Clock, Play, Shuffle, MoreHorizontal, List, ChevronLeft, ChevronRight, Music } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { fetchSpotifyData, SpotifyUser, SpotifyPlaylist, SpotifyTrack, SpotifyAlbum } from '@/lib/spotify'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export default function MusicPage() {
   const [currentView, setCurrentView] = useState<ViewType>('home')
   const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([])
   const [searching, setSearching] = useState(false)
+  const [recommendations, setRecommendations] = useState<any>(null)
 
   const {
     playTrack,
@@ -98,12 +99,22 @@ export default function MusicPage() {
         const playlistsResponse = await fetch('/api/spotify/playlists?limit=50')
         if (!playlistsResponse.ok) throw new Error('Failed to fetch playlists')
         const playlistsData = await playlistsResponse.json()
-        setPlaylists(playlistsData.items)
+        setPlaylists(playlistsData.items || [])
 
         const tracksResponse = await fetch('/api/spotify/tracks?limit=50')
         if (!tracksResponse.ok) throw new Error('Failed to fetch tracks')
         const tracksData = await tracksResponse.json()
-        setSavedTracks(tracksData.items?.map((item: { track: SpotifyTrack }) => item.track) || [])
+        const tracks = tracksData.items?.map((item: { track: SpotifyTrack }) => item.track) || []
+        setSavedTracks(tracks)
+
+        // Load recommendations if user has no playlists or saved tracks
+        if ((playlistsData.items?.length === 0 || !playlistsData.items) && tracks.length === 0) {
+          const recsResponse = await fetch('/api/spotify/recommendations?limit=20')
+          if (recsResponse.ok) {
+            const recsData = await recsResponse.json()
+            setRecommendations(recsData)
+          }
+        }
 
       } catch (err: any) {
         console.error('Failed to fetch Spotify data:', err)
@@ -337,8 +348,24 @@ export default function MusicPage() {
                 )}
               />
             </div>
-            {userProfile?.images?.[0]?.url && (
-              <img src={userProfile.images[0].url} alt={userProfile.display_name} className="w-8 h-8 rounded-full" />
+            {/* User Profile */}
+            {userProfile && (
+              <div className="flex items-center gap-2 bg-black/30 hover:bg-black/50 rounded-full p-1 pr-3 cursor-pointer transition-colors">
+                {userProfile.images?.[0]?.url ? (
+                  <img
+                    src={userProfile.images[0].url}
+                    alt={userProfile.display_name}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {userProfile.display_name?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
+                <span className="text-white text-sm font-medium">{userProfile.display_name}</span>
+              </div>
             )}
           </div>
         </div>
@@ -459,6 +486,50 @@ export default function MusicPage() {
                   ))}
                 </div>
               </section>
+
+              {/* Recommendations Section - Show when user has no playlists/tracks */}
+              {recommendations && (playlists?.length === 0 && savedTracks?.length === 0) && (
+                <section className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold text-white">{recommendations.message || 'Discover New Music'}</h2>
+                  </div>
+                  {recommendations.albums && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                      {recommendations.albums.slice(0, 10).map((album: any) => (
+                        <div
+                          key={album.id}
+                          className="p-4 bg-[#181818] hover:bg-[#282828] rounded-lg cursor-pointer transition-colors group"
+                        >
+                          <div className="relative mb-4">
+                            <img
+                              src={album.images?.[0]?.url || '/placeholder-album.png'}
+                              alt={album.name}
+                              className="w-full aspect-square object-cover rounded shadow-lg"
+                            />
+                            <Button
+                              size="icon"
+                              className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-green-500 text-black opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all shadow-lg"
+                            >
+                              <Play className="h-5 w-5 fill-black ml-0.5" />
+                            </Button>
+                          </div>
+                          <h3 className="font-semibold text-white truncate">{album.name}</h3>
+                          <p className="text-sm text-gray-400 truncate">{album.artists?.map((a: any) => a.name).join(', ')}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Empty State - When no content and no recommendations */}
+              {(!playlists || playlists.length === 0) && (!savedTracks || savedTracks.length === 0) && !recommendations && (
+                <div className="text-center py-12">
+                  <Music className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">No music yet</h3>
+                  <p className="text-gray-400 mb-4">Search for songs to add to your library</p>
+                </div>
+              )}
             </div>
           )}
 
