@@ -139,16 +139,30 @@ export default function MusicPage() {
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
 
+    // Don't search if not connected to Spotify
+    if (!hasToken) {
+      console.log('Cannot search - not connected to Spotify')
+      return
+    }
+
     setSearching(true)
     try {
       const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=20`)
+      const data = await response.json()
+
       if (response.ok) {
-        const data = await response.json()
         setSearchResults(data.tracks?.items || [])
         setCurrentView('search')
+      } else if (response.status === 401) {
+        console.log('Spotify not authenticated')
+        setSearchResults([])
+      } else {
+        console.error('Search error:', data.error)
+        setSearchResults([])
       }
     } catch (err) {
       console.error('Search error:', err)
+      setSearchResults([])
     } finally {
       setSearching(false)
     }
@@ -295,11 +309,15 @@ export default function MusicPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="What do you want to play?"
+                placeholder={hasToken ? "What do you want to play?" : "Connect Spotify to search"}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-80 pl-10 bg-[#242424] border-0 text-white placeholder:text-gray-400 rounded-full focus-visible:ring-2 focus-visible:ring-white"
+                onKeyDown={(e) => e.key === 'Enter' && hasToken && handleSearch()}
+                disabled={!hasToken}
+                className={cn(
+                  "w-80 pl-10 bg-[#242424] border-0 text-white placeholder:text-gray-400 rounded-full focus-visible:ring-2 focus-visible:ring-white",
+                  !hasToken && "opacity-50 cursor-not-allowed"
+                )}
               />
             </div>
             {userProfile?.images?.[0]?.url && (
