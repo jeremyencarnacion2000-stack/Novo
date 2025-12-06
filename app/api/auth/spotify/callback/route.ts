@@ -5,32 +5,47 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
 
+  // Show errors as HTML for debugging
   if (error) {
-    return new Response(JSON.stringify({ error }), { status: 400 });
+    const html = `<!DOCTYPE html>
+<html><head><title>Spotify Error</title></head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
+  <h1>Spotify Authorization Error</h1>
+  <p>Error: ${error}</p>
+  <p>Error description: ${url.searchParams.get('error_description') || 'No description'}</p>
+  <p><a href="/music" style="color: #1DB954;">Go back to Music</a></p>
+</body></html>`;
+    return new Response(html, { status: 400, headers: { 'Content-Type': 'text/html' } });
   }
+
   if (!code) {
-    return new Response(JSON.stringify({ error: 'No code provided' }), { status: 400 });
+    const html = `<!DOCTYPE html>
+<html><head><title>Spotify Error</title></head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
+  <h1>No Authorization Code</h1>
+  <p>No code was provided by Spotify.</p>
+  <p><a href="/music" style="color: #1DB954;">Go back to Music</a></p>
+</body></html>`;
+    return new Response(html, { status: 400, headers: { 'Content-Type': 'text/html' } });
   }
 
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return new Response(JSON.stringify({ error: 'Spotify credentials not configured' }), { status: 500 });
+    const html = `<!DOCTYPE html>
+<html><head><title>Config Error</title></head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
+  <h1>Configuration Error</h1>
+  <p>Spotify credentials not configured on server.</p>
+</body></html>`;
+    return new Response(html, { status: 500, headers: { 'Content-Type': 'text/html' } });
   }
 
-  // Use stable production domain or localhost for development
-  const host = request.headers.get('host') || 'localhost:3000';
-  let baseUrl: string;
-
-  if (host.includes('localhost')) {
-    baseUrl = 'http://localhost:3000';
-  } else {
-    // Use stable Vercel domain that's registered in Spotify
-    baseUrl = 'https://novo-desktop-mvp.vercel.app';
-  }
+  const baseUrl = 'https://novo-desktop-mvp.vercel.app';
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
 
-  console.log('Spotify callback redirect URI:', redirectUri);
+  console.log('Spotify callback - exchanging code for tokens');
+  console.log('Redirect URI:', redirectUri);
 
   try {
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
@@ -50,25 +65,36 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       console.error('Spotify token error:', tokenData);
-      return new Response(JSON.stringify({ error: tokenData }), { status: tokenResponse.status });
+      const html = `<!DOCTYPE html>
+<html><head><title>Token Error</title></head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
+  <h1>Spotify Token Error</h1>
+  <p>Error: ${tokenData.error || 'Unknown'}</p>
+  <p>Description: ${tokenData.error_description || 'No description'}</p>
+  <p>Redirect URI used: ${redirectUri}</p>
+  <p><a href="/music" style="color: #1DB954;">Go back to Music</a></p>
+</body></html>`;
+      return new Response(html, { status: tokenResponse.status, headers: { 'Content-Type': 'text/html' } });
     }
 
-    // Guardar en cookies HTTP-only
-    console.log('DEBUG: /api/auth/spotify/callback - Tokens obtenidos:', {
-      access: !!tokenData.access_token,
-      refresh: !!tokenData.refresh_token,
-      expires: tokenData.expires_in
-    });
+    console.log('Spotify tokens obtained successfully');
 
-    const response = new Response(null, { status: 302 });
-    response.headers.set('Location', '/music');
-    response.headers.set('Set-Cookie', `spotify_access_token=${tokenData.access_token}; HttpOnly; Secure; SameSite=Strict; Max-Age=${tokenData.expires_in}`);
-    response.headers.append('Set-Cookie', `spotify_refresh_token=${tokenData.refresh_token}; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`);
+    // Set cookies and redirect to music
+    const headers = new Headers();
+    headers.set('Location', '/music');
+    headers.set('Set-Cookie', `spotify_access_token=${tokenData.access_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${tokenData.expires_in}`);
+    headers.append('Set-Cookie', `spotify_refresh_token=${tokenData.refresh_token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`);
 
-    console.log('DEBUG: /api/auth/spotify/callback - Cookies guardadas, redirigiendo a /music');
-    return response;
-  } catch (err) {
+    return new Response(null, { status: 302, headers });
+  } catch (err: any) {
     console.error('Spotify callback error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+    const html = `<!DOCTYPE html>
+<html><head><title>Server Error</title></head>
+<body style="font-family: sans-serif; padding: 40px; background: #121212; color: white;">
+  <h1>Server Error</h1>
+  <p>Error: ${err.message || 'Unknown error'}</p>
+  <p><a href="/music" style="color: #1DB954;">Go back to Music</a></p>
+</body></html>`;
+    return new Response(html, { status: 500, headers: { 'Content-Type': 'text/html' } });
   }
 }
