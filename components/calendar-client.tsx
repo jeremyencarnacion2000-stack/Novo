@@ -8,7 +8,7 @@ import { DataIntegrator, type CalendarEvent } from "@/lib/data-integrator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DashboardShell } from "@/components/dashboard-shell"
+
 import { Loader2, Calendar as CalendarIcon } from "lucide-react"
 import "react-day-picker/dist/style.css"
 
@@ -53,74 +53,73 @@ export default function CalendarClient() {
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-            <p className="text-muted-foreground">View your schedule and upcoming events</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <Card className="md:col-span-8 lg:col-span-9">
-            <CardContent className="p-6 flex justify-center">
-              <DayPicker
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="p-3"
-                modifiers={{
-                  hasEvent: (date) => events.some((event) => isSameDay(event.date, date))
-                }}
-                modifiersStyles={{
-                  hasEvent: { fontWeight: "bold", textDecoration: "underline" }
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="md:col-span-4 lg:col-span-3 h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                {selectedDate ? format(selectedDate, "MMMM d, yyyy") : "Select a date"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[400px] pr-4">
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : selectedDateEvents.length > 0 ? (
-                  <div className="space-y-4">
-                    {selectedDateEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex flex-col gap-2 p-3 rounded-lg border bg-card hover:bg-accent transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className={`text-sm font-medium ${event.completed ? "line-through text-muted-foreground" : ""}`}>
-                            {event.title}
-                          </span>
-                          <Badge variant="outline" className={`text-[10px] capitalize ${getEventColor(event.type)}`}>
-                            {event.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No events for this day
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
+          <p className="text-muted-foreground">View your schedule and upcoming events</p>
         </div>
       </div>
-    </DashboardShell>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <Card className="md:col-span-8 lg:col-span-9">
+          <CardContent className="p-6 flex justify-center">
+            <DayPicker
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              className="p-3"
+              modifiers={{
+                hasEvent: (date) => events.some((event) => isSameDay(event.date, date))
+              }}
+              modifiersStyles={{
+                hasEvent: { fontWeight: "bold", textDecoration: "underline" }
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-4 lg:col-span-3 h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              {selectedDate ? format(selectedDate, "MMMM d, yyyy") : "Select a date"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[400px] pr-4">
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : selectedDateEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedDateEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex flex-col gap-2 p-3 rounded-lg border bg-card hover:bg-accent transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className={`text-sm font-medium ${event.completed ? "line-through text-muted-foreground" : ""}`}>
+                          {event.title}
+                        </span>
+                        <Badge variant="outline" className={`text-[10px] capitalize ${getEventColor(event.type)}`}>
+                          {event.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No events for this day
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+    </DashboardShell >
   )
 }

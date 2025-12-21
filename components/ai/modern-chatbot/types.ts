@@ -8,6 +8,42 @@ export interface Message {
     liked?: boolean;
     disliked?: boolean;
     artifacts?: Artifact[];
+    blocks?: MessageBlock[];
+    attachments?: Attachment[];
+}
+
+export interface Attachment {
+    id: string;
+    name: string;
+    type: string;
+    url: string; // Base64 or URL
+    size?: number;
+}
+
+export type BlockType = 'text' | 'analysis' | 'plan' | 'confirmation' | 'result';
+
+export interface MessageBlock {
+    id: string;
+    type: BlockType;
+    title?: string;
+    content: any;
+    status?: 'pending' | 'success' | 'failed' | 'waiting' | 'waiting_confirmation' | 'confirmed' | 'cancelled';
+    isVisible?: boolean;
+    actionId?: string;
+    metadata?: any;
+}
+
+export interface PlanItem {
+    id: string;
+    label: string;
+    description?: string;
+    status: 'pending' | 'success' | 'failed' | 'skipped';
+}
+
+export interface ExecutionResult {
+    success: boolean;
+    output: string;
+    metadata?: any;
 }
 
 export interface Conversation {
@@ -46,10 +82,12 @@ export interface ChatbotContextType {
 
     // Messages
     messages: Message[];
-    sendMessage: (content: string, files?: File[]) => Promise<void>;
+    sendMessage: (content: string, files?: File[], webSearchEnabled?: boolean) => Promise<void>;
     retryMessage: (messageId: string) => Promise<void>;
     likeMessage: (messageId: string) => void;
     dislikeMessage: (messageId: string) => void;
+    confirmAction: (messageId: string, blockId: string) => void;
+    cancelAction: (messageId: string, blockId: string) => void;
 
     // UI State
     sidebarCollapsed: boolean;
@@ -66,6 +104,7 @@ export interface ChatbotContextType {
     isLoading: boolean;
     isTyping: boolean;
     streamingMessage: Message | null;
+    statusMessage: string | null;
     error: string | null;
 }
 

@@ -1,0 +1,72 @@
+/* Hidden state and toggle buttons */
+.mini-chatbot-container {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mini-chatbot-container.hidden {
+    transform: translateX(120%);
+    pointer-events: none;
+}
+
+.mini-chatbot-toggle {
+    position: fixed;
+    bottom: 100px;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    color: #fff;
+    cursor: pointer;
+    z-index: 997;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateX(100%);
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.mini-chatbot-toggle.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.mini-chatbot-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    width: 50px;
+}
+
+.mini-chatbot-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: #fff;
+    cursor: pointer;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    pointer-events: all;
+    opacity: 0;
+}
+
+.mini-chatbot-container:not(.hidden):hover .mini-chatbot-close {
+    opacity: 1;
+}
+
+.mini-chatbot-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}

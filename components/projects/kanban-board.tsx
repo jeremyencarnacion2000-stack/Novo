@@ -9,6 +9,7 @@ import { Edit, Trash2, Calendar, ChevronRight, AlertCircle, CheckCircle2 } from 
 import type { Project, ProjectStatus } from "@/types/project"
 import { Progress } from "@/components/ui/progress"
 import { useState } from "react"
+import { TiltCard } from "@/components/ui/tilt-card"
 
 interface KanbanBoardProps {
   projects: Project[]
@@ -93,112 +94,114 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
                 const completedSubtasks = project.subtasks.filter((st) => st.completed).length
 
                 return (
-                  <Card
+                  <TiltCard
                     key={project.id}
                     className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === project.id ? "opacity-50" : ""}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, project.id)}
                   >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base leading-tight line-clamp-2">{project.title}</CardTitle>
-                        <Badge
-                          variant={
-                            project.priority === "high"
-                              ? "destructive"
-                              : project.priority === "medium"
-                                ? "default"
-                                : "secondary"
-                          }
-                          className="shrink-0 capitalize"
-                        >
-                          {project.priority}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
-
-                      {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Progress</span>
-                          <span>{project.progress}%</span>
-                        </div>
-                        <Progress value={project.progress} className="h-2" />
-                      </div>
-
-                      {project.subtasks.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>
-                            {completedSubtasks}/{project.subtasks.length} tasks
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 text-xs">
-                        <Calendar className="h-3 w-3 shrink-0" />
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-muted-foreground">
-                            Start:{" "}
-                            {new Date(project.startDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                          <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
-                            Due:{" "}
-                            {new Date(project.dueDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                        {isOverdue && (
-                          <Badge variant="destructive" className="text-xs gap-1 ml-auto">
-                            <AlertCircle className="h-3 w-3" />
-                            {Math.abs(daysRemaining)}d overdue
-                          </Badge>
-                        )}
-                        {!isOverdue && daysRemaining >= 0 && daysRemaining <= 7 && project.status !== "completed" && (
-                          <Badge variant="secondary" className="text-xs ml-auto">
-                            {daysRemaining}d left
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        {nextStatus && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 bg-transparent"
-                            onClick={() => onStatusChange(project.id, nextStatus)}
+                    <Card className="h-full">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base leading-tight line-clamp-2">{project.title}</CardTitle>
+                          <Badge
+                            variant={
+                              project.priority === "high"
+                                ? "destructive"
+                                : project.priority === "medium"
+                                  ? "default"
+                                  : "secondary"
+                            }
+                            className="shrink-0 capitalize"
                           >
-                            Move
-                            <ChevronRight className="h-3 w-3 ml-1" />
-                          </Button>
+                            {project.priority}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+
+                        {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => onEdit(project)}>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => onDelete(project.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Progress</span>
+                            <span>{project.progress}%</span>
+                          </div>
+                          <Progress value={project.progress} className="h-2" />
+                        </div>
+
+                        {project.subtasks.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>
+                              {completedSubtasks}/{project.subtasks.length} tasks
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 text-xs">
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-muted-foreground">
+                              Start:{" "}
+                              {new Date(project.startDate).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                              Due:{" "}
+                              {new Date(project.dueDate).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                          {isOverdue && (
+                            <Badge variant="destructive" className="text-xs gap-1 ml-auto">
+                              <AlertCircle className="h-3 w-3" />
+                              {Math.abs(daysRemaining)}d overdue
+                            </Badge>
+                          )}
+                          {!isOverdue && daysRemaining >= 0 && daysRemaining <= 7 && project.status !== "completed" && (
+                            <Badge variant="secondary" className="text-xs ml-auto">
+                              {daysRemaining}d left
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          {nextStatus && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 bg-transparent"
+                              onClick={() => onStatusChange(project.id, nextStatus)}
+                            >
+                              Move
+                              <ChevronRight className="h-3 w-3 ml-1" />
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => onEdit(project)}>
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => onDelete(project.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TiltCard>
                 )
               })}
 

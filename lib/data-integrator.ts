@@ -2,6 +2,7 @@ import { ChecklistItem } from "@/types/checklist"
 import { Routine, RoutineTask } from "@/types/routine"
 import { Project, Task, Subtask } from "@/types/project"
 import { isSameDay, parseISO } from "date-fns"
+import { trackActivity } from "@/lib/activity-tracker"
 
 // IndexedDB utilities for offline storage
 class OfflineStorage {
@@ -969,6 +970,13 @@ export const DataIntegrator = {
   toggleTaskCompletion: async (userId: string, task: IntegratedTask) => {
     // Optimistic local update
     const updatedTask = { ...task, completed: !task.completed }
+
+    // Track analytics if completing a task
+    if (updatedTask.completed) {
+      trackActivity('task', true, { id: task.id, name: task.text, module: task.source }).catch(err =>
+        console.error('Failed to track task completion:', err)
+      )
+    }
 
     try {
       if (task.source === "manual") {

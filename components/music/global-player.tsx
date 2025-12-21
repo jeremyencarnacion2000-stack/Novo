@@ -19,6 +19,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
   const { data: session } = useSession()
   const playerRef = useRef<any>(null)
   const [isPremium, setIsPremium] = useState(false)
+  const [spotifyToken, setSpotifyToken] = useState<string | null>(null)
   const {
     setDeviceId,
     setReady,
@@ -29,46 +30,60 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
     setProgress,
   } = usePlayerStore()
 
-  // Check if user has Premium account
+  // Check if user has Premium account and get the correct token
   useEffect(() => {
     async function checkPremium() {
       try {
         const response = await fetch('/api/spotify/has-token')
         const data = await response.json()
-        console.log('Premium status check:', data)
         setIsPremium(data.isPremium || false)
+        if (data.hasToken && data.accessToken) {
+          setSpotifyToken(data.accessToken)
+          usePlayerStore.getState().setAccessToken(data.accessToken)
+        } else {
+          setSpotifyToken(null)
+        }
       } catch (error) {
-        console.log('Error checking premium status:', error)
         setIsPremium(false)
+        setSpotifyToken(null)
       }
     }
-    if (session?.accessToken) {
+
+    // We check premium if we have ANY session, because we might have a Spotify cookie
+    if (session) {
       checkPremium()
     }
-  }, [session?.accessToken])
+  }, [session])
+
+  // Ref to hold the latest token to avoid closure staleness
+  const tokenRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // Only load SDK for Premium users
-    if (!session?.accessToken || !isPremium) {
-      console.log('Skipping Spotify SDK - Premium required or no session')
+    tokenRef.current = spotifyToken
+  }, [spotifyToken])
+
+  useEffect(() => {
+    // Only load SDK if we have a verified Spotify token AND user is Premium
+    if (!spotifyToken || !isPremium) {
       return
     }
 
-    console.log('Loading Spotify Web Playback SDK for Premium user')
-
     // Load Spotify Web Playback SDK
-    const script = document.createElement('script')
-    script.src = 'https://sdk.scdn.co/spotify-player.js'
-    script.async = true
-    document.body.appendChild(script)
+    if (!window.Spotify) {
+      const script = document.createElement('script')
+      script.src = 'https://sdk.scdn.co/spotify-player.js'
+      script.async = true
+      script.id = 'spotify-player-sdk'
+      if (!document.getElementById('spotify-player-sdk')) {
+        document.body.appendChild(script)
+      }
+    }
 
     window.onSpotifyWebPlaybackSDKReady = () => {
       const player = new window.Spotify.Player({
         name: 'Novo Music Player',
         getOAuthToken: (cb: (token: string) => void) => {
-          if (session?.accessToken) {
-            cb(session.accessToken)
-          }
+          cb(tokenRef.current || '')
         },
         volume: volume
       })
@@ -76,9 +91,11 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
       // Error handling
       player.addListener('initialization_error', ({ message }: any) => {
         console.error('Spotify initialization error:', message)
+        setReady(false)
       })
       player.addListener('authentication_error', ({ message }: any) => {
         console.error('Spotify authentication error:', message)
+        setReady(false)
       })
       player.addListener('account_error', ({ message }: any) => {
         console.error('Spotify account error:', message)
@@ -94,9 +111,8 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
         setReady(true)
       })
 
-      // Not Ready
       player.addListener('not_ready', ({ device_id }: any) => {
-        console.log('Device ID has gone offline', device_id)
+        console.log('Spotify Player Not Ready', device_id)
         setReady(false)
       })
 
@@ -107,21 +123,23 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
         // Update progress
         setProgress(state.position)
 
-        // Auto-play next track when current track ends
         if (state.paused && state.position === 0 && state.duration > 0) {
-          console.log('Track ended, playing next...')
           nextTrack()
         }
       })
 
-      // Connect to the player
       player.connect().then((success: boolean) => {
         if (success) {
-          console.log('Spotify Player connected successfully')
+          console.log('The Web Playback SDK successfully connected to Spotify!')
         }
       })
 
       playerRef.current = player
+    }
+
+    // If script is already loaded, manually trigger ready
+    if (window.Spotify) {
+      window.onSpotifyWebPlaybackSDKReady()
     }
 
     return () => {
@@ -129,7 +147,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
         playerRef.current.disconnect()
       }
     }
-  }, [session?.accessToken, isPremium])
+  }, [spotifyToken, isPremium])
 
   // Play/pause control (only for Premium)
   useEffect(() => {
@@ -150,7 +168,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
 
   // Play track when currentTrack changes (only for Premium)
   useEffect(() => {
-    if (!playerRef.current || !currentTrack || !session?.accessToken || !isPremium) return
+    if (!playerRef.current || !currentTrack || !spotifyToken || !isPremium) return
 
     const deviceId = usePlayerStore.getState().deviceId
     if (!deviceId) return
@@ -160,7 +178,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`
+        'Authorization': `Bearer ${spotifyToken}`
       },
       body: JSON.stringify({
         uris: [currentTrack.uri]
@@ -168,7 +186,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
     }).catch(error => {
       console.error('Error playing track:', error)
     })
-  }, [currentTrack?.id, session?.accessToken, isPremium])
+  }, [currentTrack?.id, spotifyToken, isPremium])
 
   return <>{children}</>
 }

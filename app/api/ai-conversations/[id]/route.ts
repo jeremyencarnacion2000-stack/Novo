@@ -9,17 +9,47 @@ const updateAiConversationSchema = z.object({
   messages: z.any().optional() // Assuming messages can be any JSON structure
 })
 
-export async function PUT(
-   request: NextRequest,
-   { params }: { params: Promise<{ id: string }> }
- ) {
-   try {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-     const { id } = await params
+    const { id } = await params
+
+    const conversation = await prisma.aIConversation.findUnique({
+      where: {
+        id,
+        userId: session.user.id
+      }
+    })
+
+    if (!conversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(conversation)
+  } catch (error) {
+    console.error('Error fetching AI conversation:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
 
     const body = await request.json()
     const parsedBody = updateAiConversationSchema.safeParse(body)
@@ -42,26 +72,33 @@ export async function PUT(
     })
 
     return NextResponse.json(updatedConversation)
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
+    // Prisma Record Not Found error code
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
     console.error('Error updating AI conversation:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 
 export async function DELETE(
-   request: NextRequest,
-   { params }: { params: Promise<{ id: string }> }
- ) {
-   try {
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-     const { id } = await params
+    const { id } = await params
 
     const conversation = await prisma.aIConversation.deleteMany({
       where: {

@@ -1,10 +1,13 @@
 'use client'
 
-import { DashboardShell } from '@/components/dashboard-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { FitnessStats } from '@/components/analytics/fitness-stats'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { AnalyticsOverview } from '@/components/analytics/analytics-overview'
+import { ProductivityHeatmap } from '@/components/analytics/productivity-heatmap'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Award, Calendar, CheckCircle2, Flame, Target, TrendingDown, TrendingUp } from 'lucide-react'
 
 interface DailyData {
   date: string
@@ -13,6 +16,7 @@ interface DailyData {
   routinesCompleted: number
   habitsCompleted: number
   modulesUsed: string[]
+  productivityScore: number
 }
 
 interface ProductivityMetrics {
@@ -27,24 +31,45 @@ interface ProductivityMetrics {
 interface ClientAnalyticsProps {
   dailyData: DailyData[]
   metrics: ProductivityMetrics | null
+  insights?: {
+    bestDay: string
+    habitInsights: {
+      top: Array<{ name: string, rate: number }>
+      bottom: Array<{ name: string, rate: number }>
+    }
+    routineConsistency: Array<{ day: string, count: number }>
+    goals: Array<{ title: string, progress: number, status: string }>
+  }
 }
 
 const chartConfig = {
   timeSpent: {
     label: 'Time Spent (hours)',
-    color: 'hsl(var(--chart-1))',
+    color: '#6366f1',
   },
   completions: {
     label: 'Completions',
-    color: 'hsl(var(--chart-2))',
+    color: '#10b981',
   },
-  productiveDays: {
-    label: 'Productive Days',
-    color: 'hsl(var(--chart-3))',
+  tasks: {
+    label: 'Tasks',
+    color: '#6366f1',
+  },
+  routines: {
+    label: 'Routines',
+    color: '#8b5cf6',
+  },
+  habits: {
+    label: 'Habits',
+    color: '#f43f5e',
+  },
+  count: {
+    label: 'Completions',
+    color: '#6366f1',
   },
 }
 
-export default function ClientAnalytics({ dailyData, metrics }: ClientAnalyticsProps) {
+export default function ClientAnalytics({ dailyData, metrics, insights }: ClientAnalyticsProps) {
   // Prepare module usage data for pie chart
   const moduleUsage = dailyData.reduce((acc, day) => {
     day.modulesUsed.forEach(module => {
@@ -53,179 +78,282 @@ export default function ClientAnalytics({ dailyData, metrics }: ClientAnalyticsP
     return acc
   }, {} as Record<string, number>)
 
-  const pieData = Object.entries(moduleUsage).map(([module, count]) => ({
-    name: module.charAt(0).toUpperCase() + module.slice(1),
-    value: count,
-    fill: `hsl(var(--chart-${(Object.keys(moduleUsage).indexOf(module) % 5) + 1}))`,
-  }))
+  const pieData = Object.entries(moduleUsage)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([module, count], index) => {
+      const colors = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e']
+      return {
+        name: module.charAt(0).toUpperCase() + module.slice(1),
+        value: count,
+        fill: colors[index % colors.length],
+      }
+    })
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
+    <div className="flex flex-col gap-8 md:gap-12 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/40">
             Analytics & Insights
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          <p className="text-muted-foreground mt-2 text-base md:text-lg font-medium">
             Track your productivity patterns and usage insights
           </p>
         </div>
-
-        {/* Key Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Productive Days</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.productiveDays || 0}/{metrics?.totalDays || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {metrics ? Math.round(metrics.productivityRate * 100) : 0}% productivity rate
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Daily Time</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.avgDailyTime ? Math.round(metrics.avgDailyTime * 10) / 10 : 0}h
-              </div>
-              <p className="text-xs text-muted-foreground">Hours spent daily</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Completions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{metrics?.totalCompletions || 0}</div>
-              <p className="text-xs text-muted-foreground">Tasks, routines & habits</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Peak Hour</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.peakHour ? `${metrics.peakHour}:00` : 'N/A'}
-              </div>
-              <p className="text-xs text-muted-foreground">Most active hour</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Charts */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Time Spent Over Time */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Time Spent by Day</CardTitle>
-              <CardDescription>Hours spent in the app over the last 30 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px]">
-                <BarChart data={dailyData}>
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="totalTimeSpent" fill="var(--color-timeSpent)" />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Completions Over Time */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Completions</CardTitle>
-              <CardDescription>Tasks, routines, and habits completed by day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px]">
-                <LineChart data={dailyData}>
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="tasksCompleted"
-                    stroke="var(--color-completions)"
-                    strokeWidth={2}
-                    name="Tasks"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="routinesCompleted"
-                    stroke="hsl(var(--chart-3))"
-                    strokeWidth={2}
-                    name="Routines"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="habitsCompleted"
-                    stroke="hsl(var(--chart-4))"
-                    strokeWidth={2}
-                    name="Habits"
-                  />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Module Usage */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Module Usage</CardTitle>
-              <CardDescription>Most used modules over the last 30 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px]">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Productivity Trend */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Productivity Trend</CardTitle>
-              <CardDescription>Days marked as productive over time</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px]">
-                <BarChart data={dailyData.map(d => ({ ...d, productive: (d.tasksCompleted + d.routinesCompleted + d.habitsCompleted) > 0 ? 1 : 0 }))}>
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="productive" fill="var(--color-productiveDays)" />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold uppercase tracking-widest text-white/60">Live Tracking Active</span>
         </div>
       </div>
-    </DashboardShell>
+
+      {/* New Analytics Overview Chart */}
+      <div className="w-full">
+        <AnalyticsOverview data={dailyData} metrics={metrics} />
+      </div>
+
+      {/* Intelligence Insights Section */}
+      {insights && (
+        <div className="grid gap-8 md:grid-cols-3">
+          {/* Best Day & Habit Performance */}
+          <div className="md:col-span-2 grid gap-8">
+            <div className="grid gap-8 md:grid-cols-2">
+              {/* Best Day Card */}
+              <Card className="card--primary border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/10">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-bold tracking-tight">Best Day</CardTitle>
+                    <Award className="h-5 w-5 text-yellow-500" />
+                  </div>
+                  <CardDescription className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Most Productive Period</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <span className="text-4xl font-black tracking-tighter text-white mb-2">{insights.bestDay}s</span>
+                    <p className="text-sm text-white/60 text-center">You are consistently more productive on {insights.bestDay}s.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Habit Performance */}
+              <Card className="card--primary border-white/10">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-bold tracking-tight">Habit Insights</CardTitle>
+                    <Flame className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <CardDescription className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Most vs Least Consistent</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" /> Top Performers
+                    </p>
+                    {insights.habitInsights.top.map((habit, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-white/80">{habit.name}</span>
+                        <span className="font-bold text-emerald-400">{habit.rate}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  {insights.habitInsights.bottom.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest flex items-center gap-1">
+                        <TrendingDown className="h-3 w-3" /> Needs Attention
+                      </p>
+                      {insights.habitInsights.bottom.map((habit, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <span className="text-white/80">{habit.name}</span>
+                          <span className="font-bold text-rose-400">{habit.rate}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Routine Consistency Chart */}
+            <Card className="card--primary border-white/10">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-bold tracking-tight">Routine Consistency</CardTitle>
+                  <Calendar className="h-5 w-5 text-indigo-500" />
+                </div>
+                <CardDescription className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Completion frequency by day of week</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px] w-full mt-4">
+                  <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                    <BarChart data={insights.routineConsistency}>
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
+                        tickFormatter={(val) => val.substring(0, 3)}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+                      <Bar
+                        dataKey="count"
+                        fill="#6366f1"
+                        radius={[4, 4, 0, 0]}
+                        className="hover:opacity-80 transition-opacity"
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Goal Progress Section */}
+          <Card className="card--primary border-white/10 flex flex-col">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold tracking-tight">Goal Progress</CardTitle>
+                <Target className="h-5 w-5 text-rose-500" />
+              </div>
+              <CardDescription className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Active Objectives</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto max-h-[500px] space-y-6 pt-4">
+              {insights.goals.length > 0 ? (
+                insights.goals.map((goal, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-bold text-white/90 line-clamp-1">{goal.title}</span>
+                      <span className="text-xs font-mono text-white/40">{Math.round(goal.progress)}%</span>
+                    </div>
+                    <Progress value={goal.progress} className="h-1.5 bg-white/5" />
+                    <div className="flex justify-between items-center">
+                      <Badge variant="outline" className="text-[8px] uppercase tracking-widest border-white/10 text-white/40">
+                        {goal.status}
+                      </Badge>
+                      {goal.progress >= 100 && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                  <Target className="h-12 w-12 text-white/5 mb-4" />
+                  <p className="text-sm text-white/40">No active goals found.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Productivity Heatmap */}
+      <div className="w-full">
+        <ProductivityHeatmap data={dailyData} />
+      </div>
+
+      {/* Secondary Charts */}
+      <div className="grid gap-8 md:grid-cols-2">
+        {/* Completions Over Time - Stacked Area Chart */}
+        <Card className="card--primary border-white/10 overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-bold tracking-tight">Daily Completions</CardTitle>
+            <CardDescription className="text-sm font-medium text-muted-foreground">Tasks, routines, and habits breakdown</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px] w-full">
+              <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fillTasks" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="fillRoutines" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="fillHabits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.05} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  minTickGap={32}
+                  tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+                <Area
+                  type="monotone"
+                  dataKey="tasksCompleted"
+                  stackId="1"
+                  stroke="#6366f1"
+                  fill="url(#fillTasks)"
+                  strokeWidth={3}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="routinesCompleted"
+                  stackId="1"
+                  stroke="#8b5cf6"
+                  fill="url(#fillRoutines)"
+                  strokeWidth={3}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="habitsCompleted"
+                  stackId="1"
+                  stroke="#f43f5e"
+                  fill="url(#fillHabits)"
+                  strokeWidth={3}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Module Usage - Donut Chart */}
+        <Card className="card--primary border-white/10 overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-bold tracking-tight">Module Usage</CardTitle>
+            <CardDescription className="text-sm font-medium text-muted-foreground">Most used modules over the last 90 days</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center">
+            <ChartContainer config={chartConfig} className="h-[300px] w-full max-w-[400px]">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={8}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.fill}
+                      className="hover:opacity-80 transition-opacity cursor-pointer"
+                    />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+              </PieChart>
+            </ChartContainer>
+            <div className="hidden sm:flex flex-col gap-3 ml-4">
+              {pieData.map((entry, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill }} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">{entry.name}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

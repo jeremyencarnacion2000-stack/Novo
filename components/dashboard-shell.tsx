@@ -4,9 +4,13 @@ import React from 'react'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { useSettings } from '@/lib/settings-context'
-
+import { QuickCapture } from '@/components/quick-notes/quick-capture'
 import { DataIntegrator } from '@/lib/data-integrator'
 import { useEffect } from 'react'
+import { MobileNav } from '@/components/mobile-nav'
+
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -14,6 +18,8 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children }: DashboardShellProps) {
   const { settings } = useSettings()
+  const pathname = usePathname()
+  const isFullScreenPage = pathname?.startsWith('/music') || pathname?.startsWith('/ai') || pathname?.startsWith('/calendar')
 
   useEffect(() => {
     DataIntegrator.initialize()
@@ -22,25 +28,23 @@ export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <SidebarProvider>
       <div
-        className={`flex min-h-screen w-full ${settings.compactMode ? 'compact-mode' : ''} ${!settings.showAnimations ? 'no-animations' : ''}`}
+        className={`flex h-screen w-full overflow-hidden ${settings.compactMode ? 'compact-mode' : ''} ${!settings.showAnimations ? 'no-animations' : ''}`}
       >
         <AppSidebar />
-        <main className="flex-1 overflow-auto">
-          {/* Mobile Header with Hamburger Menu */}
-          <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-3 md:hidden">
-            <SidebarTrigger />
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <span className="text-sm font-bold">N</span>
-            </div>
-            <div>
-              <h2 className="text-base font-bold leading-none">Novo</h2>
-              <p className="text-xs text-muted-foreground">Productivity Hub</p>
+        <main className={`flex-1 relative ${isFullScreenPage ? 'overflow-hidden' : 'overflow-auto'}`}>
+          <div className={isFullScreenPage
+            ? "h-full w-full"
+            : `container py-8 px-6 lg:px-8 ${settings.compactMode ? 'dashboard-shell' : ''} pb-24 md:pb-8`
+          }>
+            <div key={pathname} className={cn(
+              "h-full w-full",
+              !isFullScreenPage && "section-enter"
+            )}>
+              {children}
             </div>
           </div>
-
-          <div className={`container py-8 px-6 lg:px-8 ${settings.compactMode ? 'dashboard-shell' : ''}`}>
-            {children}
-          </div>
+          <QuickCapture />
+          <MobileNav />
         </main>
       </div>
     </SidebarProvider>

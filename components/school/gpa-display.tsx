@@ -8,10 +8,12 @@ interface GPADisplayProps {
     label: string;
     description?: string;
     size?: 'small' | 'large';
+    showScale?: boolean;
 }
 
-export function GPADisplay({ gpa, label, description, size = 'large' }: GPADisplayProps) {
+export function GPADisplay({ gpa, label, description, size = 'large', showScale = true }: GPADisplayProps) {
     const getGradeColor = (gpa: number) => {
+        if (!showScale) return 'text-foreground'; // Neutral color for credits
         if (gpa >= 3.7) return 'text-green-600 dark:text-green-400';
         if (gpa >= 3.0) return 'text-blue-600 dark:text-blue-400';
         if (gpa >= 2.0) return 'text-yellow-600 dark:text-yellow-400';
@@ -28,9 +30,11 @@ export function GPADisplay({ gpa, label, description, size = 'large' }: GPADispl
                 <div className={`${getGradeColor(gpa)} font-bold ${size === 'large' ? 'text-4xl' : 'text-2xl'}`}>
                     {gpa.toFixed(2)}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                    / 4.0
-                </div>
+                {showScale && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                        / 4.0
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

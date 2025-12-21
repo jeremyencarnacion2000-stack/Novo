@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
           hasToken: true,
-          isPremium
+          isPremium,
+          accessToken: spotifyAccessToken
         });
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       hasToken: true,
-      isPremium
+      isPremium,
+      accessToken: session.accessToken
     });
   } catch (error) {
     console.error('has-token: Error:', error);

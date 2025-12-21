@@ -17,11 +17,18 @@ import { FloatingMusicWidget } from '@/components/music/floating-music-widget'
 import { GlobalPlayer } from '@/components/music/global-player'
 import { MiniChatbot } from '@/components/ai/mini-chatbot'
 import { QuickCapture } from '@/components/quick-capture'
+import { DashboardShell } from '@/components/dashboard-shell'
+import { ChatbotProvider } from '@/components/ai/modern-chatbot/context'
+import { ChatbotSidebar } from '@/components/ai/modern-chatbot/chatbot-sidebar'
+import { useSessionTracking } from '@/hooks/use-session-tracking'
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const router = useRouter()
   const pathname = usePathname()
+
+  // Enable automatic session tracking
+  useSessionTracking()
 
   useEffect(() => {
     // If not authenticated and not on the sign-in page, redirect to sign-in
@@ -36,7 +43,16 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   // Only render children if authenticated or on the sign-in page
   if (status === 'authenticated' || pathname === '/auth/signin') {
-    return <>{children}</>
+    // Don't wrap with DashboardShell on auth pages
+    if (pathname === '/auth/signin') {
+      return <>{children}</>
+    }
+
+    return (
+      <DashboardShell>
+        {children}
+      </DashboardShell>
+    )
   }
 
   return null
@@ -53,21 +69,24 @@ export default function ClientLayout({
         <NotificationProvider>
           <PomodoroProvider>
             <FocusProvider>
-              <AuthWrapper>
-                <GlobalPlayer>
-                  <>
-                    {children}
-                    <CommandPalette />
-                    <NetworkStatus />
-                    <Toaster />
-                    <FloatingMusicWidget />
-                    <FocusTimerWidget />
-                    <PomodoroWidget />
-                    <MiniChatbot />
-                    <QuickCapture />
-                  </>
-                </GlobalPlayer>
-              </AuthWrapper>
+              <ChatbotProvider>
+                <AuthWrapper>
+                  <GlobalPlayer>
+                    <>
+                      {children}
+                      <QuickCapture />
+                    </>
+                  </GlobalPlayer>
+                </AuthWrapper>
+                <CommandPalette />
+                <NetworkStatus />
+                <Toaster />
+                <FloatingMusicWidget />
+                <FocusTimerWidget />
+                <PomodoroWidget />
+                <ChatbotSidebar />
+                <MiniChatbot />
+              </ChatbotProvider>
             </FocusProvider>
           </PomodoroProvider>
         </NotificationProvider>

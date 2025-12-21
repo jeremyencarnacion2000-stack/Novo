@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { DashboardShell } from '@/components/dashboard-shell';
+
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +9,7 @@ import { CourseCard } from '@/components/school/course-card';
 import { CourseDialog } from '@/components/school/course-dialog';
 import { GradeDialog } from '@/components/school/grade-dialog';
 import { GPADisplay } from '@/components/school/gpa-display';
+import { SchoolAnalytics } from '@/components/school/school-analytics';
 import { useToast } from '@/hooks/use-toast';
 import { calculateGPA } from '@/lib/gpa-calculator';
 
@@ -180,108 +181,102 @@ export default function SchoolPage() {
 
   if (loading) {
     return (
-      <DashboardShell>
-        <div>Loading...</div>
-      </DashboardShell>
+      <div>Loading...</div>
     );
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">School</h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            Track your courses, grades, and GPA
-          </p>
-        </div>
-
-        {/* GPA Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <GPADisplay gpa={overallGPA} label="Overall GPA" />
-          <GPADisplay gpa={semesterGPA} label={`${currentSemester} GPA`} />
-          <GPADisplay
-            gpa={totalCredits}
-            label="Total Credits"
-            description={`${courses.length} courses`}
-            size="small"
-          />
-        </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="courses" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-            <TabsTrigger value="courses">Courses</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
-
-          {/* Courses Tab */}
-          <TabsContent value="courses" className="space-y-4">
-            <div className="flex justify-end">
-              <Button
-                onClick={() => {
-                  setEditingCourse(undefined);
-                  setCourseDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Course
-              </Button>
-            </div>
-
-            {courses.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>No courses yet</p>
-                <p className="text-sm mt-2">Add your first course to get started!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {courses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    onEdit={handleEditCourse}
-                    onDelete={handleDeleteCourse}
-                    onAddGrade={handleAddGradeClick}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-4">
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Analytics coming soon...</p>
-              <p className="text-sm mt-2">Charts and trends will be displayed here</p>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Dialogs */}
-        <CourseDialog
-          open={courseDialogOpen}
-          onClose={() => {
-            setCourseDialogOpen(false);
-            setEditingCourse(undefined);
-          }}
-          onSave={handleSaveCourse}
-          course={editingCourse}
-        />
-
-        {selectedCourse && (
-          <GradeDialog
-            open={gradeDialogOpen}
-            onClose={() => {
-              setGradeDialogOpen(false);
-              setSelectedCourse(undefined);
-            }}
-            onSave={handleAddGrade}
-            courseId={selectedCourse.id}
-          />
-        )}
+    <div className="flex flex-col gap-6 md:gap-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">School</h1>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          Track your courses, grades, and GPA
+        </p>
       </div>
-    </DashboardShell>
+
+      {/* GPA Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <GPADisplay gpa={overallGPA} label="Overall GPA" />
+        <GPADisplay gpa={semesterGPA} label={`${currentSemester} GPA`} />
+        <GPADisplay
+          gpa={totalCredits}
+          label="Total Credits"
+          description={`${courses.length} courses`}
+          size="small"
+          showScale={false}
+        />
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="courses" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="courses">Courses</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        {/* Courses Tab */}
+        <TabsContent value="courses" className="space-y-4">
+          <div className="flex justify-end">
+            <Button
+              onClick={() => {
+                setEditingCourse(undefined);
+                setCourseDialogOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Course
+            </Button>
+          </div>
+
+          {courses.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No courses yet</p>
+              <p className="text-sm mt-2">Add your first course to get started!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {courses.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  onEdit={handleEditCourse}
+                  onDelete={handleDeleteCourse}
+                  onAddGrade={handleAddGradeClick}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-4">
+          <SchoolAnalytics courses={courses} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
+      <CourseDialog
+        open={courseDialogOpen}
+        onClose={() => {
+          setCourseDialogOpen(false);
+          setEditingCourse(undefined);
+        }}
+        onSave={handleSaveCourse}
+        course={editingCourse}
+      />
+
+      {selectedCourse && (
+        <GradeDialog
+          open={gradeDialogOpen}
+          onClose={() => {
+            setGradeDialogOpen(false);
+            setSelectedCourse(undefined);
+          }}
+          onSave={handleAddGrade}
+          courseId={selectedCourse.id}
+        />
+      )}
+    </div>
   );
 }

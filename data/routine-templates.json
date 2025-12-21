@@ -1,0 +1,152 @@
+[
+    {
+        "id": "morning",
+        "name": "Morning Routine",
+        "description": "Start your day right with a structured morning routine",
+        "timeOfDay": "morning",
+        "duration": 60,
+        "tasks": [
+            {
+                "text": "Wake up and hydrate (glass of water)"
+            },
+            {
+                "text": "5-minute stretching or yoga"
+            },
+            {
+                "text": "Shower and personal hygiene"
+            },
+            {
+                "text": "Healthy breakfast"
+            },
+            {
+                "text": "Review daily goals"
+            }
+        ]
+    },
+    {
+        "id": "workout",
+        "name": "Workout Routine",
+        "description": "Stay fit with a balanced exercise routine",
+        "timeOfDay": "anytime",
+        "duration": 45,
+        "tasks": [
+            {
+                "text": "5-minute warm-up"
+            },
+            {
+                "text": "20-minute cardio or strength training"
+            },
+            {
+                "text": "15-minute focused exercise"
+            },
+            {
+                "text": "5-minute cool-down and stretching"
+            },
+            {
+                "text": "Hydrate and protein intake"
+            }
+        ]
+    },
+    {
+        "id": "study",
+        "name": "Study Session",
+        "description": "Focused study routine using the Pomodoro technique",
+        "timeOfDay": "afternoon",
+        "duration": 90,
+        "tasks": [
+            {
+                "text": "Set up study space (quiet, organized)"
+            },
+            {
+                "text": "Review learning objectives"
+            },
+            {
+                "text": "25-minute focused study block"
+            },
+            {
+                "text": "5-minute break"
+            },
+            {
+                "text": "25-minute study block"
+            },
+            {
+                "text": "5-minute break"
+            },
+            {
+                "text": "Review and summarize notes"
+            }
+        ]
+    },
+    {
+        "id": "bedtime",
+        "name": "Bedtime Routine",
+        "description": "Wind down for a restful night's sleep",
+        "timeOfDay": "evening",
+        "duration": 30,
+        "tasks": [
+            {
+                "text": "Turn off screens 30 min before bed"
+            },
+            {
+                "text": "Prepare clothes for tomorrow"
+            },
+            {
+                "text": "Light stretching or meditation"
+            },
+            {
+                "text": "Read for 15 minutes"
+            },
+            {
+                "text": "Gratitude journaling (3 things)"
+            }
+        ]
+    },
+    {
+        "id": "productivity",
+        "name": "Productivity Kickoff",
+        "description": "Get into flow state for maximum productivity",
+        "timeOfDay": "morning",
+        "duration": 15,
+        "tasks": [
+            {
+                "text": "Clear desk and organize workspace"
+            },
+            {
+                "text": "Review today's top 3 priorities"
+            },
+            {
+                "text": "Close unnecessary tabs/apps"
+            },
+            {
+                "text": "Set a timer for your first task"
+            }
+        ]
+    },
+    {
+        "id": "selfcare",
+        "name": "Self-Care Sunday",
+        "description": "Weekly self-care routine for mental and physical wellness",
+        "timeOfDay": "anytime",
+        "duration": 120,
+        "tasks": [
+            {
+                "text": "Skincare routine"
+            },
+            {
+                "text": "Take a relaxing bath or shower"
+            },
+            {
+                "text": "Meal prep for the week"
+            },
+            {
+                "text": "Reflect on the past week"
+            },
+            {
+                "text": "Plan goals for the upcoming week"
+            },
+            {
+                "text": "Do something enjoyable (hobby, movie, etc.)"
+            }
+        ]
+    }
+]

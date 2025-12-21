@@ -1,4 +1,4 @@
-import { getAnalyticsData, calculateProductivityMetrics } from '@/lib/analytics-server'
+import { getAnalyticsData, calculateProductivityMetrics, getAdvancedInsights } from '@/lib/analytics-server'
 import ClientAnalytics from './ClientAnalytics'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -11,6 +11,7 @@ export interface DailyData {
   routinesCompleted: number
   habitsCompleted: number
   modulesUsed: string[]
+  productivityScore: number
 }
 
 export interface ProductivityMetrics {
@@ -34,8 +35,9 @@ export default async function AnalyticsPage() {
   const userId = session.user.id
 
   // Use server-side functions with direct Prisma queries
-  const { dailyData } = await getAnalyticsData(userId, 30)
-  const metrics = await calculateProductivityMetrics(userId, 30)
+  const { dailyData } = await getAnalyticsData(userId, 90)
+  const metrics = await calculateProductivityMetrics(userId, 90)
+  const insights = await getAdvancedInsights(userId)
 
   // Format data for charts
   const formattedData: DailyData[] = dailyData.map((d: any) => ({
@@ -45,7 +47,8 @@ export default async function AnalyticsPage() {
     routinesCompleted: d.routinesCompleted,
     habitsCompleted: d.habitsCompleted,
     modulesUsed: Array.isArray(d.modulesUsed) ? d.modulesUsed : [],
+    productivityScore: d.productivityScore || 0,
   }))
 
-  return <ClientAnalytics dailyData={formattedData} metrics={metrics} />
+  return <ClientAnalytics dailyData={formattedData} metrics={metrics} insights={insights} />
 }

@@ -1,36 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const session = await getServerSession(authOptions)
+
+  if (!session || !session.accessToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: 'No Spotify access token found' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const limit = searchParams.get('limit') || '20';
-
-    const url = `https://api.spotify.com/v1/me/albums?limit=${limit}`;
-
-    const response = await fetch(url, {
+    const response = await fetch('https://api.spotify.com/v1/me/albums?limit=50', {
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`
-      }
-    });
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    })
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Spotify albums API error:', errorData);
-      return NextResponse.json({ error: 'Spotify API error', details: errorData }, { status: response.status });
+      const error = await response.json()
+      return NextResponse.json(error, { status: response.status })
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    const data = await response.json()
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching Spotify albums:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Error fetching saved albums:", error)
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

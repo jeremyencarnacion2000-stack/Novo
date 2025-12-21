@@ -159,6 +159,30 @@ export function GrokChatbot() {
           required: []
         }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_weekly_summary',
+        description: 'Obtener un resumen semanal de tareas, rutinas y hábitos completados',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_productivity_analysis',
+        description: 'Analizar la productividad del usuario (puntuación, horas pico)',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
+      }
     }
   ];
   // Error handling helpers
@@ -218,6 +242,10 @@ export function GrokChatbot() {
           return await updateTask(args);
         case 'get_system_status':
           return await getSystemStatus();
+        case 'get_weekly_summary':
+          return await getWeeklySummary();
+        case 'get_productivity_analysis':
+          return await getProductivityAnalysis();
         default:
           throw new Error(`Función desconocida: ${name}`);
       }
@@ -281,6 +309,18 @@ export function GrokChatbot() {
       projects: { count: projects.length, items: projects.slice(0, 5) },
       routines: { count: routines.length, items: routines.slice(0, 5) }
     };
+  };
+
+  const getWeeklySummary = async () => {
+    const response = await fetch('/api/stats/productivity?days=7');
+    if (!response.ok) throw new Error('Failed to fetch weekly summary');
+    return await response.json();
+  };
+
+  const getProductivityAnalysis = async () => {
+    const response = await fetch('/api/stats/productivity?days=30');
+    if (!response.ok) throw new Error('Failed to fetch productivity analysis');
+    return await response.json();
   };
 
   // Componente para bloques de código con syntax highlighting
@@ -400,7 +440,7 @@ export function GrokChatbot() {
   };
 
   // Handle file attachment
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       const newAttachments: FileAttachment[] = [];
@@ -409,14 +449,14 @@ export function GrokChatbot() {
         const file = files[i];
         // Validate file type and size
         const isAllowedType = file.type.startsWith('image/') ||
-                              file.type.startsWith('text/') ||
-                              file.type === 'application/pdf' ||
-                              file.type === 'application/msword' ||
-                              file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          file.type.startsWith('text/') ||
+          file.type === 'application/pdf' ||
+          file.type === 'application/msword' ||
+          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         if (!isAllowedType || file.size > maxSize) {
           continue; // Skip invalid files
         }
-        // Create object URL for preview
+        // Read file as base64 for API
         const url = URL.createObjectURL(file);
         newAttachments.push({
           name: file.name,
@@ -510,6 +550,8 @@ Tienes acceso a las siguientes funciones para interactuar con el sistema Novo De
 - create_routine: Crear una nueva rutina
 - update_task: Actualizar una tarea existente
 - get_system_status: Consultar el estado actual del sistema
+- get_weekly_summary: Obtener un resumen semanal de tareas, rutinas y hábitos completados
+- get_productivity_analysis: Analizar la productividad del usuario (puntuación, horas pico)
 
 Usa estas funciones cuando el usuario te pida realizar acciones relacionadas con tareas, proyectos o rutinas.`;
 
@@ -703,9 +745,8 @@ Usa estas funciones cuando el usuario te pida realizar acciones relacionadas con
 
       {/* Sidebar de conversaciones */}
       <div
-        className={`${
-          sidebarCollapsed ? 'w-0 md:w-16' : 'w-80'
-        } bg-card border-r border-border flex flex-col transition-all duration-300 ease-in-out`}
+        className={`${sidebarCollapsed ? 'w-0 md:w-16' : 'w-80'
+          } bg-card border-r border-border flex flex-col transition-all duration-300 ease-in-out`}
         data-sidebar
       >
         <div className="p-4 border-b border-border flex items-center justify-between">
@@ -733,9 +774,8 @@ Usa estas funciones cuando el usuario te pida realizar acciones relacionadas con
             {conversations.map((conv) => (
               <div
                 key={conv.id}
-                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                  currentConversation === conv.id ? 'bg-accent border border-border' : ''
-                }`}
+                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${currentConversation === conv.id ? 'bg-accent border border-border' : ''
+                  }`}
                 data-conversation
                 tabIndex={0}
                 role="button"
@@ -816,9 +856,8 @@ Usa estas funciones cuando el usuario te pida realizar acciones relacionadas con
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-3 ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
+              className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'
+                }`}
               role="article"
               aria-label={`Mensaje de ${message.role === 'user' ? 'usuario' : 'asistente'}`}
             >
@@ -831,11 +870,10 @@ Usa estas funciones cuando el usuario te pida realizar acciones relacionadas con
               )}
 
               <div
-                className={`max-w-lg rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card border border-border text-foreground'
-                }`}
+                className={`max-w-lg rounded-lg px-4 py-2 ${message.role === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card border border-border text-foreground'
+                  }`}
               >
                 {/* Attachments */}
                 {message.attachments && message.attachments.length > 0 && (

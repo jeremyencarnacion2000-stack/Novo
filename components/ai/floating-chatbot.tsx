@@ -3,8 +3,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Sparkles, Send, X, MessageSquare, Code, Bug, FileText, Play, Settings, ChevronUp, ChevronDown, Zap, Bot, Loader2, AlertTriangle } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { detectIntent, createTask, createProject, createChecklist, createHabit } from '@/lib/ai-commands';
+import { detectIntent } from '@/lib/ai-commands';
+import { internalAI } from '@/lib/internal-ai/service';
 import { useRouter } from 'next/navigation';
+import { useSettings } from '@/lib/settings-context';
 
 interface QuickAction {
   id: string;
@@ -45,45 +47,72 @@ export default function FloatingChatbot() {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  const { settings: appSettings, updateSettings } = useSettings();
+
   // Inicializar posición y cargar estado persistido
   useEffect(() => {
-    const savedPosition = localStorage.getItem('floating-chatbot-position');
-    const savedMinimized = localStorage.getItem('floating-chatbot-minimized');
-    const savedMessages = localStorage.getItem('floating-chatbot-messages');
-    const savedSettings = localStorage.getItem('floating-chatbot-settings');
-
-    if (savedPosition) {
-      setPosition(JSON.parse(savedPosition));
+    // Load UI state from settings
+    if (appSettings.preferences?.floatingChatbot) {
+      const prefs = appSettings.preferences.floatingChatbot;
+      if (prefs.position) setPosition(prefs.position);
+      if (prefs.isMinimized !== undefined) setIsMinimized(prefs.isMinimized);
+      if (prefs.settings) setSettings(prefs.settings);
     } else {
-      // Posición por defecto
+      // Default position
       setPosition({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
     }
-    if (savedMinimized) {
-      setIsMinimized(JSON.parse(savedMinimized));
-    }
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
-    }
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
-    }
-  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('floating-chatbot-position', JSON.stringify(position));
-  }, [position]);
+    // Load messages from API
+    const loadMessages = async () => {
+      try {
+        const response = await fetch('/api/ai/chat-session');
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data.messages)) {
+            setMessages(data.messages);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    };
+    loadMessages();
+  }, [appSettings.preferences?.floatingChatbot]); // Only run when preferences change (initial load)
 
+  // Save UI state to settings
   useEffect(() => {
-    localStorage.setItem('floating-chatbot-minimized', JSON.stringify(isMinimized));
-  }, [isMinimized]);
+    const timeoutId = setTimeout(() => {
+      updateSettings({
+        preferences: {
+          ...appSettings.preferences,
+          floatingChatbot: {
+            position,
+            isMinimized,
+            settings
+          }
+        }
+      });
+    }, 1000); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [position, isMinimized, settings]);
 
+  // Save messages to API
   useEffect(() => {
-    localStorage.setItem('floating-chatbot-messages', JSON.stringify(messages));
+    if (messages.length === 0) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await fetch('/api/ai/chat-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages })
+        });
+      } catch (error) {
+        console.error('Failed to save chat history:', error);
+      }
+    }, 2000); // Debounce save
+    return () => clearTimeout(timeoutId);
   }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem('floating-chatbot-settings', JSON.stringify(settings));
-  }, [settings]);
 
   // Detectar contexto actual
   useEffect(() => {
@@ -146,17 +175,18 @@ export default function FloatingChatbot() {
     try {
       switch (intent) {
         case 'create_task':
-          const taskResult = await createTask(data as { title: string; projectName?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' });
+          const taskResult = await internalAI.execute('create_task', data);
           return taskResult.success ? `✅ Tarea "${data.title}" creada.` : `❌ Error: ${taskResult.error}`;
         case 'add_project':
-          const projectResult = await createProject(data.projectName);
+          const projectResult = await internalAI.execute('create_project', data);
           return projectResult.success ? `✅ Proyecto "${data.projectName}" creado.` : `❌ Error: ${projectResult.error}`;
         case 'create_checklist':
-          const checklistResult = await createChecklist(data.items);
-          return checklistResult.success ? `✅ Checklist creada.` : `❌ Error: ${checklistResult.error}`;
+          // Checklist might need its own action registration or mapping
+          // For now keeping legacy or mapping to task subtasks if we had that
+          return 'Comando de checklist en proceso de migración a Internal AI.';
         case 'create_habit':
-          const habitResult = await createHabit(data.habitName);
-          return habitResult.success ? `✅ Hábito "${data.habitName}" creado.` : `❌ Error: ${habitResult.error}`;
+          // Similar for habits
+          return 'Comando de hábito en proceso de migración a Internal AI.';
         default:
           return 'Comando no reconocido.';
       }
@@ -206,7 +236,7 @@ export default function FloatingChatbot() {
       id: 'settings',
       label: 'Configuración',
       icon: <Settings size={16} />,
-      action: () => requestConfirmation('Configuración', 'Funcionalidad de configuración próximamente', () => {}),
+      action: () => requestConfirmation('Configuración', 'Funcionalidad de configuración próximamente', () => { }),
       description: 'Personalizar el widget'
     },
     {
@@ -227,21 +257,39 @@ export default function FloatingChatbot() {
     setShowConfirmation({ action, message, onConfirm });
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
     setMessages([]);
-    localStorage.removeItem('floating-chatbot-messages');
+    try {
+      await fetch('/api/ai/chat-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [] })
+      });
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+    }
   };
 
   const resetSettings = () => {
-    setSettings({
+    const defaultSettings = {
       theme: 'auto',
       size: 'medium',
       autoHide: false,
       position: 'bottom-right'
-    });
+    };
+    setSettings(defaultSettings);
     setPosition({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
-    localStorage.removeItem('floating-chatbot-settings');
-    localStorage.removeItem('floating-chatbot-position');
+
+    updateSettings({
+      preferences: {
+        ...appSettings.preferences,
+        floatingChatbot: {
+          position: { x: window.innerWidth - 80, y: window.innerHeight - 80 },
+          isMinimized: false,
+          settings: defaultSettings
+        }
+      }
+    });
   };
 
   const handleSubmit = async (messageText?: string) => {
@@ -341,11 +389,10 @@ export default function FloatingChatbot() {
       <div
         ref={bubbleRef}
         onMouseDown={handleMouseDown}
-        className={`fixed z-50 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 cursor-move group ${
-          isExpanded
-            ? `w-${settings.size === 'small' ? '10' : settings.size === 'large' ? '14' : '12'} h-${settings.size === 'small' ? '10' : settings.size === 'large' ? '14' : '12'} bg-gradient-to-r from-purple-500 to-blue-500`
-            : `w-${settings.size === 'small' ? '12' : settings.size === 'large' ? '16' : '14'} h-${settings.size === 'small' ? '12' : settings.size === 'large' ? '16' : '14'} bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600`
-        }`}
+        className={`fixed z-50 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 cursor-move group ${isExpanded
+          ? `w-${settings.size === 'small' ? '10' : settings.size === 'large' ? '14' : '12'} h-${settings.size === 'small' ? '10' : settings.size === 'large' ? '14' : '12'} bg-gradient-to-r from-purple-500 to-blue-500`
+          : `w-${settings.size === 'small' ? '12' : settings.size === 'large' ? '16' : '14'} h-${settings.size === 'small' ? '12' : settings.size === 'large' ? '16' : '14'} bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600`
+          }`}
         style={{ left: position.x, top: position.y }}
         onClick={() => !isDragging && setIsExpanded(!isExpanded)}
       >
@@ -401,11 +448,10 @@ export default function FloatingChatbot() {
           <div className="flex-1 p-3 space-y-2 overflow-y-auto max-h-32">
             {messages.slice(-3).map((msg) => (
               <div key={msg.id} className={`text-xs ${msg.isUser ? 'text-right' : 'text-left'}`}>
-                <div className={`inline-block px-2 py-1 rounded-lg max-w-full ${
-                  msg.isUser
-                    ? 'bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                }`}>
+                <div className={`inline-block px-2 py-1 rounded-lg max-w-full ${msg.isUser
+                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                  }`}>
                   {msg.content.length > 50 ? `${msg.content.substring(0, 50)}...` : msg.content}
                 </div>
               </div>

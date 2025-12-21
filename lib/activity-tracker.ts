@@ -1,35 +1,34 @@
-export function trackActivity(type: 'task' | 'routine' | 'habit', completed: boolean = true) {
+import { trackEvent } from './analytics'
+
+export async function trackActivity(
+  type: 'task' | 'routine' | 'habit',
+  completed: boolean = true,
+  metadata?: { id?: string; name?: string; module?: string }
+) {
   if (!completed) return
-  
-  const today = new Date().toISOString().split('T')[0]
-  const history = JSON.parse(localStorage.getItem('activity-history') || '{}')
-  
-  if (!history[today]) {
-    history[today] = { completed: 0, tasks: 0, routines: 0, habits: 0 }
+
+  try {
+    // Use the centralized trackEvent which is more robust
+    await trackEvent(
+      undefined, // userId will be picked up from session on server
+      `${type}_complete` as any,
+      metadata?.module || type
+    )
+  } catch (error) {
+    console.error('Failed to track activity:', error)
   }
-  
-  history[today].completed += 1
-  history[today][type === 'task' ? 'tasks' : type === 'routine' ? 'routines' : 'habits'] += 1
-  
-  localStorage.setItem('activity-history', JSON.stringify(history))
 }
 
-export function getStreak(): number {
-  const history = JSON.parse(localStorage.getItem('activity-history') || '{}')
-  let streak = 0
-  const today = new Date()
-  
-  for (let i = 0; i < 365; i++) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - i)
-    const dateKey = date.toISOString().split('T')[0]
-    
-    if (history[dateKey] && history[dateKey].completed > 0) {
-      streak++
-    } else if (i > 0) {
-      break
+export async function getStreak(): Promise<number> {
+  try {
+    const response = await fetch('/api/analytics?type=streak')
+    if (response.ok) {
+      const data = await response.json()
+      return data.streak || 0
     }
+    return 0
+  } catch (error) {
+    console.error('Failed to get streak:', error)
+    return 0
   }
-  
-  return streak
 }

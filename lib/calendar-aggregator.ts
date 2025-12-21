@@ -44,7 +44,7 @@ export class CalendarAggregator {
     ): Promise<CalendarEvent[]> {
         const events: CalendarEvent[] = [];
 
-        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit'];
+        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit', 'business'];
 
         // Fetch from all enabled sources in parallel
         const promises: Promise<CalendarEvent[]>[] = [];
@@ -67,12 +67,50 @@ export class CalendarAggregator {
         if (enabledSources.includes('habit')) {
             promises.push(this.getHabitEvents(userId, start, end));
         }
+        if (enabledSources.includes('business')) {
+            promises.push(this.getBusinessEvents(userId, start, end));
+        }
 
         const results = await Promise.all(promises);
         results.forEach(sourceEvents => events.push(...sourceEvents));
 
         // Sort by start date
         return events.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+
+    /**
+     * Get Business events (deals with expectedClose)
+     */
+    private static async getBusinessEvents(
+        userId: string,
+        start: Date,
+        end: Date
+    ): Promise<CalendarEvent[]> {
+        const deals = await prisma.deal.findMany({
+            where: {
+                userId,
+                expectedClose: {
+                    gte: start,
+                    lte: end,
+                },
+            },
+            include: {
+                client: true,
+            },
+        });
+
+        return deals.map(deal => ({
+            id: `business:deal:${deal.id}`,
+            title: `🤝 Deal: ${deal.title} (${deal.client.name})`,
+            start: startOfDay(deal.expectedClose!),
+            end: endOfDay(deal.expectedClose!),
+            allDay: true,
+            source: 'business' as const,
+            color: SOURCE_COLORS.business,
+            metadata: {
+                description: `Value: $${deal.value} | Stage: ${deal.stage} | Probability: ${deal.probability}%`,
+            },
+        }));
     }
 
     /**
@@ -234,36 +272,58 @@ export class CalendarAggregator {
 
         const events: CalendarEvent[] = [];
 
+        // Day name mapping for daysOfWeek check
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
         // Generate routine blocks for each day in range
         let currentDate = new Date(start);
         while (currentDate <= end) {
-            for (const routine of routines) {
-                let startHour: number;
-                let endHour: number;
+            const currentDayName = dayNames[currentDate.getDay()];
 
-                // Map timeOfDay to hours
-                switch (routine.timeOfDay) {
-                    case 'morning':
-                        startHour = 6;
-                        endHour = 12;
-                        break;
-                    case 'afternoon':
-                        startHour = 12;
-                        endHour = 18;
-                        break;
-                    case 'evening':
-                        startHour = 18;
-                        endHour = 22;
-                        break;
-                    case 'anytime':
-                    default:
-                        // Skip anytime routines for calendar (they appear in Today view)
-                        continue;
+            for (const routine of routines) {
+                // Check if routine is scheduled for this day of week
+                if (routine.daysOfWeek) {
+                    try {
+                        const scheduledDays = JSON.parse(routine.daysOfWeek) as string[];
+                        if (!scheduledDays.includes(currentDayName)) {
+                            continue; // Skip this routine for this day
+                        }
+                    } catch {
+                        // If parsing fails, include the routine anyway
+                    }
                 }
 
-                // Create event for this day
-                const eventStart = setHours(setMinutes(new Date(currentDate), 0), startHour);
-                const eventEnd = setHours(setMinutes(new Date(currentDate), 0), endHour);
+                let eventStart: Date;
+                let eventEnd: Date;
+
+                // Use scheduledTime if available, otherwise fall back to timeOfDay
+                if (routine.scheduledTime) {
+                    const [hours, minutes] = routine.scheduledTime.split(':').map(Number);
+                    eventStart = setHours(setMinutes(new Date(currentDate), minutes || 0), hours);
+                    eventEnd = new Date(eventStart.getTime() + routine.duration * 60 * 1000);
+                } else {
+                    let startHour: number;
+
+                    // Map timeOfDay to hours
+                    switch (routine.timeOfDay) {
+                        case 'morning':
+                            startHour = 6;
+                            break;
+                        case 'afternoon':
+                            startHour = 12;
+                            break;
+                        case 'evening':
+                            startHour = 18;
+                            break;
+                        case 'anytime':
+                        default:
+                            // Skip anytime routines without scheduledTime for calendar
+                            continue;
+                    }
+
+                    eventStart = setHours(setMinutes(new Date(currentDate), 0), startHour);
+                    eventEnd = new Date(eventStart.getTime() + routine.duration * 60 * 1000);
+                }
 
                 events.push({
                     id: `routine:${routine.id}:${currentDate.toISOString().split('T')[0]}`,

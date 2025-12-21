@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { DashboardShell } from '@/components/dashboard-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -146,173 +145,169 @@ export default function TodayPage() {
 
     if (loading) {
         return (
-            <DashboardShell>
-                <div>Loading...</div>
-            </DashboardShell>
+            <div>Loading...</div>
         );
     }
 
     return (
-        <DashboardShell>
-            <div className="flex flex-col gap-6 md:gap-8">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                            Today
-                        </h1>
-                        <p className="text-muted-foreground mt-1">
-                            {new Date().toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                month: 'long',
-                                day: 'numeric'
-                            })}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-2xl font-bold">
-                            {completedCount}/{totalCount}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Tasks completed</div>
-                    </div>
+        <div className="flex flex-col gap-6 md:gap-8">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                        Today
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        {new Date().toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric'
+                        })}
+                    </p>
                 </div>
-
-                {/* Progress Bar */}
-                <div className="w-full bg-secondary rounded-full h-3">
-                    <div
-                        className="bg-primary h-3 rounded-full transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                    />
+                <div className="text-right">
+                    <div className="text-2xl font-bold">
+                        {completedCount}/{totalCount}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Tasks completed</div>
                 </div>
-
-                {/* Urgency Panel */}
-                {urgentItems.length > 0 && (
-                    <Card className="border-orange-200 dark:border-orange-800">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-orange-600" />
-                                Urgent School Items
-                            </CardTitle>
-                            <CardDescription>
-                                Assignments and exams in the next 72 hours
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {urgentItems.map(item => (
-                                    <div
-                                        key={item.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border"
-                                    >
-                                        <div className="flex-1">
-                                            <div className="font-medium">{item.courseCode}: {item.title}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                Due: {new Date(item.dueDate).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                        <Badge className={getUrgencyColor(item.urgencyLevel)}>
-                                            {item.urgencyLevel.toUpperCase()}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Morning Routines */}
-                {morningTasks.length > 0 && (
-                    <TaskSection
-                        title="🌅 Morning Routine"
-                        tasks={morningTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Afternoon Routines */}
-                {afternoonTasks.length > 0 && (
-                    <TaskSection
-                        title="☀️ Afternoon Routine"
-                        tasks={afternoonTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Evening Routines */}
-                {eveningTasks.length > 0 && (
-                    <TaskSection
-                        title="🌙 Evening Routine"
-                        tasks={eveningTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Anytime Tasks */}
-                {anytimeTasks.length > 0 && (
-                    <TaskSection
-                        title="⏰ Anytime"
-                        tasks={anytimeTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Project Tasks */}
-                {projectTasks.length > 0 && (
-                    <TaskSection
-                        title="📋 Projects"
-                        tasks={projectTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* School Tasks */}
-                {schoolTasks.length > 0 && (
-                    <TaskSection
-                        title="🎓 School"
-                        tasks={schoolTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Manual Tasks */}
-                {manualTasks.length > 0 && (
-                    <TaskSection
-                        title="✏️ Manual Tasks"
-                        tasks={manualTasks}
-                        onToggle={handleToggleComplete}
-                        getPriorityColor={getPriorityColor}
-                        getSourceIcon={getSourceIcon}
-                    />
-                )}
-
-                {/* Empty State */}
-                {totalCount === 0 && (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="text-center py-12">
-                                <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                <p className="text-lg font-medium">No tasks for today!</p>
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    You're all caught up 🎉
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
             </div>
-        </DashboardShell>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-secondary rounded-full h-3">
+                <div
+                    className="bg-primary h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                />
+            </div>
+
+            {/* Urgency Panel */}
+            {urgentItems.length > 0 && (
+                <Card className="border-orange-200 dark:border-orange-800">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                            Urgent School Items
+                        </CardTitle>
+                        <CardDescription>
+                            Assignments and exams in the next 72 hours
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            {urgentItems.map(item => (
+                                <div
+                                    key={item.id}
+                                    className="flex items-center justify-between p-3 rounded-lg border"
+                                >
+                                    <div className="flex-1">
+                                        <div className="font-medium">{item.courseCode}: {item.title}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                            Due: {new Date(item.dueDate).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                    <Badge className={getUrgencyColor(item.urgencyLevel)}>
+                                        {item.urgencyLevel.toUpperCase()}
+                                    </Badge>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Morning Routines */}
+            {morningTasks.length > 0 && (
+                <TaskSection
+                    title="🌅 Morning Routine"
+                    tasks={morningTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Afternoon Routines */}
+            {afternoonTasks.length > 0 && (
+                <TaskSection
+                    title="☀️ Afternoon Routine"
+                    tasks={afternoonTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Evening Routines */}
+            {eveningTasks.length > 0 && (
+                <TaskSection
+                    title="🌙 Evening Routine"
+                    tasks={eveningTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Anytime Tasks */}
+            {anytimeTasks.length > 0 && (
+                <TaskSection
+                    title="⏰ Anytime"
+                    tasks={anytimeTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Project Tasks */}
+            {projectTasks.length > 0 && (
+                <TaskSection
+                    title="📋 Projects"
+                    tasks={projectTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* School Tasks */}
+            {schoolTasks.length > 0 && (
+                <TaskSection
+                    title="🎓 School"
+                    tasks={schoolTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Manual Tasks */}
+            {manualTasks.length > 0 && (
+                <TaskSection
+                    title="✏️ Manual Tasks"
+                    tasks={manualTasks}
+                    onToggle={handleToggleComplete}
+                    getPriorityColor={getPriorityColor}
+                    getSourceIcon={getSourceIcon}
+                />
+            )}
+
+            {/* Empty State */}
+            {totalCount === 0 && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="text-center py-12">
+                            <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-lg font-medium">No tasks for today!</p>
+                            <p className="text-sm text-muted-foreground mt-2">
+                                You're all caught up 🎉
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
     );
 }
 

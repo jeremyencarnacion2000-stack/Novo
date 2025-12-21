@@ -10,6 +10,10 @@ export interface AppSettings {
   autoThemeMode: 'system' | 'time' | 'both'
   compactMode: boolean
   showAnimations: boolean
+  backgroundImage?: string
+  backgroundBlur: number
+  backgroundDimness: number
+  autoContrast: boolean
 
   // Notifications
   dailyReminder: boolean
@@ -31,6 +35,9 @@ export interface AppSettings {
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
   timeFormat: '12h' | '24h'
   language: 'en' | 'es' | 'fr' | 'de'
+
+  // Generic preferences for UI state (widgets, etc.)
+  preferences: Record<string, any>
 }
 
 const defaultSettings: AppSettings = {
@@ -39,6 +46,10 @@ const defaultSettings: AppSettings = {
   autoThemeMode: 'system',
   compactMode: false,
   showAnimations: true,
+  backgroundImage: '',
+  backgroundBlur: 40,
+  backgroundDimness: 20,
+  autoContrast: false,
   dailyReminder: true,
   routineNotifications: true,
   projectDeadlines: true,
@@ -52,6 +63,7 @@ const defaultSettings: AppSettings = {
   dateFormat: 'MM/DD/YYYY',
   timeFormat: '12h',
   language: 'en',
+  preferences: {},
 }
 
 interface SettingsContextType {
@@ -138,6 +150,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark')
     }
 
+    // Apply background settings
+    root.style.setProperty('--bg-blur', `${settings.backgroundBlur}px`)
+    root.style.setProperty('--bg-dimness', `${settings.backgroundDimness / 100}`)
+
+    // Apply background image if set
+    if (settings.backgroundImage) {
+      document.body.style.backgroundImage = `url(${settings.backgroundImage})`
+      document.body.style.backgroundSize = 'cover'
+      document.body.style.backgroundPosition = 'center'
+      document.body.style.backgroundAttachment = 'fixed'
+    } else {
+      document.body.style.backgroundImage = ''
+      document.body.style.backgroundSize = ''
+      document.body.style.backgroundPosition = ''
+      document.body.style.backgroundAttachment = ''
+    }
+
     // Set up listeners for auto themes
     if (settings.theme === 'auto' && settings.autoThemeEnabled) {
       const listeners: (() => void)[] = []
@@ -177,7 +206,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return

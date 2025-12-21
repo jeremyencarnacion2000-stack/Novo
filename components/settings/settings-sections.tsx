@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { LiquidSwitch } from '@/components/ui/liquid-switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
@@ -17,8 +18,11 @@ import type { AIModel } from '@/types/ai'
 import { useState, useRef, useEffect } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react' // New: signIn, signOut, useSession
 import { SiSpotify } from 'react-icons/si' // New: Spotify Icon
+import { useTranslation } from '@/lib/i18n'
+import { aiModelManager } from '@/lib/ai-models'
 
 export function SettingsSections() {
+  const { t } = useTranslation()
   const { toast } = useToast()
   const { settings, updateSettings, resetSettings } = useSettings()
   const { isSupported, permission, requestPermission, settings: notificationSettings, updateSettings: updateNotificationSettings } = useNotifications()
@@ -37,6 +41,89 @@ export function SettingsSections() {
   const [newModelType, setNewModelType] = useState<'lora' | 'base'>('base')
   const [newModelBase, setNewModelBase] = useState('')
 
+  // Background Image state
+  const [isUploadingBg, setIsUploadingBg] = useState(false)
+  const bgInputRef = useRef<HTMLInputElement>(null)
+
+  const compressImage = (dataUrl: string, maxWidth = 1200, quality = 0.6): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = dataUrl
+    })
+  }
+
+  const handleBgUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Limit original file size to 10MB to avoid browser hang, but we will compress it
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload an image smaller than 10MB.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsUploadingBg(true)
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const result = e.target?.result as string
+        const compressed = await compressImage(result)
+
+        // Check if compressed result is still too large (e.g. > 1MB)
+        if (compressed.length > 1.5 * 1024 * 1024) {
+          // Try again with lower quality
+          const superCompressed = await compressImage(result, 800, 0.4)
+          updateSetting('backgroundImage', superCompressed)
+        } else {
+          updateSetting('backgroundImage', compressed)
+        }
+
+        setIsUploadingBg(false)
+        toast({
+          title: 'Background updated',
+          description: 'Your custom background has been applied (and optimized).',
+        })
+      } catch (error) {
+        console.error('Compression failed:', error)
+        setIsUploadingBg(false)
+        toast({
+          title: 'Upload failed',
+          description: 'Failed to process the image.',
+          variant: 'destructive',
+        })
+      }
+    }
+    reader.onerror = () => {
+      setIsUploadingBg(false)
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to read the image file.',
+        variant: 'destructive',
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+
   // Load available backups on mount
   useEffect(() => {
     const backups = DataIntegrator.getAvailableBackups()
@@ -45,11 +132,8 @@ export function SettingsSections() {
 
   // Load AI models on mount
   useEffect(() => {
-    // Dynamic import to avoid SSR issues with @xenova/transformers
-    import('@/lib/ai-models').then(({ aiModelManager }) => {
-      const loadedModels = aiModelManager.getModels()
-      setModels(loadedModels)
-    }).catch(console.error)
+    const loadedModels = aiModelManager.getModels()
+    setModels(loadedModels)
   }, [])
 
   // Handle auto-backup toggle
@@ -334,17 +418,17 @@ export function SettingsSections() {
               )}
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">Appearance</CardTitle>
-              <CardDescription className="text-sm">Customize the look and feel of Novo</CardDescription>
+              <CardTitle className="text-lg md:text-xl">{t('settings.appearance.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.appearance.desc')}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Theme</Label>
+              <Label>{t('settings.theme.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Choose your preferred color scheme
+                {t('settings.theme.desc')}
               </p>
             </div>
             <Select
@@ -367,12 +451,12 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Compact Mode</Label>
+              <Label>{t('settings.compact.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Use less spacing in the interface
+                {t('settings.compact.desc')}
               </p>
             </div>
-            <Switch
+            <LiquidSwitch
               checked={settings.compactMode}
               onCheckedChange={(checked) => updateSetting('compactMode', checked)}
             />
@@ -382,15 +466,147 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Animations</Label>
+              <Label>{t('settings.animations.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Enable smooth transitions and effects
+                {t('settings.animations.desc')}
               </p>
             </div>
-            <Switch
+            <LiquidSwitch
               checked={settings.showAnimations}
               onCheckedChange={(checked) => updateSetting('showAnimations', checked)}
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Background Image</Label>
+            <p className="text-sm text-muted-foreground">
+              Upload a custom background image for the application.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={bgInputRef}
+                onChange={handleBgUpload}
+              />
+              <Button
+                variant="outline"
+                onClick={() => bgInputRef.current?.click()}
+                disabled={isUploadingBg}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {isUploadingBg ? 'Uploading...' : 'Upload Image'}
+              </Button>
+              {settings.backgroundImage && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => updateSetting('backgroundImage', '')}
+                  title="Remove background"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Background Blur</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjust the blur intensity of the background ({settings.backgroundBlur}px)
+                </p>
+              </div>
+              <div className="w-full sm:w-[200px]">
+                <Progress value={(settings.backgroundBlur / 100) * 100} className="h-2" />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={settings.backgroundBlur}
+                  onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
+                  className="w-full mt-2"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Background Dimness</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjust the darkness of the background ({settings.backgroundDimness}%)
+                </p>
+              </div>
+              <div className="w-full sm:w-[200px]">
+                <Progress value={settings.backgroundDimness} className="h-2" />
+                <input
+                  type="range"
+                  min="0"
+                  max="90"
+                  value={settings.backgroundDimness}
+                  onChange={(e) => updateSetting('backgroundDimness', parseInt(e.target.value))}
+                  className="w-full mt-2"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Auto Contrast</Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatically adjust background based on time of day
+                </p>
+              </div>
+              <LiquidSwitch
+                checked={settings.autoContrast}
+                onCheckedChange={(checked) => updateSetting('autoContrast', checked)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* General */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Globe className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl">{t('settings.general.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.general.desc')}</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 md:space-y-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5">
+              <Label>{t('settings.language.label')}</Label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.language.desc')}
+              </p>
+            </div>
+            <Select
+              value={settings.language || 'en'}
+              onValueChange={(value) => updateSetting('language', value)}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
+                <SelectItem value="de">Deutsch</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -403,20 +619,20 @@ export function SettingsSections() {
               <Bell className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">Notifications</CardTitle>
-              <CardDescription className="text-sm">Manage how you receive updates and reminders</CardDescription>
+              <CardTitle className="text-lg md:text-xl">{t('settings.notifications.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.notifications.desc')}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Daily Reminder</Label>
+              <Label>{t('settings.daily_reminder.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Get a daily reminder to check your tasks
+                {t('settings.daily_reminder.desc')}
               </p>
             </div>
-            <Switch
+            <LiquidSwitch
               checked={settings.dailyReminder}
               onCheckedChange={(checked) => updateSetting('dailyReminder', checked)}
             />
@@ -426,9 +642,9 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Reminder Time</Label>
+              <Label>{t('settings.reminder_time.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                When to send daily reminders
+                {t('settings.reminder_time.desc')}
               </p>
             </div>
             <Input
@@ -443,12 +659,12 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Routine Notifications</Label>
+              <Label>{t('settings.routine_notif.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Alerts for your scheduled routines
+                {t('settings.routine_notif.desc')}
               </p>
             </div>
-            <Switch
+            <LiquidSwitch
               checked={settings.routineNotifications}
               onCheckedChange={(checked) => updateSetting('routineNotifications', checked)}
             />
@@ -458,12 +674,12 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Project Deadlines</Label>
+              <Label>{t('settings.project_deadlines.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Reminders for upcoming project deadlines
+                {t('settings.project_deadlines.desc')}
               </p>
             </div>
-            <Switch
+            <LiquidSwitch
               checked={settings.projectDeadlines}
               onCheckedChange={(checked) => updateSetting('projectDeadlines', checked)}
             />
@@ -508,7 +724,7 @@ export function SettingsSections() {
                       Push notifications for habit tracking
                     </p>
                   </div>
-                  <Switch
+                  <LiquidSwitch
                     checked={notificationSettings.habitReminders}
                     onCheckedChange={(checked) => updateNotificationSettings({ habitReminders: checked })}
                     disabled={permission !== 'granted'}
@@ -552,7 +768,7 @@ export function SettingsSections() {
                       Notifications for new tasks and updates
                     </p>
                   </div>
-                  <Switch
+                  <LiquidSwitch
                     checked={notificationSettings.taskNotifications}
                     onCheckedChange={(checked) => updateNotificationSettings({ taskNotifications: checked })}
                     disabled={permission !== 'granted'}
@@ -568,7 +784,7 @@ export function SettingsSections() {
                       Celebrate your milestones and achievements
                     </p>
                   </div>
-                  <Switch
+                  <LiquidSwitch
                     checked={notificationSettings.progressAchievements}
                     onCheckedChange={(checked) => updateNotificationSettings({ progressAchievements: checked })}
                     disabled={permission !== 'granted'}
@@ -584,7 +800,7 @@ export function SettingsSections() {
                       Play sounds with notifications
                     </p>
                   </div>
-                  <Switch
+                  <LiquidSwitch
                     checked={notificationSettings.soundEnabled}
                     onCheckedChange={(checked) => updateNotificationSettings({ soundEnabled: checked })}
                     disabled={permission !== 'granted'}
@@ -608,14 +824,14 @@ export function SettingsSections() {
               <User className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">Profile</CardTitle>
-              <CardDescription className="text-sm">Manage your personal information</CardDescription>
+              <CardTitle className="text-lg md:text-xl">{t('settings.profile.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.profile.desc')}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name</Label>
+            <Label htmlFor="displayName">{t('settings.display_name')}</Label>
             <Input
               id="displayName"
               value={settings.displayName}
@@ -625,7 +841,7 @@ export function SettingsSections() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('settings.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -638,10 +854,10 @@ export function SettingsSections() {
           <Separator />
 
           <div className="space-y-2">
-            <Label>Password</Label>
+            <Label>{t('settings.password')}</Label>
             <Button variant="outline" className="w-full">
               <Lock className="mr-2 h-4 w-4" />
-              Change Password
+              {t('settings.change_password')}
             </Button>
           </div>
         </CardContent>
@@ -655,17 +871,17 @@ export function SettingsSections() {
               <Database className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">Data & Privacy</CardTitle>
-              <CardDescription className="text-sm">Control your data and backup settings</CardDescription>
+              <CardTitle className="text-lg md:text-xl">{t('settings.data.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.data.desc')}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Automatic Backup</Label>
+              <Label>{t('settings.auto_backup.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Automatically backup your data
+                {t('settings.auto_backup.desc')}
               </p>
             </div>
             <Switch
@@ -678,9 +894,9 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Backup Frequency</Label>
+              <Label>{t('settings.backup_freq.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                How often to backup your data
+                {t('settings.backup_freq.desc')}
               </p>
             </div>
             <Select
@@ -701,9 +917,9 @@ export function SettingsSections() {
           <Separator />
 
           <div className="space-y-2">
-            <Label>Export Data</Label>
+            <Label>{t('settings.export.label')}</Label>
             <p className="text-sm text-muted-foreground">
-              Download all your data as a JSON backup file.
+              {t('settings.export.desc')}
             </p>
             <Button
               variant="outline"
@@ -719,9 +935,9 @@ export function SettingsSections() {
           <Separator />
 
           <div className="space-y-2">
-            <Label>Import Data</Label>
+            <Label>{t('settings.import.label')}</Label>
             <p className="text-sm text-muted-foreground mb-2">
-              Restore your data from a JSON backup file. Existing data will be overwritten.
+              {t('settings.import.desc')}
             </p>
             <input
               type="file"
@@ -776,14 +992,14 @@ export function SettingsSections() {
           <Separator />
 
           <div className="space-y-2">
-            <Label className="text-destructive">Danger Zone</Label>
+            <Label className="text-destructive">{t('settings.danger.label')}</Label>
             <Button
               variant="destructive"
               className="w-full"
               onClick={handleDeleteAllData}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete All Data
+              {t('settings.delete_all')}
             </Button>
           </div>
         </CardContent>
@@ -831,17 +1047,17 @@ export function SettingsSections() {
               <Globe className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">General</CardTitle>
-              <CardDescription className="text-sm">Regional and format preferences</CardDescription>
+              <CardTitle className="text-lg md:text-xl">{t('settings.general.title')}</CardTitle>
+              <CardDescription className="text-sm">{t('settings.general.desc')}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 md:space-y-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Start of Week</Label>
+              <Label>{t('settings.start_week.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                First day of your week
+                {t('settings.start_week.desc')}
               </p>
             </div>
             <Select
@@ -863,9 +1079,9 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Date Format</Label>
+              <Label>{t('settings.date_format.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                How dates are displayed
+                {t('settings.date_format.desc')}
               </p>
             </div>
             <Select
@@ -887,9 +1103,9 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Time Format</Label>
+              <Label>{t('settings.time_format.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                12-hour or 24-hour clock
+                {t('settings.time_format.desc')}
               </p>
             </div>
             <Select
@@ -910,9 +1126,9 @@ export function SettingsSections() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
-              <Label>Language</Label>
+              <Label>{t('settings.language.label')}</Label>
               <p className="text-sm text-muted-foreground">
-                Interface language
+                {t('settings.language.desc')}
               </p>
             </div>
             <Select

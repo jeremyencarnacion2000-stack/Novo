@@ -2,13 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const bookSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  author: z.string().optional().nullable(),
-  status: z.enum(['read', 'reading', 'to-read']),
-})
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,48 +30,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const parsedBody = bookSchema.safeParse(body)
+    const { title, author, coverUrl, totalPages, isbn, status } = body
 
-    if (!parsedBody.success) {
-      return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
-    }
-
-    const { title, author, status } = parsedBody.data
-
-    // Buscar carátula usando Google Books API
-    let coverUrl = null
-    try {
-      const query = `intitle:${title}${author ? ` inauthor:${author}` : ''}`
-      const apiResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}`)
-      if (apiResponse.ok) {
-        const data = await apiResponse.json()
-        if (data.items && data.items.length > 0) {
-          const volumeInfo = data.items[0].volumeInfo
-          if (volumeInfo.imageLinks && volumeInfo.imageLinks.thumbnail) {
-            coverUrl = volumeInfo.imageLinks.thumbnail
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching cover from Google Books API:', error)
-      // Continuar sin carátula si falla la API
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
     const book = await prisma.book.create({
       data: {
+        userId: session.user.id,
         title,
         author,
-        status,
         coverUrl,
-        userId: session.user.id
+        totalPages,
+        isbn,
+        status: status || 'to-read',
+        currentPage: 0
       }
     })
 
-    return NextResponse.json(book, { status: 201 })
+    return NextResponse.json(book)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
     console.error('Error creating book:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

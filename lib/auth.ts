@@ -193,7 +193,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'user-read-email user-read-private playlist-read-private playlist-read-collaborative user-library-read user-library-modify user-read-playback-state user-modify-playback-state streaming user-read-recently-played user-top-read',
+          scope: 'user-read-email user-read-private playlist-read-private playlist-read-collaborative user-library-read user-library-modify user-read-playback-state user-modify-playback-state streaming user-read-recently-played user-top-read user-follow-read user-read-currently-playing',
         },
       },
     }),

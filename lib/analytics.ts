@@ -4,7 +4,7 @@
  */
 
 export async function trackEvent(
-  userId: string,
+  userId: string | undefined,
   eventType: 'page_view' | 'task_complete' | 'routine_complete' | 'habit_complete' | 'reading_progress',
   module: string
 ) {
@@ -20,7 +20,7 @@ export async function trackEvent(
   }
 }
 
-export async function startSession(userId: string, module: string) {
+export async function startSession(userId: string | undefined, module: string) {
   try {
     const res = await fetch('/api/analytics', {
       method: 'POST',
@@ -48,7 +48,7 @@ export async function endSession(sessionId: string) {
 }
 
 export async function trackCompletion(
-  userId: string,
+  userId: string | undefined,
   type: 'task' | 'routine' | 'habit',
   module: string
 ) {

@@ -23,72 +23,83 @@ export function Sidebar() {
 
     return (
         <div
-            className={`relative h-full bg-card border-r border-border transition-all duration-300 flex flex-col ${sidebarCollapsed ? 'w-0 lg:w-16' : 'w-64 lg:w-72'
+            className={`relative h-full bg-white/[0.02] backdrop-blur-xl border-r border-white/5 transition-all duration-500 ease-in-out flex flex-col ${sidebarCollapsed ? 'w-16' : 'w-72 lg:w-80'
                 }`}
         >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+            <div className={`flex items-center p-4 border-b border-white/5 flex-shrink-0 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!sidebarCollapsed && (
-                    <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>
+                    <h2 className="text-sm font-bold text-white/90 tracking-widest uppercase opacity-80">Conversaciones</h2>
                 )}
                 <button
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="p-2 hover:bg-accent rounded-lg transition-colors"
+                    className="p-2 hover:bg-white/5 rounded-xl transition-all duration-300 text-white/50 hover:text-white"
                     aria-label={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
                 >
                     {sidebarCollapsed ? (
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        <ChevronRight className="w-5 h-5" />
                     ) : (
-                        <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+                        <ChevronLeft className="w-5 h-5" />
                     )}
                 </button>
             </div>
 
-            {!sidebarCollapsed && (
-                <>
-                    {/* Search */}
-                    <div className="p-3 flex-shrink-0">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <input
-                                type="text"
-                                placeholder="Buscar conversaciones..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+            {/* Actions Area */}
+            <div className={`p-3 space-y-2 flex-shrink-0 ${sidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
+                {/* New Conversation Button */}
+                <button
+                    onClick={createConversation}
+                    className={`flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-xl transition-all duration-300 group shadow-lg shadow-indigo-500/5 ${sidebarCollapsed ? 'p-3 justify-center' : 'w-full px-4 py-2.5'
+                        }`}
+                    title="Nueva conversación"
+                >
+                    <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+                    {!sidebarCollapsed && <span className="text-sm font-medium">Nueva conversación</span>}
+                </button>
+
+                {/* Search - Only in expanded or as icon in collapsed */}
+                {sidebarCollapsed ? (
+                    <button className="p-3 text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <Search className="w-4 h-4" />
+                    </button>
+                ) : (
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-focus-within:text-indigo-400 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Buscar..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white/[0.02] border border-white/5 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Conversations List */}
+            <div className="flex-1 overflow-y-auto px-2 space-y-1 min-h-0 custom-scrollbar py-2">
+                {filteredConversations.length === 0 ? (
+                    !sidebarCollapsed && (
+                        <div className="text-center py-8 text-white/20 text-xs font-medium italic">
+                            {searchQuery ? 'Sin resultados' : 'Sin historial'}
                         </div>
-                    </div>
-
-                    {/* New Conversation Button */}
-                    <div className="px-3 pb-3 flex-shrink-0">
-                        <button
-                            onClick={createConversation}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
+                    )
+                ) : (
+                    filteredConversations.map((conv) => (
+                        <div
+                            key={conv.id}
+                            className={`group relative flex items-center gap-3 rounded-xl cursor-pointer transition-all duration-300 ${sidebarCollapsed ? 'p-3 justify-center' : 'px-3 py-2.5'
+                                } ${currentConversationId === conv.id
+                                    ? 'bg-white/10 text-white shadow-sm border border-white/5'
+                                    : 'text-white/40 hover:bg-white/[0.04] hover:text-white/80'
+                                }`}
+                            onClick={() => setCurrentConversationId(conv.id)}
+                            title={sidebarCollapsed ? conv.title : undefined}
                         >
-                            <Plus className="w-4 h-4" />
-                            <span className="text-sm font-medium">Nueva conversación</span>
-                        </button>
-                    </div>
-
-                    {/* Conversations List - NOW WITH INDEPENDENT SCROLL */}
-                    <div className="flex-1 overflow-y-auto px-3 space-y-1 min-h-0">
-                        {filteredConversations.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                                {searchQuery ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
-                            </div>
-                        ) : (
-                            filteredConversations.map((conv) => (
-                                <div
-                                    key={conv.id}
-                                    className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${currentConversationId === conv.id
-                                        ? 'bg-accent text-accent-foreground'
-                                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                                        }`}
-                                    onClick={() => setCurrentConversationId(conv.id)}
-                                >
-                                    <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                                    <span className="flex-1 text-sm truncate">{conv.title}</span>
+                            <MessageSquare className={`w-4 h-4 flex-shrink-0 ${currentConversationId === conv.id ? 'text-indigo-400' : 'opacity-50'}`} />
+                            {!sidebarCollapsed && (
+                                <>
+                                    <span className="flex-1 text-sm truncate font-medium">{conv.title}</span>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -96,17 +107,17 @@ export function Sidebar() {
                                                 deleteConversation(conv.id);
                                             }
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/20 rounded transition-opacity"
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"
                                         aria-label="Eliminar conversación"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </>
-            )}
+                                </>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
     );
 }

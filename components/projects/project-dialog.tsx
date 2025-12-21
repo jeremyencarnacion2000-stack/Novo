@@ -51,7 +51,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
       setStartDate(project.startDate)
       setDueDate(project.dueDate)
       setProgress(project.progress)
-      setTags(project.tags)
+      setTags(typeof project.tags === 'string' ? JSON.parse(project.tags) : (Array.isArray(project.tags) ? project.tags : []))
       setSubtasks(project.subtasks)
       setNotes(project.notes)
     } else {

@@ -99,7 +99,7 @@ export function QuickCapture() {
         <>
             {/* Floating Button */}
             <motion.button
-                className="fixed bottom-6 left-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+                className="fixed bottom-8 left-8 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
                 onClick={() => setIsOpen(true)}
                 whileTap={{ scale: 0.95 }}
                 title="Quick Capture (⌘+Shift+N)"
@@ -150,8 +150,8 @@ export function QuickCapture() {
                                             key={t}
                                             onClick={() => setType(t)}
                                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${type === t
-                                                    ? `${color} text-white`
-                                                    : 'bg-muted hover:bg-muted/80'
+                                                ? `${color} text-white`
+                                                : 'bg-muted hover:bg-muted/80'
                                                 }`}
                                         >
                                             <Icon className="h-3 w-3" />

@@ -14,6 +14,7 @@ import { format, parseISO, isPast, isToday, differenceInDays } from "date-fns"
 import { toast } from "sonner"
 import { useSession } from "next-auth/react"
 import { DataIntegrator } from "@/lib/data-integrator"
+import { TiltCard } from "@/components/ui/tilt-card"
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
   { status: "todo", title: "Not Started", color: "bg-secondary text-secondary-foreground" },
@@ -212,89 +213,91 @@ export function TasksView() {
                     !isToday(parseISO(task.dueDate))
 
                   return (
-                    <Card
+                    <TiltCard
                       key={task.id}
                       className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === task.id ? "opacity-50" : ""
                         }`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
                     >
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <span
-                            className={`font-medium leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""
-                              }`}
-                          >
-                            {task.title}
-                          </span>
-                          <Badge
-                            variant={getPriorityColor(task.priority) as any}
-                            className="shrink-0 text-[10px] h-5 px-1.5 capitalize"
-                          >
-                            {task.priority}
-                          </Badge>
-                        </div>
-
-                        {Array.isArray(task.tags) && task.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {task.tags.map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-[10px] px-1 h-5">
-                                {tag}
-                              </Badge>
-                            ))}
+                      <Card className="h-full">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <span
+                              className={`font-medium leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""
+                                }`}
+                            >
+                              {task.title}
+                            </span>
+                            <Badge
+                              variant={getPriorityColor(task.priority) as any}
+                              className="shrink-0 text-[10px] h-5 px-1.5 capitalize"
+                            >
+                              {task.priority}
+                            </Badge>
                           </div>
-                        )}
 
-                        <div className="flex items-center justify-between text-xs">
-                          {task.dueDate && (
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3 text-muted-foreground" />
-                                <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
-                                  {format(parseISO(task.dueDate), "MMM d")}
-                                </span>
-                              </div>
-                              {!isOverdue && task.status !== "done" && (
-                                <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
-                                  {getDaysRemaining(task.dueDate) === 0
-                                    ? "Due today"
-                                    : `${getDaysRemaining(task.dueDate)} days left`}
-                                </span>
-                              )}
-                              {isOverdue && <AlertCircle className="h-3 w-3 text-destructive" />}
+                          {Array.isArray(task.tags) && task.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {task.tags.map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-[10px] px-1 h-5">
+                                  {tag}
+                                </Badge>
+                              ))}
                             </div>
                           )}
-                        </div>
 
-                        <div className="flex gap-2 pt-1">
-                          {nextStatus && (
+                          <div className="flex items-center justify-between text-xs">
+                            {task.dueDate && (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                                  <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                                    {format(parseISO(task.dueDate), "MMM d")}
+                                  </span>
+                                </div>
+                                {!isOverdue && task.status !== "done" && (
+                                  <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
+                                    {getDaysRemaining(task.dueDate) === 0
+                                      ? "Due today"
+                                      : `${getDaysRemaining(task.dueDate)} days left`}
+                                  </span>
+                                )}
+                                {isOverdue && <AlertCircle className="h-3 w-3 text-destructive" />}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
+                            {nextStatus && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 h-7 text-xs bg-transparent"
+                                onClick={() => handleStatusChange(task.id, nextStatus)}
+                              >
+                                Move
+                                <ChevronRight className="h-3 w-3 ml-1" />
+                              </Button>
+                            )}
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 h-7 text-xs bg-transparent"
-                              onClick={() => handleStatusChange(task.id, nextStatus)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditingTask(task)
+                                setDialogOpen(true)
+                              }}
                             >
-                              Move
-                              <ChevronRight className="h-3 w-3 ml-1" />
+                              <Edit2 className="h-3 w-3" />
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setEditingTask(task)
-                              setDialogOpen(true)
-                            }}
-                          >
-                            <Edit2 className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(task.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(task.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TiltCard>
                   )
                 })}
 

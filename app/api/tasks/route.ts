@@ -13,9 +13,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+    const status = searchParams.get('status')
+
+    const where: any = {
+      userId: session.user.id,
+    }
+
+    if (projectId) {
+      where.projectId = projectId
+    }
+
+    if (status) {
+      where.status = status
+    }
+
     const tasks = await prisma.task.findMany({
-      where: { userId: session.user.id },
-      orderBy: { updatedAt: 'desc' }
+      where,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        project: {
+          select: {
+            title: true,
+            // color: true // Project model might not have color yet, check schema if needed
+          }
+        }
+      }
     })
 
     return NextResponse.json(tasks)

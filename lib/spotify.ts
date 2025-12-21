@@ -35,6 +35,7 @@ export interface SpotifyUser {
   images: { url: string }[];
   external_urls: { spotify: string };
   uri: string;
+  product?: string; // 'premium', 'free', 'open'
 }
 
 export interface SpotifyPlaylist {
@@ -51,11 +52,13 @@ export interface SpotifyPlaylist {
 export interface SpotifyTrack {
   id: string;
   name: string;
-  artists: { name: string }[];
+  artists: { name: string; id: string }[];
   album: { name: string; images: { url: string }[] };
   external_urls: { spotify: string };
   uri: string;
   preview_url: string;
+  duration_ms: number;
+  popularity?: number;
 }
 
 export interface SpotifyAlbum {

@@ -1,0 +1,32 @@
+{
+    "name": "Novo Desktop",
+    "short_name": "Novo",
+    "description": "Your AI-powered productivity companion",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0b",
+    "theme_color": "#6366f1",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "productivity",
+        "lifestyle",
+        "utilities"
+    ],
+    "lang": "en",
+    "scope": "/",
+    "prefer_related_applications": false
+}

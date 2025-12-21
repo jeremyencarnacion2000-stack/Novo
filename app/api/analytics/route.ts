@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getAdvancedInsights } from '@/lib/analytics-server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,9 +47,9 @@ export async function GET(request: NextRequest) {
       if (!acc[dateStr]) {
         acc[dateStr] = { tasks: 0, routines: 0, habits: 0 }
       }
-      if (event.eventType === 'task_complete') acc[dateStr].tasks++
-      if (event.eventType === 'routine_complete') acc[dateStr].routines++
-      if (event.eventType === 'habit_complete') acc[dateStr].habits++
+      if (event.eventType === 'task_complete' || event.eventType === 'task_completed') acc[dateStr].tasks++
+      if (event.eventType === 'routine_complete' || event.eventType === 'routine_completed') acc[dateStr].routines++
+      if (event.eventType === 'habit_complete' || event.eventType === 'habit_completed') acc[dateStr].habits++
       return acc
     }, {} as Record<string, { tasks: number; routines: number; habits: number }>)
 
@@ -120,20 +121,38 @@ export async function GET(request: NextRequest) {
     const goalsAchieved = goals.filter(g => g.status === 'completed').length
     const goalCompletionRate = goals.length > 0 ? Math.round((goalsAchieved / goals.length) * 100) : 0
 
+    const goalTrend = 0 // Need historical goal data for trend
+
+    // Get advanced insights with error handling
+    let insights = null
+    try {
+      insights = await getAdvancedInsights(userId)
+    } catch (insightError) {
+      console.error('Failed to get advanced insights:', insightError)
+      // Fallback to empty insights instead of failing the whole request
+      insights = {
+        bestDay: 'N/A',
+        habitInsights: { top: [], bottom: [] },
+        routineConsistency: [],
+        goals: []
+      }
+    }
+
     return NextResponse.json({
       dailyData: enrichedDailyData,
       events,
       tasksCompleted: totalTasksCompleted,
-      taskCompletionRate: 0, // Needs total created tasks to calculate accurately
+      taskCompletionRate: 0,
       taskTrend,
       focusTime: focusTimeString,
       focusTrend,
-      habitsMastered: totalHabitsCompleted, // Using completions as proxy for now
-      habitCompletionRate: 0, // Needs total scheduled habits
+      habitsMastered: totalHabitsCompleted,
+      habitCompletionRate: 0,
       habitTrend,
       goalsAchieved,
       goalCompletionRate,
-      goalTrend: 0 // Need historical goal data for trend
+      goalTrend,
+      insights
     })
   } catch (error) {
     console.error('Analytics API error:', error)
@@ -141,7 +160,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function updateDailyAnalytics(userId: string, module: string, duration: number) {
+function calculateProductivityScore(completions: number, totalTimeSeconds: number): number {
+  // Formula: (completions * 10) + (hours * 5)
+  // Max score: 100
+  const hours = totalTimeSeconds / 3600;
+  const score = (completions * 10) + (hours * 5);
+  return Math.min(Math.round(score * 10) / 10, 100);
+}
+
+async function updateDailyAnalytics(userId: string, module: string, duration: number, isCompletion: boolean = false) {
   try {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -157,24 +184,34 @@ async function updateDailyAnalytics(userId: string, module: string, duration: nu
 
     if (existing) {
       const parsedModulesUsed = JSON.parse(existing.modulesUsed) as string[]
-      const modulesUsed = parsedModulesUsed.includes(module)
-        ? parsedModulesUsed
-        : [...parsedModulesUsed, module]
+      const modulesUsed = module && !parsedModulesUsed.includes(module)
+        ? [...parsedModulesUsed, module]
+        : parsedModulesUsed
+
+      const newTotalTime = existing.totalTime + duration
+      const newCompletions = isCompletion ? existing.completions + 1 : existing.completions
+      const newScore = calculateProductivityScore(newCompletions, newTotalTime)
 
       await prisma.dailyAnalytics.update({
         where: { id: existing.id },
         data: {
-          totalTime: existing.totalTime + duration,
+          totalTime: newTotalTime,
+          completions: newCompletions,
           modulesUsed: JSON.stringify(modulesUsed),
+          productivityScore: newScore,
         },
       })
     } else {
+      const completions = isCompletion ? 1 : 0
+      const score = calculateProductivityScore(completions, duration)
       await prisma.dailyAnalytics.create({
         data: {
           userId,
           date: today,
           totalTime: duration,
-          modulesUsed: JSON.stringify([module]),
+          completions,
+          modulesUsed: JSON.stringify(module ? [module] : []),
+          productivityScore: score,
         },
       })
     }
@@ -185,19 +222,27 @@ async function updateDailyAnalytics(userId: string, module: string, duration: nu
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
     const body = await request.json()
     const { action, ...data } = body
 
+    // Use session userId if not provided in body
+    const userId = data.userId || session?.user?.id
+
+    if (!userId && action !== 'endSession') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     switch (action) {
       case 'startSession': {
-        const session = await prisma.userSession.create({
+        const sessionRecord = await prisma.userSession.create({
           data: {
-            userId: data.userId,
+            userId: userId,
             modulesUsed: JSON.stringify([data.module]),
             startTime: new Date(),
           },
         })
-        return NextResponse.json({ sessionId: session.id })
+        return NextResponse.json({ sessionId: sessionRecord.id })
       }
 
       case 'endSession': {
@@ -228,11 +273,17 @@ export async function POST(request: NextRequest) {
       case 'trackEvent': {
         await prisma.analyticsEvent.create({
           data: {
-            userId: data.userId,
+            userId: userId,
             eventType: data.eventType,
-            eventData: data.module,
+            eventData: data.metadata ? JSON.stringify(data.metadata) : (data.module || ''),
           },
         })
+
+        // If it's a focus session completion, update total time
+        if (data.eventType === 'focus_session_complete' && data.metadata?.duration) {
+          await updateDailyAnalytics(userId, data.module, data.metadata.duration)
+        }
+
         return NextResponse.json({ success: true })
       }
 
@@ -240,41 +291,13 @@ export async function POST(request: NextRequest) {
         const eventType = `${data.type}_complete` as 'task_complete' | 'routine_complete' | 'habit_complete'
         await prisma.analyticsEvent.create({
           data: {
-            userId: data.userId,
+            userId: userId,
             eventType,
-            eventData: data.module,
+            eventData: data.metadata ? JSON.stringify(data.metadata) : (data.module || ''),
           },
         })
 
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-
-        const existing = await prisma.dailyAnalytics.findUnique({
-          where: {
-            userId_date: {
-              userId: data.userId,
-              date: today,
-            },
-          },
-        })
-
-        if (existing) {
-          await prisma.dailyAnalytics.update({
-            where: { id: existing.id },
-            data: {
-              completions: { increment: 1 },
-            },
-          })
-        } else {
-          await prisma.dailyAnalytics.create({
-            data: {
-              userId: data.userId,
-              date: today,
-              modulesUsed: JSON.stringify([]),
-              completions: 1,
-            },
-          })
-        }
+        await updateDailyAnalytics(userId, data.module, 0, true)
         return NextResponse.json({ success: true })
       }
 
@@ -287,7 +310,7 @@ export async function POST(request: NextRequest) {
         const [dailyData, events] = await Promise.all([
           prisma.dailyAnalytics.findMany({
             where: {
-              userId: data.userId,
+              userId: userId,
               date: {
                 gte: startDate,
                 lte: endDate,
@@ -297,7 +320,7 @@ export async function POST(request: NextRequest) {
           }),
           prisma.analyticsEvent.findMany({
             where: {
-              userId: data.userId,
+              userId: userId,
               timestamp: {
                 gte: startDate,
                 lte: endDate,
@@ -319,7 +342,7 @@ export async function POST(request: NextRequest) {
         const [dailyData, events] = await Promise.all([
           prisma.dailyAnalytics.findMany({
             where: {
-              userId: data.userId,
+              userId: userId,
               date: {
                 gte: startDate,
                 lte: endDate,
@@ -329,7 +352,7 @@ export async function POST(request: NextRequest) {
           }),
           prisma.analyticsEvent.findMany({
             where: {
-              userId: data.userId,
+              userId: userId,
               timestamp: {
                 gte: startDate,
                 lte: endDate,
@@ -347,7 +370,7 @@ export async function POST(request: NextRequest) {
         // Peak hours: group by hour of day from sessions
         const sessions = await prisma.userSession.findMany({
           where: {
-            userId: data.userId,
+            userId: userId,
             startTime: {
               gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
             },

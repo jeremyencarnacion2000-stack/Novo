@@ -35,17 +35,39 @@ export function FocusMode() {
   // Quick Notes State
   const [notes, setNotes] = useState('')
 
-  // Load notes from localStorage
+  // Load notes from API
   useEffect(() => {
-    const savedNotes = localStorage.getItem('focus-quick-notes')
-    if (savedNotes) setNotes(savedNotes)
+    async function loadNotes() {
+      try {
+        const response = await fetch('/api/quick-notes')
+        if (response.ok) {
+          const data = await response.json()
+          setNotes(data.content)
+        }
+      } catch (error) {
+        console.error('Failed to load notes:', error)
+      }
+    }
+    loadNotes()
   }, [])
 
-  // Save notes to localStorage
+  // Save notes to API with debounce
   useEffect(() => {
-    if (notes) {
-      localStorage.setItem('focus-quick-notes', notes)
-    }
+    const timeoutId = setTimeout(async () => {
+      if (notes) {
+        try {
+          await fetch('/api/quick-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: notes })
+          })
+        } catch (error) {
+          console.error('Failed to save notes:', error)
+        }
+      }
+    }, 1000)
+
+    return () => clearTimeout(timeoutId)
   }, [notes])
 
   const formatTime = (seconds: number) => {

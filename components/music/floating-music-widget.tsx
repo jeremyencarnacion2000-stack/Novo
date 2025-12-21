@@ -3,9 +3,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { usePlayerStore } from '@/lib/player-store'
-import { X, Play, Pause, SkipForward, SkipBack } from 'lucide-react'
+import { useSettings } from '@/lib/settings-context'
+import { X, Play, Pause, SkipForward, SkipBack, Minimize2, Maximize2, Shuffle, Repeat, Repeat1, Volume2, VolumeX, Heart, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { cn } from '@/lib/utils'
 
 interface Position {
   x: number
@@ -14,6 +16,8 @@ interface Position {
 
 const FloatingMusicWidgetComponent = () => {
   const pathname = usePathname()
+  const isMusicPage = pathname.startsWith('/music')
+
   const {
     currentTrack,
     isPlaying,
@@ -25,35 +29,34 @@ const FloatingMusicWidgetComponent = () => {
     previousTrack,
     setVolume,
     volume,
-    progress
+    progress,
+    isShuffle,
+    toggleShuffle,
+    repeatMode,
+    toggleRepeat,
+    deviceId
   } = usePlayerStore()
 
   const [isPremium, setIsPremium] = useState(false)
-  const [position, setPosition] = useState<Position>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedPos = localStorage.getItem('fmw-position')
-        if (savedPos) {
-          const parsed = JSON.parse(savedPos)
-          // Ensure position is within viewport
-          const widgetWidth = 350
-          const widgetHeight = 200
-          const maxX = window.innerWidth - widgetWidth - 20
-          const maxY = window.innerHeight - widgetHeight - 20
-          const minY = 80 // Minimum Y to avoid overlapping header
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [isLiked, setIsLiked] = useState(false)
+  const { settings, updateSettings } = useSettings()
 
-          if (parsed.x >= 0 && parsed.x <= maxX && parsed.y >= minY && parsed.y <= maxY) {
-            return parsed
-          }
-        }
-      } catch (e) {
-        console.error("Failed to parse fmw-position from localStorage", e);
-      }
+  const [position, setPosition] = useState<Position>({ x: 20, y: 100 })
+  const initializedRef = useRef(false)
+  const positionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Initialize position from settings only once
+  useEffect(() => {
+    if (!initializedRef.current && settings.preferences?.fmwPosition) {
+      setPosition(settings.preferences.fmwPosition)
+      initializedRef.current = true
+    } else if (!initializedRef.current && typeof window !== 'undefined') {
       // Default to bottom-right corner
-      return { x: window.innerWidth - 370, y: window.innerHeight - 220 }
+      setPosition({ x: window.innerWidth - 370, y: window.innerHeight - 220 })
+      initializedRef.current = true
     }
-    return { x: 20, y: 100 };
-  });
+  }, []) // Only run once on mount
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 })
@@ -70,14 +73,28 @@ const FloatingMusicWidgetComponent = () => {
         setIsPremium(false)
       }
     }
-    checkPremium()
-  }, [])
+    if (pathname.startsWith('/music') || isOpen) {
+      checkPremium()
+    }
+  }, [pathname, isOpen])
 
-  useEffect(() => {
-    localStorage.setItem('fmw-position', JSON.stringify(position))
-  }, [position])
+  // Save position to settings (debounced, only when dragging ends)
+  const savePosition = (pos: Position) => {
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current)
+    }
+    positionSaveTimeoutRef.current = setTimeout(() => {
+      updateSettings({
+        preferences: {
+          ...settings.preferences,
+          fmwPosition: pos
+        }
+      })
+    }, 500) // Debounce 500ms
+  }
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isMusicPage) return // Disable dragging on music page
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('a') || target.closest('.slider-container') || target.closest('iframe')) return
     setIsDragging(true)
@@ -102,7 +119,10 @@ const FloatingMusicWidgetComponent = () => {
   }
 
   const handleMouseUp = () => {
-    if (isDragging) setIsDragging(false)
+    if (isDragging) {
+      setIsDragging(false)
+      savePosition(position) // Save position when drag ends
+    }
   }
 
   useEffect(() => {
@@ -116,59 +136,57 @@ const FloatingMusicWidgetComponent = () => {
     }
   }, [isDragging, dragStart, isPremium])
 
-  // Auto-advance for Free users (Embeds)
-  useEffect(() => {
-    if (isPremium || !isPlaying || !currentTrack?.duration_ms) return
 
-    // For Free users, we can't reliably auto-advance because we don't know when the song ends in the iframe
-    // The user has to manually click play in the iframe anyway.
-    // So we just provide the Next button for them to manually advance.
-
-  }, [isPremium, isPlaying, currentTrack])
-
-  // Debug logging
-  useEffect(() => {
-    console.log('FloatingMusicWidget state:', {
-      isOpen,
-      hasCurrentTrack: !!currentTrack,
-      currentTrackId: currentTrack?.id,
-      isPlaying,
-      isPremium
-    })
-  }, [isOpen, currentTrack, isPlaying, isPremium])
-
+  // Don't show on auth pages
   if (pathname.includes('/auth') || pathname.includes('/signin')) {
     return null
   }
 
   if (!isOpen || !currentTrack) {
-    console.log('FloatingMusicWidget hidden:', { isOpen, hasCurrentTrack: !!currentTrack })
     return null
   }
 
-  console.log('FloatingMusicWidget rendering for track:', currentTrack.name)
-
   const formatTime = (ms: number) => {
-    const seconds = Math.floor((ms / 1000) % 60)
-    const minutes = Math.floor((ms / 1000 / 60) % 60)
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+    const seconds = Math.floor(ms / 1000)
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Use embed for Free users
+  const duration = currentTrack?.duration_ms || 0
+  const progressPercent = duration > 0 ? (progress / duration) * 100 : 0
+
+  // --- RENDER LOGIC ---
+
+  // 1. Free User / Embed Mode
   if (!isPremium) {
-    // Use playlist embed for playlists, or artist embed for single tracks
-    // Artist embed will auto-play related songs from the artist
     let embedUrl: string
     if (currentPlaylist) {
       embedUrl = `https://open.spotify.com/embed/playlist/${currentPlaylist.id}?utm_source=generator&theme=0`
     } else if (currentTrack.artistId) {
-      // Use artist embed for continuous related songs playback
       embedUrl = `https://open.spotify.com/embed/artist/${currentTrack.artistId}?utm_source=generator&theme=0`
     } else {
-      // Fallback to track embed if no artistId
       embedUrl = `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0`
     }
 
+    // On Music Page: Render as fixed bottom bar
+    if (isMusicPage) {
+      return (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[600px] h-[80px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-full overflow-hidden flex items-center justify-center z-50 shadow-2xl transition-all hover:bg-black/70 hover:scale-[1.01]">
+          <iframe
+            src={embedUrl}
+            width="100%"
+            height="80"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="eager"
+            className="rounded-full"
+          />
+        </div>
+      )
+    }
+
+    // On Other Pages: Render as floating widget
     return (
       <div
         ref={widgetRef}
@@ -177,35 +195,40 @@ const FloatingMusicWidgetComponent = () => {
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
-          width: 350,
+          width: isMinimized ? 200 : 350,
         }}
       >
-        <div className="w-full rounded-lg bg-gradient-to-br from-gray-900 to-black backdrop-blur-xl border-2 border-white/10 overflow-hidden">
-          {/* Widget Header */}
-          <div className="flex items-center justify-between p-2 bg-black/40 text-white cursor-move border-b border-white/5">
+        <div className="w-full rounded-lg bg-gradient-to-br from-gray-900 to-black backdrop-blur-xl border border-white/10 overflow-hidden transition-all duration-300">
+          {/* Header */}
+          <div className="flex items-center justify-between p-2 bg-black/40 text-white cursor-move">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {currentTrack.image && (
-                <img src={currentTrack.image} alt={currentTrack.name} className="h-8 w-8 rounded shadow-lg" />
+                <img src={currentTrack.image} alt={currentTrack.name} className={`rounded shadow-lg transition-all duration-300 ${isMinimized ? 'h-8 w-8' : 'h-10 w-10'}`} />
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate">{currentTrack.name}</p>
-                <p className="text-[10px] text-gray-400 truncate">{currentTrack.artist}</p>
+                {!isMinimized && <p className="text-[10px] text-gray-400 truncate">{currentTrack.artist}</p>}
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleOpen}
-              className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0"
-            >
+            {isMinimized && (
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); togglePlayPause(); }} className="h-7 w-7 text-white hover:bg-white/10 flex-shrink-0">
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
+              {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleOpen} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
               <X className="h-3 w-3" />
             </Button>
           </div>
 
-          {/* Spotify Embed - Playlist for continuous playback */}
-          <div className="relative">
+          {/* Embed */}
+          <div
+            className={`transition-all duration-300 ${isMinimized ? 'h-0 overflow-hidden' : 'relative'}`}
+            style={isMinimized ? { position: 'absolute', width: 350, height: 152, clipPath: 'inset(100%)', pointerEvents: 'none' } : { height: 152 }}
+          >
             <iframe
-              key={currentPlaylist?.id || currentTrack.id}
               src={embedUrl}
               width="100%"
               height="152"
@@ -216,31 +239,75 @@ const FloatingMusicWidgetComponent = () => {
               style={{ borderRadius: 0 }}
             />
           </div>
-
-          {/* Playback info */}
-          <div className="px-3 py-2 bg-black/40 border-t border-white/5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-left flex-1">
-                <p className="text-[10px] text-green-400 font-medium">
-                  🎵 Reproducción continua activa
-                </p>
-                <p className="text-[9px] text-gray-500">
-                  {currentPlaylist ? `Playlist: ${currentPlaylist.name}` : 'Spotify Free • Con anuncios'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] text-gray-400">
-                  🔀 Activa shuffle en el reproductor
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     )
   }
 
-  // Premium user - full controls
+  // 2. Premium User
+
+  // On Music Page: Render as Bar (SpotifyPlayerBar style)
+  if (isMusicPage) {
+    return (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[600px] h-[80px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-full px-6 flex items-center justify-between z-50 shadow-2xl transition-all hover:bg-black/70 hover:scale-[1.01]">
+        {/* Left: Track Info */}
+        <div className="flex items-center gap-4 w-[180px]">
+          <img
+            src={currentTrack.image || '/placeholder-album.png'}
+            alt={currentTrack.name}
+            className="w-12 h-12 rounded-full object-cover border-2 border-white/10 shadow-lg animate-[spin_10s_linear_infinite]"
+            style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
+          />
+          <div className="flex flex-col min-w-0">
+            <span className="text-white text-sm font-bold truncate">{currentTrack.name}</span>
+            <span className="text-gray-400 text-xs truncate">{currentTrack.artist}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setIsLiked(!isLiked)} className="h-8 w-8 text-gray-400 hover:text-green-500 hover:scale-110 transition-all">
+            <Heart className={cn("h-4 w-4", isLiked && "fill-green-500 text-green-500")} />
+          </Button>
+        </div>
+
+        {/* Center: Controls */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={toggleShuffle} className={cn("h-8 w-8 transition-colors", isShuffle ? "text-green-500" : "text-gray-400 hover:text-white")}>
+            <Shuffle className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={previousTrack} className="text-white hover:text-gray-300 h-8 w-8">
+            <SkipBack className="h-5 w-5 fill-current" />
+          </Button>
+          <Button onClick={togglePlayPause} className="w-10 h-10 rounded-full bg-white hover:bg-gray-200 hover:scale-105 transition-all flex items-center justify-center shadow-lg" disabled={!deviceId} title={!deviceId ? "Player connecting..." : "Play/Pause"}>
+            {!deviceId ? <AlertCircle className="h-5 w-5 text-yellow-600" /> : isPlaying ? <Pause className="h-5 w-5 text-black fill-black" /> : <Play className="h-5 w-5 text-black fill-black ml-0.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={nextTrack} className="text-white hover:text-gray-300 h-8 w-8">
+            <SkipForward className="h-5 w-5 fill-current" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleRepeat} className={cn("h-8 w-8 transition-colors", repeatMode !== 'off' ? "text-green-500" : "text-gray-400 hover:text-white")}>
+            {repeatMode === 'track' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        {/* Right: Progress & Volume */}
+        <div className="flex items-center gap-4 w-[180px] justify-end">
+          <span className="text-xs text-gray-400 tabular-nums">{formatTime(progress)} / {formatTime(duration)}</span>
+          <div className="flex items-center gap-2 group">
+            <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 0.5 : 0)} className="text-gray-400 hover:text-white h-8 w-8">
+              {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </Button>
+            <div className="w-20 hidden group-hover:block transition-all">
+              <Slider value={[volume * 100]} max={100} step={1} onValueChange={(value) => setVolume(value[0] / 100)} className="cursor-pointer" />
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar Overlay */}
+        <div className="absolute bottom-0 left-6 right-6 h-[2px] bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full bg-green-500 rounded-full transition-all duration-1000 ease-linear" style={{ width: `${progressPercent}%` }} />
+        </div>
+      </div>
+    )
+  }
+
+  // On Other Pages: Render as Floating Widget
   return (
     <div
       ref={widgetRef}
@@ -249,106 +316,80 @@ const FloatingMusicWidgetComponent = () => {
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: 350,
+        width: isMinimized ? 200 : 350,
       }}
     >
-      <div className="w-full rounded-lg bg-gradient-to-br from-gray-900 to-black backdrop-blur-xl border-2 border-white/10 overflow-hidden">
+      <div className="w-full rounded-lg bg-black/80 backdrop-blur-xl border border-white/10 overflow-hidden transition-all duration-300 relative">
+        {/* Background Blur Effect */}
+        {currentTrack.image && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img
+              src={currentTrack.image}
+              alt=""
+              className="w-full h-full object-cover blur-3xl opacity-30 scale-150 saturate-150"
+            />
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+        )}
+
         {/* Widget Header */}
-        <div className="flex items-center justify-between p-3 bg-black/40 text-white cursor-move border-b border-white/5">
+        <div className="relative z-10 flex items-center justify-between p-2 bg-black/20 text-white cursor-move border-b border-white/5">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {currentTrack.image && (
-              <img src={currentTrack.image} alt={currentTrack.name} className="h-10 w-10 rounded shadow-lg" />
+              <img src={currentTrack.image} alt={currentTrack.name} className={`rounded shadow-lg transition-all duration-300 ${isMinimized ? 'h-8 w-8' : 'h-10 w-10'}`} />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{currentTrack.name}</p>
-              <p className="text-xs text-gray-400 truncate">{currentTrack.artist}</p>
+              <p className="text-xs font-semibold truncate text-white shadow-black drop-shadow-md">{currentTrack.name}</p>
+              {!isMinimized && <p className="text-[10px] text-gray-300 truncate shadow-black drop-shadow-md">{currentTrack.artist}</p>}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleOpen}
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0"
-          >
-            <X className="h-4 w-4" />
+          {isMinimized && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); togglePlayPause(); }} className="h-7 w-7 text-white hover:bg-white/10 flex-shrink-0">
+              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0" title={isMinimized ? "Expandir" : "Minimizar"}>
+            {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleOpen} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
+            <X className="h-3 w-3" />
           </Button>
         </div>
 
-        {/* Player Controls */}
-        <div className="p-4 space-y-3">
-          {/* Progress Bar */}
+        {/* Full mode content */}
+        <div className={`relative z-10 p-4 space-y-3 transition-all duration-300 ${isMinimized ? 'h-0 opacity-0 overflow-hidden p-0' : ''}`}>
           {currentTrack.duration_ms && (
             <div className="space-y-1">
               <div className="slider-container">
-                <Slider
-                  value={[progress]}
-                  max={currentTrack.duration_ms}
-                  step={1000}
-                  className="cursor-pointer"
-                  disabled
-                />
+                <Slider value={[progress]} max={currentTrack.duration_ms} step={1000} className="cursor-pointer" disabled />
               </div>
-              <div className="flex justify-between text-xs text-gray-400">
+              <div className="flex justify-between text-xs text-gray-300 font-medium shadow-black drop-shadow-sm">
                 <span>{formatTime(progress)}</span>
                 <span>{formatTime(currentTrack.duration_ms)}</span>
               </div>
             </div>
           )}
 
-          {/* Playback Controls */}
           <div className="flex items-center justify-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={previousTrack}
-              disabled={!currentPlaylist}
-              className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30"
-            >
+            <Button variant="ghost" size="icon" onClick={previousTrack} disabled={!currentPlaylist} className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30">
               <SkipBack className="h-5 w-5" />
             </Button>
-
-            <Button
-              variant="default"
-              size="icon"
-              onClick={togglePlayPause}
-              className="h-12 w-12 rounded-full bg-white text-black hover:bg-gray-200 hover:scale-105 transition-transform"
-            >
-              {isPlaying ? (
-                <Pause className="h-6 w-6" />
-              ) : (
-                <Play className="h-6 w-6 ml-0.5" />
-              )}
+            <Button variant="default" size="icon" onClick={togglePlayPause} className="h-12 w-12 rounded-full bg-white text-black hover:bg-gray-200 hover:scale-105 transition-transform shadow-lg">
+              {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-0.5" />}
             </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={nextTrack}
-              disabled={!currentPlaylist}
-              className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30"
-            >
+            <Button variant="ghost" size="icon" onClick={nextTrack} disabled={!currentPlaylist} className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30">
               <SkipForward className="h-5 w-5" />
             </Button>
           </div>
 
-          {/* Volume Control */}
           <div className="slider-container flex items-center gap-2">
-            <span className="text-xs text-gray-400">Vol</span>
-            <Slider
-              value={[volume * 100]}
-              max={100}
-              step={1}
-              onValueChange={(value) => setVolume(value[0] / 100)}
-              className="flex-1"
-            />
+            <span className="text-xs text-gray-300 font-medium">Vol</span>
+            <Slider value={[volume * 100]} max={100} step={1} onValueChange={(value) => setVolume(value[0] / 100)} className="flex-1" />
           </div>
 
-          {/* Playlist Info */}
           {currentPlaylist && (
-            <div className="text-center pt-1 border-t border-white/5">
-              <p className="text-xs text-gray-400">
-                Playing from: <span className="text-white">{currentPlaylist.name}</span>
-              </p>
+            <div className="text-center pt-1 border-t border-white/10">
+              <p className="text-xs text-gray-300 shadow-black drop-shadow-sm">Playing: <span className="text-white font-medium">{currentPlaylist.name}</span></p>
             </div>
           )}
         </div>

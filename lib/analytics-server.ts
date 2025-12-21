@@ -242,3 +242,69 @@ export async function getFitnessAnalytics(userId: string, days: number = 7) {
         avgDailySteps,
     }
 }
+
+export async function getAdvancedInsights(userId: string) {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [dailyData, trackers, routineCompletions, goals] = await Promise.all([
+        prisma.dailyAnalytics.findMany({
+            where: { userId, date: { gte: thirtyDaysAgo } },
+        }),
+        prisma.tracker.findMany({
+            where: { userId, type: 'habit' },
+            include: { entries: { where: { updatedAt: { gte: thirtyDaysAgo } } } }
+        }),
+        prisma.routineCompletion.findMany({
+            where: { routine: { userId }, completedAt: { gte: thirtyDaysAgo } },
+            include: { routine: true }
+        }),
+        prisma.goal.findMany({
+            where: { userId }
+        })
+    ]);
+
+    // 1. Best Productivity Periods
+    const dayOfWeekScores: Record<number, { total: number, count: number }> = {};
+    dailyData.forEach(day => {
+        const dow = day.date.getDay();
+        if (!dayOfWeekScores[dow]) dayOfWeekScores[dow] = { total: 0, count: 0 };
+        dayOfWeekScores[dow].total += day.productivityScore;
+        dayOfWeekScores[dow].count++;
+    });
+
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let bestDayIdx = -1;
+    let maxAvg = -1;
+    Object.entries(dayOfWeekScores).forEach(([dow, data]) => {
+        const avg = data.total / data.count;
+        if (avg > maxAvg) {
+            maxAvg = avg;
+            bestDayIdx = parseInt(dow);
+        }
+    });
+
+    // 2. Habit Performance
+    const habitInsights = trackers.map(t => {
+        const completionRate = (t.entries.length / 30) * 100;
+        return { name: t.name, rate: Math.min(Math.round(completionRate), 100) };
+    }).sort((a, b) => b.rate - a.rate);
+
+    // 3. Routine Consistency
+    const routineConsistency: Record<string, number> = {};
+    days.forEach(d => routineConsistency[d] = 0);
+    routineCompletions.forEach(c => {
+        const day = days[c.completedAt.getDay()];
+        routineConsistency[day]++;
+    });
+
+    return {
+        bestDay: bestDayIdx !== -1 ? days[bestDayIdx] : 'N/A',
+        habitInsights: {
+            top: habitInsights.slice(0, 3),
+            bottom: habitInsights.slice(-3).reverse().filter(h => h.rate < 50)
+        },
+        routineConsistency: Object.entries(routineConsistency).map(([day, count]) => ({ day, count })),
+        goals: goals.map(g => ({ title: g.title, progress: g.progress, status: g.status }))
+    };
+}

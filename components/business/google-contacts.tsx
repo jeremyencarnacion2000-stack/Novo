@@ -23,7 +23,11 @@ export function GoogleContacts() {
                 const res = await fetch('/api/contacts')
                 if (res.ok) {
                     const data = await res.json()
-                    setContacts(data || [])
+                    if (Array.isArray(data)) {
+                        setContacts(data)
+                    } else {
+                        setContacts([])
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch contacts:', error)

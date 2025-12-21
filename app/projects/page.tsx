@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DashboardShell } from "@/components/dashboard-shell"
+
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { KanbanBoard } from "@/components/projects/kanban-board"
@@ -168,50 +168,48 @@ export default function ProjectsPage() {
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">Projects & Tasks</h1>
-            <p className="text-muted-foreground mt-1 text-sm md:text-base">
-              Manage your projects and tasks with detailed tracking
-            </p>
-          </div>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">Projects & Tasks</h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Manage your projects and tasks with detailed tracking
+          </p>
         </div>
-
-        <Tabs defaultValue="projects" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="projects" className="space-y-6">
-            <div className="flex justify-end">
-              <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                New Project
-              </Button>
-            </div>
-            <KanbanBoard
-              projects={projects || []}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onStatusChange={handleStatusChange}
-            />
-          </TabsContent>
-
-          <TabsContent value="tasks">
-            <TasksView />
-          </TabsContent>
-        </Tabs>
-
-        <ProjectDialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          onSave={editingProject ? handleUpdate : handleCreate}
-          project={editingProject}
-        />
       </div>
-    </DashboardShell>
+
+      <Tabs defaultValue="projects" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
+          <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="projects" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          </div>
+          <KanbanBoard
+            projects={projects || []}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onStatusChange={handleStatusChange}
+          />
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <TasksView />
+        </TabsContent>
+      </Tabs>
+
+      <ProjectDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        onSave={editingProject ? handleUpdate : handleCreate}
+        project={editingProject}
+      />
+    </div>
   )
 }

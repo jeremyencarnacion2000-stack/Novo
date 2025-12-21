@@ -18,6 +18,16 @@ export async function GET(request: Request) {
         return NextResponse.json(contacts);
     } catch (error) {
         console.error('Error fetching contacts:', error);
-        return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isAuthError = errorMessage.includes('No access token found') ||
+            errorMessage.includes('invalid_grant') ||
+            errorMessage.includes('Unauthorized');
+
+        return NextResponse.json({
+            error: isAuthError ? 'Authentication required' : 'Failed to fetch contacts',
+            details: errorMessage,
+            code: isAuthError ? 'UNAUTHORIZED' : 'FETCH_ERROR'
+        }, { status: isAuthError ? 401 : 500 });
     }
 }

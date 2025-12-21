@@ -26,6 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       where: { id, userId: session.user.id },
       data: {
         ...projectData,
+        tags: projectData.tags ? JSON.stringify(projectData.tags) : undefined,
         subtasks: {
           upsert: subtasks?.map((subtask) => ({
             where: { id: subtask.id || '' },

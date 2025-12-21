@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Send, Paperclip, Mic, MicOff, Loader2, Camera, Image, FileText, X, Globe } from 'lucide-react';
+import { Send, Paperclip, Mic, MicOff, Loader2, Camera, Image, FileText, X, Globe, Code } from 'lucide-react';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,7 +16,50 @@ const SUGGESTIONS = [
     'Crear una rutina',
 ];
 
-export function ChatInput() {
+function FilePreviewItem({ file, onRemove }: { file: File, onRemove: () => void }) {
+    const isImage = file.type.startsWith('image/');
+    const [preview, setPreview] = React.useState<string>('');
+
+    React.useEffect(() => {
+        if (isImage) {
+            const reader = new FileReader();
+            reader.onloadend = () => setPreview(reader.result as string);
+            reader.readAsDataURL(file);
+        }
+    }, [file, isImage]);
+
+    return (
+        <div className="relative group/file flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {isImage && preview ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
+                    <img src={preview} alt="preview" className="w-full h-full object-cover" />
+                </div>
+            ) : (
+                <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                    <FileText className="w-5 h-5 text-indigo-400" />
+                </div>
+            )}
+            <div className="flex flex-col pr-6">
+                <span className="text-xs font-medium text-foreground truncate max-w-[120px]">{file.name}</span>
+                <span className="text-[10px] text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</span>
+            </div>
+            <button
+                type="button"
+                onClick={onRemove}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover/file:opacity-100 transition-opacity"
+            >
+                <X className="w-3 h-3" />
+            </button>
+        </div>
+    );
+}
+
+interface ChatInputProps {
+    onSend?: (content: string, files?: File[], webSearchEnabled?: boolean) => Promise<void>;
+    disabled?: boolean;
+}
+
+export function ChatInput({ onSend, disabled }: ChatInputProps) {
     const { sendMessage, isLoading, currentConversationId, createConversation } = useChatbot();
     const { toast } = useToast();
     const [input, setInput] = React.useState('');
@@ -58,20 +101,25 @@ export function ChatInput() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isLoading || disabled) return;
 
-        // Create conversation if none exists
-        if (!currentConversationId) {
+        // Create conversation if none exists (only if using context)
+        if (!currentConversationId && !onSend) {
             createConversation();
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const message = input;
+        const filesToSend = attachedFiles;
         setInput('');
         setAttachedFiles([]);
         setAudioBlob(null);
 
-        await sendMessage(message);
+        if (onSend) {
+            await onSend(message, filesToSend, webSearchEnabled);
+        } else {
+            await sendMessage(message, filesToSend, webSearchEnabled);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -102,100 +150,189 @@ export function ChatInput() {
         setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
+    // Web Speech API recognition reference
+    const recognitionRef = React.useRef<any>(null);
+
     const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
+        // Try to use Web Speech API first (free, no API key needed)
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-            mediaRecorderRef.current = mediaRecorder;
-            audioChunksRef.current = [];
+        if (SpeechRecognition) {
+            try {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'es-ES';
+                recognition.continuous = true;
+                recognition.interimResults = true;
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
-            };
+                recognitionRef.current = recognition;
+                let finalTranscript = '';
 
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                setAudioBlob(audioBlob);
-
-                // Stop all tracks
-                stream.getTracks().forEach(track => track.stop());
-
-                // Transcribe audio automatically
-                toast({
-                    title: "Transcribiendo audio...",
-                    description: "Un momento por favor",
-                });
-
-                try {
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob);
-
-                    const response = await fetch('/api/ai/transcribe', {
-                        method: 'POST',
-                        body: formData,
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.text) {
-                            setInput(prev => prev + (prev ? ' ' : '') + data.text);
-                            toast({
-                                title: "¡Transcripción completada!",
-                                description: `Texto agregado al chat`,
-                            });
-                            textareaRef.current?.focus();
-                        }
-                    } else {
-                        throw new Error('Error en la transcripción');
-                    }
-                } catch (error) {
-                    console.error('Transcription error:', error);
+                recognition.onstart = () => {
+                    setIsRecording(true);
+                    setShowVoiceAnimation(true);
+                    setRecordingTime(0);
+                    recordingIntervalRef.current = setInterval(() => {
+                        setRecordingTime(prev => prev + 1);
+                    }, 1000);
                     toast({
-                        title: "Error de transcripción",
-                        description: "No se pudo transcribir el audio. Intenta de nuevo.",
+                        title: "🎤 Grabando...",
+                        description: "Habla ahora. Presiona el micrófono para detener.",
+                    });
+                };
+
+                recognition.onresult = (event: any) => {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript + ' ';
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+                    // Show interim results
+                    if (interimTranscript) {
+                        setInput(prev => finalTranscript + interimTranscript);
+                    }
+                };
+
+                recognition.onend = () => {
+                    setIsRecording(false);
+                    setShowVoiceAnimation(false);
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                    if (finalTranscript.trim()) {
+                        setInput(finalTranscript.trim());
+                        toast({
+                            title: "✅ Transcripción completada",
+                            description: "El texto ha sido agregado.",
+                        });
+                        textareaRef.current?.focus();
+                    }
+                };
+
+                recognition.onerror = (event: any) => {
+                    console.error('Speech recognition error:', event.error);
+                    setIsRecording(false);
+                    setShowVoiceAnimation(false);
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                    toast({
+                        title: "Error de reconocimiento",
+                        description: event.error === 'not-allowed'
+                            ? "Permisos de micrófono denegados."
+                            : "No se pudo reconocer el audio.",
                         variant: "destructive"
                     });
-                }
+                };
 
+                recognition.start();
+            } catch (error) {
+                console.error('Error starting speech recognition:', error);
+                toast({
+                    title: "Error",
+                    description: "No se pudo iniciar el reconocimiento de voz.",
+                    variant: "destructive"
+                });
+            }
+        } else {
+            // Fallback to MediaRecorder + API if Web Speech not available
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorderRef.current = mediaRecorder;
+                audioChunksRef.current = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunksRef.current.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                    setAudioBlob(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+
+                    toast({
+                        title: "Transcribiendo audio...",
+                        description: "Un momento por favor",
+                    });
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob);
+
+                        const response = await fetch('/api/ai/transcribe', {
+                            method: 'POST',
+                            body: formData,
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.text) {
+                                setInput(prev => prev + (prev ? ' ' : '') + data.text);
+                                toast({
+                                    title: "¡Transcripción completada!",
+                                    description: "Texto agregado al chat",
+                                });
+                                textareaRef.current?.focus();
+                            }
+                        } else {
+                            throw new Error('Error en la transcripción');
+                        }
+                    } catch (error) {
+                        console.error('Transcription error:', error);
+                        toast({
+                            title: "Error de transcripción",
+                            description: "No se pudo transcribir el audio.",
+                            variant: "destructive"
+                        });
+                    }
+
+                    setRecordingTime(0);
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                };
+
+                mediaRecorder.start();
+                setIsRecording(true);
+                setShowVoiceAnimation(true);
                 setRecordingTime(0);
-                if (recordingIntervalRef.current) {
-                    clearInterval(recordingIntervalRef.current);
-                }
-            };
+                recordingIntervalRef.current = setInterval(() => {
+                    setRecordingTime(prev => prev + 1);
+                }, 1000);
 
-            mediaRecorder.start();
-            setIsRecording(true);
-            setShowVoiceAnimation(true);
-
-            // Start timer
-            setRecordingTime(0);
-            recordingIntervalRef.current = setInterval(() => {
-                setRecordingTime(prev => prev + 1);
-            }, 1000);
-
-            toast({
-                title: "Grabando audio",
-                description: "Presiona el micrófono nuevamente para detener",
-            });
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            toast({
-                title: "Error de permisos",
-                description: "No se pudo acceder al micrófono. Verifica los permisos del navegador.",
-                variant: "destructive"
-            });
+                toast({
+                    title: "Grabando audio",
+                    description: "Presiona el micrófono nuevamente para detener",
+                });
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                toast({
+                    title: "Error de permisos",
+                    description: "No se pudo acceder al micrófono. Verifica los permisos del navegador.",
+                    variant: "destructive"
+                });
+            }
         }
     };
 
     const stopRecording = () => {
+        // Stop Web Speech API if active
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+            recognitionRef.current = null;
+        }
+        // Stop MediaRecorder if active
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            setShowVoiceAnimation(false);
         }
+        setIsRecording(false);
+        setShowVoiceAnimation(false);
     };
 
     const toggleVoiceRecording = () => {
@@ -207,258 +344,153 @@ export function ChatInput() {
     };
 
     return (
-        <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-8 pb-6 px-6">
+        <div className="w-full">
             <div className="max-w-4xl mx-auto">
-                {/* Suggestions Marquee */}
-                {!showVoiceAnimation && (
-                    <div className="mb-4 overflow-hidden relative">
-                        <div className="flex gap-3 animate-marquee hover:[animation-play-state:paused]">
-                            {/* Duplicate for seamless loop */}
-                            {[...SUGGESTIONS, ...SUGGESTIONS].map((suggestion, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                    className="flex-shrink-0 px-4 py-2 bg-secondary hover:bg-accent text-secondary-foreground rounded-lg text-sm font-medium transition-all hover:scale-105 active:scale-95 border border-border"
-                                >
-                                    {suggestion}
-                                </button>
-                            ))}
-                        </div>
-                        {/* Gradient masks */}
-                        <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-background to-transparent pointer-events-none" />
-                        <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-background to-transparent pointer-events-none" />
-                    </div>
-                )}
-
-                {/* Voice Animation */}
+                {/* Voice Animation - Minimal */}
                 {showVoiceAnimation && (
-                    <div className="mb-4 flex flex-col items-center gap-2">
-                        <div className={`w-32 h-32 rounded-full bg-destructive/20 flex items-center justify-center ${isRecording ? 'animate-pulse' : ''}`}>
-                            <div className="w-24 h-24 rounded-full bg-destructive/40 flex items-center justify-center">
-                                <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center">
-                                    {isRecording ? (
-                                        <MicOff className="w-8 h-8 text-destructive-foreground" />
-                                    ) : (
-                                        <Mic className="w-8 h-8 text-destructive-foreground" />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        {isRecording && (
-                            <div className="text-destructive font-mono text-lg font-bold">
-                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-                            </div>
-                        )}
+                    <div className="mb-2 flex items-center justify-center gap-2 text-destructive animate-pulse">
+                        <Mic className="w-4 h-4" />
+                        <span className="text-xs font-mono font-bold">
+                            RECORDING {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                        </span>
                     </div>
                 )}
-
                 {/* Attached Files Preview */}
                 {attachedFiles.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2">
+                    <div className="mb-3 flex flex-wrap gap-3">
                         {attachedFiles.map((file, index) => (
-                            <div
+                            <FilePreviewItem
                                 key={index}
-                                className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg text-sm"
-                            >
-                                <FileText className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-foreground truncate max-w-[150px]">{file.name}</span>
-                                <button
-                                    onClick={() => removeFile(index)}
-                                    className="p-0.5 hover:bg-accent rounded transition-colors"
-                                >
-                                    <X className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                            </div>
+                                file={file}
+                                onRemove={() => removeFile(index)}
+                            />
                         ))}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="relative">
-                    <div className="relative flex items-end gap-2 bg-secondary border-2 border-input rounded-2xl p-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring transition-all">
+                <form onSubmit={handleSubmit} className="relative group">
+                    <div className="relative flex items-center gap-2 bg-secondary/30 border border-input rounded-lg p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all shadow-sm">
+
+                        {/* Command Icon */}
+                        <div className="pl-2 text-muted-foreground">
+                            <Code className="w-4 h-4" />
+                        </div>
+
                         {/* Textarea */}
                         <textarea
                             ref={textareaRef}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Escribe tu mensaje..."
-                            className="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none px-3 py-2 max-h-40 min-h-[2.5rem]"
+                            placeholder="Type a command or ask a question..."
+                            className="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none px-2 py-2 max-h-40 min-h-[2.5rem] text-sm font-mono leading-relaxed"
                             rows={1}
-                            disabled={isLoading || showVoiceAnimation}
+                            disabled={isLoading || showVoiceAnimation || disabled}
                         />
 
-                        {/* Button Bar */}
-                        <div className="flex items-center gap-2 pb-2">
-                            {/* Left buttons */}
-                            <div className="flex items-center gap-1">
-                                {/* Attachment Toggle */}
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAttachments(!showAttachments)}
-                                    className={`p-2 hover:bg-accent rounded-lg transition-colors ${showAttachments ? 'bg-accent' : ''}`}
-                                    title="Adjuntar"
-                                    disabled={isLoading}
-                                >
-                                    <Paperclip className={`w-5 h-5 ${showAttachments ? 'text-primary' : 'text-muted-foreground'}`} />
-                                </button>
+                        {/* Right Actions */}
+                        <div className="flex items-center gap-1 pr-1">
+                            {/* Attachment Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setShowAttachments(!showAttachments)}
+                                className={`p-1.5 hover:bg-accent rounded-md transition-colors ${showAttachments ? 'bg-accent text-primary' : 'text-muted-foreground'}`}
+                                title="Attach files"
+                                disabled={isLoading || disabled}
+                            >
+                                <Paperclip className="w-4 h-4" />
+                            </button>
 
-                                {/* Web Search Toggle */}
-                                <button
-                                    type="button"
-                                    onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                                    className={`p-2 hover:bg-accent rounded-lg transition-colors ${webSearchEnabled ? 'bg-accent border-2 border-blue-500' : ''}`}
-                                    title={webSearchEnabled ? 'Búsqueda web activada' : 'Activar búsqueda web'}
-                                    disabled={isLoading}
-                                >
-                                    <Globe className={`w-5 h-5 ${webSearchEnabled ? 'text-blue-500' : 'text-muted-foreground'}`} />
-                                </button>
-                            </div>
+                            {/* Web Search Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setWebSearchEnabled(!webSearchEnabled);
+                                    toast({
+                                        title: !webSearchEnabled ? "Búsqueda Web Activada" : "Búsqueda Web Desactivada",
+                                        description: !webSearchEnabled ? "La IA buscará información en internet." : "La IA usará solo su conocimiento interno.",
+                                    });
+                                }}
+                                className={`p-1.5 rounded-md transition-colors ${webSearchEnabled ? 'bg-blue-500/10 text-blue-500' : 'text-muted-foreground hover:bg-accent'}`}
+                                title="Web Search"
+                                disabled={isLoading || disabled}
+                            >
+                                <Globe className="w-4 h-4" />
+                            </button>
 
-                            {/* Right buttons */}
-                            <div className="flex items-center gap-1">
-                                {/* Voice Recording */}
-                                <button
-                                    type="button"
-                                    onClick={toggleVoiceRecording}
-                                    className={`p-2 rounded-lg transition-all ${isRecording
-                                        ? 'bg-destructive/20 hover:bg-destructive/30'
-                                        : 'hover:bg-accent'
-                                        }`}
-                                    title={isRecording ? 'Detener grabación' : 'Grabar voz'}
-                                    disabled={isLoading}
-                                >
-                                    {isRecording ? (
-                                        <MicOff className="w-5 h-5 text-destructive animate-pulse" />
-                                    ) : (
-                                        <Mic className="w-5 h-5 text-muted-foreground" />
-                                    )}
-                                </button>
+                            {/* Voice Recording */}
+                            <button
+                                type="button"
+                                onClick={toggleVoiceRecording}
+                                className={`p-1.5 rounded-md transition-all ${isRecording
+                                    ? 'bg-destructive/20 text-destructive'
+                                    : 'hover:bg-accent text-muted-foreground'
+                                    }`}
+                                title={isRecording ? 'Stop recording' : 'Start recording'}
+                                disabled={isLoading || disabled}
+                            >
+                                {isRecording ? (
+                                    <MicOff className="w-4 h-4" />
+                                ) : (
+                                    <Mic className="w-4 h-4" />
+                                )}
+                            </button>
 
-                                {/* Send Button */}
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || isLoading || showVoiceAnimation}
-                                    className="p-2 bg-primary hover:bg-primary/90 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95"
-                                    title="Enviar mensaje"
-                                >
-                                    {isLoading ? (
-                                        <Loader2 className="w-5 h-5 text-primary-foreground animate-spin" />
-                                    ) : (
-                                        <Send className="w-5 h-5 text-primary-foreground" />
-                                    )}
-                                </button>
-                            </div>
+                            {/* Send Button */}
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isLoading || showVoiceAnimation || disabled}
+                                className="p-1.5 bg-primary text-primary-foreground rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 ml-1"
+                                title="Execute"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Send className="w-4 h-4" />
+                                )}
+                            </button>
                         </div>
                     </div>
 
                     {/* Attachments Popup */}
                     {showAttachments && (
                         <>
-                            {/* Backdrop */}
                             <div
-                                className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+                                className="fixed inset-0 z-40"
                                 onClick={() => setShowAttachments(false)}
                             />
-
-                            {/* Popup */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex items-center gap-3 bg-card/95 backdrop-blur-md border border-border rounded-2xl p-4 shadow-2xl z-50 animate-in slide-in-from-bottom-2 duration-200">
-                                {/* Close button */}
-                                <button
-                                    onClick={() => setShowAttachments(false)}
-                                    className="p-3 bg-destructive hover:bg-destructive/90 rounded-full transition-all hover:scale-110 active:scale-95"
-                                >
-                                    <X className="w-6 h-6 text-destructive-foreground" />
-                                </button>
-
-                                {/* Camera */}
-                                <button
-                                    onClick={() => cameraInputRef.current?.click()}
-                                    className="p-3 bg-primary hover:bg-primary/90 rounded-full transition-all hover:scale-110 active:scale-95"
-                                    title="Tomar foto"
-                                >
-                                    <Camera className="w-6 h-6 text-primary-foreground" />
-                                </button>
-
-                                {/* Photos */}
-                                <button
-                                    onClick={() => photoInputRef.current?.click()}
-                                    className="p-3 bg-primary hover:bg-primary/90 rounded-full transition-all hover:scale-110 active:scale-95"
-                                    title="Seleccionar imagen"
-                                >
-                                    <Image className="w-6 h-6 text-primary-foreground" />
-                                </button>
-
-                                {/* Files */}
+                            <div className="absolute bottom-full right-0 mb-2 flex flex-col gap-1 bg-popover border border-border rounded-lg p-1 shadow-lg z-50 min-w-[150px]">
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="p-3 bg-primary hover:bg-primary/90 rounded-full transition-all hover:scale-110 active:scale-95"
-                                    title="Seleccionar archivo"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-md text-left"
                                 >
-                                    <FileText className="w-6 h-6 text-primary-foreground" />
+                                    <FileText className="w-4 h-4" />
+                                    <span>Upload File</span>
+                                </button>
+                                <button
+                                    onClick={() => photoInputRef.current?.click()}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-md text-left"
+                                >
+                                    <Image className="w-4 h-4" />
+                                    <span>Upload Image</span>
+                                </button>
+                                <button
+                                    onClick={() => cameraInputRef.current?.click()}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-md text-left"
+                                >
+                                    <Camera className="w-4 h-4" />
+                                    <span>Take Photo</span>
                                 </button>
                             </div>
                         </>
                     )}
 
                     {/* Hidden file inputs */}
-                    <input
-                        ref={cameraInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                    />
-                    <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                    />
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                    />
-
-                    {/* Character count */}
-                    {input.length > 0 && !showVoiceAnimation && (
-                        <div className="absolute -bottom-6 right-0 text-xs text-muted-foreground flex items-center gap-2">
-                            {webSearchEnabled && (
-                                <span className="text-blue-500 flex items-center gap-1">
-                                    <Globe className="w-3 h-3" />
-                                    Web
-                                </span>
-                            )}
-                            <span>{input.length} caracteres</span>
-                        </div>
-                    )}
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
+                    <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                    <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
                 </form>
-
-                {/* Voice recording hint */}
-                {showVoiceAnimation && (
-                    <div className="text-center mt-4 text-sm text-muted-foreground animate-pulse">
-                        {isRecording ? 'Grabando... Toca el micrófono para detener' : 'Preparando grabación...'}
-                    </div>
-                )}
             </div>
-
-            <style jsx>{`
-        @keyframes marquee {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-
-        .animate-marquee {
-          animation: marquee 30s linear infinite;
-        }
-      `}</style>
-        </div>
+        </div >
     );
 }

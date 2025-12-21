@@ -44,6 +44,8 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  bio           String?
+  isPublic      Boolean   @default(true)
   password      String?
   role          String    @default("user") // "user" or "admin"
   accounts      Account[]
@@ -75,6 +77,17 @@ model User {
   deals Deal[]
   templates Template[]
   quickNotes QuickNote[]
+
+  // Social
+  // Social
+  sentMessages     DirectMessage[]  @relation("SentMessages")
+  receivedMessages DirectMessage[]  @relation("ReceivedMessages")
+  
+  sentFriendships     Friendship[] @relation("SentFriendships")
+  receivedFriendships Friendship[] @relation("ReceivedFriendships")
+
+  // AI Chat
+  aiChats       ChatSession[]
 }
 
 model VerificationToken {
@@ -88,6 +101,16 @@ model VerificationToken {
 model UserSettings {
   id        String   @id @default(cuid())
   userId    String   @unique
+  theme           String  @default("system")
+  language        String  @default("en")
+  notifications   Boolean @default(true)
+  soundEnabled    Boolean @default(true)
+  compactMode     Boolean @default(false)
+  showAnimations  Boolean @default(true)
+  
+  // JSON for flexible preferences (widget positions, etc.)
+  preferences     String  @default("{}") 
+
   settings  Json     // Store all user settings as JSON
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -114,21 +137,93 @@ model ChecklistItem {
 }
 
 model Routine {
-  id          String   @id @default(cuid())
-  name        String
-  description String
-  timeOfDay   String   // 'morning' | 'afternoon' | 'evening' | 'anytime'
-  duration    Int
-  isActive    Boolean  @default(true)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks       RoutineTask[]
-  updatedAt   DateTime @updatedAt
-  version     Int      @default(1)
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  timeOfDay     String   // 'morning' | 'afternoon' | 'evening' | 'anytime'
+  duration      Int
+  isActive      Boolean  @default(true)
+  scheduledTime String?  // HH:MM format for scheduled time
+  daysOfWeek    String?  // JSON array of days e.g. ["monday", "wednesday", "friday"]
+  
+  // New structured fields
+  objective     String?
+  frequency     String? // e.g. "3 days/week"
+  level         String? // e.g. "Beginner"
+  tempo         String? // e.g. "3-0-1"
+  method        String? // e.g. "Drop sets"
+  
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  days          RoutineDay[]
+  logs          WorkoutLog[]
+  
+  // Legacy support (optional)
+  tasks         RoutineTask[]
+  completions   RoutineCompletion[]
+  
+  updatedAt     DateTime @updatedAt
+  version       Int      @default(1)
 
   @@map("routines")
 }
 
+model RoutineDay {
+  id        String @id @default(cuid())
+  name      String // e.g. "Day 1 - Push"
+  routineId String
+  routine   Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exercises RoutineExercise[]
+  order     Int    @default(0)
+  weekday   String? // 'monday', 'tuesday', etc.
+
+  @@map("routine_days")
+}
+
+model RoutineExercise {
+  id           String @id @default(cuid())
+  name         String
+  muscleGroup  String // e.g. "Chest" (Frontend will enforce Enum)
+  sets         Int
+  reps         String // e.g. "10-12" or "30s"
+  tempo        String? // e.g. "3-1-1" or "3s down"
+  notes        String?
+  dayId        String
+  day          RoutineDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  order        Int    @default(0)
+
+  @@map("routine_exercises")
+}
+
+model WorkoutLog {
+  id        String   @id @default(cuid())
+  routineId String
+  routine   Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  duration  Int      // seconds
+  completed Boolean  @default(false)
+  exercises WorkoutExerciseLog[]
+
+  @@map("workout_logs")
+}
+
+model WorkoutExerciseLog {
+  id            String @id @default(cuid())
+  workoutLogId  String
+  workoutLog    WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  exerciseName  String
+  muscleGroup   String?
+  setsDone      Int
+  repsDone      String? // Optional, if they want to log specific reps
+  weight        Float?  // Optional, for progression
+  notes         String?
+
+  @@map("workout_exercise_logs")
+}
+
+// Legacy models kept for backward compatibility if needed
 model RoutineTask {
   id        String   @id @default(cuid())
   text      String
@@ -139,6 +234,18 @@ model RoutineTask {
   version   Int      @default(1)
 
   @@map("routine_tasks")
+}
+
+model RoutineCompletion {
+  id          String   @id @default(cuid())
+  routineId   String
+  routine     Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+  scheduledDay String?  // e.g. 'monday'
+  tasksTotal  Int
+  tasksCompleted Int
+
+  @@map("routine_completions")
 }
 
 model Project {
@@ -404,14 +511,24 @@ model BusinessContentIdea {
 }
 
 model Book {
-  id        String   @id @default(cuid())
-  title     String
-  author    String?
-  status    String   // 'read' | 'reading' | 'to-read'
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  updatedAt DateTime @updatedAt
-  version   Int      @default(1)
+  id          String   @id @default(cuid())
+  title       String
+  author      String?
+  coverUrl    String?
+  totalPages  Int?
+  currentPage Int      @default(0)
+  status      String   // 'read' | 'reading' | 'to-read'
+  rating      Int?     // 1-5
+  review      String?  // Text review
+  notes       String?  // General notes
+  pageNotes   Json?    // Array of { page: Int, note: String, date: DateTime }
+  isbn        String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
 
   @@map("books")
 }
@@ -433,9 +550,11 @@ model Goal {
   title       String
   description String?
   status      String   // 'active' | 'completed' | 'paused'
+  timeframe   String   @default("year") // 'year' | 'quarter' | 'month'
   deadline    String?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress    Float    @default(0)
   updatedAt   DateTime @updatedAt
   version     Int      @default(1)
 
@@ -621,4 +740,46 @@ model QuickNote {
   @@index([userId])
   @@index([userId, isPinned])
   @@map("quick_notes")
+}
+
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      String   // 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester   User     @relation("SentFriendships", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee   User     @relation("ReceivedFriendships", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@map("friendships")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  messages  String   // JSON string of messages
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_sessions")
+}
+
+model DirectMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  receiverId  String
+  content     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("direct_messages")
 }

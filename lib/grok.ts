@@ -53,7 +53,8 @@ export class GrokAPIClient {
     context: string,
     history: ConversationMessage[] = [],
     systemPrompt?: string,
-    tools?: GrokTool[]
+    tools?: GrokTool[],
+    attachments?: Array<{ name: string; type: string; url: string }>
   ): Promise<{ content: string; functionCalls: GrokFunctionCall[] }> {
     const apiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     console.log('Grok API: Clave API presente:', !!apiKey);
@@ -87,10 +88,77 @@ export class GrokAPIClient {
     }
 
     // Add current message
-    messages.push({
-      role: 'user',
-      content: message
-    });
+    // Handle different attachment types
+    if (attachments && attachments.length > 0) {
+      const imageAttachments = attachments.filter(a => a.type.startsWith('image/'));
+      const textAttachments = attachments.filter(a =>
+        a.type.startsWith('text/') ||
+        a.type === 'application/json' ||
+        a.type === 'application/javascript'
+      );
+      const documentAttachments = attachments.filter(a =>
+        a.type === 'application/pdf' ||
+        a.type === 'application/msword' ||
+        a.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        a.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        a.type === 'application/vnd.ms-excel'
+      );
+
+      // Build multimodal content
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+
+      // Start with user message
+      let textContent = message;
+
+      // Add text file contents inline
+      if (textAttachments.length > 0) {
+        textContent += '\n\n--- Archivos de texto adjuntos ---';
+        textAttachments.forEach(file => {
+          // Extract text content from base64 data URL
+          const base64Data = file.url.split(',')[1];
+          if (base64Data) {
+            try {
+              const decodedText = Buffer.from(base64Data, 'base64').toString('utf-8');
+              textContent += `\n\n[${file.name}]:\n${decodedText}`;
+            } catch (e) {
+              textContent += `\n\n[${file.name}]: (Error al leer el archivo)`;
+            }
+          }
+        });
+      }
+
+      // Add document descriptions (PDFs, Word docs - note: full text extraction requires server-side processing)
+      if (documentAttachments.length > 0) {
+        textContent += '\n\n--- Documentos adjuntos ---';
+        documentAttachments.forEach(file => {
+          textContent += `\n- ${file.name} (${file.type})`;
+          // Note: For full PDF/Word text extraction, you'd need server-side libraries like pdf-parse or mammoth
+          textContent += `\n  (Documento adjunto - para análisis completo, el archivo está disponible para procesamiento)`;
+        });
+      }
+
+      content.push({ type: 'text', text: textContent });
+
+      // Add images for Vision API
+      if (imageAttachments.length > 0) {
+        imageAttachments.forEach(img => {
+          content.push({
+            type: 'image_url',
+            image_url: { url: img.url }
+          });
+        });
+      }
+
+      messages.push({
+        role: 'user',
+        content: content.length === 1 && !imageAttachments.length ? textContent : content
+      });
+    } else {
+      messages.push({
+        role: 'user',
+        content: message
+      });
+    }
 
     try {
       console.log('Grok API: Enviando solicitud', {

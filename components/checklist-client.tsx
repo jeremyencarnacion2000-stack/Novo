@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { DashboardShell } from "@/components/dashboard-shell"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +14,7 @@ import { Plus, Trash2, Calendar, RefreshCw, Briefcase, GraduationCap, ListChecks
 import type { ChecklistItem } from "@/types/checklist"
 import { DataIntegrator, type IntegratedTask } from "@/lib/data-integrator"
 import { toast } from "sonner"
+import { TiltCard } from "@/components/ui/tilt-card"
 
 export default function ChecklistClient() {
   const { data: session } = useSession()
@@ -179,131 +180,113 @@ export default function ChecklistClient() {
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">Daily Checklist</h1>
-            <p className="text-muted-foreground mt-1 text-sm md:text-base">
-              Your unified view of tasks from all modules
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-            <Button variant="outline" size="sm" onClick={loadTasks} className="h-8 bg-transparent">
-              <RefreshCw className="h-3 w-3 mr-2" />
-              Sync
-            </Button>
-            <div className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-md">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-              </span>
-              <span className="sm:hidden">
-                {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </span>
-            </div>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">Daily Checklist</h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Your unified view of tasks from all modules
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+          <Button variant="outline" size="sm" onClick={loadTasks} className="h-8 bg-transparent">
+            <RefreshCw className="h-3 w-3 mr-2" />
+            Sync
+          </Button>
+          <div className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-md">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </span>
+            <span className="sm:hidden">
+              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
           </div>
         </div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base md:text-lg">Today&apos;s Progress</CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {completedCount} / {totalCount}
-              </Badge>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base md:text-lg">Today&apos;s Progress</CardTitle>
+            <Badge variant="outline" className="text-xs">
+              {completedCount} / {totalCount}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
+              <span className="text-muted-foreground">{progressPercent}% complete</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="text-muted-foreground">{progressPercent}% complete</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base md:text-lg">Tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleAddItem} className="flex flex-col sm:flex-row gap-2 relative">
-              <Input
-                value={newItemText}
-                onChange={(e) => setNewItemText(e.target.value)}
-                placeholder="Add a new manual task..."
-                className="flex-1 pr-10"
-                autoFocus
+            <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
               />
-              <div className="absolute right-3 top-2.5 hidden sm:block pointer-events-none">
-                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                  <span className="text-xs">↵</span>
-                </kbd>
-              </div>
-              <Button type="submit" className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Add
-              </Button>
-            </form>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2">
-              {sortedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border p-3 md:p-4 transition-colors hover:bg-accent ${item.source !== "manual" ? "bg-secondary/20" : ""
-                    }`}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Checkbox checked={item.completed} onCheckedChange={() => handleToggleComplete(item)} />
-                    <div className="flex flex-col min-w-0">
-                      <span
-                        className={`text-sm break-words ${item.completed ? "line-through text-muted-foreground" : "text-foreground"
-                          }`}
-                      >
-                        {item.text}
-                      </span>
-                      {item.source !== "manual" && (
-                        <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground">
-                          {getSourceIcon(item.source)}
-                          {getSourceBadge(item.source, getSourceLabel(item) || item.source)}
-                        </div>
-                      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">Tasks</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleAddItem} className="flex flex-col sm:flex-row gap-2 relative">
+            <Input
+              value={newItemText}
+              onChange={(e) => setNewItemText(e.target.value)}
+              placeholder="Add a new task..."
+              className="flex-1"
+            />
+            <Button type="submit">
+              <Plus className="h-4 w-4 mr-2" />
+              Add
+            </Button>
+          </form>
+
+          <div className="space-y-2">
+            {items.map(item => (
+              <TiltCard
+                key={item.id}
+                className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={item.completed}
+                    onCheckedChange={() => handleToggleComplete(item)}
+                  />
+                  <div className="flex flex-col">
+                    <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
+                      {item.text}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      {getSourceBadge(item.source, getSourceLabel(item))}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-7 sm:ml-0">
-                    <Badge
-                      variant={
-                        item.priority === "high" ? "destructive" : item.priority === "medium" ? "default" : "secondary"
-                      }
-                      className="min-w-[60px] justify-center text-xs"
-                    >
-                      {item.priority}
-                    </Badge>
-                    {item.source === "manual" && (
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
                 </div>
-              ))}
-
-              {items.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <p className="text-sm text-muted-foreground">No tasks for today. Add one or check your routines!</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardShell>
+                {item.source === 'manual' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(item.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </TiltCard>
+            ))}
+            {items.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No tasks yet. Add one above!
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

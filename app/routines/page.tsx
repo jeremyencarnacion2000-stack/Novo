@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DashboardShell } from '@/components/dashboard-shell'
 import { Button } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
 import { RoutinesList } from '@/components/routines/routines-list'
@@ -12,6 +11,7 @@ import { RoutineDetailDialog } from '@/components/routines/routine-detail-dialog
 import { useRoutines } from '@/hooks/use-swr'
 import { useToast } from '@/hooks/use-toast'
 import { FitnessTracker } from '@/components/fitness/fitness-tracker'
+import { RoutineStatsCard } from '@/components/routines/routine-stats'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
@@ -134,32 +134,34 @@ export default function RoutinesPage() {
     setEditingRoutine(undefined)
   }
 
-  const handleImport = async (routine: Omit<Routine, 'id'>) => {
+  const handleImport = async (payload: any) => {
     try {
-      const response = await fetch('/api/routines', {
+      const response = await fetch('/api/routines/import-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(routine),
+        body: JSON.stringify(payload),
       })
       if (response.ok) {
         mutate()
         setImportDialogOpen(false)
         toast({
-          title: 'Routine imported',
-          description: 'Your routine has been imported successfully.',
+          title: 'Import successful',
+          description: 'Your routines and data have been imported successfully.',
         })
       } else {
+        const errorData = await response.json()
+        console.error('Import error details:', errorData)
         toast({
-          title: 'Error importing routine',
-          description: 'Could not import routine. Please try again later.',
+          title: 'Error importing data',
+          description: errorData.error || 'Could not import data. Please try again later.',
           variant: 'destructive',
         })
       }
     } catch (error) {
-      console.error('Error importing routine:', error)
+      console.error('Error importing data:', error)
       toast({
-        title: 'Error importing routine',
-        description: 'Could not import routine. Please try again later.',
+        title: 'Error importing data',
+        description: 'Could not import data. Please try again later.',
         variant: 'destructive',
       })
     }
@@ -231,61 +233,62 @@ export default function RoutinesPage() {
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
-              Routines
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm md:text-base">
-              Manage your daily routines and habits
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Routine
-            </Button>
-          </div>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
+            Routines
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Manage your daily routines and habits
+          </p>
         </div>
-
-        <RoutinesList
-          routines={routines || []}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onView={handleView}
-        />
-
-        {/* Fitness Tracker Section */}
-        <div className="mt-8">
-          <FitnessTracker />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            New Routine
+          </Button>
         </div>
-
-        <RoutineDialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          onSave={handleSave}
-          routine={editingRoutine}
-        />
-
-        <ImportRoutineDialog
-          open={importDialogOpen}
-          onClose={() => setImportDialogOpen(false)}
-          onImport={handleImport}
-        />
-
-        <RoutineDetailDialog
-          open={detailDialogOpen}
-          onClose={() => setDetailDialogOpen(false)}
-          routine={viewingRoutine}
-          onUpdateProgress={handleUpdateProgress}
-        />
       </div>
-    </DashboardShell>
+
+      {/* Stats Section */}
+      <RoutineStatsCard />
+
+      <RoutinesList
+        routines={routines || []}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onView={handleView}
+      />
+
+      {/* Fitness Tracker Section */}
+      <div className="mt-8">
+        <FitnessTracker />
+      </div>
+
+      <RoutineDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        onSave={handleSave}
+        routine={editingRoutine}
+      />
+
+      <ImportRoutineDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImport={handleImport}
+      />
+
+      <RoutineDetailDialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        routine={viewingRoutine}
+        onUpdateProgress={handleUpdateProgress}
+      />
+    </div>
   )
 }

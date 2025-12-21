@@ -1,62 +1,217 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 
+export type FocusMode = 'work' | 'shortBreak' | 'longBreak'
+
+export interface TimerProfile {
+  id: string
+  name: string
+  workDuration: number // minutes
+  shortBreakDuration: number // minutes
+  longBreakDuration: number // minutes
+  pomodorosUntilLongBreak: number
+  autoStartBreaks: boolean
+  autoStartWork: boolean
+}
+
+export interface SoundSettings {
+  volume: number // 0-1
+  soundId: string
+  enabled: boolean
+}
+
+export interface Task {
+  id: string
+  text: string
+  completed: boolean
+}
+
 interface FocusContextType {
-  isFocusModeActive: boolean
-  setIsFocusModeActive: (active: boolean) => void
-  // Timer state
+  // Timer State
   time: number
-  setTime: (time: number) => void
   isActive: boolean
-  setIsActive: (active: boolean) => void
-  initialTime: number
-  setInitialTime: (time: number) => void
-  mode: "work" | "shortBreak" | "longBreak"
-  setMode: (mode: "work" | "shortBreak" | "longBreak") => void
-  selectedTask: string
-  setSelectedTask: (task: string) => void
-  tasks: { id: string; text: string }[]
-  setTasks: (tasks: { id: string; text: string }[]) => void
-  // Functions
+  mode: FocusMode
+  pomodoroCount: number
+  progress: number
+
+  // Actions
   toggleTimer: () => void
   resetTimer: () => void
-  setTimerMode: (mode: "work" | "shortBreak" | "longBreak") => void
+  skipTimer: () => void
+  setMode: (mode: FocusMode) => void
+
+  // Settings
+  activeProfileId: string
+  setActiveProfileId: (id: string) => void
+  profiles: TimerProfile[]
+  addProfile: (profile: TimerProfile) => void
+  updateProfile: (profile: TimerProfile) => void
+  deleteProfile: (id: string) => void
+
+  soundSettings: SoundSettings
+  setSoundSettings: (settings: SoundSettings) => void
+
+  // Tasks
+  selectedTaskId: string | null
+  setSelectedTaskId: (id: string | null) => void
+  tasks: Task[]
+  addTask: (text: string) => void
+  toggleTaskCompletion: (id: string) => void
+  deleteTask: (id: string) => void
+
   formatTime: (seconds: number) => string
+}
+
+const DEFAULT_PROFILES: TimerProfile[] = [
+  {
+    id: 'pomodoro',
+    name: 'Pomodoro (25/5)',
+    workDuration: 25,
+    shortBreakDuration: 5,
+    longBreakDuration: 15,
+    pomodorosUntilLongBreak: 4,
+    autoStartBreaks: false,
+    autoStartWork: false
+  },
+  {
+    id: 'deep-work',
+    name: 'Deep Work (50/10)',
+    workDuration: 50,
+    shortBreakDuration: 10,
+    longBreakDuration: 30,
+    pomodorosUntilLongBreak: 3,
+    autoStartBreaks: false,
+    autoStartWork: false
+  },
+  {
+    id: 'quick-focus',
+    name: 'Quick Focus (15/3)',
+    workDuration: 15,
+    shortBreakDuration: 3,
+    longBreakDuration: 10,
+    pomodorosUntilLongBreak: 4,
+    autoStartBreaks: true,
+    autoStartWork: true
+  }
+]
+
+const DEFAULT_SOUND_SETTINGS: SoundSettings = {
+  volume: 0.5,
+  soundId: 'bell',
+  enabled: true
 }
 
 const FocusContext = createContext<FocusContextType | undefined>(undefined)
 
 export function FocusProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
-  const [isFocusModeActive, setIsFocusModeActive] = useState(false)
-  const [time, setTime] = useState(25 * 60) // 25 minutes in seconds
-  const [isActive, setIsActive] = useState(false)
-  const [initialTime, setInitialTime] = useState(25 * 60)
-  const [mode, setMode] = useState<"work" | "shortBreak" | "longBreak">("work")
-  const [selectedTask, setSelectedTask] = useState<string>("")
-  const [tasks, setTasks] = useState<{ id: string; text: string }[]>([])
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
 
+  // State
+  const [profiles, setProfiles] = useState<TimerProfile[]>(DEFAULT_PROFILES)
+  const [activeProfileId, setActiveProfileId] = useState<string>('pomodoro')
+  const [soundSettings, setSoundSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS)
+
+  const activeProfile = profiles.find(p => p.id === activeProfileId) || DEFAULT_PROFILES[0]
+
+  const [mode, setModeState] = useState<FocusMode>('work')
+  const [time, setTime] = useState(activeProfile.workDuration * 60)
+  const [isActive, setIsActive] = useState(false)
+  const [pomodoroCount, setPomodoroCount] = useState(0)
+  const [initialTime, setInitialTime] = useState(activeProfile.workDuration * 60)
+
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Initialize Audio
   useEffect(() => {
-    // Initialize audio with a pleasant notification sound
     audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3")
-    audioRef.current.volume = 0.5
   }, [])
 
+  // Update volume when settings change
   useEffect(() => {
-    setIsFocusModeActive(isActive)
-  }, [isActive])
+    if (audioRef.current) {
+      audioRef.current.volume = soundSettings.volume
+    }
+  }, [soundSettings.volume])
 
-  // Save focus session when timer completes
+  // Update timer when profile or mode changes (only if not running)
+  useEffect(() => {
+    if (!isActive) {
+      let newTime = 0
+      switch (mode) {
+        case 'work': newTime = activeProfile.workDuration * 60; break;
+        case 'shortBreak': newTime = activeProfile.shortBreakDuration * 60; break;
+        case 'longBreak': newTime = activeProfile.longBreakDuration * 60; break;
+      }
+      setTime(newTime)
+      setInitialTime(newTime)
+    }
+  }, [activeProfile, mode, isActive])
+
+  // Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (isActive && time > 0) {
+      if (!sessionStartTime) setSessionStartTime(Date.now())
+
+      interval = setInterval(() => {
+        setTime((prev) => prev - 1)
+      }, 1000)
+    } else if (time === 0 && isActive) {
+      handleTimerComplete()
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isActive, time])
+
+  const handleTimerComplete = () => {
+    setIsActive(false)
+    playAlarm()
+
+    // Save Session
+    const actualDuration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : initialTime
+    saveFocusSession(actualDuration)
+    setSessionStartTime(null)
+
+    // Handle Mode Switch
+    if (mode === 'work') {
+      const newCount = pomodoroCount + 1
+      setPomodoroCount(newCount)
+
+      const isLongBreak = newCount % activeProfile.pomodorosUntilLongBreak === 0
+      const nextMode = isLongBreak ? 'longBreak' : 'shortBreak'
+
+      setModeState(nextMode)
+      if (activeProfile.autoStartBreaks) setIsActive(true)
+
+      new Notification("Focus Session Complete!", { body: "Time for a break." })
+    } else {
+      setModeState('work')
+      if (activeProfile.autoStartWork) setIsActive(true)
+
+      new Notification("Break Over!", { body: "Time to get back to work." })
+    }
+  }
+
+  const playAlarm = () => {
+    if (soundSettings.enabled && audioRef.current) {
+      audioRef.current.play().catch(e => console.error("Audio play failed:", e))
+    }
+  }
+
   const saveFocusSession = async (duration: number) => {
     if (!session?.user?.id) return
 
     try {
-      const response = await fetch('/api/analytics', {
+      await fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,88 +219,80 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
           userId: session.user.id,
           eventType: 'focus_session_complete',
           module: `focus-${mode}`,
+          metadata: { duration, profileId: activeProfileId, taskId: selectedTaskId }
         })
       })
-
-      // Also update daily analytics with focus time
-      await fetch('/api/analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'startSession',
-          userId: session.user.id,
-          module: 'focus-timer'
-        })
-      }).then(res => res.json()).then(async (data) => {
-        // Immediately end it with the actual duration
-        if (data.sessionId) {
-          await fetch('/api/analytics', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'endSession',
-              sessionId: data.sessionId,
-            })
-          })
-        }
-      })
-
-      console.log('Focus session saved successfully')
     } catch (error) {
       console.error('Failed to save focus session:', error)
     }
   }
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
-
-    if (isActive && time > 0) {
-      // Track session start time
-      if (!sessionStartTime) {
-        setSessionStartTime(Date.now())
-      }
-
-      interval = setInterval(() => {
-        setTime((prevTime) => prevTime - 1)
-      }, 1000)
-    } else if (time === 0) {
-      setIsActive(false)
-      if (interval) clearInterval(interval)
-
-      // Calculate actual duration and save session
-      const actualDuration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : initialTime
-      saveFocusSession(actualDuration)
+  // Actions
+  const toggleTimer = () => {
+    if (isActive && sessionStartTime) {
+      // Stopping: save partial time
+      const actualDuration = Math.floor((Date.now() - sessionStartTime) / 1000)
+      if (actualDuration > 0) saveFocusSession(actualDuration)
       setSessionStartTime(null)
-
-      if (audioRef.current) {
-        audioRef.current.play().catch((e) => console.log("Audio play failed:", e))
-      }
-
-      new Notification("Focus Timer Finished!", { body: "Time to take a break or get back to work." })
     }
-
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [isActive, time, sessionStartTime, initialTime, mode])
-
-  const toggleTimer = () => setIsActive(!isActive)
-
-  const resetTimer = () => {
-    setIsActive(false)
-    setTime(initialTime)
-    setSessionStartTime(null) // Reset session tracking
+    setIsActive(!isActive)
   }
 
-  const setTimerMode = (newMode: "work" | "shortBreak" | "longBreak") => {
-    setMode(newMode)
+  const resetTimer = () => {
+    if (isActive && sessionStartTime) {
+      const actualDuration = Math.floor((Date.now() - sessionStartTime) / 1000)
+      if (actualDuration > 0) saveFocusSession(actualDuration)
+    }
     setIsActive(false)
-    setSessionStartTime(null) // Reset session tracking
-    let newTime = 25 * 60
-    if (newMode === "shortBreak") newTime = 5 * 60
-    if (newMode === "longBreak") newTime = 15 * 60
-    setInitialTime(newTime)
+    setSessionStartTime(null)
+    let newTime = 0
+    switch (mode) {
+      case 'work': newTime = activeProfile.workDuration * 60; break;
+      case 'shortBreak': newTime = activeProfile.shortBreakDuration * 60; break;
+      case 'longBreak': newTime = activeProfile.longBreakDuration * 60; break;
+    }
     setTime(newTime)
+  }
+
+  const skipTimer = () => {
+    handleTimerComplete()
+  }
+
+  const setMode = (newMode: FocusMode) => {
+    setModeState(newMode)
+    setIsActive(false)
+    setSessionStartTime(null)
+  }
+
+  // Task Actions
+  const addTask = (text: string) => {
+    const newTask: Task = { id: Math.random().toString(36).substr(2, 9), text, completed: false }
+    setTasks(prev => [...prev, newTask])
+    if (!selectedTaskId) setSelectedTaskId(newTask.id)
+  }
+
+  const toggleTaskCompletion = (id: string) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
+  }
+
+  const deleteTask = (id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id))
+    if (selectedTaskId === id) setSelectedTaskId(null)
+  }
+
+  // Profile Actions
+  const addProfile = (profile: TimerProfile) => {
+    setProfiles(prev => [...prev, profile])
+  }
+
+  const updateProfile = (profile: TimerProfile) => {
+    setProfiles(prev => prev.map(p => p.id === profile.id ? profile : p))
+  }
+
+  const deleteProfile = (id: string) => {
+    if (profiles.length <= 1) return // Prevent deleting last profile
+    setProfiles(prev => prev.filter(p => p.id !== id))
+    if (activeProfileId === id) setActiveProfileId(profiles[0].id)
   }
 
   const formatTime = (seconds: number) => {
@@ -154,25 +301,33 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
+  const progress = initialTime > 0 ? ((initialTime - time) / initialTime) * 100 : 0
+
   return (
     <FocusContext.Provider value={{
-      isFocusModeActive,
-      setIsFocusModeActive,
       time,
-      setTime,
       isActive,
-      setIsActive,
-      initialTime,
-      setInitialTime,
       mode,
-      setMode,
-      selectedTask,
-      setSelectedTask,
-      tasks,
-      setTasks,
+      pomodoroCount,
+      progress,
       toggleTimer,
       resetTimer,
-      setTimerMode,
+      skipTimer,
+      setMode,
+      activeProfileId,
+      setActiveProfileId,
+      profiles,
+      addProfile,
+      updateProfile,
+      deleteProfile,
+      soundSettings,
+      setSoundSettings,
+      selectedTaskId,
+      setSelectedTaskId,
+      tasks,
+      addTask,
+      toggleTaskCompletion,
+      deleteTask,
       formatTime
     }}>
       {children}
@@ -183,30 +338,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
 export function useFocus() {
   const context = useContext(FocusContext)
   if (context === undefined) {
-    return {
-      isFocusModeActive: false,
-      setIsFocusModeActive: () => { },
-      time: 25 * 60,
-      setTime: () => { },
-      isActive: false,
-      setIsActive: () => { },
-      initialTime: 25 * 60,
-      setInitialTime: () => { },
-      mode: "work" as "work" | "shortBreak" | "longBreak",
-      setMode: () => { },
-      selectedTask: "",
-      setSelectedTask: () => { },
-      tasks: [],
-      setTasks: () => { },
-      toggleTimer: () => { },
-      resetTimer: () => { },
-      setTimerMode: () => { },
-      formatTime: (seconds: number) => {
-        const mins = Math.floor(seconds / 60)
-        const secs = seconds % 60
-        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-      }
-    }
+    throw new Error('useFocus must be used within a FocusProvider')
   }
   return context
 }

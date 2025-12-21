@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { notificationScheduler } from './notification-scheduler'
+import { useSettings } from '@/lib/settings-context'
 
 export interface NotificationSettings {
   habitReminders: boolean
@@ -37,6 +38,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<NotificationSettings>(defaultNotificationSettings)
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
 
+  const { settings: appSettings, updateSettings: updateAppSettings } = useSettings()
+
   // Check if notifications are supported
   useEffect(() => {
     const supported = 'Notification' in window && 'serviceWorker' in navigator
@@ -47,39 +50,40 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Load settings from localStorage
+  // Sync notification settings with app settings
   useEffect(() => {
-    const stored = localStorage.getItem('novo-notification-settings')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setSettings({ ...defaultNotificationSettings, ...parsed })
-      } catch (e) {
-        console.error('Failed to parse notification settings:', e)
-      }
+    if (appSettings.preferences?.notificationSettings) {
+      setSettings({ ...defaultNotificationSettings, ...appSettings.preferences.notificationSettings })
     }
-
     // Load scheduled notifications
     notificationScheduler.loadFromStorage()
-  }, [])
+  }, [appSettings.preferences])
 
-  // Save settings to localStorage
+  // Save settings to app settings (DB) instead of localStorage
   useEffect(() => {
-    localStorage.setItem('novo-notification-settings', JSON.stringify(settings))
+    // Only update if changed and loaded
+    if (JSON.stringify(settings) !== JSON.stringify(appSettings.preferences?.notificationSettings)) {
+      updateAppSettings({
+        preferences: {
+          ...appSettings.preferences,
+          notificationSettings: settings
+        }
+      })
+    }
   }, [settings])
 
   // Register service worker - DISABLED to fix redirect error
   // useEffect(() => {
   //   if (!isSupported) return
-
+  //
   //   const registerSW = async () => {
   //     try {
   //       const registration = await navigator.serviceWorker.register('/sw.js', {
   //         scope: '/'
   //       })
-
+  //
   //       console.log('Service Worker registered:', registration)
-
+  //
   //       // Handle updates
   //       registration.addEventListener('updatefound', () => {
   //         const newWorker = registration.installing
@@ -91,19 +95,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   //             }
   //           }
   //         })
-
+  //
   //       setSwRegistration(registration)
-
+  //
   //       // Request notification permission if not already granted
   //       if (Notification.permission === 'default') {
   //         // We'll request permission when user enables notifications
   //       }
-
+  //
   //     } catch (error) {
   //       console.error('Service Worker registration failed:', error)
   //     }
   //   }
-
+  //
   //   registerSW()
   // }, [isSupported])
 
@@ -213,10 +217,10 @@ export function useNotifications() {
       isSupported: false,
       permission: 'denied' as NotificationPermission,
       requestPermission: () => Promise.resolve('denied' as NotificationPermission),
-      showNotification: () => {},
-      scheduleNotification: () => {},
+      showNotification: () => { },
+      scheduleNotification: () => { },
       settings: defaultNotificationSettings,
-      updateSettings: () => {}
+      updateSettings: () => { }
     }
   }
   return context

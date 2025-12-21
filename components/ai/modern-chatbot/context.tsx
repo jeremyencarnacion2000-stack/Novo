@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment } from './types';
+import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment, MessageBlock, Attachment } from './types';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -22,13 +22,28 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
-    const [selectedModel, setSelectedModel] = useState('qwen3-next-80b'); // Changed to HuggingFace Qwen3 as default
+    const [selectedModel, setSelectedModel] = useState('qwen-max');
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     const availableModels: AIModel[] = [
+        {
+            id: 'qwen-max',
+            name: 'Qwen Max (Alibaba)',
+            provider: 'Alibaba Cloud',
+            description: 'Most capable Qwen model',
+            enabled: true
+        },
+        {
+            id: 'qwen-plus',
+            name: 'Qwen Plus (Alibaba)',
+            provider: 'Alibaba Cloud',
+            description: 'Balanced performance and speed',
+            enabled: true
+        },
         {
             id: 'grok-beta',
             name: 'Grok Beta',
@@ -37,10 +52,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             enabled: true
         },
         {
-            id: 'qwen3-next-80b',
-            name: 'Qwen3-Next-80B',
-            provider: 'Hugging Face',
-            description: 'Advanced thinking model by Qwen',
+            id: 'qwen/qwen3-235b-a22b:free',
+            name: 'Qwen 3 (OpenRouter)',
+            provider: 'OpenRouter',
+            description: 'Advanced thinking model by Qwen via OpenRouter',
             enabled: true
         },
         {
@@ -59,20 +74,38 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         }
     ];
 
-    // Load from localStorage on mount
+    // Load from database on mount
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
+        async function loadConversations() {
             try {
-                const parsed = JSON.parse(stored);
-                setConversations(parsed);
-                if (parsed.length > 0) {
-                    setCurrentConversationId(parsed[0].id);
+                const response = await fetch('/api/ai-conversations');
+                if (response.ok) {
+                    const dbConversations = await response.json();
+                    if (dbConversations.length > 0) {
+                        const formattedConversations = dbConversations.map((conv: any) => ({
+                            id: conv.id,
+                            title: conv.title || 'Nueva conversación',
+                            messages: Array.isArray(conv.messages) ? conv.messages.map((m: any) => ({
+                                id: m.id || crypto.randomUUID(),
+                                role: m.role,
+                                content: m.content,
+                                timestamp: m.timestamp || m.createdAt || new Date().toISOString(),
+                                model: m.model || 'grok-beta',
+                                attachments: m.attachments
+                            })) : [],
+                            createdAt: conv.createdAt,
+                            updatedAt: conv.updatedAt,
+                            model: conv.model || 'grok-beta'
+                        }));
+                        setConversations(formattedConversations);
+                        setCurrentConversationId(formattedConversations[0].id);
+                    }
                 }
-            } catch (e) {
-                console.error('Failed to load conversations:', e);
+            } catch (error) {
+                console.error('Failed to load conversations from database:', error);
             }
         }
+        loadConversations();
 
         const sidebarState = localStorage.getItem(SIDEBAR_KEY);
         if (sidebarState) {
@@ -85,12 +118,53 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    // Save to localStorage when conversations change
+    // Save conversations to database when they change
     useEffect(() => {
-        if (conversations.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+        async function saveToDatabase() {
+            if (conversations.length === 0) return;
+
+            for (const conv of conversations) {
+                try {
+                    const response = await fetch(`/api/ai-conversations/${conv.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: conv.title,
+                            messages: conv.messages,
+                            model: conv.model
+                        })
+                    });
+
+                    if (response.status === 404) {
+                        const createResponse = await fetch('/api/ai-conversations', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: conv.title,
+                                messages: conv.messages,
+                                model: conv.model
+                            })
+                        });
+
+                        if (createResponse.ok) {
+                            const newConv = await createResponse.json();
+                            setConversations(prev => prev.map(c =>
+                                c.id === conv.id ? { ...c, id: newConv.id } : c
+                            ));
+                            if (currentConversationId === conv.id) {
+                                setCurrentConversationId(newConv.id);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to save conversation to database:', error);
+                }
+            }
         }
-    }, [conversations]);
+
+        const timeoutId = setTimeout(saveToDatabase, 1000);
+        return () => clearTimeout(timeoutId);
+    }, [conversations, currentConversationId]);
 
     // Save sidebar state
     useEffect(() => {
@@ -118,7 +192,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         setCurrentConversationId(newConv.id);
     }, [selectedModel]);
 
-    const deleteConversation = useCallback((id: string) => {
+    const deleteConversation = useCallback(async (id: string) => {
         setConversations(prev => {
             const filtered = prev.filter(c => c.id !== id);
             if (currentConversationId === id && filtered.length > 0) {
@@ -128,6 +202,14 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             }
             return filtered;
         });
+
+        try {
+            await fetch(`/api/ai-conversations/${id}`, {
+                method: 'DELETE'
+            });
+        } catch (error) {
+            console.error('Failed to delete conversation:', error);
+        }
     }, [currentConversationId]);
 
     const updateConversation = useCallback((id: string, updates: Partial<Conversation>) => {
@@ -136,15 +218,37 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         ));
     }, []);
 
-    const sendMessage = useCallback(async (content: string, files?: File[]) => {
+    const sendMessage = useCallback(async (content: string, files?: File[], webSearchEnabled?: boolean) => {
         if (!content.trim() || !currentConversationId) return;
+
+        // Convert files to attachments for persistence
+        let messageAttachments: Attachment[] = [];
+        if (files && files.length > 0) {
+            messageAttachments = await Promise.all(
+                files.map(async (file) => {
+                    return new Promise<Attachment>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({
+                            id: crypto.randomUUID(),
+                            name: file.name,
+                            type: file.type,
+                            url: reader.result as string,
+                            size: file.size
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                })
+            );
+        }
 
         const userMessage: Message = {
             id: crypto.randomUUID(),
             role: 'user',
             content: content.trim(),
             timestamp: new Date().toISOString(),
-            model: selectedModel
+            model: selectedModel,
+            attachments: messageAttachments.length > 0 ? messageAttachments : undefined
         };
 
         // Add user message
@@ -162,131 +266,222 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         setIsTyping(true);
         setError(null);
 
+        let status = 'Thinking...';
+        const lowerContent = content.toLowerCase();
+        if (webSearchEnabled) {
+            status = 'Searching the web...';
+        } else if (lowerContent.includes('crea') || lowerContent.includes('genera') || lowerContent.includes('escribe') || lowerContent.includes('haz')) {
+            status = 'Creating content...';
+        } else if (lowerContent.includes('analiza') || lowerContent.includes('lee') || lowerContent.includes('revisa')) {
+            status = 'Analyzing...';
+        } else if (lowerContent.includes('busca') || lowerContent.includes('investiga')) {
+            status = 'Researching...';
+        } else if (lowerContent.includes('modifica') || lowerContent.includes('cambia') || lowerContent.includes('actualiza') || lowerContent.includes('corrige')) {
+            status = 'Modifying...';
+        }
+        setStatusMessage(status);
+
         try {
-            const response = await fetch('/api/ai/generate', {
+            const response = await fetch('/api/ai/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: content,
-                    history: messages,
-                    systemPrompt: 'Eres un asistente útil y profesional que puede ayudar a gestionar tareas, proyectos y rutinas. Responde en español de manera clara y concisa. Cuando el usuario te pida crear una tarea, proyecto o rutina, usa las herramientas disponibles para hacerlo.',
-                    tools: [
-                        {
-                            type: 'function',
-                            function: {
-                                name: 'create_task',
-                                description: 'Crear una nueva tarea en el sistema',
-                                parameters: {
-                                    type: 'object',
-                                    properties: {
-                                        title: { type: 'string', description: 'Título de la tarea' },
-                                        status: { type: 'string', enum: ['todo', 'in-progress', 'done'], description: 'Estado de la tarea' },
-                                        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Prioridad de la tarea' },
-                                        dueDate: { type: 'string', description: 'Fecha de vencimiento en formato ISO' },
-                                        projectId: { type: 'string', description: 'ID del proyecto asociado' },
-                                        tags: { type: 'array', items: { type: 'string' }, description: 'Etiquetas de la tarea' }
-                                    },
-                                    required: ['title']
-                                }
-                            }
-                        },
-                        {
-                            type: 'function',
-                            function: {
-                                name: 'create_project',
-                                description: 'Crear un nuevo proyecto en el sistema',
-                                parameters: {
-                                    type: 'object',
-                                    properties: {
-                                        title: { type: 'string', description: 'Título del proyecto' },
-                                        description: { type: 'string', description: 'Descripción del proyecto' },
-                                        status: { type: 'string', enum: ['not-started', 'in-progress', 'completed'], description: 'Estado del proyecto' },
-                                        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Prioridad del proyecto' },
-                                        dueDate: { type: 'string', description: 'Fecha de vencimiento en formato ISO' },
-                                        tags: { type: 'array', items: { type: 'string' }, description: 'Etiquetas del proyecto' }
-                                    },
-                                    required: ['title']
-                                }
-                            }
-                        },
-                        {
-                            type: 'function',
-                            function: {
-                                name: 'create_routine',
-                                description: 'Crear una nueva rutina en el sistema',
-                                parameters: {
-                                    type: 'object',
-                                    properties: {
-                                        name: { type: 'string', description: 'Nombre de la rutina' },
-                                        description: { type: 'string', description: 'Descripción de la rutina' },
-                                        timeOfDay: { type: 'string', enum: ['morning', 'afternoon', 'evening', 'night'], description: 'Momento del día para la rutina' },
-                                        duration: { type: 'number', description: 'Duración en minutos' }
-                                    },
-                                    required: ['name', 'timeOfDay', 'duration']
-                                }
-                            }
-                        }
-                    ],
-                    model: selectedModel
+                    history: messages.map(m => ({ role: m.role, content: m.content })),
                 })
             });
 
             if (!response.ok) {
-                throw new Error(`API error: ${response.statusText}`);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `API error: ${response.statusText}`);
             }
 
-            const data = await response.json();
-            const fullContent = data.content;
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
 
-            // Stop typing indicator
-            setIsTyping(false);
-
-            // Create streaming message with ULTRA-FAST animation
-            const messageId = crypto.randomUUID();
-            const baseMessage: Message = {
-                id: messageId,
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+            const streamingMsgId = crypto.randomUUID();
+            
+            setStreamingMessage({
+                id: streamingMsgId,
                 role: 'assistant',
                 content: '',
                 timestamp: new Date().toISOString(),
-                model: selectedModel
-            };
+                model: 'qwen3-32b'
+            });
 
-            // Ultra-fast streaming effect (1-3ms per word)
-            const words = fullContent.split(' ');
-            let currentText = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-            for (let i = 0; i < words.length; i++) {
-                currentText += (i > 0 ? ' ' : '') + words[i];
-                setStreamingMessage({
-                    ...baseMessage,
-                    content: currentText
-                });
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
 
-                // Ultra-fast delay (1-3ms per word for smooth effect)
-                const delay = words.length > 100 ? 1 : 3;
-                await new Promise(resolve => setTimeout(resolve, delay));
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+
+                        try {
+                            const json = JSON.parse(data);
+                            if (json.content) {
+                                accumulatedContent += json.content;
+                                setStreamingMessage({
+                                    id: streamingMsgId,
+                                    role: 'assistant',
+                                    content: accumulatedContent,
+                                    timestamp: new Date().toISOString(),
+                                    model: 'qwen3-32b'
+                                });
+                            }
+                        } catch (e) {}
+                    }
+                }
             }
 
-            // Final message
+            setStreamingMessage(null);
+
+            let finalContent = accumulatedContent;
+            let blocks: MessageBlock[] = [];
+
+            try {
+                let jsonStr = '';
+                const jsonBlockMatch = accumulatedContent.match(/```json\s*([\s\S]*?)\s*```/);
+                const genericBlockMatch = accumulatedContent.match(/```\s*([\s\S]*?)\s*```/);
+                const rawJsonMatch = accumulatedContent.match(/({[\s\S]*})/);
+
+                if (jsonBlockMatch) jsonStr = jsonBlockMatch[1];
+                else if (genericBlockMatch && genericBlockMatch[1].trim().startsWith('{')) jsonStr = genericBlockMatch[1];
+                else if (rawJsonMatch) jsonStr = rawJsonMatch[1];
+                else jsonStr = accumulatedContent.trim();
+
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.message || parsed.analysis || parsed.plan) {
+                    finalContent = parsed.message || '';
+                    if (parsed.analysis) blocks.push({ id: crypto.randomUUID(), type: 'analysis', content: parsed.analysis });
+                    if (parsed.plan) blocks.push({ id: crypto.randomUUID(), type: 'plan', content: parsed.plan });
+                    if (parsed.action) blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: parsed.action, status: 'pending' });
+                }
+            } catch (e) {}
+
             const assistantMessage: Message = {
-                ...baseMessage,
-                content: fullContent
+                id: streamingMsgId,
+                role: 'assistant',
+                content: finalContent,
+                blocks: blocks.length > 0 ? blocks : undefined,
+                timestamp: new Date().toISOString(),
+                model: 'qwen3-32b'
             };
 
-            // Clear streaming and add final message
-            setStreamingMessage(null);
             updateConversation(currentConversationId, {
                 messages: [...messages, userMessage, assistantMessage]
             });
+
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error desconocido');
             console.error('Send message error:', err);
-            setStreamingMessage(null);
         } finally {
             setIsLoading(false);
             setIsTyping(false);
+            setStatusMessage(null);
         }
     }, [currentConversationId, messages, selectedModel, updateConversation]);
+
+    const confirmAction = useCallback(async (messageId: string, blockId: string) => {
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (!conversation) return;
+
+        const message = conversation.messages.find(m => m.id === messageId);
+        if (!message || !message.blocks) return;
+
+        const block = message.blocks.find(b => b.id === blockId);
+        if (!block || block.type !== 'confirmation') return;
+
+        const updatedBlocks = message.blocks.map(b =>
+            b.id === blockId ? { ...b, status: 'confirmed' as const } : b
+        );
+
+        const executingBlock: MessageBlock = {
+            id: crypto.randomUUID(),
+            type: 'result',
+            content: 'Executing action...',
+            status: 'pending' as const
+        };
+
+        const tempBlocks = [...updatedBlocks, executingBlock];
+        const updatedMessages = conversation.messages.map(m =>
+            m.id === messageId ? { ...m, blocks: tempBlocks } : m
+        );
+        updateConversation(currentConversationId!, { messages: updatedMessages });
+
+        try {
+            const response = await fetch('/api/ai/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: block.content })
+            });
+
+            const result = await response.json();
+            const resultBlock: MessageBlock = {
+                id: executingBlock.id,
+                type: 'result',
+                content: result.output,
+                status: (result.success ? 'success' : 'failed') as any,
+                metadata: result.metadata
+            };
+
+            const finalBlocks = updatedBlocks.map(b => {
+                if (b.type === 'plan') {
+                    return {
+                        ...b,
+                        content: b.content.map((item: any) => ({
+                            ...item,
+                            status: result.success ? 'success' : 'failed'
+                        }))
+                    };
+                }
+                return b;
+            });
+
+            finalBlocks.push(resultBlock);
+            const finalMessages = conversation.messages.map(m =>
+                m.id === messageId ? { ...m, blocks: finalBlocks } : m
+            );
+            updateConversation(currentConversationId!, { messages: finalMessages });
+
+        } catch (error) {
+            console.error('Execution error:', error);
+            const errorBlock: MessageBlock = {
+                id: executingBlock.id,
+                type: 'result',
+                content: 'Failed to execute action. Please try again.',
+                status: 'failed' as const
+            };
+            const finalBlocks = [...updatedBlocks, errorBlock];
+            const finalMessages = conversation.messages.map(m =>
+                m.id === messageId ? { ...m, blocks: finalBlocks } : m
+            );
+            updateConversation(currentConversationId!, { messages: finalMessages });
+        }
+    }, [conversations, currentConversationId, updateConversation]);
+
+    const cancelAction = useCallback((messageId: string, blockId: string) => {
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (!conversation) return;
+
+        const message = conversation.messages.find(m => m.id === messageId);
+        if (!message || !message.blocks) return;
+
+        const updatedBlocks = message.blocks.map(b =>
+            b.id === blockId ? { ...b, status: 'cancelled' as const } : b
+        );
+
+        const updatedMessages = conversation.messages.map(m =>
+            m.id === messageId ? { ...m, blocks: updatedBlocks } : m
+        );
+        updateConversation(currentConversationId!, { messages: updatedMessages });
+    }, [conversations, currentConversationId, updateConversation]);
 
     const retryMessage = useCallback(async (messageId: string) => {
         const messageIndex = messages.findIndex(m => m.id === messageId);
@@ -295,11 +490,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const userMessage = messages[messageIndex - 1];
         if (userMessage.role !== 'user') return;
 
-        // Remove the old assistant message
         const newMessages = messages.slice(0, messageIndex);
         updateConversation(currentConversationId!, { messages: newMessages });
-
-        // Resend
         await sendMessage(userMessage.content);
     }, [messages, currentConversationId, sendMessage, updateConversation]);
 
@@ -329,6 +521,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         retryMessage,
         likeMessage,
         dislikeMessage,
+        confirmAction,
+        cancelAction,
         sidebarCollapsed,
         setSidebarCollapsed,
         artifactsPanelCollapsed,
@@ -339,6 +533,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isTyping,
         streamingMessage,
+        statusMessage,
         error
     };
 

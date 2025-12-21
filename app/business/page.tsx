@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { DashboardShell } from '@/components/dashboard-shell'
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { GoogleContacts } from '@/components/business/google-contacts'
+import { DealsPipeline } from '@/components/business/deals-pipeline'
+import { BusinessStats } from '@/components/business/business-stats'
 
 interface BusinessClient {
   id: string
@@ -166,194 +168,198 @@ export default function BusinessPage() {
   }
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Business</h1>
-            <p className="text-muted-foreground mt-1 text-sm md:text-base">
-              Manage clients and content ideas
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setClientDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
-              <Users className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
-            <Button onClick={() => setContentDialogOpen(true)} className="w-full sm:w-auto">
-              <FileText className="h-4 w-4 mr-2" />
-              Add Content
-            </Button>
-          </div>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Business</h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Manage clients and content ideas
+          </p>
         </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Clients ({clients.length})
-              </CardTitle>
-              <CardDescription>Manage your business clients</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {clients.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No clients yet</p>
-                ) : (
-                  clients.map((client) => (
-                    <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-3 w-3 rounded-full ${getStatusColor(client.status)}`} />
-                        <div>
-                          <p className="font-medium">{client.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {client.projects} projects • {client.status}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteClient(client.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Content Ideas ({contentIdeas.length})
-              </CardTitle>
-              <CardDescription>Track your content creation ideas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {contentIdeas.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No content ideas yet</p>
-                ) : (
-                  contentIdeas.map((content) => (
-                    <div key={content.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-3 w-3 rounded-full ${getStatusColor(content.status)}`} />
-                        <div>
-                          <p className="font-medium">{content.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {content.platform} • {content.status}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteContent(content.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex gap-2">
+          <Button onClick={() => setClientDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
+            <Users className="h-4 w-4 mr-2" />
+            Add Client
+          </Button>
+          <Button onClick={() => setContentDialogOpen(true)} className="w-full sm:w-auto">
+            <FileText className="h-4 w-4 mr-2" />
+            Add Content
+          </Button>
         </div>
-
-        <GoogleContacts />
-
-        <Dialog open={clientDialogOpen} onOpenChange={setClientDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
-              <DialogDescription>Add a new business client to track</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="client-name">Client Name</Label>
-                <Input
-                  id="client-name"
-                  placeholder="e.g., ABC Company"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="client-status">Status</Label>
-                <Select value={newClientStatus} onValueChange={(v: any) => setNewClientStatus(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="proposal">Proposal</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setClientDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddClient}>Add Client</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={contentDialogOpen} onOpenChange={setContentDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Content Idea</DialogTitle>
-              <DialogDescription>Add a new content creation idea</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="content-title">Title</Label>
-                <Input
-                  id="content-title"
-                  placeholder="e.g., 10 Tips for Productivity"
-                  value={newContentTitle}
-                  onChange={(e) => setNewContentTitle(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="content-platform">Platform</Label>
-                <Input
-                  id="content-platform"
-                  placeholder="e.g., Blog, YouTube, LinkedIn"
-                  value={newContentPlatform}
-                  onChange={(e) => setNewContentPlatform(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="content-status">Status</Label>
-                <Select value={newContentStatus} onValueChange={(v: any) => setNewContentStatus(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setContentDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddContent}>Add Content</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
-    </DashboardShell>
+
+      {/* Business Analytics Stats */}
+      <BusinessStats />
+
+      {/* Deals Pipeline */}
+      <DealsPipeline />
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Clients ({clients.length})
+            </CardTitle>
+            <CardDescription>Manage your business clients</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {clients.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No clients yet</p>
+              ) : (
+                clients.map((client) => (
+                  <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-3 w-3 rounded-full ${getStatusColor(client.status)}`} />
+                      <div>
+                        <p className="font-medium">{client.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {client.projects} projects • {client.status}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClient(client.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Content Ideas ({contentIdeas.length})
+            </CardTitle>
+            <CardDescription>Track your content creation ideas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {contentIdeas.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No content ideas yet</p>
+              ) : (
+                contentIdeas.map((content) => (
+                  <div key={content.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-3 w-3 rounded-full ${getStatusColor(content.status)}`} />
+                      <div>
+                        <p className="font-medium">{content.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {content.platform} • {content.status}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteContent(content.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <GoogleContacts />
+
+      <Dialog open={clientDialogOpen} onOpenChange={setClientDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+            <DialogDescription>Add a new business client to track</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="client-name">Client Name</Label>
+              <Input
+                id="client-name"
+                placeholder="e.g., ABC Company"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="client-status">Status</Label>
+              <Select value={newClientStatus} onValueChange={(v: any) => setNewClientStatus(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proposal">Proposal</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClientDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddClient}>Add Client</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contentDialogOpen} onOpenChange={setContentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Content Idea</DialogTitle>
+            <DialogDescription>Add a new content creation idea</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="content-title">Title</Label>
+              <Input
+                id="content-title"
+                placeholder="e.g., 10 Tips for Productivity"
+                value={newContentTitle}
+                onChange={(e) => setNewContentTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="content-platform">Platform</Label>
+              <Input
+                id="content-platform"
+                placeholder="e.g., Blog, YouTube, LinkedIn"
+                value={newContentPlatform}
+                onChange={(e) => setNewContentPlatform(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="content-status">Status</Label>
+              <Select value={newContentStatus} onValueChange={(v: any) => setNewContentStatus(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setContentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddContent}>Add Content</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

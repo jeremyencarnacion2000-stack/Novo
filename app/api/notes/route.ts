@@ -1,100 +1,64 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-// GET /api/notes - Get all quick notes
-export async function GET(request: NextRequest) {
+export async function GET(req: Request) {
     try {
-        const session = await getServerSession();
-
-        if (!session?.user?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return new NextResponse('Unauthorized', { status: 401 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        const { searchParams } = new URL(request.url);
-        const type = searchParams.get('type');
-        const archived = searchParams.get('archived') === 'true';
-        const pinned = searchParams.get('pinned') === 'true';
-        const tag = searchParams.get('tag');
-
-        const where: any = {
-            userId: user.id,
-            isArchived: archived,
-        };
-
-        if (type) where.type = type;
-        if (pinned) where.isPinned = true;
-        if (tag) where.tags = { has: tag };
+        const { searchParams } = new URL(req.url)
+        const archived = searchParams.get('archived') === 'true'
+        const pinned = searchParams.get('pinned') === 'true'
 
         const notes = await prisma.quickNote.findMany({
-            where,
+            where: {
+                userId: session.user.id,
+                isArchived: archived,
+                ...(searchParams.has('pinned') ? { isPinned: pinned } : {}),
+            },
             orderBy: [
                 { isPinned: 'desc' },
-                { updatedAt: 'desc' },
-            ],
-        });
+                { updatedAt: 'desc' }
+            ]
+        })
 
-        return NextResponse.json({ notes });
+        return NextResponse.json(notes)
     } catch (error) {
-        console.error('Error fetching notes:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('[NOTES_GET]', error)
+        return new NextResponse('Internal Error', { status: 500 })
     }
 }
 
-// POST /api/notes - Create a quick note
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
     try {
-        const session = await getServerSession();
-
-        if (!session?.user?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return new NextResponse('Unauthorized', { status: 401 })
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        const body = await request.json();
-        const { content, type, tags, color } = body;
+        const body = await req.json()
+        const { content, tags, color } = body
 
         if (!content) {
-            return NextResponse.json(
-                { error: 'Content is required' },
-                { status: 400 }
-            );
+            return new NextResponse('Content is required', { status: 400 })
         }
 
         const note = await prisma.quickNote.create({
             data: {
                 content,
-                type: type ?? 'note',
-                tags: tags ?? [],
+                tags: tags || [],
                 color,
-                userId: user.id,
-            },
-        });
+                userId: session.user.id
+            }
+        })
 
-        return NextResponse.json({ note });
+        return NextResponse.json(note)
     } catch (error) {
-        console.error('Error creating note:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('[NOTES_POST]', error)
+        return new NextResponse('Internal Error', { status: 500 })
     }
 }

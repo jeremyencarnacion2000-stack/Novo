@@ -21,8 +21,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Sparkles } from 'lucide-react'
 import { Routine, RoutineTask } from '@/types/routine'
+import { Checkbox } from '@/components/ui/checkbox'
+import routineTemplates from '@/data/routine-templates.json'
 
 interface RoutineDialogProps {
   open: boolean
@@ -30,6 +32,16 @@ interface RoutineDialogProps {
   onSave: (routine: Routine | Omit<Routine, 'id'>) => void
   routine?: Routine
 }
+
+const DAYS_OF_WEEK = [
+  { id: 'monday', label: 'Mon' },
+  { id: 'tuesday', label: 'Tue' },
+  { id: 'wednesday', label: 'Wed' },
+  { id: 'thursday', label: 'Thu' },
+  { id: 'friday', label: 'Fri' },
+  { id: 'saturday', label: 'Sat' },
+  { id: 'sunday', label: 'Sun' },
+]
 
 export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogProps) {
   const [name, setName] = useState('')
@@ -39,6 +51,9 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   const [tasks, setTasks] = useState<RoutineTask[]>([])
   const [isActive, setIsActive] = useState(true)
   const [newTaskText, setNewTaskText] = useState('')
+  const [scheduledTime, setScheduledTime] = useState('')
+  const [selectedDays, setSelectedDays] = useState<string[]>([])
+  const [showTemplates, setShowTemplates] = useState(false)
 
   useEffect(() => {
     if (routine) {
@@ -48,6 +63,8 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
       setDuration(routine.duration)
       setTasks(routine.tasks)
       setIsActive(routine.isActive)
+      setScheduledTime(routine.scheduledTime || '')
+      setSelectedDays(routine.daysOfWeek ? JSON.parse(routine.daysOfWeek) : [])
     } else {
       // Reset form
       setName('')
@@ -56,8 +73,35 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
       setDuration(30)
       setTasks([])
       setIsActive(true)
+      setScheduledTime('')
+      setSelectedDays([])
     }
+    setShowTemplates(false)
   }, [routine, open])
+
+  const handleSelectTemplate = (templateId: string) => {
+    const template = routineTemplates.find(t => t.id === templateId)
+    if (template) {
+      setName(template.name)
+      setDescription(template.description)
+      setTimeOfDay(template.timeOfDay as any)
+      setDuration(template.duration)
+      setTasks(template.tasks.map((t, i) => ({
+        id: `template-${i}-${Date.now()}`,
+        text: t.text,
+        completed: false,
+      })))
+      setShowTemplates(false)
+    }
+  }
+
+  const handleDayToggle = (day: string, checked: boolean) => {
+    if (checked) {
+      setSelectedDays([...selectedDays, day])
+    } else {
+      setSelectedDays(selectedDays.filter(d => d !== day))
+    }
+  }
 
   const handleAddTask = () => {
     if (newTaskText.trim()) {
@@ -86,6 +130,8 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
       duration,
       tasks,
       isActive,
+      scheduledTime: scheduledTime || null,
+      daysOfWeek: selectedDays.length > 0 ? JSON.stringify(selectedDays) : null,
     }
 
     if (routine) {
@@ -109,6 +155,39 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
           </DialogHeader>
 
           <div className="space-y-6 py-6">
+            {/* Template Selector */}
+            {!routine && (
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="w-full justify-start gap-2"
+                >
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Start from Template
+                </Button>
+                {showTemplates && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {routineTemplates.map((template) => (
+                      <Button
+                        key={template.id}
+                        type="button"
+                        variant="secondary"
+                        className="h-auto flex-col items-start p-3 text-left"
+                        onClick={() => handleSelectTemplate(template.id)}
+                      >
+                        <span className="font-medium">{template.name}</span>
+                        <span className="text-xs text-muted-foreground line-clamp-1">
+                          {template.description}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -158,6 +237,40 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
                   max={300}
                   required
                 />
+              </div>
+            </div>
+
+            {/* Schedule Section */}
+            <div className="space-y-4 p-4 rounded-lg border bg-muted/50">
+              <Label className="text-base font-semibold">Schedule (Optional)</Label>
+
+              <div className="space-y-2">
+                <Label htmlFor="scheduledTime">Time</Label>
+                <Input
+                  id="scheduledTime"
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="w-32"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Days of Week</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <div key={day.id} className="flex items-center gap-1.5">
+                      <Checkbox
+                        id={day.id}
+                        checked={selectedDays.includes(day.id)}
+                        onCheckedChange={(checked) => handleDayToggle(day.id, checked as boolean)}
+                      />
+                      <Label htmlFor={day.id} className="text-sm cursor-pointer">
+                        {day.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -224,3 +337,4 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
     </Dialog>
   )
 }
+

@@ -32,13 +32,15 @@ export interface PlayerState {
   isReady: boolean; // Whether the Spotify SDK is ready
   isShuffle: boolean; // Shuffle mode
   repeatMode: 'off' | 'track' | 'playlist'; // Repeat mode
+  queue: CurrentTrack[]; // Queue for upcoming tracks
+  accessToken: string | null; // Spotify Access Token for API calls
 }
 
 interface PlayerActions {
   playTrack: (track: CurrentTrack) => void;
   playPlaylist: (playlist: Playlist, startIndex?: number) => void;
   togglePlayPause: () => void;
-  nextTrack: () => void;
+  nextTrack: () => Promise<void>; // Changed to Promise
   previousTrack: () => void;
   setVolume: (volume: number) => void;
   setProgress: (progress: number) => void;
@@ -50,6 +52,11 @@ interface PlayerActions {
   setDeviceId: (deviceId: string) => void;
   setReady: (isReady: boolean) => void;
   resetPlayer: () => void;
+  addToQueue: (tracks: CurrentTrack[]) => void;
+  clearQueue: () => void;
+  playNext: (track: CurrentTrack) => void;
+  setAutoPlay: (autoPlay: boolean) => void;
+  setAccessToken: (token: string | null) => void;
 }
 
 const initialState: PlayerState = {
@@ -64,25 +71,34 @@ const initialState: PlayerState = {
   isReady: false,
   isShuffle: false,
   repeatMode: 'off',
+  queue: [],
+  autoPlay: true,
+  accessToken: null,
 }
 
 export const usePlayerStore = create<PlayerState & PlayerActions>()(
   persist(
     (set, get) => {
+      // Flag to prevent infinite loop from BroadcastChannel
+      let isUpdatingFromBroadcast = false
+
       // Listen for BroadcastChannel messages
       if (playerChannel) {
         playerChannel.onmessage = (event) => {
           const { type, payload } = event.data
-          if (type === 'PLAYER_STATE_UPDATE') {
+          if (type === 'PLAYER_STATE_UPDATE' && !isUpdatingFromBroadcast) {
+            isUpdatingFromBroadcast = true
             set(payload)
+            // Reset flag after a short delay to allow state to settle
+            setTimeout(() => { isUpdatingFromBroadcast = false }, 100)
           }
         }
       }
 
       return {
         ...initialState,
+        setAccessToken: (token) => set({ accessToken: token }),
         playTrack: (track) => {
-          console.log('playTrack called with:', track.name, 'Setting isOpen to true')
           set((state) => {
             const updatedState = {
               ...state,
@@ -93,7 +109,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               isOpen: true,
               progress: 0
             };
-            console.log('playTrack updatedState:', { isOpen: updatedState.isOpen, currentTrack: updatedState.currentTrack?.name })
             if (playerChannel) {
               playerChannel.postMessage({
                 type: 'PLAYER_STATE_UPDATE',
@@ -112,7 +127,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           });
         },
         playPlaylist: (playlist, startIndex = 0) => {
-          console.log('playPlaylist called with:', playlist.name, 'startIndex:', startIndex, 'Setting isOpen to true')
           set((state) => {
             const updatedState = {
               ...state,
@@ -123,7 +137,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               isOpen: true,
               progress: 0
             };
-            console.log('playPlaylist updatedState:', { isOpen: updatedState.isOpen, currentTrack: updatedState.currentTrack?.name })
             if (playerChannel) {
               playerChannel.postMessage({
                 type: 'PLAYER_STATE_UPDATE',
@@ -141,8 +154,23 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             return updatedState;
           });
         },
-        nextTrack: () => {
+        nextTrack: async () => {
           const state = get();
+
+          // 1. First check if there are tracks in the queue
+          if (state.queue.length > 0) {
+            const [nextInQueue, ...remainingQueue] = state.queue;
+            set({
+              currentTrack: nextInQueue,
+              queue: remainingQueue,
+              progress: 0,
+              isPlaying: true,
+              isOpen: true
+            });
+            return;
+          }
+
+          // 2. Then check playlist
           if (state.currentPlaylist && state.currentPlaylist.tracks.length > 0) {
             let nextIndex: number;
 
@@ -153,7 +181,61 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
                 .filter(i => i !== state.currentTrackIndex);
               nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)] || 0;
             } else {
-              nextIndex = (state.currentTrackIndex + 1) % state.currentPlaylist.tracks.length;
+              nextIndex = state.currentTrackIndex + 1;
+
+              // Check if we've reached the end
+              if (nextIndex >= state.currentPlaylist.tracks.length) {
+                if (state.repeatMode === 'playlist') {
+                  nextIndex = 0; // Loop back to start
+                } else {
+                  // End of playlist
+                  // 3. Fallback to Autoplay / Recommendations
+                  if (state.autoPlay && state.accessToken && state.currentTrack) {
+                    try {
+                      const seedTrack = state.currentTrack.id;
+                      const seedArtist = state.currentTrack.artistId;
+
+                      let url = `/api/spotify/recommendations?limit=5`;
+                      if (seedTrack) url += `&seed_tracks=${seedTrack}`;
+                      else if (seedArtist) url += `&seed_artists=${seedArtist}`;
+
+                      // We need to fetch from our API route which handles the token
+                      // But here we have the token in state, so we can call Spotify directly or use our API
+                      // Using our API is safer if we don't want to manage token refresh here, 
+                      // but we stored the token. Let's try calling our API first.
+
+                      // Actually, we can't easily call our own API with relative path if we are on server, 
+                      // but this is client-side store.
+
+                      const response = await fetch(url);
+                      if (response.ok) {
+                        const data = await response.json();
+                        const recommendations = data.tracks || [];
+                        if (recommendations.length > 0) {
+                          // Add to queue and play first
+                          const [first, ...rest] = recommendations;
+                          set({
+                            currentTrack: first,
+                            queue: rest,
+                            progress: 0,
+                            isPlaying: true,
+                            isOpen: true,
+                            // Clear playlist so we don't go back to it
+                            currentPlaylist: null,
+                            currentTrackIndex: 0
+                          });
+                          return;
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Failed to fetch recommendations", e);
+                    }
+                  }
+
+                  set({ isPlaying: false, progress: 0 });
+                  return;
+                }
+              }
             }
 
             set({
@@ -162,7 +244,41 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               progress: 0,
               isPlaying: true
             });
+            return;
           }
+
+          // 4. No playlist, but we have a current track (Single track mode) -> Fetch recommendations
+          if (state.autoPlay && state.accessToken && state.currentTrack) {
+            try {
+              const seedTrack = state.currentTrack.id;
+              const seedArtist = state.currentTrack.artistId;
+
+              let url = `/api/spotify/recommendations?limit=5`;
+              if (seedTrack) url += `&seed_tracks=${seedTrack}`;
+              else if (seedArtist) url += `&seed_artists=${seedArtist}`;
+
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                const recommendations = data.tracks || [];
+                if (recommendations.length > 0) {
+                  const [first, ...rest] = recommendations;
+                  set({
+                    currentTrack: first,
+                    queue: rest,
+                    progress: 0,
+                    isPlaying: true,
+                    isOpen: true
+                  });
+                  return;
+                }
+              }
+            } catch (e) {
+              console.error("Failed to fetch recommendations", e);
+            }
+          }
+
+          set({ isPlaying: false, progress: 0 });
         },
         previousTrack: () => {
           const state = get();
@@ -229,6 +345,22 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         setDeviceId: (deviceId) => set({ deviceId }),
         setReady: (isReady) => set({ isReady }),
         resetPlayer: () => set(initialState),
+        addToQueue: (tracks) => {
+          set((state) => ({
+            queue: [...state.queue, ...tracks]
+          }));
+        },
+        clearQueue: () => {
+          set({ queue: [] });
+        },
+        playNext: (track) => {
+          set((state) => ({
+            queue: [track, ...state.queue]
+          }));
+        },
+        setAutoPlay: (autoPlay) => {
+          set({ autoPlay });
+        },
       }
     },
     {
@@ -241,6 +373,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         isOpen: state.isOpen,
         isShuffle: state.isShuffle,
         repeatMode: state.repeatMode,
+        accessToken: state.accessToken, // Persist token
       }),
     }
   )

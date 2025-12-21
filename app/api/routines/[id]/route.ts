@@ -22,7 +22,17 @@ export async function GET(
         id,
         userId: session.user.id
       },
-      include: { tasks: true }
+      include: {
+        tasks: true,
+        days: {
+          include: {
+            exercises: {
+              orderBy: { order: 'asc' }
+            }
+          },
+          orderBy: { order: 'asc' }
+        }
+      }
     })
 
     if (!routine) {
@@ -55,24 +65,88 @@ export async function PUT(
       return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
 
-    const { tasks, ...routineData } = parsedBody.data
+    const { tasks, days, ...routineData } = parsedBody.data
 
-    const updatedRoutine = await prisma.routine.update({
-      where: {
-        id,
-        userId: session.user.id
-      },
-      data: {
-        ...routineData,
-        tasks: {
-          upsert: tasks?.map((task) => ({
-            where: { id: task.id || '' },
-            update: { text: task.text, completed: task.completed },
-            create: { text: task.text, completed: task.completed },
-          })),
-        },
-      },
-      include: { tasks: true }
+    // Transaction to handle complex nested updates
+    const updatedRoutine = await prisma.$transaction(async (tx) => {
+      // 1. Update basic fields
+      await tx.routine.update({
+        where: { id, userId: session.user.id },
+        data: { ...routineData }
+      })
+
+      // 2. Handle legacy tasks (upsert)
+      if (tasks) {
+        // Delete tasks not present in the update
+        const taskIds = tasks.map(t => t.id).filter(Boolean) as string[]
+        await tx.routineTask.deleteMany({
+          where: { routineId: id, id: { notIn: taskIds } }
+        })
+
+        // Upsert tasks
+        for (const task of tasks) {
+          if (task.id) {
+            await tx.routineTask.update({
+              where: { id: task.id },
+              data: { text: task.text, completed: task.completed }
+            })
+          } else {
+            await tx.routineTask.create({
+              data: {
+                routineId: id,
+                text: task.text,
+                completed: task.completed || false
+              }
+            })
+          }
+        }
+      }
+
+      // 3. Handle structured days and exercises (full replacement strategy for simplicity in MVP)
+      if (days) {
+        // Delete all existing days (and cascading exercises)
+        await tx.routineDay.deleteMany({
+          where: { routineId: id }
+        })
+
+        // Recreate all days and exercises
+        for (const [index, day] of days.entries()) {
+          await tx.routineDay.create({
+            data: {
+              routineId: id,
+              name: day.name,
+              order: index,
+              exercises: {
+                create: day.exercises.map((ex: any, exIndex: number) => ({
+                  name: ex.name,
+                  muscleGroup: ex.muscleGroup,
+                  sets: ex.sets,
+                  reps: ex.reps,
+                  tempo: ex.tempo,
+                  notes: ex.notes,
+                  order: exIndex
+                }))
+              }
+            }
+          })
+        }
+      }
+
+      // Return updated routine
+      return tx.routine.findUnique({
+        where: { id },
+        include: {
+          tasks: true,
+          days: {
+            include: {
+              exercises: {
+                orderBy: { order: 'asc' }
+              }
+            },
+            orderBy: { order: 'asc' }
+          }
+        }
+      })
     })
 
     return NextResponse.json(updatedRoutine)
