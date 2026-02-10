@@ -235,14 +235,13 @@ interface Conflict {
 
 // Types for our integrated data
 export interface IntegratedTask extends ChecklistItem {
-  source: "manual" | "routine" | "project" | "school" | "standalone" | "project-task"
+  source: "manual" | "routine" | "project" | "standalone" | "project-task"
   sourceId?: string // ID of the routine, project, or subject
   originalId?: string // ID of the task within the source
   task?: Task // For linked tasks
   metadata?: {
     routineName?: string
     projectName?: string
-    subjectName?: string
     dueDate?: string
   }
 }
@@ -251,23 +250,9 @@ export interface CalendarEvent {
   id: string
   title: string
   date: Date
-  type: "task" | "project" | "routine" | "school" | "habit" | "google"
+  type: "task" | "project" | "routine" | "habit" | "google" | "school"
   completed: boolean
   metadata?: Record<string, unknown>
-}
-
-export interface SchoolEvent {
-  id: string
-  title: string
-  date: string
-  type: string
-  completed: boolean
-}
-
-export interface SchoolSubject {
-  id: string
-  name: string
-  events: SchoolEvent[]
 }
 
 // Cache interface
@@ -313,7 +298,6 @@ const fetchWithCache = async <T,>(
       }
     })
     if (!response.ok) {
-      // Throw an error with status to be caught by the caller
       const error = new Error(`API error: ${response.statusText}`)
         ; (error as any).status = response.status
       throw error
@@ -322,19 +306,14 @@ const fetchWithCache = async <T,>(
     await setCachedData(cacheKey, userId, data)
     return data
   } catch (error) {
-    // Only fallback to cache if it's a network error (e.g., offline)
-    // We can identify network errors because they don't have a `status` property
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       console.warn(`Network error for ${url}. Falling back to cache.`)
       const cached = await getCachedData<T>(cacheKey, userId)
       if (cached) return cached.data
     }
-    // For other errors (like 500, 404, etc.), re-throw so the UI can handle it
     throw error
   }
 }
-
-
 
 export interface BackupData {
   version: string
@@ -343,7 +322,6 @@ export interface BackupData {
   checklist: any[]
   routines: any[]
   projects: any[]
-  school: any[]
   tasks: any[]
   trackers: any[]
 }
@@ -352,7 +330,6 @@ export const DataIntegrator = {
   // Initialize sync listeners and run initial sync
   initialize: () => {
     if (typeof window !== 'undefined') {
-      // Run initial sync if online
       if (navigator.onLine) {
         syncPendingOperations()
       }
@@ -379,13 +356,11 @@ export const DataIntegrator = {
       checklist: [],
       routines: [],
       projects: [],
-      school: [],
       tasks: [],
       trackers: []
     }
 
     try {
-      // Get settings from localStorage
       const settingsStr = localStorage.getItem('novo-settings')
       if (settingsStr) {
         backup.settings = JSON.parse(settingsStr)
@@ -413,12 +388,6 @@ export const DataIntegrator = {
     }
 
     try {
-      backup.school = await fetchWithCache('/api/school', userId, 'school')
-    } catch (error) {
-      console.error('Failed to export school:', error)
-    }
-
-    try {
       backup.tasks = await fetchWithCache('/api/tasks', userId, 'tasks')
     } catch (error) {
       console.error('Failed to export tasks:', error)
@@ -441,7 +410,6 @@ export const DataIntegrator = {
       imported: [] as string[]
     }
 
-    // Validate backup structure
     if (!backupData.version || !backupData.timestamp) {
       throw new Error('Invalid backup file: missing version or timestamp')
     }
@@ -477,7 +445,6 @@ export const DataIntegrator = {
             incoming: backupData.checklist
           })
         } else {
-          // Clear existing and add new
           for (const item of current) {
             await fetch(`/api/checklist/${item.id}`, { method: 'DELETE' })
           }
@@ -554,35 +521,6 @@ export const DataIntegrator = {
       }
     }
 
-    // Import school
-    if (backupData.school && backupData.school.length > 0) {
-      try {
-        const current = await fetchWithCache<any[]>('/api/school', userId, 'school')
-        if (current.length > 0 && !options.overwrite) {
-          result.conflicts.push({
-            type: 'school',
-            current,
-            incoming: backupData.school
-          })
-        } else {
-          for (const item of current) {
-            await fetch(`/api/school/${item.id}`, { method: 'DELETE' })
-          }
-          for (const item of backupData.school) {
-            await fetch('/api/school', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
-            })
-          }
-          result.imported.push('school')
-        }
-      } catch (error) {
-        console.error('Failed to import school:', error)
-        result.success = false
-      }
-    }
-
     // Import tasks
     if (backupData.tasks && backupData.tasks.length > 0) {
       try {
@@ -646,7 +584,6 @@ export const DataIntegrator = {
 
   // Auto-backup scheduling
   scheduleAutoBackup: (userId: string, frequency: 'daily' | 'weekly' | 'monthly') => {
-    // Clear existing backup timer
     const existingTimer = localStorage.getItem('novo-auto-backup-timer')
     if (existingTimer) {
       clearInterval(parseInt(existingTimer))
@@ -654,9 +591,9 @@ export const DataIntegrator = {
 
     const getInterval = (freq: string) => {
       switch (freq) {
-        case 'daily': return 24 * 60 * 60 * 1000 // 24 hours
-        case 'weekly': return 7 * 24 * 60 * 60 * 1000 // 7 days
-        case 'monthly': return 30 * 24 * 60 * 60 * 1000 // 30 days
+        case 'daily': return 24 * 60 * 60 * 1000
+        case 'weekly': return 7 * 24 * 60 * 60 * 1000
+        case 'monthly': return 30 * 24 * 60 * 60 * 1000
         default: return 24 * 60 * 60 * 1000
       }
     }
@@ -674,11 +611,8 @@ export const DataIntegrator = {
       }
     }
 
-    // Schedule first backup
     const timerId = setInterval(backup, interval)
     localStorage.setItem('novo-auto-backup-timer', timerId.toString())
-
-    // Store backup settings
     localStorage.setItem('novo-auto-backup-frequency', frequency)
   },
 
@@ -726,7 +660,6 @@ export const DataIntegrator = {
       )
       manualItems.forEach((item: ChecklistItem) => {
         if (item.task) {
-          // Linked to a project task
           tasks.push({
             ...item,
             source: 'project-task',
@@ -803,38 +736,7 @@ export const DataIntegrator = {
     }
 
     try {
-      // 4. Get School Events (Due Today)
-      const subjects = await fetchWithCache<SchoolSubject[]>(
-        '/api/school',
-        userId,
-        'school'
-      )
-      subjects.forEach((subject: SchoolSubject) => {
-        if (subject.events) {
-          subject.events.forEach((event: SchoolEvent) => {
-            if (isSameDay(parseISO(event.date), date)) {
-              tasks.push({
-                id: `school-${subject.id}-${event.id}`,
-                text: `${event.type === 'exam' ? 'Exam: ' : 'Assignment: '}${event.title}`,
-                completed: event.completed,
-                priority: 'high',
-                source: 'school',
-                sourceId: subject.id,
-                originalId: event.id,
-                metadata: {
-                  subjectName: subject.name
-                }
-              })
-            }
-          })
-        }
-      })
-    } catch (error) {
-      console.error('Failed to fetch school subjects:', error)
-    }
-
-    try {
-      // 5. Get Standalone Tasks
+      // 4. Get Standalone Tasks
       const standaloneTasks = await fetchWithCache<Task[]>(
         '/api/tasks',
         userId,
@@ -901,28 +803,7 @@ export const DataIntegrator = {
     }
 
     try {
-      // 2. School Events
-      const subjects = await fetchWithCache<SchoolSubject[]>('/api/school', userId, 'school')
-      subjects.forEach((subject: SchoolSubject) => {
-        if (subject.events) {
-          subject.events.forEach((event: SchoolEvent) => {
-            events.push({
-              id: `school-${event.id}`,
-              title: `${subject.name}: ${event.title}`,
-              date: parseISO(event.date),
-              type: 'school',
-              completed: event.completed,
-              metadata: { type: event.type }
-            })
-          })
-        }
-      })
-    } catch (error) {
-      console.error('Failed to fetch school subjects for calendar:', error)
-    }
-
-    try {
-      // 3. Google Calendar Events
+      // 2. Google Calendar Events
       const googleEvents = await fetchWithCache<any[]>('/api/calendar/google', userId, 'google-calendar')
       googleEvents.forEach((event: any) => {
         if (event.start?.dateTime || event.start?.date) {
@@ -930,7 +811,7 @@ export const DataIntegrator = {
             id: `google-${event.id}`,
             title: event.summary || '(No Title)',
             date: parseISO(event.start.dateTime || event.start.date),
-            type: 'google', // New type
+            type: 'google',
             completed: false,
             metadata: {
               description: event.description,
@@ -945,7 +826,7 @@ export const DataIntegrator = {
     }
 
     try {
-      // 4. Standalone Tasks
+      // 3. Standalone Tasks
       const tasks = await fetchWithCache<Task[]>('/api/tasks', userId, 'tasks')
       tasks.forEach((task: Task) => {
         if (task.dueDate) {
@@ -968,10 +849,8 @@ export const DataIntegrator = {
 
   // Sync task completion back to source with offline support
   toggleTaskCompletion: async (userId: string, task: IntegratedTask) => {
-    // Optimistic local update
     const updatedTask = { ...task, completed: !task.completed }
 
-    // Track analytics if completing a task
     if (updatedTask.completed) {
       trackActivity('task', true, { id: task.id, name: task.text, module: task.source }).catch(err =>
         console.error('Failed to track task completion:', err)
@@ -981,7 +860,6 @@ export const DataIntegrator = {
     try {
       if (task.source === "manual") {
         await syncToCloud(`/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
-        // Update local cache
         const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
         if (checklist) {
           const updatedChecklist = checklist.data.map(item =>
@@ -990,7 +868,6 @@ export const DataIntegrator = {
           await setCachedData('checklist', userId, updatedChecklist)
         }
       } else if (task.source === "routine") {
-        // For routine tasks, we need to update the routine
         const routines = await getCachedData<Routine[]>('routines', userId)
         if (routines) {
           const routine = routines.data.find(r => r.id === task.sourceId)
@@ -1007,7 +884,6 @@ export const DataIntegrator = {
           }
         }
       } else if (task.source === "project") {
-        // For project subtasks, update the project
         const projects = await getCachedData<Project[]>('projects', userId)
         if (projects) {
           const project = projects.data.find(p => p.id === task.sourceId)
@@ -1023,27 +899,9 @@ export const DataIntegrator = {
             await syncToCloud(`/api/projects/${task.sourceId}`, { subtasks: updatedSubtasks }, 'PUT')
           }
         }
-      } else if (task.source === "school") {
-        // For school events, update the subject
-        const subjects = await getCachedData<SchoolSubject[]>('school', userId)
-        if (subjects) {
-          const subject = subjects.data.find(s => s.id === task.sourceId)
-          if (subject) {
-            const updatedEvents = subject.events.map((e: SchoolEvent) =>
-              e.id === task.originalId ? { ...e, completed: updatedTask.completed } : e
-            )
-            const updatedSubject = { ...subject, events: updatedEvents }
-            const updatedSubjects = subjects.data.map(s =>
-              s.id === task.sourceId ? updatedSubject : s
-            )
-            await setCachedData('school', userId, updatedSubjects)
-            await syncToCloud(`/api/school/${task.sourceId}`, { events: updatedEvents }, 'PUT')
-          }
-        }
       } else if (task.source === "standalone") {
-        const newStatus = updatedTask.completed ? "todo" : "done"
+        const newStatus = updatedTask.completed ? "done" : "todo"
         await syncToCloud(`/api/tasks/${task.originalId}`, { status: newStatus }, 'PUT')
-        // Update local cache
         const tasks = await getCachedData<Task[]>('tasks', userId)
         if (tasks) {
           const updatedTasks = tasks.data.map(t =>
@@ -1052,11 +910,9 @@ export const DataIntegrator = {
           await setCachedData('tasks', userId, updatedTasks)
         }
       } else if (task.source === "project-task") {
-        // Update both checklist item and the linked task
         await syncToCloud(`/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
         const newStatus = updatedTask.completed ? "done" : "todo"
         await syncToCloud(`/api/tasks/${task.task?.id}`, { status: newStatus }, 'PUT')
-        // Update local caches
         const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
         if (checklist) {
           const updatedChecklist = checklist.data.map(item =>
@@ -1072,15 +928,8 @@ export const DataIntegrator = {
           await setCachedData('tasks', userId, updatedTasks)
         }
       }
-
-      // Emit WebSocket event for real-time sync
-      if (typeof window !== 'undefined') {
-        // Assume socket is available globally or through context
-        // For now, we'll handle this in the component that calls this
-      }
     } catch (error) {
       console.error('Failed to sync task completion:', error)
-      // The operation is queued for later retry
     }
 
     return updatedTask
@@ -1088,7 +937,6 @@ export const DataIntegrator = {
 
   // Create a new manual task
   createManualTask: async (userId: string, taskData: any) => {
-    // Optimistic local update
     const tempId = `temp-${Date.now()}`
     const newTask = { ...taskData, id: tempId, source: 'manual' }
 
@@ -1097,7 +945,6 @@ export const DataIntegrator = {
       if (checklist) {
         await setCachedData('checklist', userId, [...checklist.data, newTask])
       }
-
       await syncToCloud('/api/checklist', taskData, 'POST')
     } catch (error) {
       console.error('Failed to create manual task:', error)
@@ -1108,13 +955,11 @@ export const DataIntegrator = {
   // Delete a manual task
   deleteManualTask: async (userId: string, taskId: string) => {
     try {
-      // Optimistic local update
       const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
       if (checklist) {
         const updatedChecklist = checklist.data.filter(item => item.id !== taskId)
         await setCachedData('checklist', userId, updatedChecklist)
       }
-
       await syncToCloud(`/api/checklist/${taskId}`, {}, 'DELETE')
     } catch (error) {
       console.error('Failed to delete manual task:', error)

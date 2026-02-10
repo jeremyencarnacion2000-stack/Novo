@@ -26,9 +26,9 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: tokenData }), { status: tokenResponse.status });
     }
     const response = new Response(JSON.stringify({ success: true }), { status: 200 });
-    response.headers.set('Set-Cookie', `spotify_access_token=${tokenData.access_token}; HttpOnly; Secure; SameSite=Strict; Max-Age=${tokenData.expires_in}`);
+    response.headers.set('Set-Cookie', `spotify_access_token=${tokenData.access_token}; HttpOnly; Secure; SameSite=Lax; Max-Age=${tokenData.expires_in}`);
     if (tokenData.refresh_token) {
-      response.headers.append('Set-Cookie', `spotify_refresh_token=${tokenData.refresh_token}; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000`);
+      response.headers.append('Set-Cookie', `spotify_refresh_token=${tokenData.refresh_token}; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`);
     }
     return response;
   } catch (err) {

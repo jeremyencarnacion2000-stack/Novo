@@ -11,7 +11,6 @@ import { SettingsProvider } from '@/lib/settings-context'
 import { NotificationProvider } from '@/lib/notification-context'
 import { PomodoroProvider } from '@/lib/pomodoro-context'
 import { PomodoroWidget } from '@/components/pomodoro-widget'
-import { FocusTimerWidget } from '@/components/focus-timer-widget'
 import '@/lib/storage'
 import { FloatingMusicWidget } from '@/components/music/floating-music-widget'
 import { GlobalPlayer } from '@/components/music/global-player'
@@ -82,7 +81,6 @@ export default function ClientLayout({
                 <NetworkStatus />
                 <Toaster />
                 <FloatingMusicWidget />
-                <FocusTimerWidget />
                 <PomodoroWidget />
                 <ChatbotSidebar />
                 <MiniChatbot />

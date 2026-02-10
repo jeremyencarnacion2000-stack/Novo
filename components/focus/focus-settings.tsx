@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useFocus, TimerProfile } from '@/lib/focus-context'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -69,6 +69,7 @@ export function FocusSettings() {
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Focus Settings</DialogTitle>
+                    <DialogDescription>Configure your timer profiles and sound settings</DialogDescription>
                 </DialogHeader>
 
                 <Tabs defaultValue="profiles" className="w-full">

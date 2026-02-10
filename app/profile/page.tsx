@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { useSession } from 'next-auth/react'
-import { User, Target, Sparkles, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { User, Target, Sparkles, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ProfilePage() {
@@ -97,6 +97,14 @@ export default function ProfilePage() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Profile & Goals</h2>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => signOut({ callbackUrl: '/' })}
+        >
+          <XCircle className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-7">

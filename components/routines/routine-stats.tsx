@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRoutineStats } from '@/hooks/use-swr'
 import { Card, CardContent } from '@/components/ui/card'
 import { Flame, Trophy, TrendingUp, Calendar } from 'lucide-react'
 
@@ -12,28 +13,11 @@ interface RoutineStats {
 }
 
 export function RoutineStatsCard() {
-    const [stats, setStats] = useState<RoutineStats | null>(null)
-    const [loading, setLoading] = useState(true)
+    const { data: statsData, isLoading } = useRoutineStats()
+    const stats = statsData?.stats
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const response = await fetch('/api/routines/completions?days=30')
-                if (response.ok) {
-                    const data = await response.json()
-                    setStats(data.stats)
-                }
-            } catch (error) {
-                console.error('Error fetching routine stats:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
 
-        fetchStats()
-    }, [])
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="grid gap-4 md:grid-cols-4">
                 {[...Array(4)].map((_, i) => (
@@ -83,7 +67,7 @@ export function RoutineStatsCard() {
     ]
 
     return (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             {statCards.map((stat) => (
                 <Card key={stat.label} className="bg-card border-border hover:border-border/80 transition-colors">
                     <CardContent className="p-5">

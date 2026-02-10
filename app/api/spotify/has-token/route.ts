@@ -28,11 +28,12 @@ export async function GET(request: NextRequest) {
         const userData = await response.json();
         const isPremium = userData.product === 'premium';
 
-        console.log('has-token: Spotify user verified:', userData.display_name);
+        console.log('has-token: Spotify user verified:', userData.display_name, 'Product:', userData.product);
 
         return NextResponse.json({
           hasToken: true,
           isPremium,
+          product: userData.product,
           accessToken: spotifyAccessToken
         });
       } else {
@@ -42,7 +43,8 @@ export async function GET(request: NextRequest) {
           hasToken: false,
           isPremium: false,
           tokenExpired: true,
-          spotifyError: errorData.error?.message || 'Unknown error'
+          spotifyError: errorData.error?.message || 'Unknown error',
+          errorCode: 'INVALID_TOKEN'
         });
       }
     }
@@ -85,6 +87,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       hasToken: true,
       isPremium,
+      product: userData.product,
       accessToken: session.accessToken
     });
   } catch (error) {

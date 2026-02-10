@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useSession } from 'next-auth/react'
 import { trackActivity } from '@/lib/activity-tracker'
+import { mutate } from 'swr'
+import { ROUTINE_STATS_KEY } from '@/hooks/use-swr'
 
 interface ActiveWorkoutSessionProps {
     routine: Routine
@@ -101,6 +103,7 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
 
         // Here we would save the log to the database
         // For MVP, we just simulate success
+        mutate(ROUTINE_STATS_KEY)
         toast({
             title: "Workout Completed!",
             description: `Great job! You finished in ${formatTime(elapsedTime)}.`,
@@ -120,7 +123,7 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     const activeDay = routine.days.find(d => d.id === activeDayId) || routine.days[0]
 
     return (
-        <div className="fixed inset-0 bg-[#09090b] z-50 flex flex-col font-sans">
+        <div className="fixed inset-0 bg-[#09090b] z-[100] flex flex-col font-sans">
             {/* Glassmorphic Header */}
             <div className="absolute top-0 left-0 right-0 h-16 bg-[#09090b]/90 backdrop-blur-md border-b border-white/5 z-20 flex items-center justify-between px-4 sm:px-6">
                 <div className="flex items-center gap-4">

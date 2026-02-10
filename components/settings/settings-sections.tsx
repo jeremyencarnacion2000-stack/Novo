@@ -1026,8 +1026,24 @@ export function SettingsSections() {
                 Connect your Spotify account to play music
               </p>
             </div>
-            {session?.accessToken ? (
-              <Button variant="outline" onClick={() => signOut()} className="text-red-500 hover:text-red-600">
+            {session?.provider === 'spotify' || (session?.user && session.accessToken) ? (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/spotify/disconnect', { method: 'POST' });
+                    if (res.ok) {
+                      toast({ title: 'Spotify disconnected', description: 'Your Spotify account has been unlinked.' });
+                      window.location.reload(); // Reload to refresh session state
+                    } else {
+                      throw new Error('Failed to disconnect');
+                    }
+                  } catch (error) {
+                    toast({ title: 'Error', description: 'Failed to disconnect Spotify', variant: 'destructive' });
+                  }
+                }}
+                className="text-red-500 hover:text-red-600"
+              >
                 Disconnect
               </Button>
             ) : (
@@ -1317,11 +1333,23 @@ export function SettingsSections() {
                 Link your Spotify account to access your music library and control playback.
               </p>
             </div>
-            {session?.provider === 'spotify' && session?.accessToken ? ( // Check if Spotify session exists
+            {session?.provider === 'spotify' || (session?.user && session.accessToken) ? ( // Check if Spotify session exists
               <Button
                 variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => signOut({ callbackUrl: '/' })} // Sign out from all providers and redirect to home
+                className="w-full sm:w-auto text-red-500 hover:text-red-600"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/spotify/disconnect', { method: 'POST' });
+                    if (res.ok) {
+                      toast({ title: 'Spotify disconnected', description: 'Your Spotify account has been unlinked.' });
+                      window.location.reload();
+                    } else {
+                      throw new Error('Failed to disconnect');
+                    }
+                  } catch (error) {
+                    toast({ title: 'Error', description: 'Failed to disconnect Spotify', variant: 'destructive' });
+                  }
+                }}
               >
                 <SiSpotify className="mr-2 h-4 w-4" />
                 Disconnect Spotify
@@ -1337,6 +1365,31 @@ export function SettingsSections() {
               </Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Actions */}
+      <Card className="border-destructive/20 bg-destructive/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+              <Lock className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl text-destructive">Account Actions</CardTitle>
+              <CardDescription className="text-sm">Manage your account session</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="destructive"
+            className="w-full sm:w-auto"
+            onClick={() => signOut({ callbackUrl: '/' })}
+          >
+            <XCircle className="mr-2 h-4 w-4" />
+            Sign Out from Novo
+          </Button>
         </CardContent>
       </Card>
 

@@ -1,25 +1,45 @@
 "use client"
 
-import React from "react"
-import { Button } from "@/components/ui/button"
-import { Pause, RotateCcw } from "lucide-react"
+import { usePathname } from "next/navigation"
 import { useFocus } from "@/lib/focus-context"
+import { Button } from "@/components/ui/button"
+import { Pause, Play, RotateCcw } from "lucide-react"
 
 export function FocusTimerWidget() {
-  const { isFocusModeActive, time, toggleTimer, resetTimer, formatTime } = useFocus()
+  const { isActive, time, mode, toggleTimer, resetTimer, formatTime } = useFocus()
+  const pathname = usePathname()
 
-  if (!isFocusModeActive) {
+  if (pathname === "/focus") {
+    return null
+  }
+
+  const isDefaultTime = time === (mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60)
+  const isModified = time > 0 && !isDefaultTime
+
+  if (!isActive && !isModified) {
     return null
   }
 
   return (
-    <div className="fixed right-5 top-5 z-[1000] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 flex flex-col items-center transform scale-80">
-      <div className="text-2xl font-bold font-mono text-gray-900 dark:text-gray-100">{formatTime(time)}</div>
-      <div className="flex gap-2 mt-2">
-        <Button size="sm" variant="outline" onClick={toggleTimer} className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
-          <Pause className="h-4 w-4" />
+    <div className="fixed right-6 top-6 z-[1000] bg-black/80 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl p-4 flex flex-col items-center justify-center w-32 h-32 animate-in fade-in zoom-in duration-300">
+      <div className="text-2xl font-bold font-mono text-white mb-2 tabular-nums">
+        {formatTime(time)}
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={toggleTimer}
+          className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none"
+        >
+          {isActive ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
-        <Button size="sm" variant="outline" onClick={resetTimer} className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={resetTimer}
+          className="h-10 w-10 rounded-full bg-white/5 hover:bg-white/10 text-white/70 border-none"
+        >
           <RotateCcw className="h-4 w-4" />
         </Button>
       </div>

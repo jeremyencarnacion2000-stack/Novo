@@ -5,12 +5,23 @@ export type AIActionType =
     | 'START_WORKOUT'
     | 'FINISH_WORKOUT'
     | 'CREATE_TASK'
+    | 'CREATE_TASKS'
     | 'UPDATE_TASK'
     | 'DELETE_TASK'
+    | 'DELETE_ALL_TASKS'
     | 'CREATE_NOTE'
     | 'UPDATE_NOTE'
     | 'ANALYZE_PROGRESS'
-    | 'SYSTEM_QUERY';
+    | 'SYSTEM_QUERY'
+    | 'CREATE_PROJECT'
+    | 'UPDATE_PROJECT'
+    | 'DELETE_PROJECT'
+    | 'CREATE_COURSE'
+    | 'UPDATE_COURSE'
+    | 'DELETE_COURSE'
+    | 'ADD_GRADE'
+    | 'UPDATE_GRADE'
+    | 'DELETE_GRADE';
 
 export interface BaseAction {
     type: AIActionType;
@@ -87,6 +98,18 @@ export interface CreateTaskAction extends BaseAction {
     };
 }
 
+export interface CreateTasksAction extends BaseAction {
+    type: 'CREATE_TASKS';
+    payload: {
+        tasks: {
+            title: string;
+            category: 'Training' | 'Study' | 'Personal' | 'Work';
+            priority: number;
+            dueDate?: string;
+        }[];
+    };
+}
+
 export interface UpdateTaskAction extends BaseAction {
     type: 'UPDATE_TASK';
     payload: {
@@ -105,6 +128,11 @@ export interface DeleteTaskAction extends BaseAction {
     payload: {
         id: string;
     };
+}
+
+export interface DeleteAllTasksAction extends BaseAction {
+    type: 'DELETE_ALL_TASKS';
+    payload: {};
 }
 
 // --- Notes ---
@@ -138,11 +166,119 @@ export interface AnalyzeProgressAction extends BaseAction {
     };
 }
 
+// --- Projects ---
+export interface CreateProjectAction extends BaseAction {
+    type: 'CREATE_PROJECT';
+    payload: {
+        title: string;
+        description: string;
+        status: 'not-started' | 'in-progress' | 'completed';
+        priority: 'low' | 'medium' | 'high';
+        dueDate?: string;
+        tags: string[];
+    };
+}
+
+export interface UpdateProjectAction extends BaseAction {
+    type: 'UPDATE_PROJECT';
+    payload: {
+        id: string;
+        updates: Partial<{
+            title: string;
+            description: string;
+            status: 'not-started' | 'in-progress' | 'completed';
+            priority: 'low' | 'medium' | 'high';
+            dueDate: string;
+            progress: number;
+            tags: string[];
+        }>;
+    };
+}
+
+export interface DeleteProjectAction extends BaseAction {
+    type: 'DELETE_PROJECT';
+    payload: {
+        id: string;
+    };
+}
+
+// --- School ---
+export interface CreateCourseAction extends BaseAction {
+    type: 'CREATE_COURSE';
+    payload: {
+        name: string;
+        code?: string;
+        credits?: number;
+        semester: string;
+        year: number;
+        professor?: string;
+        color?: string;
+    };
+}
+
+export interface UpdateCourseAction extends BaseAction {
+    type: 'UPDATE_COURSE';
+    payload: {
+        id: string;
+        updates: Partial<{
+            name: string;
+            code: string;
+            credits: number;
+            semester: string;
+            year: number;
+            professor: string;
+            color: string;
+        }>;
+    };
+}
+
+export interface DeleteCourseAction extends BaseAction {
+    type: 'DELETE_COURSE';
+    payload: {
+        id: string;
+    };
+}
+
+export interface AddGradeAction extends BaseAction {
+    type: 'ADD_GRADE';
+    payload: {
+        courseId: string;
+        name: string;
+        score: number;
+        maxScore: number;
+        weight: number;
+        category: 'Exam' | 'Assignment' | 'Quiz' | 'Project' | 'Participation';
+        date: string;
+    };
+}
+
+export interface UpdateGradeAction extends BaseAction {
+    type: 'UPDATE_GRADE';
+    payload: {
+        id: string;
+        updates: Partial<{
+            name: string;
+            score: number;
+            maxScore: number;
+            weight: number;
+            category: string;
+            date: string;
+        }>;
+    };
+}
+
+export interface DeleteGradeAction extends BaseAction {
+    type: 'DELETE_GRADE';
+    payload: {
+        id: string;
+    };
+}
+
 // --- System Query ---
 export interface SystemQueryAction extends BaseAction {
     type: 'SYSTEM_QUERY';
     payload: {
-        entity: 'routines' | 'tasks' | 'workouts' | 'notes' | 'stats';
+        entity: 'routines' | 'tasks' | 'workouts' | 'notes' | 'stats' | 'projects' | 'courses' | 'grades';
         filters?: Record<string, any>;
     };
 }
@@ -154,9 +290,20 @@ export type AIAction =
     | StartWorkoutAction
     | FinishWorkoutAction
     | CreateTaskAction
+    | CreateTasksAction
     | UpdateTaskAction
     | DeleteTaskAction
+    | DeleteAllTasksAction
     | CreateNoteAction
     | UpdateNoteAction
     | AnalyzeProgressAction
-    | SystemQueryAction;
+    | SystemQueryAction
+    | CreateProjectAction
+    | UpdateProjectAction
+    | DeleteProjectAction
+    | CreateCourseAction
+    | UpdateCourseAction
+    | DeleteCourseAction
+    | AddGradeAction
+    | UpdateGradeAction
+    | DeleteGradeAction;

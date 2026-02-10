@@ -9,7 +9,7 @@ export interface CalendarEvent {
     start: Date;
     end: Date;
     allDay: boolean;
-    source: 'google' | 'checklist' | 'project' | 'school' | 'routine' | 'habit' | 'business';
+    source: 'google' | 'checklist' | 'project' | 'school' | 'routine' | 'habit' | 'business' | 'holidays';
     color: string;
     metadata?: {
         projectId?: string;
@@ -18,18 +18,20 @@ export interface CalendarEvent {
         priority?: string;
         weight?: number;
         description?: string;
+        isHoliday?: boolean;
     };
 }
 
 // Color scheme for sources
 const SOURCE_COLORS = {
-    google: '#3b82f6',      // Blue
-    checklist: '#0ea5e9',   // Sky
-    project: '#10b981',     // Green
-    school: '#8b5cf6',      // Purple
-    routine: '#f97316',     // Orange
-    habit: '#14b8a6',       // Teal
-    business: '#ef4444',    // Red
+    google: '#A5B4FC',      // Indigo 300
+    checklist: '#67E8F9',   // Cyan 300
+    project: '#6EE7B7',     // Emerald 300
+    school: '#C4B5FD',      // Violet 300
+    routine: '#FDBA74',     // Orange 300
+    habit: '#5EEAD4',       // Teal 300
+    business: '#FCA5A5',    // Red 300
+    holidays: '#CBD5E1',    // Slate 300
 };
 
 export class CalendarAggregator {
@@ -44,7 +46,7 @@ export class CalendarAggregator {
     ): Promise<CalendarEvent[]> {
         const events: CalendarEvent[] = [];
 
-        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit', 'business'];
+        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit', 'business', 'holidays'];
 
         // Fetch from all enabled sources in parallel
         const promises: Promise<CalendarEvent[]>[] = [];
@@ -69,6 +71,9 @@ export class CalendarAggregator {
         }
         if (enabledSources.includes('business')) {
             promises.push(this.getBusinessEvents(userId, start, end));
+        }
+        if (enabledSources.includes('holidays')) {
+            promises.push(this.getHolidayEvents(start, end));
         }
 
         const results = await Promise.all(promises);
@@ -395,7 +400,50 @@ export class CalendarAggregator {
                 }
             }
         }
-
         return events;
+    }
+
+    /**
+     * Get Holiday events for 2026
+     */
+    private static async getHolidayEvents(
+        start: Date,
+        end: Date
+    ): Promise<CalendarEvent[]> {
+        const holidays2026 = [
+            { date: '2026-01-01', title: 'New Year\'s Day' },
+            { date: '2026-01-06', title: 'Epiphany' },
+            { date: '2026-01-21', title: 'Our Lady of Altagracia' },
+            { date: '2026-01-26', title: 'Duarte\'s Day' },
+            { date: '2026-02-14', title: 'Valentine\'s Day' },
+            { date: '2026-02-27', title: 'Independence Day' },
+            { date: '2026-04-03', title: 'Good Friday' },
+            { date: '2026-05-01', title: 'Labor Day' },
+            { date: '2026-05-31', title: 'Mother\'s Day' },
+            { date: '2026-06-04', title: 'Corpus Christi' },
+            { date: '2026-08-16', title: 'Restoration Day' },
+            { date: '2026-09-24', title: 'Our Lady of Mercedes' },
+            { date: '2026-11-06', title: 'Constitution Day' },
+            { date: '2026-12-24', title: 'Christmas Eve' },
+            { date: '2026-12-25', title: 'Christmas Day' },
+            { date: '2026-12-31', title: 'New Year\'s Eve' },
+        ];
+
+        return holidays2026
+            .map(h => ({
+                date: new Date(h.date),
+                title: h.title
+            }))
+            .filter(h => h.date >= start && h.date <= end)
+            .map(h => ({
+                id: `holiday:${h.date.toISOString()}`,
+                title: `🎉 ${h.title}`,
+                start: startOfDay(h.date),
+                end: endOfDay(h.date),
+                allDay: true,
+                source: 'holidays' as const,
+                color: SOURCE_COLORS.holidays,
+                metadata: { isHoliday: true }
+            }));
     }
 }

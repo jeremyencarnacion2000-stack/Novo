@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   const baseUrl = 'https://novo-desktop-mvp.vercel.app';
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
-  const scopes = 'user-read-email user-read-private playlist-read-private user-library-read user-read-playback-state';
+  const scopes = 'user-read-email user-read-private playlist-read-private playlist-read-collaborative user-library-read user-library-modify user-read-playback-state user-modify-playback-state streaming user-read-recently-played user-top-read user-follow-read user-read-currently-playing';
   // show_dialog=true forces Spotify to show the login screen every time
   const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(redirectUri)}&show_dialog=true`;
 

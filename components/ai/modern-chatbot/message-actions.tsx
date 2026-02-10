@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Copy, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Copy, RotateCcw, ThumbsDown, ThumbsUp, Pencil } from 'lucide-react';
 import type { Message } from './types';
 
 interface MessageActionsProps {
@@ -10,9 +10,10 @@ interface MessageActionsProps {
     onRetry: () => void;
     onLike: () => void;
     onDislike: () => void;
+    onEdit?: () => void;
 }
 
-export function MessageActions({ message, onCopy, onRetry, onLike, onDislike }: MessageActionsProps) {
+export function MessageActions({ message, onCopy, onRetry, onLike, onDislike, onEdit }: MessageActionsProps) {
     const [copied, setCopied] = React.useState(false);
 
     const handleCopy = () => {
@@ -59,6 +60,16 @@ export function MessageActions({ message, onCopy, onRetry, onLike, onDislike }: 
                         <ThumbsDown className={`w-3.5 h-3.5 ${message.disliked ? 'text-red-500' : 'text-muted-foreground'}`} />
                     </button>
                 </>
+            )}
+
+            {message.role === 'user' && onEdit && (
+                <button
+                    onClick={onEdit}
+                    className="p-1.5 hover:bg-accent rounded transition-colors"
+                    title="Editar"
+                >
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
             )}
 
             {copied && (

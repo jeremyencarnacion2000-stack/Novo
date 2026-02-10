@@ -19,14 +19,15 @@ interface Grade {
 interface Course {
     id: string;
     name: string;
-    code: string;
-    credits: number;
+    code?: string;
+    credits?: number;
     semester: string;
     year: number;
     professor?: string;
     color: string;
     finalGrade?: number;
     letterGrade?: string;
+    educationType: string;
     grades: Grade[];
 }
 
@@ -55,8 +56,25 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                     <div className="flex-1">
                         <CardTitle className="text-lg">{course.name}</CardTitle>
                         <CardDescription className="mt-1">
-                            {course.code} • {course.credits} credits
-                            {course.professor && ` • ${course.professor}`}
+                            {course.educationType === 'university' ? (
+                                <>
+                                    {course.code} • {course.credits} credits
+                                    {course.professor && ` • ${course.professor}`}
+                                </>
+                            ) : (
+                                <>
+                                    {course.semester} {course.year}
+                                    {course.professor && ` • ${course.professor}`}
+                                </>
+                            )}
+                            <div className="mt-2">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${course.educationType === 'university'
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                    : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                    }`}>
+                                    {course.educationType === 'university' ? 'Universitario' : 'Secundaria'}
+                                </span>
+                            </div>
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-1">

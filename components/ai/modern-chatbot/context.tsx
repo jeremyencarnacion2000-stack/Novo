@@ -22,57 +22,31 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
-    const [selectedModel, setSelectedModel] = useState('qwen-max');
+    const [selectedModel] = useState('qwen-max'); // Fixed to Cognitive Core
+    const setSelectedModel = (_model?: string) => { }; // Dummy function to avoid ReferenceError
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+    const conversationsRef = React.useRef(conversations);
+    useEffect(() => {
+        conversationsRef.current = conversations;
+    }, [conversations]);
+
     const availableModels: AIModel[] = [
         {
             id: 'qwen-max',
-            name: 'Qwen Max (Alibaba)',
-            provider: 'Alibaba Cloud',
-            description: 'Most capable Qwen model',
-            enabled: true
-        },
-        {
-            id: 'qwen-plus',
-            name: 'Qwen Plus (Alibaba)',
-            provider: 'Alibaba Cloud',
-            description: 'Balanced performance and speed',
-            enabled: true
-        },
-        {
-            id: 'grok-beta',
-            name: 'Grok Beta',
-            provider: 'xAI',
-            description: 'Advanced AI model by xAI',
-            enabled: true
-        },
-        {
-            id: 'qwen/qwen3-235b-a22b:free',
-            name: 'Qwen 3 (OpenRouter)',
-            provider: 'OpenRouter',
-            description: 'Advanced thinking model by Qwen via OpenRouter',
-            enabled: true
-        },
-        {
-            id: 'gemma-3-4b',
-            name: 'Gemma 3 4B',
-            provider: 'Chutes AI',
-            description: 'Efficient Gemma model via Chutes',
-            enabled: true
-        },
-        {
-            id: 'chutes/openai/gpt-oss-20b',
-            name: 'GPT OSS 20B',
-            provider: 'Chutes',
-            description: 'Open source GPT model',
+            name: 'Cognitive Core',
+            provider: 'Novo AI',
+            description: 'Advanced reasoning and conversation',
             enabled: true
         }
     ];
+
+    // Track which conversations are already in the database to avoid noisy 404s
+    const persistedRef = React.useRef<Set<string>>(new Set());
 
     // Load from database on mount
     useEffect(() => {
@@ -82,21 +56,25 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 if (response.ok) {
                     const dbConversations = await response.json();
                     if (dbConversations.length > 0) {
-                        const formattedConversations = dbConversations.map((conv: any) => ({
-                            id: conv.id,
-                            title: conv.title || 'Nueva conversación',
-                            messages: Array.isArray(conv.messages) ? conv.messages.map((m: any) => ({
-                                id: m.id || crypto.randomUUID(),
-                                role: m.role,
-                                content: m.content,
-                                timestamp: m.timestamp || m.createdAt || new Date().toISOString(),
-                                model: m.model || 'grok-beta',
-                                attachments: m.attachments
-                            })) : [],
-                            createdAt: conv.createdAt,
-                            updatedAt: conv.updatedAt,
-                            model: conv.model || 'grok-beta'
-                        }));
+                        const formattedConversations = dbConversations.map((conv: any) => {
+                            persistedRef.current.add(conv.id);
+                            return {
+                                id: conv.id,
+                                title: conv.title || 'Nueva conversación',
+                                messages: Array.isArray(conv.messages) ? conv.messages.map((m: any) => ({
+                                    id: m.id || crypto.randomUUID(),
+                                    role: m.role,
+                                    content: m.content,
+                                    timestamp: m.timestamp || m.createdAt || new Date().toISOString(),
+                                    model: m.model || 'grok-beta',
+                                    attachments: m.attachments,
+                                    blocks: m.blocks
+                                })) : [],
+                                createdAt: conv.createdAt,
+                                updatedAt: conv.updatedAt,
+                                model: conv.model || 'grok-beta'
+                            };
+                        });
                         setConversations(formattedConversations);
                         setCurrentConversationId(formattedConversations[0].id);
                     }
@@ -118,26 +96,31 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // Track which conversations are currently being saved to avoid duplicates
+    const savingRef = React.useRef<Set<string>>(new Set());
+
     // Save conversations to database when they change
     useEffect(() => {
         async function saveToDatabase() {
             if (conversations.length === 0) return;
 
-            for (const conv of conversations) {
-                try {
-                    const response = await fetch(`/api/ai-conversations/${conv.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            title: conv.title,
-                            messages: conv.messages,
-                            model: conv.model
-                        })
-                    });
+            const conversationsToSave = conversations.filter(conv => {
+                // Only save if it has messages or a non-default title
+                return conv.messages.length > 0 || conv.title !== 'Nueva conversación';
+            });
 
-                    if (response.status === 404) {
-                        const createResponse = await fetch('/api/ai-conversations', {
-                            method: 'POST',
+            for (const conv of conversationsToSave) {
+                if (savingRef.current.has(conv.id)) continue;
+
+                try {
+                    savingRef.current.add(conv.id);
+
+                    const isPersisted = persistedRef.current.has(conv.id);
+
+                    if (isPersisted) {
+                        // Update existing
+                        await fetch(`/api/ai-conversations/${conv.id}`, {
+                            method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 title: conv.title,
@@ -145,26 +128,33 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                 model: conv.model
                             })
                         });
-
-                        if (createResponse.ok) {
-                            const newConv = await createResponse.json();
-                            setConversations(prev => prev.map(c =>
-                                c.id === conv.id ? { ...c, id: newConv.id } : c
-                            ));
-                            if (currentConversationId === conv.id) {
-                                setCurrentConversationId(newConv.id);
-                            }
+                    } else {
+                        // Create new
+                        const response = await fetch('/api/ai-conversations', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: conv.id,
+                                title: conv.title,
+                                messages: conv.messages,
+                                model: conv.model
+                            })
+                        });
+                        if (response.ok) {
+                            persistedRef.current.add(conv.id);
                         }
                     }
                 } catch (error) {
                     console.error('Failed to save conversation to database:', error);
+                } finally {
+                    savingRef.current.delete(conv.id);
                 }
             }
         }
 
-        const timeoutId = setTimeout(saveToDatabase, 1000);
+        const timeoutId = setTimeout(saveToDatabase, 2000); // Increased delay to reduce noise
         return () => clearTimeout(timeoutId);
-    }, [conversations, currentConversationId]);
+    }, [conversations]);
 
     // Save sidebar state
     useEffect(() => {
@@ -223,24 +213,95 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         // Convert files to attachments for persistence
         let messageAttachments: Attachment[] = [];
+        let documentContext = '';
+
+        const compressImage = (base64Str: string, maxWidth = 1200, maxHeight = 1200, quality = 0.7): Promise<string> => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+            });
+        };
+
         if (files && files.length > 0) {
             messageAttachments = await Promise.all(
                 files.map(async (file) => {
+                    const isImage = file.type.startsWith('image/');
+                    const isDocument = file.name.match(/\.(pdf|docx|txt|md)$/i);
+
+                    // For documents, parse and extract text
+                    if (isDocument && !isImage) {
+                        try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const parseResponse = await fetch('/api/ai/parse-document', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            if (parseResponse.ok) {
+                                const parseData = await parseResponse.json();
+                                if (parseData.content) {
+                                    documentContext += `\n\n[DOCUMENT: ${file.name}]\n${parseData.content}\n[END OF DOCUMENT]`;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse document:', e);
+                        }
+                    }
+
+                    // Create attachment for display
                     return new Promise<Attachment>((resolve, reject) => {
                         const reader = new FileReader();
-                        reader.onload = () => resolve({
-                            id: crypto.randomUUID(),
-                            name: file.name,
-                            type: file.type,
-                            url: reader.result as string,
-                            size: file.size
-                        });
+                        reader.onload = async () => {
+                            let url = reader.result as string;
+                            if (isImage) {
+                                try {
+                                    url = await compressImage(url);
+                                } catch (e) {
+                                    console.error('Failed to compress image:', e);
+                                }
+                            }
+                            resolve({
+                                id: crypto.randomUUID(),
+                                name: file.name,
+                                type: isImage ? 'image/jpeg' : file.type,
+                                url: url,
+                                size: file.size
+                            });
+                        };
                         reader.onerror = reject;
                         reader.readAsDataURL(file);
                     });
                 })
             );
         }
+
+        // Append document context to message if present
+        const processedContent = documentContext
+            ? content.trim() + documentContext
+            : content.trim();
 
         const userMessage: Message = {
             id: crypto.randomUUID(),
@@ -251,16 +312,17 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             attachments: messageAttachments.length > 0 ? messageAttachments : undefined
         };
 
-        // Add user message
-        updateConversation(currentConversationId, {
-            messages: [...messages, userMessage]
-        });
-
-        // Update title if first message
-        if (messages.length === 0) {
-            const title = content.slice(0, 50) + (content.length > 50 ? '...' : '');
-            updateConversation(currentConversationId, { title });
-        }
+        // Add user message using functional update to ensure we have latest state
+        setConversations(prev => prev.map(c =>
+            c.id === currentConversationId
+                ? {
+                    ...c,
+                    messages: [...c.messages, userMessage],
+                    title: c.messages.length === 0 ? (content.slice(0, 50) + (content.length > 50 ? '...' : '')) : c.title,
+                    updatedAt: new Date().toISOString()
+                }
+                : c
+        ));
 
         setIsLoading(true);
         setIsTyping(true);
@@ -282,12 +344,23 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         setStatusMessage(status);
 
         try {
+            // Get latest messages for history from the ref
+            const currentConv = conversationsRef.current.find(c => c.id === currentConversationId);
+            let history = currentConv?.messages || [];
+
+            // Ensure the user message we just added is included in the history sent to the API
+            if (!history.find(m => m.id === userMessage.id)) {
+                history = [...history, userMessage];
+            }
+
             const response = await fetch('/api/ai/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: content,
-                    history: messages.map(m => ({ role: m.role, content: m.content })),
+                    message: processedContent,
+                    history: history.map(m => ({ role: m.role, content: m.content })),
+                    attachments: messageAttachments,
+                    webSearchEnabled
                 })
             });
 
@@ -302,7 +375,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             const decoder = new TextDecoder();
             let accumulatedContent = '';
             const streamingMsgId = crypto.randomUUID();
-            
+
             setStreamingMessage({
                 id: streamingMsgId,
                 role: 'assistant',
@@ -335,7 +408,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     model: 'qwen3-32b'
                                 });
                             }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
             }
@@ -346,24 +419,184 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             let blocks: MessageBlock[] = [];
 
             try {
-                let jsonStr = '';
+                // 1. Try to find JSON in various formats
                 const jsonBlockMatch = accumulatedContent.match(/```json\s*([\s\S]*?)\s*```/);
-                const genericBlockMatch = accumulatedContent.match(/```\s*([\s\S]*?)\s*```/);
-                const rawJsonMatch = accumulatedContent.match(/({[\s\S]*})/);
+                const genericBlockMatch = accumulatedContent.match(/```\s*(\{[\s\S]*?\})\s*```/);
+                const rawJsonMatch = accumulatedContent.match(/(\{[\s\S]*\})/);
 
-                if (jsonBlockMatch) jsonStr = jsonBlockMatch[1];
-                else if (genericBlockMatch && genericBlockMatch[1].trim().startsWith('{')) jsonStr = genericBlockMatch[1];
-                else if (rawJsonMatch) jsonStr = rawJsonMatch[1];
-                else jsonStr = accumulatedContent.trim();
+                let jsonStr = '';
+                let fullMatch = '';
 
-                const parsed = JSON.parse(jsonStr);
-                if (parsed.message || parsed.analysis || parsed.plan) {
-                    finalContent = parsed.message || '';
-                    if (parsed.analysis) blocks.push({ id: crypto.randomUUID(), type: 'analysis', content: parsed.analysis });
-                    if (parsed.plan) blocks.push({ id: crypto.randomUUID(), type: 'plan', content: parsed.plan });
-                    if (parsed.action) blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: parsed.action, status: 'pending' });
+                if (jsonBlockMatch) {
+                    jsonStr = jsonBlockMatch[1];
+                    fullMatch = jsonBlockMatch[0];
+                } else if (genericBlockMatch) {
+                    jsonStr = genericBlockMatch[1];
+                    fullMatch = genericBlockMatch[0];
+                } else if (rawJsonMatch) {
+                    const match = rawJsonMatch[1];
+                    if (match.includes('"action"') || match.includes('"plan"') || match.includes('"analysis"')) {
+                        jsonStr = match;
+                        fullMatch = match;
+                    }
                 }
-            } catch (e) {}
+
+                if (jsonStr) {
+                    try {
+                        // Robust JSON cleaning
+                        let cleanedJson = jsonStr.trim();
+
+                        // Remove trailing commas in objects and arrays
+                        cleanedJson = cleanedJson.replace(/,\s*([}\]])/g, '$1');
+
+                        const parsed = JSON.parse(cleanedJson);
+                        console.log('[Chatbot] Parsed JSON:', parsed);
+
+                        // 1. Robust Action Extraction
+                        let rawAction = parsed.action || parsed.accion;
+                        let extractedType = '';
+                        let extractedPayload = {};
+
+                        if (rawAction) {
+                            if (typeof rawAction === 'string') {
+                                // Case: { "action": "CREATE_TASKS", "payload": { ... } }
+                                extractedType = rawAction;
+                                extractedPayload = parsed.payload || parsed.parametros || parsed.data || {};
+                            } else if (typeof rawAction === 'object') {
+                                // Case: { "action": { "type": "CREATE_TASKS", "payload": { ... } } }
+                                extractedType = rawAction.type || rawAction.tipo || rawAction.name || '';
+                                extractedPayload = rawAction.payload || rawAction.parametros || rawAction.data || {};
+                            }
+                        } else {
+                            // Case: { "type": "CREATE_TASKS", "payload": { ... } } (top-level)
+                            extractedType = parsed.type || parsed.tipo || parsed.name || '';
+                            extractedPayload = parsed.payload || parsed.parametros || parsed.data || {};
+                        }
+
+                        // 2. Robust Metadata Extraction
+                        const mapped: any = {
+                            analysis: parsed.analysis || parsed.analisis,
+                            plan: parsed.plan,
+                            message: parsed.message || parsed.mensaje,
+                            action: extractedType ? {
+                                type: extractedType,
+                                payload: extractedPayload
+                            } : null
+                        };
+
+                        console.log('[Chatbot] Mapped Structure:', mapped);
+
+                        const isStructured = mapped.message || mapped.analysis || mapped.plan || mapped.action;
+
+                        if (isStructured) {
+                            // 2. Extract the explanation (everything before or after the JSON)
+                            const explanation = accumulatedContent.replace(fullMatch, '').trim();
+
+                            // 3. Build blocks
+                            if (explanation) {
+                                blocks.push({ id: crypto.randomUUID(), type: 'markdown', content: explanation });
+                            }
+
+                            if (mapped.analysis) {
+                                blocks.push({ id: crypto.randomUUID(), type: 'analysis', content: mapped.analysis });
+                            }
+
+                            if (mapped.plan) {
+                                blocks.push({ id: crypto.randomUUID(), type: 'plan', content: mapped.plan });
+                            }
+
+                            if (mapped.action) {
+                                // Validate action type
+                                const validTypes = [
+                                    'CREATE_TASK', 'CREATE_TASKS', 'UPDATE_TASK', 'DELETE_TASK',
+                                    'CREATE_PROJECT', 'UPDATE_PROJECT', 'DELETE_PROJECT',
+                                    'CREATE_ROUTINE', 'UPDATE_ROUTINE', 'DELETE_ROUTINE',
+                                    'START_WORKOUT', 'FINISH_WORKOUT',
+                                    'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE',
+                                    'ADD_GRADE', 'UPDATE_GRADE', 'DELETE_GRADE',
+                                    'CREATE_NOTE', 'UPDATE_NOTE',
+                                    'ANALYZE_PROGRESS', 'SYSTEM_QUERY', 'DELETE_ALL_TASKS'
+                                ];
+
+                                let finalType = mapped.action.type;
+
+                                // Translation Map (Spanish to English Action Types)
+                                const typeMap: Record<string, string> = {
+                                    'crear_tarea': 'CREATE_TASK',
+                                    'crear_tareas': 'CREATE_TASKS',
+                                    'actualizar_tarea': 'UPDATE_TASK',
+                                    'eliminar_tarea': 'DELETE_TASK',
+                                    'crear_proyecto': 'CREATE_PROJECT',
+                                    'actualizar_proyecto': 'UPDATE_PROJECT',
+                                    'eliminar_proyecto': 'DELETE_PROJECT',
+                                    'crear_rutina': 'CREATE_ROUTINE',
+                                    'actualizar_rutina': 'UPDATE_ROUTINE',
+                                    'eliminar_rutina': 'DELETE_ROUTINE',
+                                    'empezar_entrenamiento': 'START_WORKOUT',
+                                    'terminar_entrenamiento': 'FINISH_WORKOUT',
+                                    'crear_curso': 'CREATE_COURSE',
+                                    'actualizar_curso': 'UPDATE_COURSE',
+                                    'eliminar_curso': 'DELETE_COURSE',
+                                    'agregar_nota': 'ADD_GRADE',
+                                    'actualizar_nota': 'UPDATE_GRADE',
+                                    'eliminar_nota': 'DELETE_GRADE',
+                                    'crear_nota': 'CREATE_NOTE',
+                                    'actualizar_nota_rapida': 'UPDATE_NOTE',
+                                    'analizar_progreso': 'ANALYZE_PROGRESS',
+                                    'consulta_sistema': 'SYSTEM_QUERY',
+                                    'eliminar_todas_las_tareas': 'DELETE_ALL_TASKS'
+                                };
+
+                                if (typeMap[finalType.toLowerCase()]) {
+                                    finalType = typeMap[finalType.toLowerCase()];
+                                }
+
+                                // Fallback: If action is unknown but has tasks, map to CREATE_TASKS
+                                if (!validTypes.includes(finalType)) {
+                                    if (mapped.action.payload?.tasks || Array.isArray(mapped.action.payload)) {
+                                        finalType = 'CREATE_TASKS';
+                                        if (Array.isArray(mapped.action.payload) && !mapped.action.payload.tasks) {
+                                            mapped.action.payload = { tasks: mapped.action.payload };
+                                        }
+                                    } else if (finalType.includes(' ') || finalType.length > 25) {
+                                        // Heuristic: If it's a sentence, it's likely a hallucinated description
+                                        console.warn(`[Chatbot] Hallucinated action type detected: ${finalType}`);
+                                        // If it looks like a task (has title or description in payload)
+                                        if (mapped.action.payload?.title || mapped.action.payload?.name || mapped.action.payload?.text) {
+                                            finalType = 'CREATE_TASK';
+                                        } else if (mapped.action.payload?.tasks) {
+                                            finalType = 'CREATE_TASKS';
+                                        } else {
+                                            // Default to SYSTEM_QUERY if we can't tell, or just leave as is
+                                            // Actually, let's keep it as is but log it clearly
+                                            console.warn(`[Chatbot] Could not auto-map hallucination: ${finalType}`);
+                                        }
+                                    } else {
+                                        console.warn(`[Chatbot] Unknown action type: ${finalType}`);
+                                    }
+                                }
+
+                                const action = {
+                                    ...mapped.action,
+                                    type: finalType,
+                                    name: finalType
+                                };
+                                blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: action, status: 'waiting' });
+                            }
+
+                            if (mapped.message && mapped.message !== explanation) {
+                                blocks.push({ id: crypto.randomUUID(), type: 'markdown', content: mapped.message });
+                            }
+
+                            finalContent = explanation || mapped.message || 'Respuesta estructurada';
+                        }
+                    } catch (parseError) {
+                        console.error('[Chatbot] JSON parse error:', parseError);
+                    }
+                }
+            } catch (e) {
+                console.error('[Chatbot] Block creation error:', e);
+            }
 
             const assistantMessage: Message = {
                 id: streamingMsgId,
@@ -374,9 +607,15 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 model: 'qwen3-32b'
             };
 
-            updateConversation(currentConversationId, {
-                messages: [...messages, userMessage, assistantMessage]
-            });
+            setConversations(prev => prev.map(c =>
+                c.id === currentConversationId
+                    ? {
+                        ...c,
+                        messages: [...c.messages, assistantMessage],
+                        updatedAt: new Date().toISOString()
+                    }
+                    : c
+            ));
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -386,7 +625,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             setIsTyping(false);
             setStatusMessage(null);
         }
-    }, [currentConversationId, messages, selectedModel, updateConversation]);
+    }, [currentConversationId, selectedModel]);
 
     const confirmAction = useCallback(async (messageId: string, blockId: string) => {
         const conversation = conversations.find(c => c.id === currentConversationId);
@@ -416,6 +655,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         updateConversation(currentConversationId!, { messages: updatedMessages });
 
         try {
+            console.log('[Chatbot] Executing action:', block.content);
             const response = await fetch('/api/ai/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -432,7 +672,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             };
 
             const finalBlocks = updatedBlocks.map(b => {
-                if (b.type === 'plan') {
+                if (b.type === 'plan' && Array.isArray(b.content)) {
                     return {
                         ...b,
                         content: b.content.map((item: any) => ({
@@ -483,6 +723,142 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         updateConversation(currentConversationId!, { messages: updatedMessages });
     }, [conversations, currentConversationId, updateConversation]);
 
+    const editMessage = useCallback(async (messageId: string, newContent: string) => {
+        if (!currentConversationId) return;
+
+        // Find the conversation and message
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (!conversation) return;
+
+        const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) return;
+
+        // Truncate history: keep messages up to the edited one (exclusive), then add the edited one
+        const previousMessages = conversation.messages.slice(0, messageIndex);
+
+        // Create the updated message
+        const updatedMessage: Message = {
+            ...conversation.messages[messageIndex],
+            content: newContent,
+            timestamp: new Date().toISOString() // Update timestamp? Maybe keep original? Let's update to show it's fresh.
+        };
+
+        // Update state immediately
+        setConversations(prev => prev.map(c =>
+            c.id === currentConversationId
+                ? { ...c, messages: [...previousMessages, updatedMessage] }
+                : c
+        ));
+
+        // Trigger AI response with the new history
+        setIsLoading(true);
+        setIsTyping(true);
+        setError(null);
+        setStatusMessage('Regenerating response...');
+
+        try {
+            // We need to send the history *including* the edited message to the API
+            // The API expects the last message in 'history' or 'message' param to be the user prompt
+            // But our API structure takes `message` (current prompt) and `history` (context)
+
+            // So we pass the edited content as `message` and `previousMessages` as `history`
+
+            // Re-attach attachments if any exist on the edited message
+            const attachments = updatedMessage.attachments;
+
+            const response = await fetch('/api/ai/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: newContent,
+                    history: previousMessages.map(m => ({ role: m.role, content: m.content })),
+                    attachments: attachments,
+                    webSearchEnabled: false // Or pass current state if we track it
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `API error: ${response.statusText}`);
+            }
+
+            // ... handle stream response (same as sendMessage) ...
+            // We can reuse the stream handling logic if we extract it, but for now let's duplicate or refactor.
+            // Actually, to avoid duplication and complexity, let's just use the existing stream handling logic
+            // by calling a shared internal function or just duplicating the stream reader part.
+
+            // Let's duplicate the stream reader part for now to be safe and self-contained.
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            if (!reader) throw new Error('No reader available');
+
+            let assistantMessageId = crypto.randomUUID();
+            let fullContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            if (data.content) {
+                                fullContent += data.content;
+                                setStreamingMessage({
+                                    id: assistantMessageId,
+                                    role: 'assistant',
+                                    content: fullContent,
+                                    timestamp: new Date().toISOString(),
+                                    model: selectedModel
+                                });
+                            }
+
+                            if (data.status) {
+                                setStatusMessage(data.status);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stream chunk:', e);
+                        }
+                    }
+                }
+            }
+
+            // Finalize
+            const assistantMessage: Message = {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: fullContent,
+                timestamp: new Date().toISOString(),
+                model: selectedModel
+            };
+
+            setStreamingMessage(null);
+            setIsLoading(false);
+            setIsTyping(false);
+            setStatusMessage(null);
+
+            setConversations(prev => prev.map(c =>
+                c.id === currentConversationId
+                    ? { ...c, messages: [...previousMessages, updatedMessage, assistantMessage] }
+                    : c
+            ));
+
+        } catch (err) {
+            console.error('Error regenerating message:', err);
+            setError(err instanceof Error ? err.message : 'Failed to regenerate');
+            setIsLoading(false);
+            setIsTyping(false);
+        }
+
+    }, [conversations, currentConversationId, selectedModel]);
+
     const retryMessage = useCallback(async (messageId: string) => {
         const messageIndex = messages.findIndex(m => m.id === messageId);
         if (messageIndex === -1 || messageIndex === 0) return;
@@ -508,7 +884,6 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         );
         updateConversation(currentConversationId!, { messages: updated });
     }, [messages, currentConversationId, updateConversation]);
-
     const value: ChatbotContextType = {
         conversations,
         currentConversationId,
@@ -519,6 +894,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         messages,
         sendMessage,
         retryMessage,
+        editMessage,
         likeMessage,
         dislikeMessage,
         confirmAction,

@@ -8,17 +8,29 @@ import { authOptions } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
-// Normalize history
+// Normalize history and prevent token limit issues
 function normalizeHistory(history: any[]): any[] {
     if (!history?.length) return [];
+
+    // Limit to last 10 messages to keep context window manageable
+    const recentHistory = history.slice(-10);
     const normalized: any[] = [];
     let lastRole = '';
-    for (const msg of history) {
+
+    for (const msg of recentHistory) {
         const role = msg.role === 'user' ? 'user' : 'assistant';
         if (role === lastRole) continue;
-        normalized.push({ role, content: msg.content || '' });
+
+        // Truncate extremely long messages (max 2000 chars per history message)
+        let content = msg.content || '';
+        if (content.length > 2000) {
+            content = content.substring(0, 2000) + '... [truncated]';
+        }
+
+        normalized.push({ role, content });
         lastRole = role;
     }
+
     if (normalized.length > 0 && normalized[0].role !== 'user') normalized.shift();
     return normalized;
 }
@@ -27,61 +39,96 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
         const userId = session?.user?.id || 'demo-user-id';
-        const { message, history } = await request.json();
+        let { message, history, attachments, webSearchEnabled } = await request.json();
 
-        if (!message) {
-            return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400 });
+        if (!message && (!attachments || attachments.length === 0)) {
+            return new Response(JSON.stringify({ error: 'Message or attachment is required' }), { status: 400 });
         }
 
-        // Classify Intent
-        const classification = classifyIntent(message);
-        console.log('[Stream] Intent:', classification.type);
+        // Truncate current message if too long (max 4000 chars)
+        if (message && message.length > 4000) {
+            message = message.substring(0, 4000) + '... [truncated]';
+        }
 
-        // Build Context
-        let userContext = '';
-        if (requiresSystemContext(classification)) {
+        // 1. INTENT ENGINE (Deterministic)
+        const classification = classifyIntent(message || '');
+        console.log('[Novo Brain] Intent:', classification.type);
+
+        // 2. WEB SEARCH (if enabled)
+        let webSearchContext = '';
+        if (webSearchEnabled && message) {
             try {
-                const context = await buildUserContext(userId);
-                userContext = context.summary;
-            } catch (e) { console.error('[Stream] Context error:', e); }
+                console.log('[Novo Brain] Performing web search for:', message);
+                const searchResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/ai/web-search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: message, num_results: 5 })
+                });
+
+                if (searchResponse.ok) {
+                    const searchData = await searchResponse.json();
+                    if (searchData.results && searchData.results.length > 0) {
+                        webSearchContext = '\n\n[WEB SEARCH RESULTS]\n' +
+                            searchData.results.slice(0, 5).map((r: any, i: number) =>
+                                `${i + 1}. ${r.title}\n   ${r.snippet}\n   Source: ${r.link}`
+                            ).join('\n\n') +
+                            '\n[END OF SEARCH RESULTS]\n\nUse the above search results to provide accurate, up-to-date information. Cite sources when appropriate.';
+                    }
+                }
+            } catch (searchError) {
+                console.error('[Novo Brain] Web search error:', searchError);
+            }
         }
 
-        // Select Prompt
-        let selectedPrompt: string;
-        switch (classification.type) {
-            case 'GENERAL_KNOWLEDGE':
-                selectedPrompt = COGNITIVE_CORE_PROMPT;
-                break;
-            case 'SYSTEM_ACTION':
-            case 'SYSTEM_QUERY':
-                selectedPrompt = SYSTEM_AGENT_PROMPT;
-                break;
-            case 'MIXED':
-                selectedPrompt = HYBRID_PROMPT;
-                break;
-            default:
-                selectedPrompt = SYSTEM_PROMPT;
-        }
+        // 3. MEMORY LAYER (3-Layer Context)
+        const context = await buildUserContext(userId);
+        const userContext = context.summary;
 
-        // Build final prompt
+        // 4. COGNITIVE CORE (Model A: Llama 3.3 70B or Vision Model)
         const now = new Date();
-        const timeCtx = `Time: ${now.toLocaleTimeString('en-US')}\nDate: ${now.toLocaleDateString('en-US')}`;
-        const finalPrompt = `${selectedPrompt}\n\nCONTEXT:\n${timeCtx}\n${userContext}`;
+        const timeCtx = `Current Time: ${now.toLocaleTimeString('en-US')}\nCurrent Date: ${now.toLocaleDateString('en-US')}`;
+        const finalPrompt = `${COGNITIVE_CORE_PROMPT}\n\n${userContext}\n\n${timeCtx}${webSearchContext}`;
 
-        // Prepare messages
         const cleanHistory = normalizeHistory(history || []);
-        const messages: Array<{ role: string; content: string }> = [
+
+        // Determine if we should use a vision model
+        const hasImages = attachments?.some((a: any) => a.type.startsWith('image/'));
+        const model = hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+
+        const messages: any[] = [
             { role: 'system', content: finalPrompt },
-            ...cleanHistory,
-            { role: 'user', content: message }
+            ...cleanHistory.map(m => ({
+                role: m.role,
+                content: m.content
+            }))
         ];
+
+        // Format user message based on whether it has images
+        if (hasImages) {
+            const content: any[] = [];
+            if (message) {
+                content.push({ type: 'text', text: message });
+            }
+            attachments.forEach((att: any) => {
+                if (att.type.startsWith('image/')) {
+                    content.push({
+                        type: 'image_url',
+                        image_url: {
+                            url: att.url // This is the base64 data URL
+                        }
+                    });
+                }
+            });
+            messages.push({ role: 'user', content });
+        } else {
+            messages.push({ role: 'user', content: message });
+        }
 
         const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) {
             return new Response(JSON.stringify({ error: 'GROQ_API_KEY missing' }), { status: 500 });
         }
 
-        // Call Groq with streaming
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -89,20 +136,31 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'qwen/qwen3-32b',
+                model,
                 messages,
-                temperature: 0.7,
+                temperature: 0.6,
                 max_tokens: 4096,
                 stream: true
             })
         });
 
         if (!groqResponse.ok) {
-            const error = await groqResponse.text();
-            return new Response(JSON.stringify({ error: `Groq error: ${error}` }), { status: 500 });
+            const errorText = await groqResponse.text();
+            console.error('[Novo Brain] Groq API Error:', errorText);
+
+            let errorMessage = 'AI service is currently unavailable';
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error?.code === 'rate_limit_exceeded') {
+                    errorMessage = 'Rate limit exceeded. Please try again in a moment or reduce the message size.';
+                } else if (errorJson.error?.message) {
+                    errorMessage = `Groq error: ${errorJson.error.message}`;
+                }
+            } catch (e) { }
+
+            return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
         }
 
-        // Stream the response
         const encoder = new TextEncoder();
         const readable = new ReadableStream({
             async start(controller) {
@@ -114,10 +172,10 @@ export async function POST(request: NextRequest) {
 
                 const decoder = new TextDecoder();
                 let buffer = '';
+                let cognitiveCoreResponse = '';
+                let insideThink = false;
 
                 try {
-                    let insideThink = false;
-
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
@@ -135,7 +193,6 @@ export async function POST(request: NextRequest) {
                                     const json = JSON.parse(data);
                                     let content = json.choices?.[0]?.delta?.content || '';
 
-                                    // Filter out <think> tags and their content
                                     if (content.includes('<think>')) {
                                         insideThink = true;
                                         content = content.replace(/<think>/g, '');
@@ -145,23 +202,61 @@ export async function POST(request: NextRequest) {
                                         content = content.replace(/<\/think>/g, '');
                                     }
 
-                                    // Skip content inside think tags
-                                    if (insideThink) continue;
-
-                                    // Remove any remaining think tags
-                                    content = content.replace(/<\/?think>/g, '');
-
-                                    if (content) {
-                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+                                    if (!insideThink) {
+                                        content = content.replace(/<\/?think>/g, '');
+                                        if (content) {
+                                            cognitiveCoreResponse += content;
+                                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+                                        }
                                     }
-                                } catch (e) {
-                                    // Skip malformed JSON
-                                }
+                                } catch (e) { }
                             }
                         }
                     }
-                } finally {
 
+                    // 4. SYSTEM AGENT (Model B: Llama 3.1 8B)
+                    const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META'];
+                    if (actionIntents.includes(classification.type)) {
+                        console.log('[Novo Brain] Triggering System Agent for:', classification.type);
+
+                        const agentResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: 'llama-3.3-70b-versatile',
+                                messages: [
+                                    { role: 'system', content: SYSTEM_AGENT_PROMPT },
+                                    { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}` }
+                                ],
+                                temperature: 0.1,
+                                max_tokens: 1024,
+                                stream: false
+                            })
+                        });
+
+                        if (agentResponse.ok) {
+                            const agentJson = await agentResponse.json();
+                            let agentContent = agentJson.choices?.[0]?.message?.content || '';
+
+                            if (agentContent) {
+                                // Extract JSON if the model included extra text
+                                const jsonMatch = agentContent.match(/\{[\s\S]*\}/);
+                                if (jsonMatch) {
+                                    agentContent = jsonMatch[0];
+                                }
+
+                                // Send as a clean JSON block
+                                const formattedContent = `\n\n\`\`\`json\n${agentContent.trim()}\n\`\`\``;
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: formattedContent })}\n\n`));
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Novo Brain] Stream Error:', error);
+                } finally {
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
                 }
@@ -177,7 +272,7 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('[Stream] Error:', error);
+        console.error('[Novo Brain] POST Error:', error);
         return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500 });
     }
 }

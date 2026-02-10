@@ -97,16 +97,18 @@ export default function CalendarPage() {
     routine: true,
     habit: true,
     business: true,
+    holidays: true,
   });
 
   const sourceLabels = {
-    google: { label: 'Google', icon: '📅', color: '#93C5FD' },
-    checklist: { label: 'Tasks', icon: '✓', color: '#7DD3FC' },
+    google: { label: 'Google', icon: '📅', color: '#A5B4FC' },
+    checklist: { label: 'Tasks', icon: '✓', color: '#67E8F9' },
     project: { label: 'Projects', icon: '📋', color: '#6EE7B7' },
     school: { label: 'School', icon: '🎓', color: '#C4B5FD' },
     routine: { label: 'Routines', icon: '🔄', color: '#FDBA74' },
     habit: { label: 'Habits', icon: '✨', color: '#5EEAD4' },
     business: { label: 'Business', icon: '💼', color: '#FCA5A5' },
+    holidays: { label: 'Holidays', icon: '🎉', color: '#CBD5E1' },
   };
 
   const fetchEvents = useCallback(async () => {
@@ -245,6 +247,7 @@ export default function CalendarPage() {
         overflow: 'hidden',
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis',
+        border: 'none',
       },
     };
   };

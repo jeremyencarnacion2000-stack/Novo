@@ -123,9 +123,29 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        // Enter to send (without Shift)
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSubmit(e as any);
+        }
+        // Ctrl+Enter to force send even with Shift
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            handleSubmit(e as any);
+        }
+        // Escape to stop recording or clear attachments
+        if (e.key === 'Escape') {
+            if (isRecording) {
+                stopRecording();
+            } else if (attachedFiles.length > 0) {
+                setAttachedFiles([]);
+                toast({
+                    title: "Archivos eliminados",
+                    description: "Se eliminaron todos los archivos adjuntos",
+                });
+            } else if (showAttachments) {
+                setShowAttachments(false);
+            }
         }
     };
 
@@ -343,6 +363,29 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         }
     };
 
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        const files: File[] = [];
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) {
+                    const file = new File([blob], `pasted-image-${Date.now()}.png`, { type: blob.type });
+                    files.push(file);
+                }
+            }
+        }
+
+        if (files.length > 0) {
+            setAttachedFiles(prev => [...prev, ...files]);
+            toast({
+                title: "Imagen pegada",
+                description: `${files.length} imagen(es) agregada(s) desde el portapapeles`,
+            });
+        }
+    };
+
     return (
         <div className="w-full">
             <div className="max-w-4xl mx-auto">
@@ -382,6 +425,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
+                            onPaste={handlePaste}
                             placeholder="Type a command or ask a question..."
                             className="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none px-2 py-2 max-h-40 min-h-[2.5rem] text-sm font-mono leading-relaxed"
                             rows={1}

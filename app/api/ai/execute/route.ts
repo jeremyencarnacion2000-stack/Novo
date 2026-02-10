@@ -14,12 +14,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Action is required' }, { status: 400 });
         }
 
-        console.log(`[Execute Route] Executing action: ${action.type}`);
+        console.log(`[Execute Route] Incoming Action:`, JSON.stringify(action, null, 2));
         const result = await executeAIAction(action, userId);
+        console.log(`[Execute Route] Result:`, JSON.stringify(result, null, 2));
 
         return NextResponse.json({
             success: result.success,
-            output: result.message || JSON.stringify(result.data, null, 2),
+            output: result.success ? (result.message || JSON.stringify(result.data, null, 2)) : (result.error || result.message || 'Unknown execution error'),
             metadata: result.data
         });
 

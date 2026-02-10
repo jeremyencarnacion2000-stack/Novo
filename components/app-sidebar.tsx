@@ -140,10 +140,23 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" variant="floating" className="!h-[calc(100vh-2rem)] !m-4 !rounded-[40px] border-0 bg-transparent shadow-none [&>[data-sidebar=sidebar]]:!rounded-[40px] [&>[data-sidebar=sidebar]]:!bg-transparent [&>[data-sidebar=sidebar]]:!border-0 [&>[data-sidebar=sidebar]]:!shadow-none">
-      <div className="h-full w-full glass-sidebar rounded-[40px] flex flex-col overflow-hidden shadow-xl">
-        <SidebarHeader className="px-6 py-8 flex justify-center">
-          <div className={cn("flex items-center justify-center transition-all duration-300", state === 'collapsed' ? 'w-10' : 'w-full')}>
+    <Sidebar
+      collapsible="icon"
+      variant="floating"
+      className={cn(
+        "border-0 bg-transparent shadow-none transition-all duration-300",
+        "md:!h-[calc(100vh-2rem)] md:!m-4 md:!rounded-[40px]",
+        "is-mobile:!h-full is-mobile:!m-0 is-mobile:!rounded-none",
+        "[&>[data-sidebar=sidebar]]:!bg-transparent [&>[data-sidebar=sidebar]]:!border-0 [&>[data-sidebar=sidebar]]:!shadow-none",
+        isMobile ? "w-[280px]" : ""
+      )}
+    >
+      <div className={cn(
+        "h-full w-full glass-sidebar flex flex-col overflow-hidden shadow-xl transition-all duration-300",
+        isMobile ? "rounded-none" : "rounded-[40px]"
+      )}>
+        <SidebarHeader className={cn("py-8 flex justify-center transition-all duration-300", state === 'collapsed' ? "!px-0" : "px-6")}>
+          <div className={cn("flex items-center justify-center transition-all duration-300", state === 'collapsed' ? 'w-full' : 'w-full')}>
             <div
               onClick={() => {
                 if (isMobile) setOpenMobile(false)
@@ -213,8 +226,8 @@ export function AppSidebar() {
           ))}
         </SidebarContent>
 
-        <SidebarFooter className={cn("mt-auto transition-all duration-300", state === 'collapsed' ? "p-2" : "p-4")}>
-          <div className="glass-card rounded-[24px] p-2 flex flex-col gap-1">
+        <SidebarFooter className={cn("mt-auto transition-all duration-300", state === 'collapsed' ? "!px-0" : "p-4")}>
+          <div className={cn("glass-card rounded-[24px] flex flex-col gap-1 transition-all duration-300", state === 'collapsed' ? "p-0 bg-transparent border-0 shadow-none" : "p-2")}>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Profile" className={cn("rounded-full h-10 transition-all duration-300 hover:bg-white/10", state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "px-2")}>

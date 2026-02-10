@@ -1,17 +1,64 @@
 import '@testing-library/jest-dom';
+import fetch from 'node-fetch';
 
-// MSW setup
-import { server } from './lib/mocks/server';
+if (!globalThis.fetch) {
+  (globalThis as any).fetch = fetch;
+  (globalThis as any).Request = (fetch as any).Request;
+  (globalThis as any).Response = (fetch as any).Response;
+  (globalThis as any).Headers = (fetch as any).Headers;
+}
 
-// Establish API mocking before all tests
-beforeAll(() => server.listen());
+// Mock Prisma
+jest.mock('./lib/prisma', () => ({
+  prisma: {
+    task: {
+      create: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Mock Task' }),
+      update: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Updated Task' }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 5 }),
+    },
+    routine: {
+      create: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
+      findUnique: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
+    },
+    quickNote: {
+      create: jest.fn().mockResolvedValue({ id: 'mock-note-id', content: 'Mock Note' }),
+    },
+    workoutLog: {
+      create: jest.fn().mockResolvedValue({ id: 'mock-log-id' }),
+      count: jest.fn().mockResolvedValue(10),
+    }
+  }
+}));
 
-// Reset any request handlers that we may add during the tests,
-// so they don't affect other tests
-afterEach(() => server.resetHandlers());
+// Global fetch mock for AI tests
+const originalFetch = globalThis.fetch;
+(globalThis as any).fetch = jest.fn(async (url, options) => {
+  if (url.includes('api.groq.com')) {
+    const body = JSON.parse(options.body);
+    const model = body.model;
 
-// Clean up after the tests are finished
-afterAll(() => server.close());
+    let content = 'This is a mocked response from Groq.';
+
+    if (model === 'llama-3.1-8b-instant') {
+      const isCritical = body.messages[1].content.toLowerCase().includes('borra');
+      content = JSON.stringify({
+        analysis: "Mocked analysis",
+        plan: [{ id: "1", label: "Mocked step", status: "pending" }],
+        action: { name: isCritical ? "DELETE_ALL_TASKS" : "CREATE_TASK", payload: isCritical ? {} : { title: "Mocked Task" } },
+        message: "Mocked confirmation"
+      });
+    }
+
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content } }]
+      }),
+      text: async () => JSON.stringify({ choices: [{ message: { content } }] })
+    };
+  }
+  return originalFetch(url, options);
+});
 
 // Mock Next.js router
 jest.mock('next/router', () => ({

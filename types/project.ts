@@ -27,6 +27,7 @@ export interface Task {
   priority: "low" | "medium" | "high"
   dueDate?: string
   projectId?: string // Optional link to a project
+  project?: Project // Added to match Prisma model
   tags: string[]
   createdAt: string
 }

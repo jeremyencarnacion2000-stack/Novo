@@ -98,29 +98,37 @@ export async function GET(request: NextRequest) {
     })
 
     // 4. Get School Events (Due Today)
-    const subjects = await prisma.schoolSubject.findMany({
+    const courses = await prisma.course.findMany({
       where: { userId: session.user.id },
-      include: { events: true }
+      include: {
+        grades: {
+          where: {
+            date: {
+              gte: new Date(date.setHours(0, 0, 0, 0)),
+              lt: new Date(date.setHours(23, 59, 59, 999))
+            },
+            category: {
+              in: ['Exam', 'Assignment', 'Project', 'Quiz']
+            }
+          }
+        }
+      }
     })
-    subjects.forEach((subject) => {
-      if (subject.events) {
-        subject.events.forEach((event) => {
-          if (isSameDay(parseISO(event.date), date)) {
-            tasks.push({
-              id: `school-${subject.id}-${event.id}`,
-              text: `${event.type === 'exam' ? 'Exam: ' : 'Assignment: '}${event.title}`,
-              completed: event.completed,
-              priority: 'high',
-              source: 'school',
-              sourceId: subject.id,
-              originalId: event.id,
-              metadata: {
-                subjectName: subject.name
-              }
-            })
+    courses.forEach((course) => {
+      course.grades.forEach((grade) => {
+        tasks.push({
+          id: `school-${course.id}-${grade.id}`,
+          text: `${grade.category}: ${grade.name}`,
+          completed: grade.score !== null && grade.score > 0,
+          priority: 'high',
+          source: 'school',
+          sourceId: course.id,
+          originalId: grade.id,
+          metadata: {
+            subjectName: course.name
           }
         })
-      }
+      })
     })
 
     // 5. Get Standalone Tasks

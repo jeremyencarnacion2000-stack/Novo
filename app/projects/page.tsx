@@ -137,7 +137,7 @@ export default function ProjectsPage() {
         const response = await fetch(`/api/projects/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...project, status })
+          body: JSON.stringify({ status })
         })
         if (response.ok) {
           mutate()

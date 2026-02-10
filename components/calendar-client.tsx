@@ -43,11 +43,11 @@ export default function CalendarClient() {
 
   const getEventColor = (type: CalendarEvent["type"]) => {
     switch (type) {
-      case "project": return "bg-blue-500/10 text-blue-500 border-blue-500/20"
-      case "school": return "bg-orange-500/10 text-orange-500 border-orange-500/20"
-      case "routine": return "bg-purple-500/10 text-purple-500 border-purple-500/20"
-      case "habit": return "bg-green-500/10 text-green-500 border-green-500/20"
-      case "google": return "bg-red-500/10 text-red-500 border-red-500/20"
+      case "project": return "bg-[#6EE7B7]/10 text-[#6EE7B7] border-[#6EE7B7]/20"
+      case "school": return "bg-[#C4B5FD]/10 text-[#C4B5FD] border-[#C4B5FD]/20"
+      case "routine": return "bg-[#FDBA74]/10 text-[#FDBA74] border-[#FDBA74]/20"
+      case "habit": return "bg-[#5EEAD4]/10 text-[#5EEAD4] border-[#5EEAD4]/20"
+      case "google": return "bg-[#A5B4FC]/10 text-[#A5B4FC] border-[#A5B4FC]/20"
       default: return "bg-gray-500/10 text-gray-500 border-gray-500/20"
     }
   }
@@ -120,6 +120,5 @@ export default function CalendarClient() {
         </Card>
       </div>
     </div>
-    </DashboardShell >
   )
 }

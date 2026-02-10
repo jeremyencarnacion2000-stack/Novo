@@ -25,12 +25,100 @@ interface MessageProps {
     onDislike: () => void;
 }
 
-
+const MarkdownComponents = {
+    code({ node, inline, className, children, ...props }: any) {
+        const match = /language-(\w+)/.exec(className || '');
+        return !inline && match ? (
+            <SyntaxHighlighter
+                style={oneDark}
+                language={match[1]}
+                PreTag="div"
+                className="rounded-lg !mt-2 !mb-2"
+                {...props}
+            >
+                {String(children).replace(/\n$/, '')}
+            </SyntaxHighlighter>
+        ) : (
+            <code className="px-1.5 py-0.5 bg-secondary rounded text-primary" {...props}>
+                {children}
+            </code>
+        );
+    },
+    p({ children }: any) {
+        return <p className="mb-4 last:mb-0 leading-7 text-foreground">{children}</p>;
+    },
+    ul({ children }: any) {
+        return <ul className="list-disc list-inside mb-4 space-y-1 text-foreground">{children}</ul>;
+    },
+    ol({ children }: any) {
+        return <ol className="list-decimal list-inside mb-4 space-y-1 text-foreground">{children}</ol>;
+    },
+    h1({ children }: any) {
+        return <h1 className="text-2xl font-bold mb-4 mt-6 text-foreground">{children}</h1>;
+    },
+    h2({ children }: any) {
+        return <h2 className="text-xl font-bold mb-3 mt-5 text-foreground">{children}</h2>;
+    },
+    h3({ children }: any) {
+        return <h3 className="text-lg font-bold mb-2 mt-4 text-foreground">{children}</h3>;
+    },
+    blockquote({ children }: any) {
+        return (
+            <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-muted-foreground">
+                {children}
+            </blockquote>
+        );
+    },
+    table({ children }: any) {
+        return (
+            <div className="overflow-x-auto my-4">
+                <table className="min-w-full divide-y divide-border">{children}</table>
+            </div>
+        );
+    },
+    th({ children }: any) {
+        return (
+            <th className="px-4 py-2 bg-secondary text-left text-xs font-medium text-secondary-foreground uppercase tracking-wider">
+                {children}
+            </th>
+        );
+    },
+    td({ children }: any) {
+        return <td className="px-4 py-2 text-sm text-foreground border-t border-border">{children}</td>;
+    },
+    a({ href, children }: any) {
+        return (
+            <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline"
+            >
+                {children}
+            </a>
+        );
+    }
+};
 
 export function Message({ message, onCopy, onRetry, onLike, onDislike }: MessageProps) {
     const isUser = message.role === 'user';
-    const { confirmAction, cancelAction } = useChatbot();
+    const { confirmAction, cancelAction, editMessage } = useChatbot();
     const { data: session } = useSession();
+
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editContent, setEditContent] = React.useState(message.content);
+
+    const handleSaveEdit = async () => {
+        if (editContent.trim() !== message.content) {
+            await editMessage(message.id, editContent);
+        }
+        setIsEditing(false);
+    };
+
+    const handleCancelEdit = () => {
+        setEditContent(message.content);
+        setIsEditing(false);
+    };
 
     return (
         <div className={`group flex gap-4 px-6 py-6 transition-all duration-300 ${isUser
@@ -121,6 +209,7 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                         <ConfirmationBlock
                                             key={block.id}
                                             status={block.status as any}
+                                            action={block.content}
                                             onConfirm={() => confirmAction(message.id, block.id)}
                                             onCancel={() => cancelAction(message.id, block.id)}
                                         />
@@ -131,128 +220,78 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                             key={block.id}
                                             success={block.status === 'success'}
                                             output={block.content}
-                                            metadata={block.content?.metadata}
+                                            metadata={block.metadata}
                                         />
                                     );
-                                case 'text':
                                 default:
-                                    return (
-                                        <div key={block.id} className="prose prose-sm dark:prose-invert max-w-none">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {block.content}
-                                            </ReactMarkdown>
-                                        </div>
-                                    );
+                                    return null;
                             }
                         })}
                     </div>
                 ) : (
-                    /* Fallback to legacy markdown content */
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                                code({ node, inline, className, children, ...props }) {
-                                    const match = /language-(\w+)/.exec(className || '');
-                                    return !inline && match ? (
-                                        <SyntaxHighlighter
-                                            style={oneDark}
-                                            language={match[1]}
-                                            PreTag="div"
-                                            className="rounded-lg !mt-2 !mb-2"
-                                            {...props}
-                                        >
-                                            {String(children).replace(/\n$/, '')}
-                                        </SyntaxHighlighter>
-                                    ) : (
-                                        <code className="px-1.5 py-0.5 bg-secondary rounded text-primary" {...props}>
-                                            {children}
-                                        </code>
-                                    );
-                                },
-                                p({ children }) {
-                                    return <p className="mb-4 last:mb-0 leading-7 text-foreground">{children}</p>;
-                                },
-                                ul({ children }) {
-                                    return <ul className="list-disc list-inside mb-4 space-y-1 text-foreground">{children}</ul>;
-                                },
-                                ol({ children }) {
-                                    return <ol className="list-decimal list-inside mb-4 space-y-1 text-foreground">{children}</ol>;
-                                },
-                                h1({ children }) {
-                                    return <h1 className="text-2xl font-bold mb-4 mt-6 text-foreground">{children}</h1>;
-                                },
-                                h2({ children }) {
-                                    return <h2 className="text-xl font-bold mb-3 mt-5 text-foreground">{children}</h2>;
-                                },
-                                h3({ children }) {
-                                    return <h3 className="text-lg font-bold mb-2 mt-4 text-foreground">{children}</h3>;
-                                },
-                                blockquote({ children }) {
-                                    return (
-                                        <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-muted-foreground">
-                                            {children}
-                                        </blockquote>
-                                    );
-                                },
-                                table({ children }) {
-                                    return (
-                                        <div className="overflow-x-auto my-4">
-                                            <table className="min-w-full divide-y divide-border">{children}</table>
-                                        </div>
-                                    );
-                                },
-                                th({ children }) {
-                                    return (
-                                        <th className="px-4 py-2 bg-secondary text-left text-xs font-medium text-secondary-foreground uppercase tracking-wider">
-                                            {children}
-                                        </th>
-                                    );
-                                },
-                                td({ children }) {
-                                    return <td className="px-4 py-2 text-sm text-foreground border-t border-border">{children}</td>;
-                                },
-                                a({ href, children }) {
-                                    return (
-                                        <a
-                                            href={href}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:text-primary/80 underline"
-                                        >
-                                            {children}
-                                        </a>
-                                    );
-                                }
-                            }}
-                        >
-                            {(() => {
-                                // If it looks like a JSON response from the assistant, don't show the raw text
-                                if (!isUser && (message.content.trim().startsWith('{') || message.content.includes('```json'))) {
-                                    return (
-                                        <div className="flex items-center gap-2 text-indigo-400/70 italic text-sm py-2">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                                            </span>
-                                            Procesando respuesta estructurada...
-                                        </div>
-                                    );
-                                }
-                                return message.content;
-                            })()}
-                        </ReactMarkdown>
+                    // Regular Text Content or Edit Mode
+                    isEditing ? (
+                        <div className="mt-2">
+                            <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full bg-secondary/50 border border-input rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                                rows={Math.max(3, editContent.split('\n').length)}
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                                <button
+                                    onClick={handleCancelEdit}
+                                    className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveEdit}
+                                    className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                                >
+                                    Guardar y enviar
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="prose prose-invert prose-sm max-w-none">
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={MarkdownComponents}
+                            >
+                                {message.content}
+                            </ReactMarkdown>
+                        </div>
+                    )
+                )}
+
+                {/* Suggested Followups */}
+                {message.suggestedFollowups && message.suggestedFollowups.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {message.suggestedFollowups.map((prompt, index) => (
+                            <button
+                                key={index}
+                                onClick={() => {
+                                    const event = new CustomEvent('chat-followup', { detail: prompt });
+                                    window.dispatchEvent(event);
+                                }}
+                                className="text-xs bg-secondary/50 hover:bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full transition-colors border border-white/5"
+                            >
+                                {prompt}
+                            </button>
+                        ))}
                     </div>
                 )}
 
                 {/* Actions */}
-                <div className="mt-3">
+                <div className="mt-2">
                     <MessageActions
                         message={message}
                         onCopy={onCopy}
                         onRetry={onRetry}
                         onLike={onLike}
                         onDislike={onDislike}
+                        onEdit={() => setIsEditing(true)}
                     />
                 </div>
             </div>

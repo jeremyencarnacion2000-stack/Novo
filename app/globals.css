@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
+/* @import 'tw-animate-css'; */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -58,25 +58,24 @@
 
 .dark {
   /* Novo Design DNA: Carbon Mode (Dark Premium) */
-  --background: #09090b;
-  /* Deep Dark Base */
+  --background: #050505;
+  /* Deeper, richer dark */
   --foreground: #fafafa;
 
   /* Glass Layers - Frosted Matte */
-  --card: rgba(24, 24, 27, 0.4);
+  --card: rgba(20, 20, 23, 0.4);
   --card-foreground: #fafafa;
   --popover: #09090b;
   --popover-foreground: #fafafa;
 
   /* Semantic Colors */
   --primary: #6366f1;
-  /* Elegant Indigo */
   --primary-foreground: #ffffff;
-  --secondary: rgba(255, 255, 255, 0.03);
+  --secondary: rgba(255, 255, 255, 0.05);
   --secondary-foreground: #fafafa;
-  --muted: rgba(255, 255, 255, 0.02);
+  --muted: rgba(255, 255, 255, 0.03);
   --muted-foreground: #a1a1aa;
-  --accent: rgba(255, 255, 255, 0.03);
+  --accent: rgba(255, 255, 255, 0.05);
   --accent-foreground: #fafafa;
 
   /* States */
@@ -84,19 +83,19 @@
   --destructive-foreground: #fafafa;
 
   /* Borders & Inputs */
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.06);
-  --ring: rgba(99, 102, 241, 0.4);
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: rgba(99, 102, 241, 0.5);
 
   /* Sidebar */
-  --sidebar: #09090b;
+  --sidebar: #050505;
   --sidebar-foreground: #fafafa;
   --sidebar-primary: #6366f1;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(255, 255, 255, 0.03);
+  --sidebar-accent: rgba(255, 255, 255, 0.05);
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: rgba(255, 255, 255, 0.04);
-  --sidebar-ring: rgba(99, 102, 241, 0.4);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: rgba(99, 102, 241, 0.5);
 }
 
 @theme inline {
@@ -137,6 +136,90 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Card Hierarchy System - Frosted Matte */
+
+/* 1. MAIN CONTAINER (Panel grande translúcido) */
+@utility glass-panel {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(25, 25, 25, 0.35);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
+@utility card--hero {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(30, 30, 30, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+}
+
+/* 3. SMALL CARDS (Items individuales) */
+@utility card--primary {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(40, 40, 40, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+/* Reusing card--primary style for secondary/tertiary to maintain consistency with the new system, 
+   or slightly adjusting if needed. Mapping 'card--secondary' to 'Small Cards' style as well for now. */
+@utility card--secondary {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(40, 40, 40, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+@utility card--tertiary {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(40, 40, 40, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 5. BUTTONS (Glass sólido) */
+@utility btn-glass {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(25, 25, 25, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+/* Generic Glass Utility (Componente Base Completo) */
+@utility glass {
+  @apply relative overflow-hidden transition-all duration-300;
+  background: rgba(25, 25, 25, 0.35);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -158,8 +241,21 @@
 
   .dark body {
     /* Dark Theme - Silent Dark Base */
-    background: #09090b;
+    background: #050505;
     color: #ffffff;
+  }
+
+  /* Background Image Transparency Overrides */
+  .has-bg-image body,
+  .has-bg-image [data-slot="sidebar-inset"],
+  .has-bg-image [data-slot="sidebar-wrapper"] {
+    background: transparent !important;
+  }
+
+  .has-bg-image .dark body,
+  .has-bg-image .dark [data-slot="sidebar-inset"],
+  .has-bg-image .dark [data-slot="sidebar-wrapper"] {
+    background: transparent !important;
   }
 
   /* Cinematic Directional Light Overlay (Sunlight Effect) */
@@ -177,8 +273,8 @@
 
   .dark body::before {
     background: radial-gradient(circle at 15% 10%,
-        rgba(99, 102, 241, 0.12),
-        transparent 50%);
+        rgba(99, 102, 241, 0.1),
+        transparent 60%);
     opacity: 1;
   }
 
@@ -272,7 +368,7 @@
   /* App Background - Silent Dark */
   .app-background {
     @apply fixed inset-0 z-[-1] pointer-events-none transition-all duration-500;
-    background: #09090b;
+    background: #050505;
   }
 
   /* Typography - Systemic Micro-copy */
@@ -280,48 +376,19 @@
     @apply text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40;
   }
 
-  /* Card Hierarchy System - Frosted Matte */
-
-  /* Primary: High clarity, low blur (Metrics / Focus Cards) */
-  .card--primary {
-    @apply relative overflow-hidden transition-all duration-300;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(20px) saturate(120%);
-    -webkit-backdrop-filter: blur(20px) saturate(120%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  }
-
   .dark .card--primary {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  /* Secondary: Medium blur, matte (Main Panels) */
-  .card--secondary {
-    @apply relative overflow-hidden transition-all duration-300;
-    background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(32px) saturate(110%);
-    -webkit-backdrop-filter: blur(32px) saturate(110%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .dark .card--secondary {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  /* Tertiary: Background context */
-  .card--tertiary {
-    @apply relative overflow-hidden transition-all duration-300;
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   /* Global glass noise texture overlay - Frosted Grain */
+  .card--hero::after,
   .card--primary::after,
   .card--secondary::after,
   .card--tertiary::after,
@@ -332,26 +399,49 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.03;
+    /* High frequency noise for premium feel */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.04;
     pointer-events: none;
     mix-blend-mode: overlay;
     z-index: 1;
   }
 
   .dark .card--tertiary {
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* 4. TEXTO (Importante) */
+  .dark h1,
+  .dark h2,
+  .dark h3,
+  .dark .text-title {
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+  }
+
+  .dark p,
+  .dark .text-body {
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .dark .text-meta,
+  .dark .text-muted-foreground {
+    color: rgba(255, 255, 255, 0.45);
   }
 
   /* Base card with editorial spacing + glass thickness */
   .card {
     position: relative;
     padding: var(--space-6);
-    border-radius: 28px;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 20px 40px rgba(0, 0, 0, 0.4);
+    /* Defaulting to small card style as base */
+    background: rgba(40, 40, 40, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
   }
 
   /* Cognitive Pulse Animation */
@@ -388,14 +478,9 @@
     border-right: 1px solid rgba(255, 255, 255, 0.04);
   }
 
-  /* Glass Panel - Standard Frosted Matte */
-  .glass-panel {
-    @apply relative overflow-hidden transition-all duration-300;
-    background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(32px) saturate(110%);
-    -webkit-backdrop-filter: blur(32px) saturate(110%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
+
+
+
 
   /* Active Item (Elegant Indigo) */
   .sidebar-active-item {

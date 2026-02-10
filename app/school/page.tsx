@@ -16,14 +16,15 @@ import { calculateGPA } from '@/lib/gpa-calculator';
 interface Course {
   id: string;
   name: string;
-  code: string;
-  credits: number;
+  code?: string;
+  credits?: number;
   semester: string;
   year: number;
   professor?: string;
   color: string;
   finalGrade?: number;
   letterGrade?: string;
+  educationType: string;
   grades: any[];
 }
 
@@ -35,6 +36,7 @@ export default function SchoolPage() {
   const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | undefined>();
   const [selectedCourse, setSelectedCourse] = useState<Course | undefined>();
+  const [educationFilter, setEducationFilter] = useState<string>('all');
 
   // Fetch courses
   const fetchCourses = async () => {
@@ -176,8 +178,19 @@ export default function SchoolPage() {
   const currentSemesterCourses = courses.filter(
     c => c.semester === courses[0]?.semester && c.year === courses[0]?.year
   );
-  const semesterGPA = calculateGPA(currentSemesterCourses);
-  const totalCredits = courses.reduce((sum, c) => sum + c.credits, 0);
+  const semesterGPA = calculateGPA(currentSemesterCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
+  const totalCredits = courses.reduce((sum, c) => sum + (c.credits ?? 0), 0);
+
+  // Filtered courses
+  const filteredCourses = educationFilter === 'all'
+    ? courses
+    : courses.filter(c => c.educationType === educationFilter);
+
+  // Separate GPAs
+  const universityCourses = courses.filter(c => c.educationType === 'university');
+  const highSchoolCourses = courses.filter(c => c.educationType === 'high_school');
+  const universityGPA = calculateGPA(universityCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
+  const highSchoolGPA = calculateGPA(highSchoolCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
 
   if (loading) {
     return (
@@ -198,14 +211,8 @@ export default function SchoolPage() {
       {/* GPA Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GPADisplay gpa={overallGPA} label="Overall GPA" />
-        <GPADisplay gpa={semesterGPA} label={`${currentSemester} GPA`} />
-        <GPADisplay
-          gpa={totalCredits}
-          label="Total Credits"
-          description={`${courses.length} courses`}
-          size="small"
-          showScale={false}
-        />
+        <GPADisplay gpa={universityGPA} label="University GPA" />
+        <GPADisplay gpa={highSchoolGPA} label="High School GPA" />
       </div>
 
       {/* Tabs */}
@@ -217,7 +224,14 @@ export default function SchoolPage() {
 
         {/* Courses Tab */}
         <TabsContent value="courses" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <Tabs value={educationFilter} onValueChange={setEducationFilter} className="w-full md:w-auto">
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="university">University</TabsTrigger>
+                <TabsTrigger value="high_school">High School</TabsTrigger>
+              </TabsList>
+            </Tabs>
             <Button
               onClick={() => {
                 setEditingCourse(undefined);
@@ -236,7 +250,7 @@ export default function SchoolPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {courses.map((course) => (
+              {filteredCourses.map((course) => (
                 <CourseCard
                   key={course.id}
                   course={course}

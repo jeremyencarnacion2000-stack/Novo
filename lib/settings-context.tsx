@@ -156,11 +156,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     // Apply background image if set
     if (settings.backgroundImage) {
+      root.classList.add('has-bg-image')
+      root.style.setProperty('--bg-image', `url(${settings.backgroundImage})`)
       document.body.style.backgroundImage = `url(${settings.backgroundImage})`
       document.body.style.backgroundSize = 'cover'
       document.body.style.backgroundPosition = 'center'
       document.body.style.backgroundAttachment = 'fixed'
     } else {
+      root.classList.remove('has-bg-image')
+      root.style.setProperty('--bg-image', 'none')
       document.body.style.backgroundImage = ''
       document.body.style.backgroundSize = ''
       document.body.style.backgroundPosition = ''

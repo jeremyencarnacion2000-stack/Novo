@@ -36,7 +36,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             ? "h-full w-full"
             : `container py-8 px-6 lg:px-8 ${settings.compactMode ? 'dashboard-shell' : ''} pb-24 md:pb-8`
           }>
-            <div key={pathname} className={cn(
+            <div className={cn(
               "h-full w-full",
               !isFullScreenPage && "section-enter"
             )}>

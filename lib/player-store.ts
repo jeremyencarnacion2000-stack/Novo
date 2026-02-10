@@ -10,6 +10,7 @@ export interface CurrentTrack {
   name: string;
   artist: string;
   artistId?: string; // Spotify artist ID for continuous playback
+  albumId?: string; // Spotify album ID for context-aware playback
   image: string | undefined;
   duration_ms?: number;
 }
@@ -33,6 +34,7 @@ export interface PlayerState {
   isShuffle: boolean; // Shuffle mode
   repeatMode: 'off' | 'track' | 'playlist'; // Repeat mode
   queue: CurrentTrack[]; // Queue for upcoming tracks
+  autoPlay: boolean; // Automatic playback of next tracks
   accessToken: string | null; // Spotify Access Token for API calls
 }
 
@@ -160,6 +162,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           // 1. First check if there are tracks in the queue
           if (state.queue.length > 0) {
             const [nextInQueue, ...remainingQueue] = state.queue;
+            console.log('PlayerStore: Playing next from queue:', nextInQueue.name);
             set({
               currentTrack: nextInQueue,
               queue: remainingQueue,
@@ -190,7 +193,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
                 } else {
                   // End of playlist
                   // 3. Fallback to Autoplay / Recommendations
-                  if (state.autoPlay && state.accessToken && state.currentTrack) {
+                  if (state.autoPlay && state.currentTrack) {
+                    console.log('PlayerStore: End of playlist. Fetching recommendations...');
                     try {
                       const seedTrack = state.currentTrack.id;
                       const seedArtist = state.currentTrack.artistId;
@@ -248,21 +252,25 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           }
 
           // 4. No playlist, but we have a current track (Single track mode) -> Fetch recommendations
-          if (state.autoPlay && state.accessToken && state.currentTrack) {
+          if (state.autoPlay && state.currentTrack) {
+            console.log('PlayerStore: End of playback. Fetching recommendations for infinite playback...');
             try {
               const seedTrack = state.currentTrack.id;
               const seedArtist = state.currentTrack.artistId;
 
-              let url = `/api/spotify/recommendations?limit=5`;
+              let url = `/api/spotify/recommendations?limit=10`;
               if (seedTrack) url += `&seed_tracks=${seedTrack}`;
               else if (seedArtist) url += `&seed_artists=${seedArtist}`;
 
+              console.log('PlayerStore: Fetching from:', url);
               const response = await fetch(url);
               if (response.ok) {
                 const data = await response.json();
                 const recommendations = data.tracks || [];
+                console.log(`PlayerStore: Found ${recommendations.length} recommendations.`);
                 if (recommendations.length > 0) {
                   const [first, ...rest] = recommendations;
+                  console.log('PlayerStore: Playing recommended track:', first.name);
                   set({
                     currentTrack: first,
                     queue: rest,
@@ -272,12 +280,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
                   });
                   return;
                 }
+              } else {
+                console.error('PlayerStore: Recommendations fetch failed with status:', response.status);
               }
             } catch (e) {
-              console.error("Failed to fetch recommendations", e);
+              console.error("PlayerStore: Failed to fetch recommendations", e);
             }
           }
 
+          console.log('PlayerStore: End of playback. No recommendations found or autoPlay is off.');
           set({ isPlaying: false, progress: 0 });
         },
         previousTrack: () => {

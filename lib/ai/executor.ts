@@ -68,13 +68,18 @@ export async function executeAIAction(
         prisma: prismaClient,
     };
 
+    console.log(`[AI Executor] Context: UserID=${userId}`);
+    console.log(`[AI Executor] Action Payload:`, JSON.stringify(action.payload, null, 2));
+
     try {
-        const handler = actionRegistry[action.type];
+        const actionType = action.type || (action as any).name;
+        const handler = actionRegistry[actionType as AIActionType];
 
         if (!handler) {
+            const validActions = Object.keys(actionRegistry).join(', ');
             return {
                 success: false,
-                error: `No handler registered for action type: ${action.type}`,
+                error: `Invalid action: "${actionType}". Valid actions are: ${validActions}`,
             };
         }
 
@@ -83,6 +88,7 @@ export async function executeAIAction(
         // if (requiredPermissions) { ... check permissions ... }
 
         const result = await handler(action, context);
+        console.log(`[AI Executor] Handler Result:`, JSON.stringify(result, null, 2));
 
         return {
             ...result,
@@ -172,7 +178,15 @@ registerActionHandler<CreateRoutineAction>('CREATE_ROUTINE', async (action, ctx)
         },
         include: { days: { include: { exercises: true } } },
     });
-    return { success: true, data: routine, message: `Routine "${routine.name}" created with ${routine.days.length} days.` };
+    return {
+        success: true,
+        data: routine,
+        message: `Routine "${routine.name}" created with ${routine.days.length} days.`,
+        metadata: {
+            sectionName: 'Routines',
+            redirectPath: '/routines'
+        }
+    };
 });
 
 registerActionHandler<UpdateRoutineAction>('UPDATE_ROUTINE', async (action, ctx) => {
@@ -214,6 +228,10 @@ registerActionHandler<StartWorkoutAction>('START_WORKOUT', async (action, ctx) =
         success: true,
         data: { workoutLogId: log.id, routine },
         message: `Workout started! Tracking log ID: ${log.id}`,
+        metadata: {
+            sectionName: 'Workouts',
+            redirectPath: '/workouts'
+        }
     };
 });
 
@@ -255,7 +273,40 @@ registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
             userId: ctx.userId,
         },
     });
-    return { success: true, data: task, message: `Task "${task.title}" created.` };
+    return {
+        success: true,
+        data: task,
+        message: `Task "${task.title}" created.`,
+        metadata: {
+            sectionName: 'Tasks',
+            redirectPath: '/tasks'
+        }
+    };
+});
+
+registerActionHandler<CreateTasksAction>('CREATE_TASKS', async (action, ctx) => {
+    const { tasks } = action.payload;
+    const createdTasks = await Promise.all(
+        tasks.map(t => ctx.prisma.task.create({
+            data: {
+                title: t.title,
+                status: 'todo',
+                priority: t.priority === 3 ? 'high' : t.priority === 2 ? 'medium' : 'low',
+                dueDate: t.dueDate,
+                tags: JSON.stringify([t.category]),
+                userId: ctx.userId,
+            },
+        }))
+    );
+    return {
+        success: true,
+        data: createdTasks,
+        message: `${createdTasks.length} tasks created successfully.`,
+        metadata: {
+            sectionName: 'Tasks',
+            redirectPath: '/tasks'
+        }
+    };
 });
 
 registerActionHandler<UpdateTaskAction>('UPDATE_TASK', async (action, ctx) => {
@@ -278,6 +329,127 @@ registerActionHandler<DeleteTaskAction>('DELETE_TASK', async (action, ctx) => {
     return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this task?" };
 });
 
+// Projects
+registerActionHandler<CreateProjectAction>('CREATE_PROJECT', async (action, ctx) => {
+    const { title, description, status, priority, dueDate, tags } = action.payload;
+    const project = await ctx.prisma.project.create({
+        data: {
+            title,
+            description,
+            status,
+            priority,
+            dueDate,
+            tags: JSON.stringify(tags || []),
+            userId: ctx.userId,
+        },
+    });
+    return {
+        success: true,
+        data: project,
+        message: `Project "${project.title}" created.`,
+        metadata: {
+            sectionName: 'Projects',
+            redirectPath: '/projects'
+        }
+    };
+});
+
+registerActionHandler<UpdateProjectAction>('UPDATE_PROJECT', async (action, ctx) => {
+    const { id, updates } = action.payload;
+    const project = await ctx.prisma.project.update({
+        where: { id, userId: ctx.userId },
+        data: {
+            ...updates,
+            tags: updates.tags ? JSON.stringify(updates.tags) : undefined,
+        },
+    });
+    return { success: true, data: project, message: `Project updated.` };
+});
+
+registerActionHandler<DeleteProjectAction>('DELETE_PROJECT', async (action, ctx) => {
+    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this project?" };
+});
+
+// School
+registerActionHandler<CreateCourseAction>('CREATE_COURSE', async (action, ctx) => {
+    const { name, code, credits, semester, year, professor, color } = action.payload;
+    const course = await ctx.prisma.course.create({
+        data: {
+            name,
+            code,
+            credits,
+            semester,
+            year,
+            professor,
+            color: color || '#3b82f6',
+            userId: ctx.userId,
+        },
+    });
+    return {
+        success: true,
+        data: course,
+        message: `Course "${course.name}" created.`,
+        metadata: {
+            sectionName: 'School',
+            redirectPath: '/school'
+        }
+    };
+});
+
+registerActionHandler<UpdateCourseAction>('UPDATE_COURSE', async (action, ctx) => {
+    const { id, updates } = action.payload;
+    const course = await ctx.prisma.course.update({
+        where: { id, userId: ctx.userId },
+        data: updates,
+    });
+    return { success: true, data: course, message: `Course updated.` };
+});
+
+registerActionHandler<DeleteCourseAction>('DELETE_COURSE', async (action, ctx) => {
+    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this course?" };
+});
+
+registerActionHandler<AddGradeAction>('ADD_GRADE', async (action, ctx) => {
+    const { courseId, name, score, maxScore, weight, category, date } = action.payload;
+    const grade = await ctx.prisma.grade.create({
+        data: {
+            courseId,
+            name,
+            score,
+            maxScore,
+            weight,
+            category,
+            date: new Date(date),
+            userId: ctx.userId,
+        },
+    });
+    return {
+        success: true,
+        data: grade,
+        message: `Grade "${grade.name}" added to course.`,
+        metadata: {
+            sectionName: 'School',
+            redirectPath: '/school'
+        }
+    };
+});
+
+registerActionHandler<UpdateGradeAction>('UPDATE_GRADE', async (action, ctx) => {
+    const { id, updates } = action.payload;
+    const grade = await ctx.prisma.grade.update({
+        where: { id, userId: ctx.userId },
+        data: {
+            ...updates,
+            date: updates.date ? new Date(updates.date) : undefined,
+        },
+    });
+    return { success: true, data: grade, message: `Grade updated.` };
+});
+
+registerActionHandler<DeleteGradeAction>('DELETE_GRADE', async (action, ctx) => {
+    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this grade?" };
+});
+
 // Notes
 registerActionHandler<CreateNoteAction>('CREATE_NOTE', async (action, ctx) => {
     const { title, content, tags } = action.payload;
@@ -289,7 +461,15 @@ registerActionHandler<CreateNoteAction>('CREATE_NOTE', async (action, ctx) => {
             type: 'note',
         },
     });
-    return { success: true, data: note, message: `Note saved.` };
+    return {
+        success: true,
+        data: note,
+        message: `Note saved.`,
+        metadata: {
+            sectionName: 'Notes',
+            redirectPath: '/notes'
+        }
+    };
 });
 
 registerActionHandler<UpdateNoteAction>('UPDATE_NOTE', async (action, ctx) => {
@@ -356,9 +536,26 @@ registerActionHandler<SystemQueryAction>('SYSTEM_QUERY', async (action, ctx) => 
         data = await ctx.prisma.task.findMany({ where: { userId: ctx.userId } });
     } else if (entity === 'notes') {
         data = await ctx.prisma.quickNote.findMany({ where: { userId: ctx.userId } });
+    } else if (entity === 'projects') {
+        data = await ctx.prisma.project.findMany({ where: { userId: ctx.userId } });
+    } else if (entity === 'courses') {
+        data = await ctx.prisma.course.findMany({ where: { userId: ctx.userId } });
+    } else if (entity === 'grades') {
+        data = await ctx.prisma.grade.findMany({ where: { userId: ctx.userId } });
     } else {
         data = [];
     }
 
     return { success: true, data };
+});
+
+registerActionHandler<any>('DELETE_ALL_TASKS', async (action, ctx) => {
+    const result = await ctx.prisma.task.deleteMany({
+        where: { userId: ctx.userId }
+    });
+    return {
+        success: true,
+        message: `Deleted ${result.count} tasks.`,
+        data: { count: result.count }
+    };
 });

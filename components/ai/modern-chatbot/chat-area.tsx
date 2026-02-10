@@ -5,6 +5,7 @@ import { Loader2, ListTodo, Timer, CalendarDays, Sparkles, Lightbulb, MessageSqu
 import { useChatbot } from './context';
 import { Message } from './message';
 import { ChatInput } from './chat-input';
+import { ThinkingIndicator } from './thinking-indicator';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,17 @@ export function ChatArea() {
     React.useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping, streamingMessage]);
+
+    // Listen for follow-up suggestions
+    React.useEffect(() => {
+        const handleFollowup = (e: CustomEvent) => {
+            if (e.detail) {
+                sendMessage(e.detail);
+            }
+        };
+        window.addEventListener('chat-followup', handleFollowup as EventListener);
+        return () => window.removeEventListener('chat-followup', handleFollowup as EventListener);
+    }, [sendMessage]);
 
     const handleCopy = async (content: string) => {
         try {
@@ -128,23 +140,8 @@ export function ChatArea() {
 
                             {/* Typing indicator */}
                             {isTyping && !streamingMessage && (
-                                <div className="flex gap-4 px-6 py-8 bg-white/[0.02] rounded-2xl border border-white/5 mb-6 animate-pulse">
-                                    <div className="flex-shrink-0">
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                                            <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
-                                        </div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-xs font-bold tracking-widest uppercase text-indigo-400">AI Thinking</span>
-                                            <span className="text-[10px] text-white/30 font-mono">{statusMessage || 'PROCESANDO...'}</span>
-                                        </div>
-                                        <div className="flex gap-1.5">
-                                            <div className="w-1.5 h-1.5 bg-indigo-400/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                            <div className="w-1.5 h-1.5 bg-indigo-400/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                            <div className="w-1.5 h-1.5 bg-indigo-400/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                        </div>
-                                    </div>
+                                <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <ThinkingIndicator status={statusMessage} />
                                 </div>
                             )}
 
@@ -160,12 +157,29 @@ export function ChatArea() {
                     <div className="max-w-3xl mx-auto transform transition-all duration-500 hover:scale-[1.01]">
                         <ChatInput />
                     </div>
-                    <p className="text-[10px] text-center text-white/20 mt-3 font-medium tracking-wide uppercase">
-                        AI can make mistakes. Check important info.
-                    </p>
+                    <div className="flex items-center justify-center gap-4 mt-3">
+                        {/* Context Memory Indicator */}
+                        <div className="flex items-center gap-2 text-[10px] text-white/30" title="Uso de memoria de contexto">
+                            <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
+                                <div
+                                    className={cn(
+                                        "h-full rounded-full transition-all duration-500",
+                                        messages.length > 8 ? "bg-red-500/50" : "bg-indigo-500/50"
+                                    )}
+                                    style={{ width: `${Math.min((messages.length / 10) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <span>
+                                {Math.min(messages.length, 10)}/10
+                            </span>
+                        </div>
+                        <span className="text-white/10">•</span>
+                        <p className="text-[10px] text-white/20 font-medium tracking-wide uppercase">
+                            AI can make mistakes. Check important info.
+                        </p>
+                    </div>
                 </div>
             )}
         </div>
     );
 }
-

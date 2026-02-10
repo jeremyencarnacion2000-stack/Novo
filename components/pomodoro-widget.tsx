@@ -1,19 +1,23 @@
 'use client'
 
 import { useFocus } from '@/lib/focus-context'
-import { Timer, Play, Pause } from 'lucide-react'
+import { Timer, Play, Pause, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export function PomodoroWidget() {
-    const { mode, time, isActive, toggleTimer, formatTime } = useFocus()
+    const { mode, time, isActive, toggleTimer, resetTimer, formatTime } = useFocus()
     const pathname = usePathname()
     const isFocusPage = pathname === '/focus'
 
-    if (!isActive) {
+    const isDefaultTime = time === (mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60)
+    const isModified = time > 0 && !isDefaultTime
+
+    if (!isActive && !isModified) {
         return null
     }
 
@@ -34,50 +38,72 @@ export function PomodoroWidget() {
     }
 
     return (
-        <Card className={cn(
-            "fixed z-50 transition-all duration-700 ease-in-out shadow-2xl border-white/10 backdrop-blur-xl",
-            isFocusPage
-                ? "bottom-8 left-1/2 -translate-x-1/2 w-[500px] h-16 rounded-full flex items-center px-6 justify-between bg-black/60"
-                : "top-6 right-6 w-[160px] p-3 rounded-2xl bg-black/40 border-white/5"
-        )}>
-            {/* Left Section: Badge */}
-            <div className="flex items-center gap-2">
-                {!isFocusPage && <Timer className="h-3 w-3 text-muted-foreground" />}
-                <Badge variant="outline" className={cn(
-                    "border-0 text-white font-medium",
-                    getModeColor(),
-                    isFocusPage ? "px-3 py-1 text-xs" : "text-[10px] px-1.5 py-0.5"
-                )}>
-                    {getModeLabel()}
-                </Badge>
-            </div>
+        <AnimatePresence mode="wait">
+            <motion.div
+                layout
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className={cn(
+                    "fixed z-50 shadow-2xl border-white/10 backdrop-blur-xl overflow-hidden",
+                    isFocusPage
+                        ? "bottom-20 left-1/2 -translate-x-1/2 w-[400px] h-16 rounded-full flex items-center px-6 justify-between bg-black/60 border border-white/20"
+                        : "top-6 right-6 w-[160px] p-4 rounded-3xl bg-black/60 border-white/10 flex flex-col items-center gap-3"
+                )}
+            >
+                {/* Left Section: Badge */}
+                <motion.div layout className="flex items-center gap-2">
+                    {!isFocusPage && <Timer className="h-3 w-3 text-muted-foreground" />}
+                    <Badge variant="outline" className={cn(
+                        "border-0 text-white font-medium transition-colors duration-500",
+                        getModeColor(),
+                        isFocusPage ? "px-3 py-1 text-xs" : "text-[10px] px-2 py-0.5"
+                    )}>
+                        {getModeLabel()}
+                    </Badge>
+                </motion.div>
 
-            {/* Center Section: Time */}
-            <div className={cn(
-                "font-mono font-bold tabular-nums text-white",
-                isFocusPage ? "text-2xl absolute left-1/2 -translate-x-1/2" : "text-xl text-center my-1"
-            )}>
-                {formatTime(time)}
-            </div>
-
-            {/* Right Section: Controls */}
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleTimer}
+                {/* Center Section: Time */}
+                <motion.div
+                    layout
                     className={cn(
-                        "rounded-full hover:bg-white/10 text-white",
-                        isFocusPage ? "h-10 w-10 p-0" : "h-7 w-7 p-0 mx-auto"
+                        "font-mono font-bold tabular-nums text-white",
+                        isFocusPage ? "text-2xl" : "text-3xl"
                     )}
                 >
-                    {isActive ? (
-                        <Pause className={cn(isFocusPage ? "h-5 w-5" : "h-3.5 w-3.5")} />
-                    ) : (
-                        <Play className={cn(isFocusPage ? "h-5 w-5 ml-1" : "h-3.5 w-3.5 ml-0.5")} />
+                    {formatTime(time)}
+                </motion.div>
+
+                {/* Right Section: Controls */}
+                <motion.div layout className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleTimer}
+                        className={cn(
+                            "rounded-full hover:bg-white/10 text-white transition-all",
+                            isFocusPage ? "h-10 w-10 p-0" : "h-8 w-8 p-0"
+                        )}
+                    >
+                        {isActive ? (
+                            <Pause className={cn(isFocusPage ? "h-5 w-5" : "h-4 w-4")} />
+                        ) : (
+                            <Play className={cn(isFocusPage ? "h-5 w-5 ml-1" : "h-4 w-4 ml-0.5")} />
+                        )}
+                    </Button>
+                    {!isFocusPage && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={resetTimer}
+                            className="h-10 w-10 p-0 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                        >
+                            <RotateCcw className="h-4 w-4" />
+                        </Button>
                     )}
-                </Button>
-            </div>
-        </Card>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
     )
 }

@@ -10,6 +10,7 @@ export interface Message {
     artifacts?: Artifact[];
     blocks?: MessageBlock[];
     attachments?: Attachment[];
+    suggestedFollowups?: string[];
 }
 
 export interface Attachment {
@@ -20,7 +21,7 @@ export interface Attachment {
     size?: number;
 }
 
-export type BlockType = 'text' | 'analysis' | 'plan' | 'confirmation' | 'result';
+export type BlockType = 'text' | 'markdown' | 'analysis' | 'plan' | 'confirmation' | 'result';
 
 export interface MessageBlock {
     id: string;
@@ -84,6 +85,7 @@ export interface ChatbotContextType {
     messages: Message[];
     sendMessage: (content: string, files?: File[], webSearchEnabled?: boolean) => Promise<void>;
     retryMessage: (messageId: string) => Promise<void>;
+    editMessage: (messageId: string, newContent: string) => Promise<void>;
     likeMessage: (messageId: string) => void;
     dislikeMessage: (messageId: string) => void;
     confirmAction: (messageId: string, blockId: string) => void;

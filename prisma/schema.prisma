@@ -55,7 +55,6 @@ model User {
   projects      Project[]
   tasks         Task[]
   trackers      Tracker[]
-  schoolSubjects SchoolSubject[]
   analyticsEvents AnalyticsEvent[]
   userSessions   UserSession[]
   dailyAnalytics DailyAnalytics[]
@@ -329,44 +328,7 @@ model TrackerEntry {
   @@map("tracker_entries")
 }
 
-model SchoolSubject {
-  id        String   @id @default(cuid())
-  name      String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events    SchoolEvent[]
-  grades    SchoolGrade[]
-  updatedAt DateTime @updatedAt
-  version   Int      @default(1)
 
-  @@map("school_subjects")
-}
-
-model SchoolEvent {
-  id        String   @id @default(cuid())
-  title     String
-  date      String
-  type      String   // e.g., 'exam', 'assignment'
-  completed Boolean  @default(false)
-  subjectId String
-  subject   SchoolSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  updatedAt DateTime @updatedAt
-  version   Int      @default(1)
-
-  @@map("school_events")
-}
-
-model SchoolGrade {
-  id        String   @id @default(cuid())
-  period    String
-  grade     Float
-  subjectId String
-  subject   SchoolSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  updatedAt DateTime @updatedAt
-  version   Int      @default(1)
-
-  @@map("school_grades")
-}
 
 model AnalyticsEvent {
   id        String   @id @default(cuid())
@@ -633,12 +595,13 @@ model Course {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
-  code        String
-  credits     Float
+  code        String?
+  credits     Float?
   semester    String   // e.g., "Fall 2024", "Spring 2025"
   year        Int
   professor   String?
   color       String   @default("#3b82f6")
+  educationType String @default("university")
   finalGrade  Float?   // Calculated final grade percentage
   letterGrade String?  // Calculated letter grade (A, B+, etc.)
   grades      Grade[]

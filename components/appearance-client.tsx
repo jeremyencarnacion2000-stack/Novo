@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { SkinToneSuggestions } from '@/components/appearance/skin-tone-suggestions'
 
 interface Routine {
   id: string
@@ -392,9 +393,11 @@ export default function AppearanceClient() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Style Notes</CardTitle>
-          <CardDescription>Hair, outfits, and grooming tips</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Style Notes</CardTitle>
+            <CardDescription>Hair, outfits, and grooming tips</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -409,6 +412,8 @@ export default function AppearanceClient() {
           </div>
         </CardContent>
       </Card>
+
+      <SkinToneSuggestions />
     </div>
   )
 }

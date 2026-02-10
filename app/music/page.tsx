@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession, signIn, signOut } from 'next-auth/react'
-import { Search, Home as HomeIcon, Library, Heart, Play, Shuffle, MoreHorizontal, ChevronLeft, ChevronRight, Music, Disc, Mic2, Radio, User, Clock, Plus, Loader2, LogOut, LogIn, Pause, SkipForward, SkipBack, Repeat, Volume2, Headphones, ListMusic, Grid, Mic } from 'lucide-react'
+import { Search, Home as HomeIcon, Library, Heart, Play, Shuffle, MoreHorizontal, ChevronLeft, ChevronRight, Music, Disc, Mic2, Radio, User, Clock, Plus, Loader2, LogOut, LogIn, Pause, SkipForward, SkipBack, Repeat, Volume2, Headphones, ListMusic, Grid, Mic, AlertCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { fetchSpotifyData, SpotifyUser, SpotifyPlaylist, SpotifyTrack } from '@/lib/spotify'
 import { Button } from '@/components/ui/button'
@@ -228,6 +228,7 @@ export default function MusicPage() {
       name: item.track.name,
       artist: item.track.artists.map(a => a.name).join(', '),
       artistId: item.track.artists[0]?.id,
+      albumId: item.track.album?.id,
       image: item.track.album.images?.[0]?.url,
       duration_ms: item.track.duration_ms,
     }))
@@ -330,7 +331,7 @@ export default function MusicPage() {
       {/* Removed hardcoded background to allow global glass effect */}
 
       {/* Left Sidebar - Glass Panel */}
-      <div className="w-64 flex flex-col gap-8 glass-panel rounded-3xl p-6 z-10">
+      <div className="hidden lg:flex w-64 flex-col gap-8 glass-panel rounded-3xl p-6 z-10">
         <div className="space-y-1">
           <Button
             variant="ghost"
@@ -422,7 +423,7 @@ export default function MusicPage() {
                 </div>
               ))}
             </div>
-            <ScrollBar className="opacity-0 hover:opacity-100 transition-opacity" />
+            <ScrollBar />
           </ScrollArea>
         </div>
 
@@ -437,7 +438,17 @@ export default function MusicPage() {
                 </Avatar>
                 <div className="flex flex-col items-start text-left min-w-0">
                   <span className="text-sm font-medium truncate w-full">{userProfile?.display_name || 'User'}</span>
-                  <span className="text-xs text-gray-400 truncate w-full">{userProfile?.product === 'premium' ? 'Premium' : 'Free'}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
+                      userProfile?.product === 'premium' ? "bg-green-500/20 text-green-500" : "bg-yellow-500/20 text-yellow-500"
+                    )}>
+                      {userProfile?.product === 'premium' ? 'Premium' : 'Free'}
+                    </span>
+                    {userProfile?.product !== 'premium' && (
+                      <AlertCircle className="h-3 w-3 text-yellow-500/50" />
+                    )}
+                  </div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -479,83 +490,94 @@ export default function MusicPage() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 -mr-6 pr-6">
-          <div className="flex flex-col gap-8 pb-8">
+        <div className="flex flex-col gap-8 flex-1 min-h-0">
 
-            {/* Trending Songs */}
-            {currentView === 'home' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">Trending songs this week</h2>
-                  <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>
-                </div>
-                <ScrollArea className="w-full whitespace-nowrap pb-4">
-                  <div className="flex gap-4">
-                    {topTracks.map((track) => (
-                      <div
-                        key={track.id}
-                        className="w-64 shrink-0 relative group cursor-pointer rounded-2xl overflow-hidden"
-                        onClick={() => playTrack({
-                          id: track.id,
-                          uri: track.uri,
-                          name: track.name,
-                          artist: track.artists.map(a => a.name).join(', '),
-                          artistId: track.artists[0]?.id,
-                          image: track.album.images[0]?.url,
-                          duration_ms: track.duration_ms,
-                        })}
-                      >
-                        <img src={track.album.images[0]?.url} alt={track.name} className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-105" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-end">
-                          <h3 className="font-bold text-white truncate text-lg">{track.name}</h3>
-                          <div className="flex items-center justify-between text-gray-300 text-sm">
-                            <span className="truncate max-w-[70%]">{track.artists[0].name}</span>
-                            <span>{formatDuration(track.duration_ms)}</span>
-                          </div>
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[2px]">
-                          <div className="bg-white/20 backdrop-blur-md p-3 rounded-full">
-                            <Play className="h-6 w-6 text-white fill-white" />
-                          </div>
+          {/* Trending Songs */}
+          {currentView === 'home' && (
+            <div className="space-y-4 shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white">Trending songs this week</h2>
+                <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap pb-4" horizontalWheel>
+                <div className="flex gap-4">
+                  {topTracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className="w-64 shrink-0 relative group cursor-pointer rounded-2xl overflow-hidden"
+                      onClick={() => {
+                        console.log('MusicPage: Play Trending Track clicked:', track.name, 'ID:', track.id, 'URI:', track.uri);
+
+                        const tracksToPlay: CurrentTrack[] = topTracks.map(t => ({
+                          id: t.id,
+                          uri: t.uri,
+                          name: t.name,
+                          artist: t.artists.map(a => a.name).join(', '),
+                          artistId: t.artists[0]?.id,
+                          albumId: t.album?.id,
+                          image: t.album.images[0]?.url,
+                          duration_ms: t.duration_ms,
+                        }));
+
+                        playPlaylist({
+                          id: 'trending-songs',
+                          name: 'Trending Songs',
+                          tracks: tracksToPlay
+                        }, topTracks.indexOf(track));
+                      }}
+                    >
+                      <img src={track.album.images[0]?.url} alt={track.name} className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-end">
+                        <h3 className="font-bold text-white truncate text-lg">{track.name}</h3>
+                        <div className="flex items-center justify-between text-gray-300 text-sm">
+                          <span className="truncate max-w-[70%]">{track.artists[0].name}</span>
+                          <span>{formatDuration(track.duration_ms)}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <ScrollBar orientation="horizontal" className="hidden" />
-                </ScrollArea>
-              </div>
-            )}
-
-            {/* Popular Artists */}
-            {currentView === 'home' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">Popular artists</h2>
-                  <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>
-                </div>
-                <ScrollArea className="w-full whitespace-nowrap pb-2">
-                  <div className="flex gap-6">
-                    {topArtists.map((artist) => (
-                      <div
-                        key={artist.id}
-                        className="flex flex-col items-center gap-3 shrink-0 cursor-pointer group"
-                        onClick={() => handleArtistClick(artist)}
-                      >
-                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-transparent group-hover:border-white/20 transition-all">
-                          <img src={artist.images[0]?.url} alt={artist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[2px]">
+                        <div className="bg-white/20 backdrop-blur-md p-3 rounded-full">
+                          <Play className="h-6 w-6 text-white fill-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{artist.name}</span>
                       </div>
-                    ))}
-                  </div>
-                  <ScrollBar orientation="horizontal" className="hidden" />
-                </ScrollArea>
-              </div>
-            )}
+                    </div>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          )}
 
-            {/* Artists Grid View */}
-            {currentView === 'artists' && (
-              <div className="space-y-4">
+          {/* Popular Artists */}
+          {currentView === 'home' && (
+            <div className="space-y-4 shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white">Popular artists</h2>
+                <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap pb-2" horizontalWheel>
+                <div className="flex gap-6">
+                  {topArtists.map((artist) => (
+                    <div
+                      key={artist.id}
+                      className="flex flex-col items-center gap-3 shrink-0 cursor-pointer group"
+                      onClick={() => handleArtistClick(artist)}
+                    >
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-transparent group-hover:border-white/20 transition-all">
+                        <img src={artist.images[0]?.url} alt={artist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{artist.name}</span>
+                    </div>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Artists Grid View */}
+          {currentView === 'artists' && (
+            <ScrollArea className="flex-1 -mr-6 pr-6">
+              <div className="space-y-4 pb-8">
                 <h2 className="text-lg font-bold text-white">Your Artists</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                   {followedArtists.map((artist) => (
@@ -572,35 +594,56 @@ export default function MusicPage() {
                   ))}
                 </div>
               </div>
-            )}
+            </ScrollArea>
+          )}
 
-            {/* Recently Played / Playlist / Artist Tracks List */}
-            {currentView !== 'artists' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">
-                    {currentView === 'home' ? 'Recently played' :
-                      currentView === 'playlist' ? selectedPlaylist?.name :
-                        currentView === 'artist' ? `Top Tracks by ${selectedArtist?.name}` :
-                          currentView === 'songs' ? 'Liked Songs' :
-                            currentView === 'search' ? 'Search Results' : 'Tracks'}
-                  </h2>
-                  {currentView === 'home' && <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>}
-                </div>
-                <div className="space-y-2">
-                  {(currentView === 'home' ? recentlyPlayed.slice(0, 5).map(i => i.track) : displayedTracks)?.map((track, index) => (
+          {/* Recently Played / Playlist / Artist Tracks List */}
+          {currentView !== 'artists' && (
+            <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+              <div className="flex items-center justify-between shrink-0">
+                <h2 className="text-lg font-bold text-white">
+                  {currentView === 'home' ? 'Recently played' :
+                    currentView === 'playlist' ? selectedPlaylist?.name :
+                      currentView === 'artist' ? `Top Tracks by ${selectedArtist?.name}` :
+                        currentView === 'songs' ? 'Liked Songs' :
+                          currentView === 'search' ? 'Search Results' : 'Tracks'}
+                </h2>
+                {currentView === 'home' && <span className="text-xs text-gray-400 cursor-pointer hover:text-white">See all</span>}
+              </div>
+              <ScrollArea className="flex-1 -mr-6 pr-6 min-h-0">
+                <div className="space-y-2 pb-8">
+                  {(currentView === 'home' ? recentlyPlayed.map(i => i.track) : displayedTracks)?.map((track, index) => (
                     <div
                       key={`${track.id}-${index}`}
                       className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
-                      onClick={() => playTrack({
-                        id: track.id,
-                        uri: track.uri,
-                        name: track.name,
-                        artist: track.artists.map(a => a.name).join(', '),
-                        artistId: track.artists[0]?.id,
-                        image: track.album.images[0]?.url,
-                        duration_ms: track.duration_ms,
-                      })}
+                      onClick={() => {
+                        console.log('MusicPage: Play Track from List clicked:', track.name, 'ID:', track.id, 'URI:', track.uri);
+
+                        // Get the actual list being displayed to create the correct context
+                        const currentList = currentView === 'home' ? recentlyPlayed.map(i => i.track) : displayedTracks;
+
+                        // Create a temporary playlist from the currently displayed tracks
+                        const tracksToPlay: CurrentTrack[] = currentList.map(t => ({
+                          id: t.id,
+                          uri: t.uri,
+                          name: t.name,
+                          artist: t.artists.map(a => a.name).join(', '),
+                          artistId: t.artists[0]?.id,
+                          albumId: t.album?.id,
+                          image: t.album.images?.[0]?.url,
+                          duration_ms: t.duration_ms,
+                        }));
+
+                        playPlaylist({
+                          id: currentView === 'playlist' ? (selectedPlaylist?.id || 'current-view') :
+                            currentView === 'home' ? 'recently-played' : 'current-view',
+                          name: currentView === 'playlist' ? (selectedPlaylist?.name || 'Current View') :
+                            currentView === 'home' ? 'Recently Played' :
+                              currentView === 'songs' ? 'Liked Songs' :
+                                currentView === 'search' ? 'Search Results' : 'Current View',
+                          tracks: tracksToPlay
+                        }, index);
+                      }}
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden relative">
                         <img src={track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover" />
@@ -619,16 +662,15 @@ export default function MusicPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </ScrollArea>
+            </div>
+          )}
 
-          </div>
-          <ScrollBar className="opacity-0 hover:opacity-100 transition-opacity" />
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Right Sidebar - Glass Panel */}
-      <div className="w-80 flex flex-col gap-6 z-10">
+      <div className="hidden xl:flex w-80 flex-col gap-6 z-10">
 
         {/* Now Playing Card */}
         <div className="glass-panel rounded-3xl p-6 flex flex-col gap-4 relative overflow-hidden group">
@@ -700,7 +742,7 @@ export default function MusicPage() {
                 </div>
               )}
             </div>
-            <ScrollBar className="opacity-0 hover:opacity-100 transition-opacity" />
+            <ScrollBar />
           </ScrollArea>
         </div>
       </div>

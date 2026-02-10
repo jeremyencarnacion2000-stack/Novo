@@ -49,16 +49,7 @@ export function ChatbotSidebar() {
 
     return (
         <div className="fixed right-0 top-0 bottom-0 z-50 flex pointer-events-none">
-            {/* Toggle Button (Visible when collapsed) */}
-            <div className={`pointer-events-auto transition-all duration-300 ${sidebarCollapsed ? 'translate-x-0' : 'translate-x-full'}`}>
-                <Button
-                    onClick={() => setSidebarCollapsed(false)}
-                    className="fixed right-6 bottom-6 h-14 w-14 rounded-full shadow-2xl bg-[#0B0B0F] border border-indigo-500/30 hover:bg-[#15151A] hover:scale-105 transition-all group"
-                >
-                    <div className="absolute inset-0 rounded-full bg-indigo-500/10 group-hover:bg-indigo-500/20 blur-md transition-all" />
-                    <Bot className="h-6 w-6 text-indigo-400 relative z-10" />
-                </Button>
-            </div>
+            {/* Toggle Button removed - now controlled by MiniChatbot */}
 
             {/* Sidebar Panel - Cognitive Layer */}
             <div
@@ -107,50 +98,52 @@ export function ChatbotSidebar() {
                 )}
 
                 {/* Messages Area */}
-                <ScrollArea className="flex-1 p-4">
-                    <div className="space-y-6 pb-4">
-                        {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-6 opacity-0 animate-in fade-in zoom-in-95 duration-700 fill-mode-forwards delay-100">
-                                <div className="relative group">
-                                    <div className="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-full animate-pulse-slow group-hover:bg-indigo-500/20 transition-all duration-1000" />
-                                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-white/5 flex items-center justify-center backdrop-blur-md relative z-10 shadow-2xl group-hover:scale-105 transition-transform duration-500">
-                                        <Brain className="h-8 w-8 text-indigo-400/50" />
+                <div className="flex-1 min-h-0 overflow-hidden">
+                    <ScrollArea className="h-full w-full p-4">
+                        <div className="space-y-6 pb-4">
+                            {messages.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-6 opacity-0 animate-in fade-in zoom-in-95 duration-700 fill-mode-forwards delay-100">
+                                    <div className="relative group">
+                                        <div className="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-full animate-pulse-slow group-hover:bg-indigo-500/20 transition-all duration-1000" />
+                                        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-white/5 flex items-center justify-center backdrop-blur-md relative z-10 shadow-2xl group-hover:scale-105 transition-transform duration-500">
+                                            <Brain className="h-8 w-8 text-indigo-400/50" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 max-w-[240px]">
+                                        <p className="text-xs font-mono text-indigo-400/80 tracking-widest uppercase">System Ready</p>
+                                        <p className="text-[10px] text-muted-foreground/50 font-mono">
+                                            Cognitive layer active. Awaiting input.
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="space-y-2 max-w-[240px]">
-                                    <p className="text-xs font-mono text-indigo-400/80 tracking-widest uppercase">System Ready</p>
-                                    <p className="text-[10px] text-muted-foreground/50 font-mono">
-                                        Cognitive layer active. Awaiting input.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                            )}
 
-                        {messages.map((message) => (
-                            <Message
-                                key={message.id}
-                                message={message}
-                                onCopy={() => { }}
-                                onRetry={() => { }}
-                                onLike={() => { }}
-                                onDislike={() => { }}
-                            />
-                        ))}
+                            {messages.map((message) => (
+                                <Message
+                                    key={message.id}
+                                    message={message}
+                                    onCopy={() => { }}
+                                    onRetry={() => { }}
+                                    onLike={() => { }}
+                                    onDislike={() => { }}
+                                />
+                            ))}
 
-                        {streamingMessage && (
-                            <Message
-                                message={streamingMessage}
-                                onCopy={() => { }}
-                                onRetry={() => { }}
-                                onLike={() => { }}
-                                onDislike={() => { }}
-                            />
-                        )}
-                    </div>
-                </ScrollArea>
+                            {streamingMessage && (
+                                <Message
+                                    message={streamingMessage}
+                                    onCopy={() => { }}
+                                    onRetry={() => { }}
+                                    onLike={() => { }}
+                                    onDislike={() => { }}
+                                />
+                            )}
+                        </div>
+                    </ScrollArea>
+                </div>
 
                 {/* Input Area */}
-                <div className="p-4 bg-[#0B0B0F]/80 backdrop-blur-xl border-t border-white/5 relative z-20">
+                <div className="p-4 bg-[#0B0B0F]/80 backdrop-blur-xl border-t border-white/5 shrink-0">
                     <ChatInput onSend={sendMessage} disabled={isLoading} />
                 </div>
             </div>

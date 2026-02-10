@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
 import { calculateCourseGrade, percentageToLetter } from '@/lib/gpa-calculator';
 
 // GET /api/school/courses - Get all courses for user
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 // POST /api/school/courses - Create new course
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -85,11 +86,19 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, code, credits, semester, year, professor, color } = body;
+        const { name, code, credits, semester, year, professor, color, educationType } = body;
 
-        if (!name || !code || !credits || !semester || !year) {
+        if (!name || !semester || !year) {
             return NextResponse.json(
                 { error: 'Missing required fields' },
+                { status: 400 }
+            );
+        }
+
+        // Require code and credits only for university
+        if (educationType !== 'high_school' && (!code || !credits)) {
+            return NextResponse.json(
+                { error: 'Course code and credits are required for university courses' },
                 { status: 400 }
             );
         }
@@ -98,12 +107,13 @@ export async function POST(request: NextRequest) {
             data: {
                 userId: user.id,
                 name,
-                code,
-                credits: parseFloat(credits),
+                code: code || null,
+                credits: credits ? parseFloat(credits) : null,
                 semester,
                 year: parseInt(year),
                 professor: professor || null,
                 color: color || '#3b82f6',
+                educationType: educationType || 'university',
             },
             include: {
                 grades: true,

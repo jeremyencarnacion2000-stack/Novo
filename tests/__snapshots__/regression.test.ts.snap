@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Regression Regression: Estoy cansado y no sé por dónde empezar 1`] = `"MESSAGE"`;
+
+exports[`Regression Regression: Tengo que estudiar mañana 1`] = `"MESSAGE"`;

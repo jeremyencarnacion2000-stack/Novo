@@ -5,7 +5,7 @@ import { QuickActions } from '@/components/quick-actions'
 import { RecentActivity } from '@/components/recent-activity'
 import { DashboardHabits } from '@/components/dashboard-habits'
 import { useSettings } from '@/lib/settings-context'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export default function DashboardClient() {
   const { settings } = useSettings()
@@ -25,7 +25,7 @@ export default function DashboardClient() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRefreshKey(prev => prev + 1)
+      setRefreshKey((prev: number) => prev + 1)
     }, 30000)
     return () => clearInterval(interval)
   }, [])

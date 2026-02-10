@@ -5,6 +5,7 @@ import { Routine } from '@/types/routine'
 import { RoutineDetailView } from './routine-detail-view'
 import { ActiveWorkoutSession } from './active-workout-session'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface RoutineDetailDialogProps {
   open: boolean
@@ -32,12 +33,15 @@ export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }
   }
 
   if (isWorkoutActive) {
-    return (
+    if (typeof document === 'undefined') return null
+
+    return createPortal(
       <ActiveWorkoutSession
         routine={routine}
         onComplete={handleCompleteWorkout}
         onCancel={handleCancelWorkout}
-      />
+      />,
+      document.body
     )
   }
 

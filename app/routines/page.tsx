@@ -8,13 +8,16 @@ import { RoutineDialog } from '@/components/routines/routine-dialog'
 import { ImportRoutineDialog } from '@/components/routines/import-routine-dialog'
 import { Routine } from '@/types/routine'
 import { RoutineDetailDialog } from '@/components/routines/routine-detail-dialog'
-import { useRoutines } from '@/hooks/use-swr'
+import { useRoutines, ROUTINE_STATS_KEY } from '@/hooks/use-swr'
+import { useSWRConfig } from 'swr'
+
 import { useToast } from '@/hooks/use-toast'
-import { FitnessTracker } from '@/components/fitness/fitness-tracker'
+
 import { RoutineStatsCard } from '@/components/routines/routine-stats'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
+  const { mutate: globalMutate } = useSWRConfig()
   const { toast } = useToast()
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export default function RoutinesPage() {
       })
       if (response.ok) {
         mutate()
+        globalMutate(ROUTINE_STATS_KEY)
         setDialogOpen(false)
         toast({
           title: 'Routine created',
@@ -73,6 +77,7 @@ export default function RoutinesPage() {
       })
       if (response.ok) {
         mutate()
+        globalMutate(ROUTINE_STATS_KEY)
         setDialogOpen(false)
         setEditingRoutine(undefined)
         toast({
@@ -103,6 +108,7 @@ export default function RoutinesPage() {
       })
       if (response.ok) {
         mutate()
+        globalMutate(ROUTINE_STATS_KEY)
         toast({
           title: 'Routine deleted',
           description: 'Your routine has been deleted successfully.',
@@ -143,6 +149,7 @@ export default function RoutinesPage() {
       })
       if (response.ok) {
         mutate()
+        globalMutate(ROUTINE_STATS_KEY)
         setImportDialogOpen(false)
         toast({
           title: 'Import successful',
@@ -208,6 +215,7 @@ export default function RoutinesPage() {
           throw new Error("Failed to update routine")
         }
         mutate()
+        globalMutate(ROUTINE_STATS_KEY)
       } catch (error) {
         console.error('Error updating routine progress:', error)
         toast({
@@ -265,10 +273,7 @@ export default function RoutinesPage() {
         onView={handleView}
       />
 
-      {/* Fitness Tracker Section */}
-      <div className="mt-8">
-        <FitnessTracker />
-      </div>
+
 
       <RoutineDialog
         open={dialogOpen}

@@ -17,12 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface Course {
     id?: string;
     name: string;
-    code: string;
-    credits: number;
+    code?: string;
+    credits?: number;
     semester: string;
     year: number;
     professor?: string;
     color: string;
+    educationType: string;
 }
 
 interface CourseDialogProps {
@@ -49,11 +50,12 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
     const [formData, setFormData] = React.useState<Course>({
         name: '',
         code: '',
-        credits: 3,
+        credits: 1,
         semester: 'Fall',
         year: currentYear,
         professor: '',
         color: '#3b82f6',
+        educationType: 'university',
     });
 
     React.useEffect(() => {
@@ -63,11 +65,12 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
             setFormData({
                 name: '',
                 code: '',
-                credits: 3,
+                credits: 1,
                 semester: 'Fall',
                 year: currentYear,
                 professor: '',
                 color: '#3b82f6',
+                educationType: 'university',
             });
         }
     }, [course, currentYear, open]);
@@ -103,31 +106,35 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
                         </div>
 
                         {/* Course Code */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="code">Course Code *</Label>
-                            <Input
-                                id="code"
-                                placeholder="e.g., CS 101"
-                                value={formData.code}
-                                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                                required
-                            />
-                        </div>
+                        {formData.educationType !== 'high_school' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="code">Course Code *</Label>
+                                <Input
+                                    id="code"
+                                    placeholder="e.g., CS 101"
+                                    value={formData.code}
+                                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        )}
 
                         {/* Credits */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="credits">Credits *</Label>
-                            <Input
-                                id="credits"
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                placeholder="3"
-                                value={formData.credits}
-                                onChange={(e) => setFormData({ ...formData, credits: parseFloat(e.target.value) })}
-                                required
-                            />
-                        </div>
+                        {formData.educationType !== 'high_school' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="credits">Credits *</Label>
+                                <Input
+                                    id="credits"
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    placeholder="3"
+                                    value={formData.credits}
+                                    onChange={(e) => setFormData({ ...formData, credits: parseFloat(e.target.value) })}
+                                    required
+                                />
+                            </div>
+                        )}
 
                         {/* Semester and Year */}
                         <div className="grid grid-cols-2 gap-4">
@@ -164,6 +171,23 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
                             </div>
                         </div>
 
+                        {/* Education Type */}
+                        <div className="grid gap-2">
+                            <Label htmlFor="educationType">Education Type *</Label>
+                            <Select
+                                value={formData.educationType}
+                                onValueChange={(value) => setFormData({ ...formData, educationType: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select education type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="university">Universitario</SelectItem>
+                                    <SelectItem value="high_school">Secundaria</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         {/* Professor */}
                         <div className="grid gap-2">
                             <Label htmlFor="professor">Professor (optional)</Label>
@@ -184,8 +208,8 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
                                         key={color.value}
                                         type="button"
                                         className={`w-8 h-8 rounded-full border-2 transition-all ${formData.color === color.value
-                                                ? 'border-primary scale-110'
-                                                : 'border-transparent hover:scale-105'
+                                            ? 'border-primary scale-110'
+                                            : 'border-transparent hover:scale-105'
                                             }`}
                                         style={{ backgroundColor: color.value }}
                                         onClick={() => setFormData({ ...formData, color: color.value })}

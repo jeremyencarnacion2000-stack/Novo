@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
 import { calculateCourseGrade, percentageToLetter } from '@/lib/gpa-calculator';
 
 // GET /api/school/courses/[id] - Get single course with grades
@@ -9,7 +10,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -68,7 +69,7 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -83,7 +84,7 @@ export async function PUT(
         }
 
         const body = await request.json();
-        const { name, code, credits, semester, year, professor, color } = body;
+        const { name, code, credits, semester, year, professor, color, educationType } = body;
 
         const course = await prisma.course.findFirst({
             where: {
@@ -100,12 +101,13 @@ export async function PUT(
             where: { id: params.id },
             data: {
                 name: name ?? course.name,
-                code: code ?? course.code,
-                credits: credits !== undefined ? parseFloat(credits) : course.credits,
+                code: code !== undefined ? (code || null) : course.code,
+                credits: credits !== undefined ? (credits ? parseFloat(credits) : null) : course.credits,
                 semester: semester ?? course.semester,
                 year: year !== undefined ? parseInt(year) : course.year,
                 professor: professor !== undefined ? professor : course.professor,
                 color: color ?? course.color,
+                educationType: educationType ?? course.educationType,
             },
             include: {
                 grades: true,
@@ -128,7 +130,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -158,10 +160,10 @@ export async function DELETE(
         });
 
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error deleting course:', error);
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Internal server error', details: error.message },
             { status: 500 }
         );
     }

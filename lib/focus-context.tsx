@@ -130,7 +130,45 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
   // Initialize Audio
   useEffect(() => {
     audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3")
+
+    // Load state from localStorage
+    const savedState = localStorage.getItem('novo-focus-state')
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState)
+        setModeState(parsed.mode || 'work')
+        setTime(parsed.time)
+        setPomodoroCount(parsed.pomodoroCount || 0)
+        setInitialTime(parsed.initialTime || parsed.time)
+        // We don't auto-start the timer for safety
+        setIsActive(false)
+      } catch (e) {
+        console.error('Failed to parse saved focus state', e)
+      }
+    }
   }, [])
+
+  // Save state to localStorage
+  useEffect(() => {
+    const stateToSave = {
+      mode,
+      time,
+      pomodoroCount,
+      initialTime,
+      updatedAt: Date.now()
+    }
+
+    // Only save if it's not the default state or if it's active
+    const isDefaultTime = time === (mode === 'work' ? activeProfile.workDuration * 60 :
+      mode === 'shortBreak' ? activeProfile.shortBreakDuration * 60 :
+        activeProfile.longBreakDuration * 60)
+
+    if (!isDefaultTime || pomodoroCount > 0) {
+      localStorage.setItem('novo-focus-state', JSON.stringify(stateToSave))
+    } else {
+      localStorage.removeItem('novo-focus-state')
+    }
+  }, [mode, time, pomodoroCount, initialTime, activeProfile])
 
   // Update volume when settings change
   useEffect(() => {
@@ -148,8 +186,14 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
         case 'shortBreak': newTime = activeProfile.shortBreakDuration * 60; break;
         case 'longBreak': newTime = activeProfile.longBreakDuration * 60; break;
       }
-      setTime(newTime)
-      setInitialTime(newTime)
+
+      // Only set time if it's a fresh start for this mode/profile
+      // We check if the current time is the same as the previous mode's initial time
+      // to avoid resetting a paused timer.
+      if (time === 0 || time === initialTime) {
+        setTime(newTime)
+        setInitialTime(newTime)
+      }
     }
   }, [activeProfile, mode, isActive])
 
@@ -252,6 +296,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
       case 'longBreak': newTime = activeProfile.longBreakDuration * 60; break;
     }
     setTime(newTime)
+    localStorage.removeItem('novo-focus-state')
   }
 
   const skipTimer = () => {
