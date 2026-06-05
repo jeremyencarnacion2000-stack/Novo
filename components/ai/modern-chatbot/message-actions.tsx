@@ -26,38 +26,38 @@ export function MessageActions({ message, onCopy, onRetry, onLike, onDislike, on
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
                 onClick={handleCopy}
-                className="p-1.5 hover:bg-accent rounded transition-colors"
+                className="p-1.5 hover:bg-white/10 rounded transition-colors"
                 title="Copiar"
             >
-                <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                <Copy className="w-3.5 h-3.5 text-white/40 hover:text-white/70" />
             </button>
 
             {message.role === 'assistant' && (
                 <>
                     <button
                         onClick={onRetry}
-                        className="p-1.5 hover:bg-accent rounded transition-colors"
+                        className="p-1.5 hover:bg-white/10 rounded transition-colors"
                         title="Regenerar"
                     >
-                        <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                        <RotateCcw className="w-3.5 h-3.5 text-white/40 hover:text-white/70" />
                     </button>
 
                     <button
                         onClick={onLike}
-                        className={`p-1.5 hover:bg-accent rounded transition-colors ${message.liked ? 'bg-accent' : ''
+                        className={`p-1.5 hover:bg-white/10 rounded transition-colors ${message.liked ? 'bg-white/10' : ''
                             }`}
                         title="Me gusta"
                     >
-                        <ThumbsUp className={`w-3.5 h-3.5 ${message.liked ? 'text-green-500' : 'text-muted-foreground'}`} />
+                        <ThumbsUp className={`w-3.5 h-3.5 ${message.liked ? 'text-green-400' : 'text-white/40 hover:text-white/70'}`} />
                     </button>
 
                     <button
                         onClick={onDislike}
-                        className={`p-1.5 hover:bg-accent rounded transition-colors ${message.disliked ? 'bg-accent' : ''
+                        className={`p-1.5 hover:bg-white/10 rounded transition-colors ${message.disliked ? 'bg-white/10' : ''
                             }`}
                         title="No me gusta"
                     >
-                        <ThumbsDown className={`w-3.5 h-3.5 ${message.disliked ? 'text-red-500' : 'text-muted-foreground'}`} />
+                        <ThumbsDown className={`w-3.5 h-3.5 ${message.disliked ? 'text-red-400' : 'text-white/40 hover:text-white/70'}`} />
                     </button>
                 </>
             )}
@@ -65,15 +65,15 @@ export function MessageActions({ message, onCopy, onRetry, onLike, onDislike, on
             {message.role === 'user' && onEdit && (
                 <button
                     onClick={onEdit}
-                    className="p-1.5 hover:bg-accent rounded transition-colors"
+                    className="p-1.5 hover:bg-white/10 rounded transition-colors"
                     title="Editar"
                 >
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Pencil className="w-3.5 h-3.5 text-white/40 hover:text-white/70" />
                 </button>
             )}
 
             {copied && (
-                <span className="text-xs text-green-500 ml-1">Copiado!</span>
+                <span className="text-xs text-green-400 ml-1">Copiado!</span>
             )}
         </div>
     );

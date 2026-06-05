@@ -1,8 +1,8 @@
 'use client'
 
-import { ReactNode, useEffect, useRef, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { usePlayerStore } from '@/lib/player-store'
+import { useToast } from '@/components/ui/use-toast'
 
 interface GlobalPlayerProps {
   children: ReactNode
@@ -10,280 +10,261 @@ interface GlobalPlayerProps {
 
 declare global {
   interface Window {
-    onSpotifyWebPlaybackSDKReady: () => void;
-    Spotify: any;
+    onYouTubeIframeAPIReady: () => void;
+    YT: any;
   }
 }
 
 export function GlobalPlayer({ children }: GlobalPlayerProps) {
-  const { data: session } = useSession()
   const playerRef = useRef<any>(null)
-  const [isPremium, setIsPremium] = useState(false)
-  const [spotifyToken, setSpotifyToken] = useState<string | null>(null)
+  const apiLoadedRef = useRef(false)
+  
   const {
-    setDeviceId,
-    setReady,
     currentTrack,
     isPlaying,
     volume,
     nextTrack,
     setProgress,
+    setReady,
+    isReady
   } = usePlayerStore()
 
-  // Check if user has Premium account and get the correct token
-  useEffect(() => {
-    async function checkPremium() {
-      try {
-        const response = await fetch('/api/spotify/has-token')
-        const data = await response.json()
-        setIsPremium(data.isPremium || false)
-        if (data.hasToken && data.accessToken) {
-          console.log('GlobalPlayer: Spotify Token Found. Premium:', data.isPremium, 'Product:', data.product)
-          setSpotifyToken(data.accessToken)
-          usePlayerStore.getState().setAccessToken(data.accessToken)
-        } else {
-          console.log('GlobalPlayer: No Spotify Token found')
-          setSpotifyToken(null)
-        }
-      } catch (error) {
-        setIsPremium(false)
-        setSpotifyToken(null)
-      }
-    }
+  const { toast } = useToast()
 
-    // We check premium if we have ANY session, because we might have a Spotify cookie
-    if (session) {
-      checkPremium()
-    }
-  }, [session])
+  // Refs to prevent redundant triggers
+  const lastProcessedTrackId = useRef<string | null>(null)
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const consecutiveErrors = useRef<number>(0)
 
-  // Ref to hold the latest token to avoid closure staleness
-  const tokenRef = useRef<string | null>(null)
+  // ─── Mobile detection (pointer coarse = touch device) ────────────────────
+  // On mobile, we NEVER auto-load the YouTube script reactively.
+  // It must come from a real onClick event dispatched via 'youtube:load-api'.
+  const isMobile = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1
 
-  useEffect(() => {
-    tokenRef.current = spotifyToken
-  }, [spotifyToken])
+  // ─── Facade: Core API loader — called only on demand ───────────────────────
+  function loadYouTubeAPI() {
+    if (apiLoadedRef.current) return
+    apiLoadedRef.current = true
 
-  useEffect(() => {
-    // Only load SDK if we have a verified Spotify token AND user is Premium
-    if (!spotifyToken || !isPremium) {
-      if (playerRef.current) {
-        console.log('Disconnecting Spotify SDK because user is not Premium or token is missing')
-        playerRef.current.disconnect()
-        playerRef.current = null
-        setReady(false)
-        setDeviceId('')
-      }
-
-      // Also remove the script tag if it exists
-      const script = document.getElementById('spotify-player-sdk')
-      if (script) {
-        console.log('Removing Spotify SDK script for Free user')
-        script.remove()
-      }
-
-      // Clear the global ready callback
-      window.onSpotifyWebPlaybackSDKReady = () => { }
-
-      return
-    }
-
-    // Load Spotify Web Playback SDK
-    if (!window.Spotify) {
-      const script = document.createElement('script')
-      script.src = 'https://sdk.scdn.co/spotify-player.js'
-      script.async = true
-      script.id = 'spotify-player-sdk'
-      if (!document.getElementById('spotify-player-sdk')) {
-        document.body.appendChild(script)
-      }
-    }
-
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      const player = new window.Spotify.Player({
-        name: 'Novo Music Player',
-        getOAuthToken: async (cb: (token: string) => void) => {
-          // Fetch a fresh token when the SDK requests it
-          try {
-            const response = await fetch('/api/spotify/has-token')
-            const data = await response.json()
-            if (data.hasToken && data.accessToken) {
-              console.log('Refreshing Spotify token for SDK...')
-              cb(data.accessToken)
-              // Update local state as well
-              setSpotifyToken(data.accessToken)
-              usePlayerStore.getState().setAccessToken(data.accessToken)
-            } else {
-              console.warn('Failed to refresh Spotify token for SDK', data)
-              cb(tokenRef.current || '')
-            }
-          } catch (error) {
-            console.error('Error fetching fresh token for SDK:', error)
-            cb(tokenRef.current || '')
-          }
+    window.onYouTubeIframeAPIReady = () => {
+      playerRef.current = new window.YT.Player('youtube-player-container', {
+        height: '1',
+        width: '1',
+        videoId: '',
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          enablejsapi: 1,
+          origin: typeof window !== 'undefined' ? window.location.origin : '*'
         },
-        volume: volume
-      })
-
-      // Error handling
-      player.addListener('initialization_error', ({ message }: any) => {
-        console.error('Spotify initialization error:', message)
-        setReady(false)
-      })
-      player.addListener('authentication_error', ({ message }: any) => {
-        console.error('Spotify authentication error:', message)
-        setReady(false)
-      })
-      player.addListener('account_error', ({ message }: any) => {
-        console.error('Spotify account error:', message)
-      })
-      player.addListener('playback_error', ({ message }: any) => {
-        console.error('Spotify playback error:', message)
-      })
-
-      // Ready
-      player.addListener('ready', ({ device_id }: any) => {
-        console.log('Spotify Player Ready with Device ID', device_id)
-        setDeviceId(device_id)
-        setReady(true)
-      })
-
-      player.addListener('not_ready', ({ device_id }: any) => {
-        console.log('Spotify Player Not Ready', device_id)
-        setReady(false)
-      })
-
-      // Player state changed
-      player.addListener('player_state_changed', (state: any) => {
-        if (!state) return
-
-        // Update progress
-        setProgress(state.position)
-
-        // Lógica de Cambio Automático (Auto-play)
-        const isTrackEnd = (state.paused && state.position === 0 && state.duration > 0) ||
-          (state.paused && (state.position === 0 || state.position === state.duration) &&
-            (!state.restrictions?.disallow_resuming_reasons || state.restrictions.disallow_resuming_reasons.length === 0));
-
-        if (isTrackEnd) {
-          console.log('GlobalPlayer: Fin de canción detectado. Pasando al siguiente track...')
-          nextTrack()
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
         }
       })
-
-      player.connect().then((success: boolean) => {
-        if (success) {
-          console.log('The Web Playback SDK successfully connected to Spotify!')
-        }
-      })
-
-      playerRef.current = player
     }
 
-    // If script is already loaded, manually trigger ready
-    if (window.Spotify) {
-      window.onSpotifyWebPlaybackSDKReady()
-    }
-
-    return () => {
-      if (playerRef.current) {
-        playerRef.current.disconnect()
-      }
-    }
-  }, [spotifyToken, isPremium])
-
-  // Play/pause control (only for Premium)
-  useEffect(() => {
-    if (!playerRef.current || !isPremium) return
-
-    if (isPlaying) {
-      playerRef.current.resume()
-    } else {
-      playerRef.current.pause()
-    }
-  }, [isPlaying, isPremium])
-
-  // Volume control (only for Premium)
-  useEffect(() => {
-    if (!playerRef.current || !isPremium) return
-    playerRef.current.setVolume(volume)
-  }, [volume, isPremium])
-
-  // Play track when currentTrack changes (only for Premium)
-  useEffect(() => {
-    if (!playerRef.current || !currentTrack || !spotifyToken || !isPremium) return
-
-    const deviceId = usePlayerStore.getState().deviceId
-    if (!deviceId) return
-
-    const playTrack = async (token: string) => {
-      try {
-        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            uris: [currentTrack.uri]
-          })
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error('Spotify play error:', response.status, errorData)
-
-          // If unauthorized or forbidden, try to refresh the token once
-          if (response.status === 401 || response.status === 403) {
-            console.log('Token might be stale or invalid, attempting to refresh...')
-            const refreshRes = await fetch('/api/spotify/has-token')
-            const data = await refreshRes.json()
-
-            if (data.hasToken && data.accessToken && data.accessToken !== token) {
-              setSpotifyToken(data.accessToken)
-              usePlayerStore.getState().setAccessToken(data.accessToken)
-              setIsPremium(data.isPremium)
-              // The effect will re-run with the new token
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error playing track:', error)
-      }
-    }
-
-    playTrack(spotifyToken)
-  }, [currentTrack?.id, spotifyToken, isPremium, usePlayerStore.getState().deviceId])
-
-  // Timer-based auto-next for Free users
-  useEffect(() => {
-    if (isPremium) return
-
-    console.log(`GlobalPlayer (Free): State Check - isPlaying: ${isPlaying}, Track: ${currentTrack?.name}, Duration: ${currentTrack?.duration_ms}ms`)
-
-    if (!isPlaying || !currentTrack?.duration_ms) {
-      console.log('GlobalPlayer (Free): Timer not started - isPlaying is false or duration is missing.')
+    // If the YT API was already injected (e.g. hot reload), initialize immediately
+    if (window.YT && window.YT.Player) {
+      window.onYouTubeIframeAPIReady()
       return
     }
 
-    // Use full duration + buffer. 
-    // Note: For real playlists, the embed handles audio transition internally, 
-    // but this timer keeps our store/UI in sync.
-    const BUFFER = 5000
-    const triggerTime = currentTrack.duration_ms + BUFFER
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    tag.async = true
+    const firstScriptTag = document.getElementsByTagName('script')[0]
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag)
+  }
 
-    console.log(`GlobalPlayer (Free): Starting auto-next timer. Will trigger in ${triggerTime}ms`)
-
-    const timer = setTimeout(() => {
-      console.log('GlobalPlayer (Free): Timer reached! Triggering nextTrack().')
-      nextTrack()
-    }, triggerTime)
+  // ─── 1. Deferred initialization: strictly event-driven ────────────────────
+  // The ONLY allowed trigger is the 'youtube:load-api' CustomEvent, which is
+  // dispatched exclusively from real onClick handlers in ContextHub.
+  // NO passive listeners (scroll, pointermove, touchstart) are used.
+  useEffect(() => {
+    const handleLoadRequest = () => loadYouTubeAPI()
+    window.addEventListener('youtube:load-api', handleLoadRequest)
 
     return () => {
-      console.log('GlobalPlayer (Free): Clearing auto-next timer (cleanup).')
-      clearTimeout(timer)
+      window.removeEventListener('youtube:load-api', handleLoadRequest)
+      if (playerRef.current?.destroy) {
+        playerRef.current.destroy()
+        playerRef.current = null
+      }
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
     }
-  }, [currentTrack?.id, isPlaying, isPremium, nextTrack])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  return <>{children}</>
+  // ─── Auto-load only on DESKTOP when a track is selected programmatically ──
+  // On mobile (isMobile=true), we skip this reactive trigger entirely to
+  // prevent main-thread injection during hydration.
+  useEffect(() => {
+    if (!isMobile && currentTrack?.id) {
+      loadYouTubeAPI()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack?.id])
+
+  function onPlayerReady(event: any) {
+    console.log('YouTube Player Ready')
+    setReady(true)
+    event.target.setVolume(volume * 100)
+    
+    // Start syncing progress
+    startProgressSync()
+  }
+
+  function startProgressSync() {
+    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
+    
+    syncIntervalRef.current = setInterval(() => {
+      if (playerRef.current?.getCurrentTime && isPlaying) {
+        const currentTime = playerRef.current.getCurrentTime()
+        // YT returns seconds, setProgress expects milliseconds
+        if (currentTime > 0) {
+          setProgress(Math.floor(currentTime * 1000))
+        }
+      }
+    }, 1000)
+  }
+
+  function onPlayerStateChange(event: any) {
+    const YT_STATE_PLAYING = 1
+    const YT_STATE_PAUSED = 2
+    const YT_STATE_ENDED = 0
+
+    if (event.data === YT_STATE_ENDED) {
+       console.log('GlobalPlayer: Track ended natively in YT player.')
+       const state = usePlayerStore.getState()
+       
+       if (state.currentTrack && state.currentTrack.id !== lastProcessedTrackId.current) {
+         lastProcessedTrackId.current = state.currentTrack.id
+         
+         // Notify user
+         toast({
+           title: "Autoplay",
+           description: `Playing next...`,
+           duration: 3000,
+         });
+
+         nextTrack()
+       }
+    }
+  }
+
+  function onPlayerError(event: any) {
+    console.error('YouTube Player Error:', event.data)
+    consecutiveErrors.current += 1
+    
+    if (consecutiveErrors.current >= 3) {
+      toast({
+        title: "Error de reproducción",
+        description: "Demasiados errores de reproducción consecutivos. Se detuvo para evitar bucles.",
+        variant: "destructive"
+      })
+      usePlayerStore.getState().togglePlayPause() // Stop playing
+      consecutiveErrors.current = 0
+      return
+    }
+
+    toast({
+        title: "Playback Error",
+        description: "This track could not be played. Skipping to next.",
+        variant: "destructive"
+    })
+    nextTrack()
+  }
+
+  // 2. Playback Control: Reacting to ZUSTAND changes
+  useEffect(() => {
+    // Crucial: Only proceed if player is initialized and methods exist
+    if (!playerRef.current || !isReady || typeof playerRef.current.loadVideoById !== 'function') {
+        return;
+    }
+
+    if (currentTrack?.id) {
+        // Safe check for getVideoData which might not be ready yet
+        let currentlyLoadedVideoId = '';
+        try {
+            if (typeof playerRef.current.getVideoData === 'function') {
+                currentlyLoadedVideoId = playerRef.current.getVideoData()?.video_id;
+            }
+        } catch (e) {
+            // Method might be unavailable early in hydration
+        }
+        
+        // If the video ID changed, we need to load the new video
+        if (currentTrack.id !== currentlyLoadedVideoId) {
+            console.log(`GlobalPlayer: Loading new video ID: ${currentTrack.id}`)
+            consecutiveErrors.current = 0 // Reset error count when starting a new track
+            if (typeof playerRef.current.loadVideoById === 'function') {
+                playerRef.current.loadVideoById(currentTrack.id)
+            }
+            lastProcessedTrackId.current = null // Reset block
+            
+            // We don't need to manually call playVideo if loadVideoById is used 
+            // but we'll ensure the state is synced
+            if (!isPlaying) {
+              playerRef.current.pauseVideo();
+            }
+
+            // Persistence: Record History
+            fetch('/api/music/history', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trackId: currentTrack.id,
+                title: currentTrack.name,
+                artist: currentTrack.artist,
+                artistId: currentTrack.artistId || '',
+                thumbnail: currentTrack.image,
+              })
+            }).catch(err => console.error('Failed to record history:', err));
+        } else {
+            // Video is already loaded, handle play/pause sync
+            const playerState = playerRef.current.getPlayerState?.();
+            const YT_PLAYING = 1;
+            const YT_PAUSED = 2;
+
+            if (isPlaying && playerState !== YT_PLAYING) {
+                playerRef.current.playVideo?.();
+            } else if (!isPlaying && playerState === YT_PLAYING) {
+                playerRef.current.pauseVideo?.();
+            }
+        }
+    } else {
+        if (typeof playerRef.current.stopVideo === 'function') {
+            playerRef.current.stopVideo()
+        }
+    }
+  }, [currentTrack?.id, isPlaying, isReady])
+
+  // 3. Volume control
+  useEffect(() => {
+    if (!playerRef.current || !isReady) return
+    // YT volume is 0-100
+    if (typeof playerRef.current.setVolume === 'function') {
+        playerRef.current.setVolume(Math.floor(volume * 100))
+    }
+  }, [volume, isReady])
+
+  // 4. Seek Control (TODO: Need a separate signal in Zustand if we want explicit seeking vs polling progress)
+  // For now, seeking is handled by updating progress in the store. We'd need an event channel to tell this component "Seek now".
+
+  return (
+    <>
+      <div 
+        id="youtube-player-container" 
+        className="fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none -z-50 overflow-hidden" 
+        aria-hidden="true"
+      />
+      {children}
+    </>
+  )
 }

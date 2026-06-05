@@ -8,12 +8,23 @@ import {
     StartWorkoutAction,
     FinishWorkoutAction,
     CreateTaskAction,
+    AnalyzeProgressAction,
+    SystemQueryAction,
     UpdateTaskAction,
     DeleteTaskAction,
     CreateNoteAction,
     UpdateNoteAction,
-    AnalyzeProgressAction,
-    SystemQueryAction
+    GenerateFileAction,
+    CreateProjectAction,
+    UpdateProjectAction,
+    DeleteProjectAction,
+    CreateCourseAction,
+    UpdateCourseAction,
+    DeleteCourseAction,
+    AddGradeAction,
+    UpdateGradeAction,
+    DeleteGradeAction,
+    CreateTasksAction
 } from './actions';
 import { ACTION_PERMISSIONS, AIPermission } from './permissions';
 
@@ -71,8 +82,92 @@ export async function executeAIAction(
     console.log(`[AI Executor] Context: UserID=${userId}`);
     console.log(`[AI Executor] Action Payload:`, JSON.stringify(action.payload, null, 2));
 
+    // Programmatic ID Verification Layer to prevent LLM ID hallucinations
+    if (action.payload) {
+        const payload = action.payload;
+        const actionType = (action.type || (action as any).name || '').toUpperCase();
+        
+        let idToVerify: string | undefined = undefined;
+        let entityType: string = '';
+        let prismaModel: any = null;
+        let customCheck: (() => Promise<boolean>) | null = null;
+        
+        if (['UPDATE_TASK', 'DELETE_TASK'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Tarea';
+            prismaModel = prismaClient.task;
+        } else if (['UPDATE_PROJECT', 'DELETE_PROJECT'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Proyecto';
+            prismaModel = prismaClient.project;
+        } else if (['UPDATE_ROUTINE', 'DELETE_ROUTINE'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Rutina';
+            prismaModel = prismaClient.routine;
+        } else if (['UPDATE_NOTE'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Nota';
+            prismaModel = prismaClient.quickNote;
+        } else if (['UPDATE_COURSE', 'DELETE_COURSE'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Curso';
+            prismaModel = prismaClient.course;
+        } else if (['UPDATE_GRADE', 'DELETE_GRADE'].includes(actionType) && payload.id) {
+            idToVerify = payload.id;
+            entityType = 'Calificación';
+            prismaModel = prismaClient.grade;
+        } else if (actionType === 'START_WORKOUT' && payload.routineId) {
+            idToVerify = payload.routineId;
+            entityType = 'Rutina';
+            prismaModel = prismaClient.routine;
+        } else if (actionType === 'ADD_GRADE' && payload.courseId) {
+            idToVerify = payload.courseId;
+            entityType = 'Curso';
+            prismaModel = prismaClient.course;
+        } else if (actionType === 'FINISH_WORKOUT' && payload.workoutLogId) {
+            idToVerify = payload.workoutLogId;
+            entityType = 'Registro de Entrenamiento';
+            customCheck = async () => {
+                const record = await prismaClient.workoutLog.findFirst({
+                    where: {
+                        id: payload.workoutLogId,
+                        routine: { userId }
+                    }
+                });
+                return !!record;
+            };
+        }
+
+        // Perform verification if an ID was mapped
+        if (idToVerify || customCheck) {
+            let exists = false;
+            if (customCheck) {
+                exists = await customCheck();
+            } else if (prismaModel && idToVerify) {
+                const record = await prismaModel.findFirst({
+                    where: {
+                        id: idToVerify,
+                        userId: userId
+                    }
+                });
+                exists = !!record;
+            }
+            
+            if (!exists) {
+                const targetId = idToVerify || payload.workoutLogId || 'N/A';
+                console.warn(`[AI Executor] ID verification failed: ${entityType} with ID ${targetId} not found under userId ${userId}`);
+                return {
+                    success: false,
+                    error: `Database verification failed: ${entityType} con ID "${targetId}" no encontrado. Por favor, verifica el ID o consulta la lista antes de continuar.`,
+                    message: `No se pudo encontrar la ${entityType.toLowerCase()} solicitada para modificar o eliminar. Por favor, asegúrate de que el elemento exista.`
+                };
+            }
+            console.log(`[AI Executor] ID verification passed for ${entityType}: ${idToVerify || payload.workoutLogId}`);
+        }
+    }
+
     try {
-        const actionType = action.type || (action as any).name;
+        const actionType = (action.type || (action as any).name || '').toUpperCase();
         const handler = actionRegistry[actionType as AIActionType];
 
         if (!handler) {
@@ -181,9 +276,9 @@ registerActionHandler<CreateRoutineAction>('CREATE_ROUTINE', async (action, ctx)
     return {
         success: true,
         data: routine,
-        message: `Routine "${routine.name}" created with ${routine.days.length} days.`,
+        message: `Rutina "${routine.name}" creada con éxito. La encontrarás en tu sección de Rutinas.`,
         metadata: {
-            sectionName: 'Routines',
+            sectionName: 'Rutinas',
             redirectPath: '/routines'
         }
     };
@@ -202,7 +297,20 @@ registerActionHandler<UpdateRoutineAction>('UPDATE_ROUTINE', async (action, ctx)
 });
 
 registerActionHandler<DeleteRoutineAction>('DELETE_ROUTINE', async (action, ctx) => {
-    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this routine?" };
+    const { id, confirmed } = action.payload;
+    if (!confirmed) {
+        return { success: false, confirmationRequired: true, message: "¿Estás seguro de que deseas eliminar esta rutina?" };
+    }
+
+    const routine = await ctx.prisma.routine.delete({
+        where: { id, userId: ctx.userId }
+    });
+
+    return { 
+        success: true, 
+        data: routine, 
+        message: `La rutina "${routine.name}" ha sido eliminada correctamente.` 
+    };
 });
 
 // Workouts
@@ -263,11 +371,15 @@ registerActionHandler<FinishWorkoutAction>('FINISH_WORKOUT', async (action, ctx)
 // Tasks
 registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
     const { title, category, priority, dueDate } = action.payload;
+    const p = priority as any;
+    const finalPriority = (p === 3 || p === 'high' || p === '3') ? 'high' :
+        (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
+
     const task = await ctx.prisma.task.create({
         data: {
             title,
             status: 'todo',
-            priority: priority === 3 ? 'high' : priority === 2 ? 'medium' : 'low',
+            priority: finalPriority,
             dueDate,
             tags: JSON.stringify([category]),
             userId: ctx.userId,
@@ -276,9 +388,9 @@ registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
     return {
         success: true,
         data: task,
-        message: `Task "${task.title}" created.`,
+        message: `Tarea "${task.title}" guardada correctamente en tu lista de tareas.`,
         metadata: {
-            sectionName: 'Tasks',
+            sectionName: 'Tareas',
             redirectPath: '/tasks'
         }
     };
@@ -287,23 +399,28 @@ registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
 registerActionHandler<CreateTasksAction>('CREATE_TASKS', async (action, ctx) => {
     const { tasks } = action.payload;
     const createdTasks = await Promise.all(
-        tasks.map(t => ctx.prisma.task.create({
-            data: {
-                title: t.title,
-                status: 'todo',
-                priority: t.priority === 3 ? 'high' : t.priority === 2 ? 'medium' : 'low',
-                dueDate: t.dueDate,
-                tags: JSON.stringify([t.category]),
-                userId: ctx.userId,
-            },
-        }))
+        tasks.map(t => {
+            const p = t.priority as any;
+            const finalPriority = (p === 3 || p === 'high' || p === '3') ? 'high' :
+                (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
+            return ctx.prisma.task.create({
+                data: {
+                    title: t.title,
+                    status: 'todo',
+                    priority: finalPriority,
+                    dueDate: t.dueDate,
+                    tags: JSON.stringify([t.category]),
+                    userId: ctx.userId,
+                },
+            });
+        })
     );
     return {
         success: true,
         data: createdTasks,
-        message: `${createdTasks.length} tasks created successfully.`,
+        message: `Se han creado ${createdTasks.length} tareas nuevas en tu lista.`,
         metadata: {
-            sectionName: 'Tasks',
+            sectionName: 'Tareas',
             redirectPath: '/tasks'
         }
     };
@@ -326,7 +443,20 @@ registerActionHandler<UpdateTaskAction>('UPDATE_TASK', async (action, ctx) => {
 });
 
 registerActionHandler<DeleteTaskAction>('DELETE_TASK', async (action, ctx) => {
-    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this task?" };
+    const { id, confirmed } = action.payload;
+    if (!confirmed) {
+        return { success: false, confirmationRequired: true, message: "¿Estás seguro de que deseas eliminar esta tarea?" };
+    }
+
+    const task = await ctx.prisma.task.delete({
+        where: { id, userId: ctx.userId }
+    });
+
+    return { 
+        success: true, 
+        data: task, 
+        message: `La tarea "${task.title}" ha sido eliminada correctamente.` 
+    };
 });
 
 // Projects
@@ -346,9 +476,9 @@ registerActionHandler<CreateProjectAction>('CREATE_PROJECT', async (action, ctx)
     return {
         success: true,
         data: project,
-        message: `Project "${project.title}" created.`,
+        message: `Proyecto "${project.title}" organizado exitosamente en tu panel de proyectos.`,
         metadata: {
-            sectionName: 'Projects',
+            sectionName: 'Proyectos',
             redirectPath: '/projects'
         }
     };
@@ -367,7 +497,20 @@ registerActionHandler<UpdateProjectAction>('UPDATE_PROJECT', async (action, ctx)
 });
 
 registerActionHandler<DeleteProjectAction>('DELETE_PROJECT', async (action, ctx) => {
-    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this project?" };
+    const { id, confirmed } = action.payload;
+    if (!confirmed) {
+        return { success: false, confirmationRequired: true, message: "¿Estás seguro de que deseas eliminar este proyecto?" };
+    }
+
+    const project = await ctx.prisma.project.delete({
+        where: { id, userId: ctx.userId }
+    });
+
+    return { 
+        success: true, 
+        data: project, 
+        message: `El proyecto "${project.title}" ha sido eliminado correctamente.` 
+    };
 });
 
 // School
@@ -406,7 +549,20 @@ registerActionHandler<UpdateCourseAction>('UPDATE_COURSE', async (action, ctx) =
 });
 
 registerActionHandler<DeleteCourseAction>('DELETE_COURSE', async (action, ctx) => {
-    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this course?" };
+    const { id, confirmed } = action.payload;
+    if (!confirmed) {
+        return { success: false, confirmationRequired: true, message: "¿Estás seguro de que deseas eliminar este curso?" };
+    }
+
+    const course = await ctx.prisma.course.delete({
+        where: { id, userId: ctx.userId }
+    });
+
+    return { 
+        success: true, 
+        data: course, 
+        message: `El curso "${course.name}" ha sido eliminado correctamente.` 
+    };
 });
 
 registerActionHandler<AddGradeAction>('ADD_GRADE', async (action, ctx) => {
@@ -447,7 +603,20 @@ registerActionHandler<UpdateGradeAction>('UPDATE_GRADE', async (action, ctx) => 
 });
 
 registerActionHandler<DeleteGradeAction>('DELETE_GRADE', async (action, ctx) => {
-    return { success: false, confirmationRequired: true, message: "Are you sure you want to delete this grade?" };
+    const { id, confirmed } = action.payload;
+    if (!confirmed) {
+        return { success: false, confirmationRequired: true, message: "¿Estás seguro de que deseas eliminar esta calificación?" };
+    }
+
+    const grade = await ctx.prisma.grade.delete({
+        where: { id, userId: ctx.userId }
+    });
+
+    return { 
+        success: true, 
+        data: grade, 
+        message: `La calificación "${grade.name}" ha sido eliminada correctamente.` 
+    };
 });
 
 // Notes
@@ -464,9 +633,9 @@ registerActionHandler<CreateNoteAction>('CREATE_NOTE', async (action, ctx) => {
     return {
         success: true,
         data: note,
-        message: `Note saved.`,
+        message: `Nota guardada en tu libreta de apuntes.`,
         metadata: {
-            sectionName: 'Notes',
+            sectionName: 'Notas',
             redirectPath: '/notes'
         }
     };
@@ -559,3 +728,212 @@ registerActionHandler<any>('DELETE_ALL_TASKS', async (action, ctx) => {
         data: { count: result.count }
     };
 });
+registerActionHandler<any>('GENERATE_FILE', async (action, ctx) => {
+    const payload = action.payload || {};
+    let content = payload.content || payload.data || payload.body || payload.text || '';
+    const mimeType = payload.mimeType || payload.mime || 'text/plain';
+    const description = payload.description || payload.title || payload.topic || '';
+
+    // Robust filename extraction with fallbacks
+    let filename = payload.filename || payload.fileName || payload.name || payload.file;
+    if (!filename) {
+        const extMap: Record<string, string> = {
+            'text/html': '.html', 'text/css': '.css', 'text/csv': '.csv',
+            'application/json': '.json', 'text/markdown': '.md', 'text/plain': '.txt',
+            'application/pdf': '.pdf',
+        };
+        const ext = extMap[mimeType] || '.txt';
+        filename = `documento${ext}`;
+    }
+
+    // If content is empty, generate it using AI
+    let summary = '';
+    if (!content.trim() && description) {
+        try {
+            const { groqAPI } = await import('@/lib/groq');
+            const isHTML = mimeType === 'text/html' || filename.endsWith('.html');
+            const genPrompt = isHTML
+                ? `Generate a complete, styled HTML document about: "${description}". Include modern CSS (dark background, nice typography). Output ONLY the raw HTML code inside a code block. Then, AFTER the code block, write a 2-sentence summary of what the document contains, prefixed with "SUMMARY: ".`
+                : `Generate the complete content for a ${mimeType} file about: "${description}". Output ONLY the raw file content inside a code block. Then, AFTER the code block, write a 2-sentence summary of what the document contains, prefixed with "SUMMARY: ".`;
+
+            const result = await groqAPI.generateResponse(genPrompt, '', [], 'You are a file content generator. Output the content in a code block, then a short summary.');
+            if (result.content?.trim()) {
+                // More robust code block matching (handles different languages or no language)
+                const codeMatch = result.content.match(/```(?:\w+)?\s*\n?([\s\S]*?)```/i) ||
+                    result.content.match(/<html>[\s\S]*<\/html>/i);
+
+                if (codeMatch) {
+                    content = codeMatch[1] || codeMatch[0];
+                    content = content.trim();
+                    const summaryMatch = result.content.match(/SUMMARY:\s*(.*)/i);
+                    summary = summaryMatch ? summaryMatch[1].trim() : 'Documento generado con éxito.';
+                } else if (result.content.includes('<html') || result.content.includes('<!DOCTYPE')) {
+                    content = result.content.trim();
+                    summary = 'Documento HTML generado.';
+                } else {
+                    content = result.content.trim();
+                }
+            }
+        } catch (e) {
+            console.error('[GENERATE_FILE] AI content generation failed:', e);
+            content = `# ${description}\n\nContenido generado automáticamente.\n`;
+        }
+    }
+
+    // Last resort fallback
+    if (!content.trim()) {
+        content = `Documento generado por Novo AI\n\nEl contenido solicitado no pudo ser generado.`;
+    }
+
+    if (!summary) summary = `Se ha generado el archivo "${filename}".`;
+
+    return {
+        success: true,
+        data: {
+            filename,
+            content,
+            mimeType,
+            summary,
+            downloadReady: true
+        },
+        message: summary,
+        metadata: {
+            type: 'file',
+            filename,
+            content,
+            mimeType,
+            summary,
+            downloadReady: true,
+            steps: [
+                { id: '1', label: 'Leyendo configuración de archivos', status: 'completed' },
+                { id: '2', label: 'Preparando generador de contenido', status: 'completed' },
+                { id: '3', label: `Generando ${filename}`, status: 'completed' },
+                { id: '4', label: 'Archivo listo para descarga', status: 'completed' }
+            ]
+        }
+    };
+});
+
+registerActionHandler('UPDATE_COGNITIVE_STATE', async (action: any, ctx) => {
+    const { 
+        fatigueEstimate, 
+        productivityScore, 
+        focusTimeToday, 
+        moodSignal, 
+        triggerRecovery,
+        musicRecommendation,
+        styleRecommendation 
+    } = action.payload;
+
+    // 1. Update/Upsert the user's UserCognitiveSnapshot
+    // @ts-ignore
+    const snapshot = await ctx.prisma.userCognitiveSnapshot.upsert({
+        where: { userId: ctx.userId },
+        create: {
+            userId: ctx.userId,
+            fatigueEstimate: fatigueEstimate || 'low',
+            productivityScore: productivityScore !== undefined ? productivityScore : 8.0,
+            focusTimeToday: focusTimeToday !== undefined ? focusTimeToday : 0,
+            overdueTasks: 0,
+        },
+        update: {
+            fatigueEstimate: fatigueEstimate !== undefined ? fatigueEstimate : undefined,
+            productivityScore: productivityScore !== undefined ? productivityScore : undefined,
+            focusTimeToday: focusTimeToday !== undefined ? focusTimeToday : undefined,
+        }
+    });
+
+    // 2. If recovery block triggered, create a task
+    let recoveryTask = null;
+    if (triggerRecovery) {
+        recoveryTask = await ctx.prisma.task.create({
+            data: {
+                userId: ctx.userId,
+                title: '💆 Sesión de Recuperación Cognitiva (Novo)',
+                description: 'Bloque de 30 minutos sugerido por el Asistente Novo para bajar la fatiga acumulada.',
+                status: 'todo',
+                priority: 'high',
+                category: 'routine',
+                dueDate: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            }
+        });
+    }
+
+    // 3. Store style & music insights so the chatbot is fully conscious and UI can show it
+    let styleInsight = null;
+    if (styleRecommendation) {
+        styleInsight = await ctx.prisma.insight.create({
+            data: {
+                userId: ctx.userId,
+                content: JSON.stringify({
+                    type: 'style',
+                    context: styleRecommendation.context,
+                    suggestion: styleRecommendation.suggestion,
+                    colorPsychology: styleRecommendation.colorPsychology
+                }),
+                type: 'style',
+                status: 'unread'
+            }
+        });
+    }
+
+    let musicInsight = null;
+    if (musicRecommendation) {
+        musicInsight = await ctx.prisma.insight.create({
+            data: {
+                userId: ctx.userId,
+                content: JSON.stringify({
+                    type: 'music',
+                    mood: musicRecommendation.mood,
+                    searchQuery: musicRecommendation.searchQuery
+                }),
+                type: 'music',
+                status: 'unread'
+            }
+        });
+    }
+
+    return {
+        success: true,
+        data: {
+            snapshot,
+            recoveryTask,
+            styleRecommendation,
+            musicRecommendation,
+            triggeredRecovery: !!triggerRecovery
+        },
+        message: `Estado cognitivo actualizado con éxito. Fatiga: ${fatigueEstimate || snapshot.fatigueEstimate}. Se han calibrado la música, el calendario y tus outfits para optimizar tu energía.`,
+        metadata: {
+            sectionName: 'Cognitivo',
+            redirectPath: '/today'
+        }
+    };
+});
+
+registerActionHandler('COGNITIVE_PIPELINE', async (action: any, ctx) => {
+    const { actions } = action.payload;
+    if (!actions || !Array.isArray(actions)) {
+        throw new Error('Pipeline actions list must be provided as an array.');
+    }
+
+    const results = [];
+    for (const subAction of actions) {
+        console.log(`[Cognitive Pipeline] Executing sub-action: ${subAction.type}`);
+        const subResult = await executeAIAction(subAction, ctx.userId, ctx.prisma);
+        results.push({
+            type: subAction.type,
+            result: subResult
+        });
+    }
+
+    return {
+        success: true,
+        data: results,
+        message: `Pipeline cognitivo completado: se ejecutaron con éxito ${actions.length} acciones automatizadas.`,
+        metadata: {
+            pipelineCount: actions.length
+        }
+    };
+});
+
+

@@ -3,11 +3,41 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function PATCH(
+export async function GET(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return new NextResponse('Unauthorized', { status: 401 })
+        }
+
+        const note = await prisma.quickNote.findUnique({
+            where: {
+                id,
+                userId: session.user.id
+            }
+        })
+
+        if (!note) {
+            return new NextResponse('Not Found', { status: 404 })
+        }
+
+        return NextResponse.json(note)
+    } catch (error) {
+        console.error('[NOTE_GET]', error)
+        return new NextResponse('Internal Error', { status: 500 })
+    }
+}
+
+export async function PATCH(
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return new NextResponse('Unauthorized', { status: 401 })
@@ -18,7 +48,7 @@ export async function PATCH(
 
         const note = await prisma.quickNote.update({
             where: {
-                id: params.id,
+                id,
                 userId: session.user.id
             },
             data: {
@@ -39,9 +69,10 @@ export async function PATCH(
 
 export async function DELETE(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return new NextResponse('Unauthorized', { status: 401 })
@@ -49,7 +80,7 @@ export async function DELETE(
 
         await prisma.quickNote.delete({
             where: {
-                id: params.id,
+                id,
                 userId: session.user.id
             }
         })

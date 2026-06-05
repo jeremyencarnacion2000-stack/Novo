@@ -28,7 +28,8 @@ export class GroqAPIClient {
         context: string,
         history: ConversationMessage[] = [],
         systemPrompt?: string,
-        model: string = 'qwen/qwen3-32b'
+        model: string = 'qwen-2.5-coder-32b',
+        temperature: number = 0.7
     ): Promise<{ content: string }> {
         const apiKey = process.env.GROQ_API_KEY;
 
@@ -80,7 +81,7 @@ export class GroqAPIClient {
                 body: JSON.stringify({
                     model,
                     messages,
-                    temperature: 0.7,
+                    temperature,
                     max_tokens: 4096,
                     top_p: 0.95,
                     stream: false
@@ -114,7 +115,7 @@ export class GroqAPIClient {
 
     async getModels(): Promise<string[]> {
         return [
-            'qwen/qwen3-32b',
+            'qwen-2.5-coder-32b',
             'llama-3.3-70b-versatile',
             'llama-3.1-8b-instant',
             'mixtral-8x7b-32768',

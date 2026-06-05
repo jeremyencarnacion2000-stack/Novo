@@ -5,12 +5,14 @@ const createJestConfig = nextJest({
   dir: './',
 })
 
-// Add any custom config to be passed to Jest
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   testEnvironmentOptions: {
     customExportConditions: [''],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(msw|@mswjs)/)',

@@ -4,9 +4,12 @@ export type AIActionType =
     | 'delete_task'
     | 'create_project'
     | 'create_routine'
+    | 'create_checklist'
+    | 'create_habit'
     | 'analyze_image'
     | 'analyze_file'
-    | 'generate_suggestion';
+    | 'generate_suggestion'
+    | 'categorize_note';
 
 export interface AIActionPayload {
     [key: string]: any;

@@ -8,7 +8,7 @@ export interface CourseGrade {
 
 export interface Course {
     id: string;
-    credits: number;
+    credits: number | null;
     finalGrade?: number;
     letterGrade?: string;
     grades: CourseGrade[];
@@ -74,19 +74,19 @@ export function letterToGPA(letter: string): number {
 /**
  * Calculate GPA from courses
  */
-export function calculateGPA(courses: Course[]): number {
+export function calculateGPA(courses: any[]): number {
     if (courses.length === 0) return 0;
 
-    const totalCredits = courses.reduce((sum, c) => sum + c.credits, 0);
+    const totalCredits = (courses as any[]).reduce((sum, c) => sum + (c.credits || 0), 0);
 
     if (totalCredits === 0) return 0;
 
-    const weightedSum = courses.reduce((sum, c) => {
+    const weightedSum = (courses as any[]).reduce((sum, c) => {
         // Use stored final grade if available, otherwise calculate
-        const courseGrade = c.finalGrade ?? calculateCourseGrade(c.grades);
+        const courseGrade = c.finalGrade ?? calculateCourseGrade(c.grades || []);
         const letter = c.letterGrade ?? percentageToLetter(courseGrade);
         const gpa = letterToGPA(letter);
-        return sum + (gpa * c.credits);
+        return sum + (gpa * (c.credits || 0));
     }, 0);
 
     return Number((weightedSum / totalCredits).toFixed(2));

@@ -15,13 +15,17 @@ interface RoutineDetailViewProps {
 }
 
 export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailViewProps) {
-    const [activeDayId, setActiveDayId] = useState<string>(
-        routine.days && routine.days.length > 0 ? routine.days[0].id : ''
-    )
+    const [activeDayId, setActiveDayId] = useState<string>(() => {
+        if (!routine.days || routine.days.length === 0) return ''
 
-    // This state would ideally be persisted to the backend
-    // For now, we'll just manage it locally for the UI demo
-    // In a real app, onWeekdayChange would call an API endpoint
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+        const todayWeekday = days[new Date().getDay()]
+
+        const todayDay = routine.days.find(d => d.weekday?.toLowerCase() === todayWeekday)
+        return todayDay ? todayDay.id : routine.days[0].id
+    })
+
+    // This state is initialized from the routine data
     const [dayWeekdays, setDayWeekdays] = useState<Record<string, string>>(() => {
         const initial: Record<string, string> = {}
         routine.days?.forEach(day => {
@@ -30,9 +34,28 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
         return initial
     })
 
-    const handleWeekdayChange = (dayId: string, weekday: string) => {
-        setDayWeekdays(prev => ({ ...prev, [dayId]: weekday }))
-        // TODO: Call API to update day.weekday
+    const handleWeekdayChange = async (dayId: string, weekday: string) => {
+        const newWeekdays = { ...dayWeekdays, [dayId]: weekday }
+        setDayWeekdays(newWeekdays)
+
+        // Persist to backend 
+        try {
+            const updatedDays = routine.days?.map(d => ({
+                ...d,
+                weekday: d.id === dayId ? weekday : (dayWeekdays[d.id] || d.weekday)
+            }))
+
+            await fetch(`/api/routines/${routine.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...routine,
+                    days: updatedDays
+                })
+            })
+        } catch (e) {
+            console.error('[RoutineDetail] Failed to update weekday:', e)
+        }
     }
 
     if (!routine.days || routine.days.length === 0) {
@@ -50,15 +73,19 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
     ]
 
     return (
-        <div className="flex flex-col h-full space-y-6">
+        <div className="flex flex-col space-y-6">
             {/* Header Info */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold break-words">{routine.name}</h2>
-                    <div className="text-muted-foreground whitespace-pre-line text-sm mt-2 break-words">
-                        {routine.description}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+                <div className="space-y-3 md:space-y-4 w-full md:w-auto">
+                    <div>
+                        <h2 className="text-xl md:text-3xl font-bold break-words pr-4 md:pr-8 leading-tight">{routine.name}</h2>
+                        {routine.description && (
+                            <p className="text-muted-foreground whitespace-pre-line text-xs md:text-sm mt-1 md:mt-2 break-words leading-relaxed max-w-2xl opacity-80">
+                                {routine.description}
+                            </p>
+                        )}
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className="flex items-center gap-1">
                             <Clock className="h-3 w-3" /> {routine.duration} min
                         </Badge>
@@ -89,19 +116,20 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
             </div>
 
             {/* Days Tabs */}
-            <Tabs defaultValue={routine.days[0]?.id} className="w-full">
-                <TabsList className="w-full justify-start overflow-x-auto mb-4 bg-transparent border-b rounded-none h-auto p-0 space-x-6">
-                    {routine.days.map((day) => (
-                        <TabsTrigger
-                            key={day.id}
-                            value={day.id}
-                            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 py-2 text-muted-foreground data-[state=active]:text-foreground transition-none"
-                        >
-                            {day.name}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-
+            <Tabs defaultValue={routine.days[0]?.id} className="w-full flex flex-col">
+                <div className="w-full overflow-x-auto mb-4 custom-scrollbar border-b">
+                    <TabsList className="flex w-max min-w-full justify-start bg-transparent rounded-none h-auto p-0 space-x-6 shrink-0">
+                        {routine.days.map((day) => (
+                            <TabsTrigger
+                                key={day.id}
+                                value={day.id}
+                                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 py-2 text-muted-foreground data-[state=active]:text-foreground transition-none whitespace-nowrap shrink-0 flex-none"
+                            >
+                                {day.name}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </div>
                 {routine.days.map((day) => {
                     // Group exercises by muscleGroup (Section)
                     const sections: { [key: string]: typeof day.exercises } = {};
@@ -140,31 +168,39 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
                                     <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider pl-1 border-l-2 border-primary/50">
                                         {sectionName}
                                     </h3>
-                                    <div className="grid gap-3">
+                                    <div className="grid gap-2 sm:grid-cols-1">
                                         {exercises.map((exercise, index) => (
-                                            <Card key={index} className="p-4 border-l-4 border-l-primary/20 hover:border-l-primary transition-colors bg-card/50">
-                                                <div className="flex justify-between items-start gap-4">
-                                                    <div className="space-y-1 w-full">
-                                                        <h4 className="font-medium text-base break-words">{exercise.name}</h4>
-                                                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
-                                                            <Badge variant="secondary" className="font-normal">
-                                                                {exercise.sets} sets
+                                            <Card
+                                                key={index}
+                                                className="!p-3 !md:p-4 !gap-2 !py-3 !rounded-2xl border-l-4 border-l-primary/20 hover:border-l-primary transition-colors bg-card/50 overflow-hidden"
+                                            >
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <h4 className="font-bold text-sm md:text-base leading-tight break-words flex-1">
+                                                            {exercise.name}
+                                                        </h4>
+                                                        <div className="flex flex-wrap gap-1.5 shrink-0 justify-end">
+                                                            <Badge variant="secondary" className="font-bold text-[10px] md:text-xs">
+                                                                {exercise.sets} Sets
                                                             </Badge>
-                                                            <Badge variant="secondary" className="font-normal">
-                                                                {exercise.reps} reps
+                                                            <Badge variant="secondary" className="font-bold text-[10px] md:text-xs">
+                                                                {exercise.reps} Reps
                                                             </Badge>
-                                                            {exercise.tempo && (
-                                                                <Badge variant="outline" className="font-normal">
-                                                                    {exercise.tempo}
-                                                                </Badge>
-                                                            )}
                                                         </div>
-                                                        {exercise.notes && (
-                                                            <p className="text-sm text-muted-foreground mt-2 italic border-l-2 pl-2 border-primary/30 break-words">
-                                                                {exercise.notes}
-                                                            </p>
-                                                        )}
                                                     </div>
+
+                                                    {exercise.tempo && (
+                                                        <div className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5">
+                                                            <span className="font-bold text-primary italic uppercase tracking-wider">Tempo:</span>
+                                                            {exercise.tempo}
+                                                        </div>
+                                                    )}
+
+                                                    {exercise.notes && (
+                                                        <p className="text-xs text-muted-foreground/80 italic border-l-2 pl-2 border-primary/20 break-words leading-relaxed">
+                                                            {exercise.notes}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </Card>
                                         ))}
@@ -173,28 +209,31 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
                             ))}
                         </TabsContent>
                     );
-                })}
-            </Tabs>
+                })
+                }
+            </Tabs >
 
             {/* Checklist & Reminders */}
-            {routine.tasks && routine.tasks.length > 0 && (
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 sm:p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium pb-2 border-b border-amber-500/10">
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Checklist & Reminders</span>
-                    </div>
-                    <div className="space-y-2">
-                        {routine.tasks.map((task, idx) => (
-                            <div key={task.id || idx} className="flex items-start gap-3 group">
-                                <div className="mt-0.5 h-4 w-4 rounded border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:border-amber-500/60 transition-colors">
-                                    {task.completed && <div className="h-2.5 w-2.5 bg-amber-500 rounded-sm" />}
+            {
+                routine.tasks && routine.tasks.length > 0 && (
+                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 sm:p-5 space-y-3 mb-12">
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium pb-2 border-b border-amber-500/10">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Checklist & Reminders</span>
+                        </div>
+                        <div className="space-y-2">
+                            {routine.tasks.map((task, idx) => (
+                                <div key={task.id || idx} className="flex items-start gap-3 group">
+                                    <div className="mt-0.5 h-4 w-4 rounded border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:border-amber-500/60 transition-colors">
+                                        {task.completed && <div className="h-2.5 w-2.5 bg-amber-500 rounded-sm" />}
+                                    </div>
+                                    <span className="text-sm text-muted-foreground leading-relaxed break-words">{task.text}</span>
                                 </div>
-                                <span className="text-sm text-muted-foreground leading-relaxed break-words">{task.text}</span>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     )
 }

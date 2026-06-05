@@ -208,7 +208,8 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                 {/* Summary Stats - Interactive Buttons */}
                 <div className="grid grid-cols-3 gap-4 mt-auto">
                     {/* Stat 1: Total Time */}
-                    <button
+                    <motion.button
+                        layoutId="focus-time-metric-card"
                         onClick={() => setSelectedMetric('time')}
                         className={cn(
                             "rounded-[24px] p-5 border text-center transition-all duration-500 relative overflow-hidden group/btn",
@@ -225,7 +226,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                         <p className="text-2xl md:text-3xl font-black relative z-10">
                             {currentStats.totalTime} <span className="text-xs font-bold text-white/40 ml-1">Hr</span>
                         </p>
-                    </button>
+                    </motion.button>
 
                     {/* Stat 2: Productivity */}
                     <button

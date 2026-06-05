@@ -1,0 +1,86 @@
+﻿
+> my-v0-project@0.1.0 build C:\Users\User\Downloads\novo-desktop-mvp (2)
+> prisma db push --skip-generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "neondb", schema "public" at "ep-curly-sun-ae9ky46f-pooler.c-2.us-east-2.aws.neon.tech"
+
+The database is already in sync with the Prisma schema.
+
+node.exe :  ΓÜá Warning: Next.js inferred your workspace root, but it may not be correct.
+At C:\Users\User\AppData\Roaming\npm\pnpm.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( ΓÜá Warning: N...not be correct.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ We detected multiple lockfiles and selected the directory of C:\Users\User\pnpm-lock.yaml as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if 
+it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\User\Downloads\novo-desktop-mvp (2)\pnpm-lock.yaml
+
+   Γû▓ Next.js 16.0.7 (Turbopack)
+   - Environments: .env.local, .env
+   - Experiments (use with caution):
+     ┬╖ optimizePackageImports
+
+   Creating an optimized production build ...
+Error: Cannot apply unknown utility class `card--primary`
+    [2m[at onInvalidCandidate (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:21:1511)][0m
+    [2m[at Te (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:16:36038)][0m
+    [2m[at C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:21:355)][0m
+    [2m[at Tr (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:3:1718)][0m
+    [2m[at _ (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:3:1377)][0m
+    [2m[at Se (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:21:172)][0m
+    [2m[at ln (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:38:294)][0m
+    [2m[at async sn (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\tailwindcss@4.1.17\node_modules\tailwindcss\dist\lib.js:38:631)][0m
+    [2m[at async Qr (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\@tailwindcss+node@4.1.17\node_modules\@tailwindcss\node\dist\index.js:10:3385)][0m
+    [2m[at async I (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\@tailwindcss+postcss@4.1.17\node_modules\@tailwindcss\postcss\dist\index.js:10:3978)][0m
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./Downloads/novo-desktop-mvp (2)/app/globals.css
+Error evaluating Node.js code
+CssSyntaxError: tailwindcss: C:\Users\User\Downloads\novo-desktop-mvp (2)\app\globals.css:1:1: Cannot apply unknown 
+utility class `card--primary`
+    at Input.error (Downloads/novo-desktop-mvp 
+(2)/node_modules/.pnpm/postcss@8.5.6/node_modules/postcss/lib/input.js:135:16) 
+[C:\Users\User\Downloads\novo-desktop-mvp (2)\.next\build\chunks\9d0a4__pnpm_3294a405._.js:4651:22]
+    at Root.error (Downloads/novo-desktop-mvp 
+(2)/node_modules/.pnpm/postcss@8.5.6/node_modules/postcss/lib/node.js:146:32) 
+[C:\Users\User\Downloads\novo-desktop-mvp (2)\.next\build\chunks\9d0a4__pnpm_3294a405._.js:928:38]
+    [at Object.Once (C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\node_modules\.pnpm\@tailwindcss+postcss@4.1.17\node_modules\@tailwindcss\postcss\dist\index.js:10:6912)]
+    at async LazyResult.runAsync (Downloads/novo-desktop-mvp 
+(2)/node_modules/.pnpm/postcss@8.5.6/node_modules/postcss/lib/lazy-result.js:293:11) 
+[C:\Users\User\Downloads\novo-desktop-mvp (2)\.next\build\chunks\9d0a4__pnpm_3294a405._.js:6206:21]
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) 
+[C:\Users\User\Downloads\novo-desktop-mvp (2)\.next\build\chunks\[root-of-the-server]__4497ae04._.js:146:36]
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\.next\build\chunks\[root-of-the-server]__5c7792dd._.js:443:31]
+
+Import trace:
+  Client Component Browser:
+    ./Downloads/novo-desktop-mvp (2)/app/globals.css [Client Component Browser]
+    ./Downloads/novo-desktop-mvp (2)/app/layout.tsx [Server Component]
+
+
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) 
+[C:\Users\User\Downloads\novo-desktop-mvp (2)\.next\build\chunks\[root-of-the-server]__4497ae04._.js:146:36])
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [C:\Users\User\Downloads\novo-desktop-mvp 
+(2)\.next\build\chunks\[root-of-the-server]__5c7792dd._.js:443:31])
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.
+

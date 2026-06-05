@@ -187,7 +187,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className="bg-sidebar/30 backdrop-blur-[calc(var(--glass-blur,20)*1px)] saturate-[160%] text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
           style={
             {
               '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -244,7 +244,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          className="bg-[rgba(255,255,255,var(--glass-opacity))] backdrop-blur-[calc(var(--glass-blur,20)*1px)] saturate-[160%] border-r border-white/10 flex h-full w-full flex-col group-data-[variant=floating]:rounded-[40px] group-data-[variant=floating]:border group-data-[variant=floating]:shadow-xl"
         >
           {children}
         </div>
@@ -368,9 +368,13 @@ function SidebarSeparator({
   )
 }
 
-function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
+const SidebarContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
   return (
     <div
+      ref={ref}
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
@@ -380,7 +384,8 @@ function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
       {...props}
     />
   )
-}
+})
+SidebarContent.displayName = "SidebarContent"
 
 function SidebarGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (

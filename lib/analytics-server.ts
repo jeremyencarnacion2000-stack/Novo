@@ -308,3 +308,98 @@ export async function getAdvancedInsights(userId: string) {
         goals: goals.map(g => ({ title: g.title, progress: g.progress, status: g.status }))
     };
 }
+
+/**
+ * Internal Productivity Score Calculation
+ */
+function calculateProductivityScore(completions: number, totalTimeSeconds: number): number {
+    const hours = totalTimeSeconds / 3600;
+    const score = (completions * 10) + (hours * 5);
+    return Math.min(Math.round(score * 10) / 10, 100);
+}
+
+/**
+ * Updates or creates DailyAnalytics records
+ */
+export async function updateDailyAnalytics(userId: string, module: string = '', duration: number = 0, isCompletion: boolean = false) {
+    try {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        const existing = await prisma.dailyAnalytics.findUnique({
+            where: {
+                userId_date: {
+                    userId,
+                    date: today,
+                },
+            },
+        })
+
+        if (existing) {
+            const parsedModulesUsed = typeof existing.modulesUsed === 'string'
+                ? JSON.parse(existing.modulesUsed) as string[]
+                : (existing.modulesUsed as string[] || [])
+
+            const modulesUsed = module && !parsedModulesUsed.includes(module)
+                ? [...parsedModulesUsed, module]
+                : parsedModulesUsed
+
+            const newTotalTime = (existing.totalTime || 0) + duration
+            const newCompletions = isCompletion ? (existing.completions || 0) + 1 : (existing.completions || 0)
+            const newScore = calculateProductivityScore(newCompletions, newTotalTime)
+
+            await prisma.dailyAnalytics.update({
+                where: { id: existing.id },
+                data: {
+                    totalTime: newTotalTime,
+                    completions: newCompletions,
+                    modulesUsed: JSON.stringify(modulesUsed),
+                    productivityScore: newScore,
+                },
+            })
+        } else {
+            const completions = isCompletion ? 1 : 0
+            const score = calculateProductivityScore(completions, duration)
+            await prisma.dailyAnalytics.create({
+                data: {
+                    userId,
+                    date: today,
+                    totalTime: duration,
+                    completions,
+                    modulesUsed: JSON.stringify(module ? [module] : []),
+                    productivityScore: score,
+                },
+            })
+        }
+    } catch (error) {
+        console.error('Failed to update daily analytics:', error)
+    }
+}
+
+/**
+ * Track completion from server-side
+ */
+export async function trackServerCompletion(
+    userId: string,
+    type: 'task' | 'routine' | 'habit',
+    module: string = '',
+    metadata: any = {}
+) {
+    try {
+        const eventType = `${type}_complete`
+
+        await prisma.analyticsEvent.create({
+            data: {
+                userId,
+                eventType,
+                eventData: metadata ? JSON.stringify(metadata) : module,
+            },
+        })
+
+        // Update counts
+        await updateDailyAnalytics(userId, module, 0, true)
+
+    } catch (error) {
+        console.error(`Failed to track ${type} completion:`, error)
+    }
+}

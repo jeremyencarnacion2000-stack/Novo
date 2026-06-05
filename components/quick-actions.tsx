@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, CheckSquare, FolderKanban, Activity, Dumbbell, Calendar } from 'lucide-react'
+import { Plus, CheckSquare, FolderKanban, Activity, Dumbbell, Calendar, Mic } from 'lucide-react'
 import Link from 'next/link'
+import { VoiceAssistantButton } from './ai/voice-command-button'
 
 const createActions = [
   {
@@ -49,30 +50,38 @@ export function QuickActions() {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Command Center</CardTitle>
+        <CardTitle className="subtitle-technical">Command Center</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
+        {/* Voice Command Section */}
+        <div className="space-y-4">
+          <h3 className="subtitle-technical text-primary">
+            AI Assistant
+          </h3>
+          <VoiceAssistantButton className="w-full justify-center py-6 rounded-2xl" />
+        </div>
+
         {/* Create Section */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground/70 px-1">CREATE</h3>
-          <div className="grid gap-2">
+        <div className="space-y-4">
+          <h3 className="subtitle-technical">Actions</h3>
+          <div className="grid gap-3">
             {createActions.map((action) => {
               const Icon = action.icon
               return (
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className="justify-between h-auto py-2 px-3 hover:bg-secondary/50 group"
+                  className="justify-between h-auto py-3 px-4 rounded-xl bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08] group transition-all"
                   asChild
                 >
                   <Link href={action.href}>
                     <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-md bg-secondary text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <div className="p-2 rounded-lg bg-white/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
                         <Icon className="h-4 w-4" />
                       </div>
-                      <span className="font-medium text-sm">{action.title}</span>
+                      <span className="font-semibold text-xs tracking-tight opacity-70 group-hover:opacity-100">{action.title}</span>
                     </div>
-                    <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
+                    <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-white/5 bg-white/5 px-1.5 font-mono text-[9px] font-medium text-white/20 opacity-40 group-hover:opacity-100 transition-all">
                       {action.shortcut}
                     </kbd>
                   </Link>
@@ -83,42 +92,40 @@ export function QuickActions() {
         </div>
 
         {/* Register Section - Systemic Actions */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground/70 px-1 flex items-center gap-2">
-            SYSTEMIC <span className="h-px flex-1 bg-border/50"></span>
-          </h3>
-          <div className="grid gap-2">
+        <div className="space-y-4">
+          <h3 className="subtitle-technical">System logs</h3>
+          <div className="grid gap-3">
             {registerActions.map((action) => {
               const Icon = action.icon
-              const isProbable = action.title === 'Start Workout'; // Simulated prediction
+              const isProbable = action.title === 'Log Event'; // Corrected probability logic
 
               return (
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className={`justify-between h-auto py-2 px-3 group transition-all duration-300 ${isProbable
-                    ? 'bg-indigo-500/10 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:bg-indigo-500/20'
-                    : 'hover:bg-secondary/50 border border-transparent'
+                  className={`justify-between h-auto py-3 px-4 rounded-xl group transition-all duration-300 ${isProbable
+                    ? 'bg-primary/10 border border-primary/20 shadow-[0_10px_30px_rgba(var(--primary-rgb),0.1)] hover:bg-primary/20'
+                    : 'bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08]'
                     }`}
                   asChild
                 >
                   <Link href={action.href}>
                     <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-md transition-colors ${isProbable
-                        ? 'bg-indigo-500/20 text-indigo-400 group-hover:bg-indigo-500/30 group-hover:text-indigo-300'
-                        : 'bg-secondary/80 text-muted-foreground group-hover:bg-secondary group-hover:text-foreground'
+                      <div className={`p-2 rounded-lg transition-colors ${isProbable
+                        ? 'bg-primary/20 text-primary group-hover:bg-primary/30 group-hover:opacity-80'
+                        : 'bg-secondary/50 text-muted-foreground group-hover:bg-secondary group-hover:text-foreground'
                         }`}>
                         <Icon className="h-4 w-4" />
                       </div>
-                      <span className={`font-medium text-sm ${isProbable ? 'text-indigo-100' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                      <span className={`font-semibold text-xs tracking-tight ${isProbable ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
                         {action.title}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {isProbable && (
-                        <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse-cognitive shadow-[0_0_5px_rgba(99,102,241,0.8)]" />
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_var(--primary-glow)]" />
                       )}
-                      <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
+                      <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-white/10 bg-muted/30 px-1.5 font-mono text-[9px] font-medium text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity">
                         {action.shortcut}
                       </kbd>
                     </div>

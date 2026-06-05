@@ -1,11 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import React from 'react'
 import './globals.css'
 import ClientLayout from './client-layout'
-import { ChatbotSidebar } from '@/components/ai/modern-chatbot/chatbot-sidebar'
+// NOTE: ChatbotSidebar is lazy-loaded via next/dynamic in client-layout.tsx
+// Importing it here again would double-bundle it — removed.
 
-const inter = Inter({ subsets: ["latin"], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Novo - Productivity Hub',
@@ -27,6 +26,12 @@ export const metadata: Metadata = {
   },
 }
 
+// ─── Font Strategy: Self-hosted via CSS variable ─────────────────────────────
+// next/font/google requires network access to fonts.googleapis.com at build time.
+// To make builds resilient in offline/CI environments, we use a CSS variable
+// defined in globals.css that loads Inter via a local @font-face declaration.
+// The className below matches what Inter({ variable: '--font-sans' }) would produce.
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,47 +39,54 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full font-sans antialiased relative">
-        {/* Background Image Layer (Custom) */}
+      <body className="font-sans h-full antialiased relative">
+        {/* Background Image is now applied directly to the body in settings-context.tsx */}
+
+        {/* Dynamic Background Overlay - Level 0 (Gradients) — desktop only */}
         <div
-          className="fixed inset-0 z-[-2] pointer-events-none transition-opacity duration-700 ease-in-out"
+          className="bg-overlay fixed inset-0 z-[-2] pointer-events-none hidden md:block"
           style={{
-            backgroundImage: 'var(--bg-image, none)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            opacity: 1
+            backdropFilter: 'blur(var(--bg-blur-px, 0px))',
+            WebkitBackdropFilter: 'blur(var(--bg-blur-px, 0px))',
           }}
         />
 
-        {/* Dynamic Background Overlay - Level 0 (Gradients & Blur) */}
         <div
-          className="fixed inset-0 z-[-1] pointer-events-none transition-all duration-500 ease-in-out"
+          className="bg-gradient-overlay fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-500 ease-in-out hidden md:block"
           style={{
-            background: `
-              radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.25) 0%, transparent 60%),
-              radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.20) 0%, transparent 50%),
-              radial-gradient(circle at 15% 60%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
-              radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.10) 0%, transparent 50%),
-              linear-gradient(to bottom, rgba(2, 2, 3, 0.7), rgba(5, 5, 7, 0.8))
-            `,
-            backdropFilter: 'blur(var(--bg-blur, 60px))',
-            // If there's a background image, we might want to reduce the opacity of the base gradient
-            // but the radial gradients should stay for the "glow" effect.
-            // For now, we keep it as is, but the linear-gradient at the bottom might cover the image.
-            // Let's make the linear-gradient slightly transparent if an image is present.
+            background: 'var(--app-bg-overlay)'
           }}
         />
 
-        {/* Dynamic Dimness Overlay - The Secret Contrast Layer */}
+        {/* Dynamic Dimness Overlay — desktop only */}
         <div
-          className="fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-500 ease-in-out"
+          className="dimness-overlay fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-500 ease-in-out hidden md:block"
           style={{
-            background: 'linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.45))',
-            opacity: 1
+            background: '#000000',
+            opacity: 'var(--bg-dimness, 0.2)'
           }}
         />
         <ClientLayout>{children}</ClientLayout>
+
+        {/* Global SVG Liquid Gooey Filter */}
+        <svg
+          style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}
+          xmlns="http://www.w3.org/2000/svg"
+          version="1.1"
+        >
+          <defs>
+            <filter id="liquid-gooey">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+              <feColorMatrix
+                in="blur"
+                mode="matrix"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9"
+                result="goo"
+              />
+              <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+            </filter>
+          </defs>
+        </svg>
       </body>
     </html>
   )

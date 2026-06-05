@@ -1,408 +1,190 @@
-'use client'
+'use client';
 
-import React, { useEffect, useRef, useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { usePlayerStore } from '@/lib/player-store'
-import { useSettings } from '@/lib/settings-context'
-import { X, Play, Pause, SkipForward, SkipBack, Minimize2, Maximize2, Shuffle, Repeat, Repeat1, Volume2, VolumeX, Heart, AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
-import { cn } from '@/lib/utils'
+import React, { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { usePlayerStore } from '@/lib/player-store';
+import {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Volume2,
+  VolumeX
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
-interface Position {
-  x: number
-  y: number
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotate: number;
 }
 
 const FloatingMusicWidgetComponent = () => {
-  const pathname = usePathname()
-  const isMusicPage = pathname.startsWith('/music')
+  const pathname = usePathname();
+  const isMusicPage = pathname.startsWith('/music');
 
   const {
     currentTrack,
     isPlaying,
     isOpen,
-    currentPlaylist,
-    toggleOpen,
     togglePlayPause,
     nextTrack,
     previousTrack,
     setVolume,
     volume,
     progress,
-    isShuffle,
-    toggleShuffle,
-    repeatMode,
-    toggleRepeat,
-    deviceId
-  } = usePlayerStore()
+    isReady
+  } = usePlayerStore();
 
-  const [isPremium, setIsPremium] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
-  const { settings, updateSettings } = useSettings()
+  // Reward triggers
+  const [isRewarding, setIsRewarding] = useState(false);
+  const [rewardParticles, setRewardParticles] = useState<Particle[]>([]);
 
-  const [position, setPosition] = useState<Position>({ x: 20, y: 100 })
-  const initializedRef = useRef(false)
-  const positionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Initialize position from settings only once
+  // Decoupled Global Reward Listener for instant feedback
   useEffect(() => {
-    if (!initializedRef.current && settings.preferences?.fmwPosition) {
-      setPosition(settings.preferences.fmwPosition)
-      initializedRef.current = true
-    } else if (!initializedRef.current && typeof window !== 'undefined') {
-      // Default to bottom-right corner
-      setPosition({ x: window.innerWidth - 370, y: window.innerHeight - 220 })
-      initializedRef.current = true
-    }
-  }, []) // Only run once on mount
+    const handleHabitCompleted = () => {
+      setIsRewarding(true);
 
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 })
-  const widgetRef = useRef<HTMLDivElement | null>(null)
+      // Spawn dazzling crystal fragments
+      const newParticles: Particle[] = Array.from({ length: 15 }).map((_, idx) => ({
+        id: Date.now() + idx,
+        x: (Math.random() - 0.5) * 220,
+        y: (Math.random() - 0.5) * 160 - 30,
+        scale: Math.random() * 0.75 + 0.35,
+        rotate: Math.random() * 360
+      }));
+      setRewardParticles(newParticles);
 
-  // Check if user is Premium
-  useEffect(() => {
-    async function checkPremium() {
-      try {
-        const response = await fetch('/api/spotify/has-token')
-        const data = await response.json()
-        setIsPremium(data.isPremium || false)
-      } catch (error) {
-        setIsPremium(false)
-      }
-    }
-    if (pathname.startsWith('/music') || isOpen) {
-      checkPremium()
-    }
-  }, [pathname, isOpen])
+      setTimeout(() => {
+        setIsRewarding(false);
+      }, 2600);
 
-  // Save position to settings (debounced, only when dragging ends)
-  const savePosition = (pos: Position) => {
-    if (positionSaveTimeoutRef.current) {
-      clearTimeout(positionSaveTimeoutRef.current)
-    }
-    positionSaveTimeoutRef.current = setTimeout(() => {
-      updateSettings({
-        preferences: {
-          ...settings.preferences,
-          fmwPosition: pos
-        }
-      })
-    }, 500) // Debounce 500ms
-  }
+      setTimeout(() => {
+        setRewardParticles([]);
+      }, 1400);
+    };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isMusicPage) return // Disable dragging on music page
-    const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('a') || target.closest('.slider-container') || target.closest('iframe')) return
-    setIsDragging(true)
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
-  }
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return
-    const newX = e.clientX - dragStart.x
-    const newY = e.clientY - dragStart.y
-
-    const widgetWidth = 350
-    const widgetHeight = isPremium ? 250 : 180
-
-    const maxX = Math.max(0, window.innerWidth - widgetWidth - 20)
-    const maxY = Math.max(0, window.innerHeight - widgetHeight - 20)
-
-    setPosition({
-      x: Math.max(8, Math.min(newX, maxX)),
-      y: Math.max(8, Math.min(newY, maxY))
-    })
-  }
-
-  const handleMouseUp = () => {
-    if (isDragging) {
-      setIsDragging(false)
-      savePosition(position) // Save position when drag ends
-    }
-  }
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-      }
-    }
-  }, [isDragging, dragStart, isPremium])
-
-
-  // Don't show on auth pages
-  if (pathname.includes('/auth') || pathname.includes('/signin')) {
-    return null
-  }
-
-  if (!isOpen || !currentTrack) {
-    return null
-  }
+    window.addEventListener('habit-completed', handleHabitCompleted);
+    return () => window.removeEventListener('habit-completed', handleHabitCompleted);
+  }, []);
 
   const formatTime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000)
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+    const seconds = Math.floor(ms / 1000);
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-  const duration = currentTrack?.duration_ms || 0
-  const progressPercent = duration > 0 ? (progress / duration) * 100 : 0
+  const duration = currentTrack?.duration_ms || 0;
+  const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
 
-  // --- RENDER LOGIC ---
-
-  // 1. Free User / Embed Mode
-  if (!isPremium) {
-    let embedUrl: string
-    // Only use playlist embed if it's a real Spotify playlist ID (not our virtual IDs)
-    const isRealPlaylist = currentPlaylist &&
-      !currentPlaylist.id.includes('current-view') &&
-      !currentPlaylist.id.includes('trending-songs') &&
-      !currentPlaylist.id.includes('recently-played');
-
-    if (isRealPlaylist && currentPlaylist) {
-      embedUrl = `https://open.spotify.com/embed/playlist/${currentPlaylist.id}?utm_source=generator&theme=0&autoplay=1`
-    } else if (currentPlaylist?.id === 'trending-songs') {
-      // Use Global Top 50 for Trending Songs to get native controls and auto-play
-      embedUrl = `https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator&theme=0&autoplay=1`
-    } else if (currentTrack.albumId) {
-      // Use Album context for search results/recent tracks to get native controls
-      embedUrl = `https://open.spotify.com/embed/album/${currentTrack.albumId}?utm_source=generator&theme=0&autoplay=1`
-    } else if (currentTrack.id) {
-      embedUrl = `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0&autoplay=1`
-    } else if (currentTrack.artistId) {
-      embedUrl = `https://open.spotify.com/embed/artist/${currentTrack.artistId}?utm_source=generator&theme=0&autoplay=1`
-    } else {
-      embedUrl = `https://open.spotify.com/embed/track/${currentTrack.id}?utm_source=generator&theme=0&autoplay=1`
-    }
-
-    // Unified container for Free users to prevent iframe unmounting
+  // ─── MUSIC PAGE: Horizontal bottom bar player ───
+  if (isMusicPage && isOpen && currentTrack) {
     return (
       <div
-        ref={widgetRef}
-        onMouseDown={handleMouseDown}
-        className={cn(
-          "fixed z-50 transition-all duration-500 ease-in-out overflow-hidden shadow-2xl",
-          isMusicPage
-            ? "bottom-6 left-1/2 -translate-x-1/2 w-[600px] h-[80px] rounded-full bg-black/60 backdrop-blur-xl border border-white/10"
-            : "rounded-lg bg-gradient-to-br from-gray-900 to-black backdrop-blur-xl border border-white/10"
-        )}
-        style={!isMusicPage ? {
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: isMinimized ? 200 : 350,
-          transform: 'none'
-        } : {}}
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[680px] h-[85px] rounded-full bg-gradient-to-r from-[#0d0f0d]/95 via-[#141a14]/95 to-[#0b0c0a]/95 backdrop-blur-2xl border border-white/10 px-8 flex items-center justify-between shadow-[0_8px_32px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 transition-all overflow-hidden"
       >
-        {/* Header (Only in Floating Mode) */}
-        {!isMusicPage && (
-          <div className="flex items-center justify-between p-2 bg-black/40 text-white cursor-move">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              {currentTrack.image && (
-                <img src={currentTrack.image} alt={currentTrack.name} className={`rounded shadow-lg transition-all duration-300 ${isMinimized ? 'h-8 w-8' : 'h-10 w-10'}`} />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold truncate">{currentTrack.name}</p>
-                  <span className="text-[8px] px-1 bg-yellow-500/20 text-yellow-500 rounded border border-yellow-500/30 font-bold uppercase">Free</span>
-                </div>
-                {!isMinimized && <p className="text-[10px] text-gray-400 truncate">{currentTrack.artist}</p>}
+        {/* Left: Track Info with Rotating Vinyl Cover */}
+        <div className="flex items-center gap-4 w-[210px] relative z-10">
+          <div className="relative group flex-shrink-0">
+            {isPlaying && (
+              <span className="absolute inset-0 rounded-full bg-emerald-500/20 blur-md scale-105 animate-pulse" />
+            )}
+            <div
+              className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl animate-[spin_20s_linear_infinite]"
+              style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
+            >
+              <img src={currentTrack.image || '/placeholder-album.png'} alt={currentTrack.name} className="w-full h-full object-cover rounded-full" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.3)_0%,transparent_60%)] pointer-events-none rounded-full" />
+              <div className="absolute inset-2 border border-white/5 rounded-full" />
+              <div className="absolute inset-4 border border-black/40 rounded-full" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#0d0f0d] border border-white/20 shadow-inner flex items-center justify-center">
+                <div className="w-1 h-1 rounded-full bg-black" />
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
-              {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleOpen} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
-              <X className="h-3 w-3" />
-            </Button>
           </div>
-        )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-white text-sm font-bold truncate tracking-tight">{currentTrack.name}</span>
+            <span className="text-emerald-400/80 text-xs truncate font-medium">{currentTrack.artist}</span>
+          </div>
+        </div>
 
-        {/* Iframe (Persistent) */}
-        <div className={cn(
-          "transition-all duration-500",
-          isMusicPage ? "h-full w-full" : (isMinimized ? "h-0 overflow-hidden" : "h-[152px] w-full")
-        )}>
-          <iframe
-            src={embedUrl}
-            width="100%"
-            height={isMusicPage ? "80" : "152"}
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="eager"
-            className={cn(isMusicPage ? "rounded-full" : "rounded-b-lg")}
-          />
+        {/* Center: Controls */}
+        <div className="flex items-center gap-5 relative z-10">
+          <Button variant="ghost" size="icon" onClick={previousTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-9 w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
+            <SkipBack className="h-5 w-5 fill-current" />
+          </Button>
+          <Button
+            onClick={togglePlayPause}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all duration-300 active:scale-95 border border-white/10",
+              isPlaying
+                ? "bg-gradient-to-tr from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                : "bg-white hover:bg-gray-100 text-black"
+            )}
+            disabled={!isReady}
+          >
+            {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={nextTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-9 w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
+            <SkipForward className="h-5 w-5 fill-current" />
+          </Button>
+        </div>
+
+        {/* Right: Time & Volume */}
+        <div className="flex items-center gap-4 w-[210px] justify-end relative z-10">
+          <span className="text-xs text-white/50 font-mono tracking-wider tabular-nums bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+            {formatTime(progress)} <span className="opacity-40">/</span> {formatTime(duration)}
+          </span>
+          <div className="flex items-center gap-2 group relative">
+            <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 0.5 : 0)} className="text-white/50 hover:text-white hover:bg-white/5 h-8 w-8 rounded-full transition-colors">
+              {volume === 0 ? <VolumeX className="h-4 w-4 text-rose-400" /> : <Volume2 className="h-4 w-4" />}
+            </Button>
+            <div className="w-20 hidden group-hover:block transition-all duration-300 ease-in-out absolute right-9 bg-[#111411]/95 border border-white/10 p-2 rounded-lg shadow-xl -top-1">
+              <Slider value={[volume * 100]} max={100} step={1} onValueChange={(value) => setVolume(value[0] / 100)} className="cursor-pointer [&>[role=slider]]:bg-emerald-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Neon Progress Bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/5 overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 transition-all duration-1000 ease-linear shadow-[0_0_8px_#10b981]" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
-    )
+    );
   }
 
-  // 2. Premium User
-  // Unified container for Premium users to prevent UI unmounting
+  // Render only reward particles when not on `/music` (or minimized) to avoid overlapping ContextHub
   return (
-    <div
-      ref={widgetRef}
-      onMouseDown={handleMouseDown}
-      className={cn(
-        "fixed z-50 transition-all duration-500 ease-in-out overflow-hidden shadow-2xl",
-        isMusicPage
-          ? "bottom-6 left-1/2 -translate-x-1/2 w-[600px] h-[80px] rounded-full bg-black/60 backdrop-blur-xl border border-white/10 px-6 flex items-center justify-between"
-          : "rounded-lg bg-black/80 backdrop-blur-xl border border-white/10"
-      )}
-      style={!isMusicPage ? {
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: isMinimized ? 200 : 350,
-        transform: 'none'
-      } : {}}
-    >
-      {/* Background Blur Effect (Only in Floating Mode) */}
-      {!isMusicPage && currentTrack.image && (
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <img
-            src={currentTrack.image}
-            alt=""
-            className="w-full h-full object-cover blur-3xl opacity-30 scale-150 saturate-150"
+    <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+      <AnimatePresence>
+        {rewardParticles.map((p) => (
+          <motion.div
+            key={p.id}
+            initial={{ x: 0, y: 0, scale: 0.1, opacity: 1, rotate: 0 }}
+            animate={{ x: p.x, y: p.y, scale: p.scale, opacity: 0, rotate: p.rotate }}
+            exit={{ opacity: 0 }}
+            transition={{
+              type: 'spring',
+              stiffness: 190,
+              damping: 13,
+              mass: 0.45
+            }}
+            className="absolute w-3.5 h-3.5 rounded-[4px] bg-gradient-to-tr from-yellow-300 via-pink-400 to-indigo-500 border border-white/60 backdrop-blur-md shadow-[0_0_12px_rgba(236,72,153,0.5)]"
+            style={{
+              left: `calc(100vw - 120px)`,
+              top: `50vh`
+            }}
           />
-          <div className="absolute inset-0 bg-black/20" />
-        </div>
-      )}
-
-      {/* Music Page Bar Content */}
-      {isMusicPage ? (
-        <>
-          {/* Left: Track Info */}
-          <div className="flex items-center gap-4 w-[180px] relative z-10">
-            <img
-              src={currentTrack.image || '/placeholder-album.png'}
-              alt={currentTrack.name}
-              className="w-12 h-12 rounded-full object-cover border-2 border-white/10 shadow-lg animate-[spin_10s_linear_infinite]"
-              style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-white text-sm font-bold truncate">{currentTrack.name}</span>
-              <span className="text-gray-400 text-xs truncate">{currentTrack.artist}</span>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsLiked(!isLiked)} className="h-8 w-8 text-gray-400 hover:text-green-500 hover:scale-110 transition-all">
-              <Heart className={cn("h-4 w-4", isLiked && "fill-green-500 text-green-500")} />
-            </Button>
-          </div>
-
-          {/* Center: Controls */}
-          <div className="flex items-center gap-4 relative z-10">
-            <Button variant="ghost" size="icon" onClick={toggleShuffle} className={cn("h-8 w-8 transition-colors", isShuffle ? "text-green-500" : "text-gray-400 hover:text-white")}>
-              <Shuffle className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={previousTrack} className="text-white hover:text-gray-300 h-8 w-8">
-              <SkipBack className="h-5 w-5 fill-current" />
-            </Button>
-            <Button onClick={togglePlayPause} className="w-10 h-10 rounded-full bg-white hover:bg-gray-200 hover:scale-105 transition-all flex items-center justify-center shadow-lg" disabled={!deviceId}>
-              {!deviceId ? <AlertCircle className="h-5 w-5 text-yellow-600" /> : isPlaying ? <Pause className="h-5 w-5 text-black fill-black" /> : <Play className="h-5 w-5 text-black fill-black ml-0.5" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={nextTrack} className="text-white hover:text-gray-300 h-8 w-8">
-              <SkipForward className="h-5 w-5 fill-current" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleRepeat} className={cn("h-8 w-8 transition-colors", repeatMode !== 'off' ? "text-green-500" : "text-gray-400 hover:text-white")}>
-              {repeatMode === 'track' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
-            </Button>
-          </div>
-
-          {/* Right: Progress & Volume */}
-          <div className="flex items-center gap-4 w-[180px] justify-end relative z-10">
-            <span className="text-xs text-gray-400 tabular-nums">{formatTime(progress)} / {formatTime(duration)}</span>
-            <div className="flex items-center gap-2 group">
-              <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 0.5 : 0)} className="text-gray-400 hover:text-white h-8 w-8">
-                {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </Button>
-              <div className="w-20 hidden group-hover:block transition-all">
-                <Slider value={[volume * 100]} max={100} step={1} onValueChange={(value) => setVolume(value[0] / 100)} className="cursor-pointer" />
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bar Overlay */}
-          <div className="absolute bottom-0 left-6 right-6 h-[2px] bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all duration-1000 ease-linear" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </>
-      ) : (
-        /* Floating Widget Content */
-        <>
-          {/* Widget Header */}
-          <div className="relative z-10 flex items-center justify-between p-2 bg-black/20 text-white cursor-move border-b border-white/5">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              {currentTrack.image && (
-                <img src={currentTrack.image} alt={currentTrack.name} className={`rounded shadow-lg transition-all duration-300 ${isMinimized ? 'h-8 w-8' : 'h-10 w-10'}`} />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate text-white shadow-black drop-shadow-md">{currentTrack.name}</p>
-                {!isMinimized && <p className="text-[10px] text-gray-300 truncate shadow-black drop-shadow-md">{currentTrack.artist}</p>}
-              </div>
-            </div>
-            {isMinimized && (
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); togglePlayPause(); }} className="h-7 w-7 text-white hover:bg-white/10 flex-shrink-0">
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
-              {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleOpen} className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 flex-shrink-0">
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-
-          {/* Full mode content */}
-          <div className={cn(
-            "relative z-10 p-4 space-y-3 transition-all duration-300",
-            isMinimized && "h-0 opacity-0 overflow-hidden p-0"
-          )}>
-            {currentTrack.duration_ms && (
-              <div className="space-y-1">
-                <div className="slider-container">
-                  <Slider value={[progress]} max={currentTrack.duration_ms} step={1000} className="cursor-pointer" disabled />
-                </div>
-                <div className="flex justify-between text-xs text-gray-300 font-medium shadow-black drop-shadow-sm">
-                  <span>{formatTime(progress)}</span>
-                  <span>{formatTime(currentTrack.duration_ms)}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-center gap-2">
-              <Button variant="ghost" size="icon" onClick={previousTrack} disabled={!currentPlaylist} className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30">
-                <SkipBack className="h-5 w-5" />
-              </Button>
-              <Button variant="default" size="icon" onClick={togglePlayPause} className="h-12 w-12 rounded-full bg-white text-black hover:bg-gray-200 hover:scale-105 transition-transform shadow-lg">
-                {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-0.5" />}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={nextTrack} disabled={!currentPlaylist} className="h-10 w-10 text-white hover:bg-white/10 disabled:opacity-30">
-                <SkipForward className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="slider-container flex items-center gap-2">
-              <span className="text-xs text-gray-300 font-medium">Vol</span>
-              <Slider value={[volume * 100]} max={100} step={1} onValueChange={(value) => setVolume(value[0] / 100)} className="flex-1" />
-            </div>
-
-            {currentPlaylist && (
-              <div className="text-center pt-1 border-t border-white/10">
-                <p className="text-xs text-gray-300 shadow-black drop-shadow-sm">Playing: <span className="text-white font-medium">{currentPlaylist.name}</span></p>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+        ))}
+      </AnimatePresence>
     </div>
-  )
-}
+  );
+};
 
-export const FloatingMusicWidget = React.memo(FloatingMusicWidgetComponent)
+export const FloatingMusicWidget = React.memo(FloatingMusicWidgetComponent);

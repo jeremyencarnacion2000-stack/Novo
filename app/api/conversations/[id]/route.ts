@@ -7,15 +7,15 @@ import { z } from 'zod'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
     const body = await request.json()
     const parsedBody = updateConversationSchema.safeParse(body)
 
@@ -28,7 +28,7 @@ export async function PUT(
     // Verificar que la conversación pertenece al usuario
     const existingConversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -39,7 +39,7 @@ export async function PUT(
 
     // Actualizar la conversación
     const updatedConversation = await prisma.conversation.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: title || existingConversation.title,
         updatedAt: new Date(),
@@ -70,9 +70,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -81,7 +82,7 @@ export async function DELETE(
     // Verificar que la conversación pertenece al usuario
     const existingConversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -92,7 +93,7 @@ export async function DELETE(
 
     // Eliminar la conversación (los mensajes se eliminan automáticamente por cascade)
     await prisma.conversation.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ success: true })

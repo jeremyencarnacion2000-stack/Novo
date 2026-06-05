@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Pause, Square, SkipForward, Plus, CheckCircle2, Circle } from 'lucide-react';
 import { useFocus } from '@/lib/focus-context';
 import { FocusSettings } from '@/components/focus/focus-settings';
+import { useAnalytics } from '@/hooks/use-swr';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,31 +35,12 @@ export default function FocusPage() {
     } = useFocus();
 
     const [newTaskText, setNewTaskText] = useState('');
-    const [todayFocusTime, setTodayFocusTime] = useState(0);
-
-    // Fetch real focus time from analytics
-    useEffect(() => {
-        async function fetchStats() {
-            try {
-                const response = await fetch('/api/analytics?days=1');
-                if (response.ok) {
-                    const data = await response.json();
-                    // Find today's data in dailyData
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayData = data.dailyData.find((d: any) => d.date.startsWith(today));
-                    if (todayData) {
-                        setTodayFocusTime(todayData.totalTime);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to fetch focus stats:', error);
-            }
-        }
-        fetchStats();
-        // Refresh stats periodically if active
-        const interval = setInterval(fetchStats, 60000);
-        return () => clearInterval(interval);
-    }, [isActive]);
+    
+    // Fetch real focus time from analytics using SWR
+    const { data: analyticsData } = useAnalytics();
+    
+    const todayFocusTimeStr = analyticsData?.focusTime || '0.0h';
+    const streakDays = analyticsData?.streak || 0;
 
     const handleAddTask = (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,7 +70,7 @@ export default function FocusPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Timer Column */}
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="border-2 shadow-sm bg-card/50 backdrop-blur-sm">
+                    <Card className="border-2 shadow-sm bg-card/50">
                         <CardContent className="pt-8 pb-8">
                             <div className="flex flex-col items-center gap-6">
                                 {/* Session Type Badge */}
@@ -105,7 +87,7 @@ export default function FocusPage() {
                                     animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
                                     transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
                                 >
-                                    <div className="text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">
+                                    <div className="text-6xl sm:text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">
                                         {formatTime(time)}
                                     </div>
                                 </motion.div>
@@ -187,7 +169,7 @@ export default function FocusPage() {
                         <Card className="bg-card/50">
                             <CardHeader className="p-4 pb-2">
                                 <CardDescription className="text-xs">Today</CardDescription>
-                                <CardTitle className="text-lg">{(todayFocusTime / 3600).toFixed(1)}h</CardTitle>
+                                <CardTitle className="text-lg">{todayFocusTimeStr}</CardTitle>
                             </CardHeader>
                         </Card>
                         <Card className="bg-card/50">
@@ -199,7 +181,7 @@ export default function FocusPage() {
                         <Card className="bg-card/50">
                             <CardHeader className="p-4 pb-2">
                                 <CardDescription className="text-xs">Streak</CardDescription>
-                                <CardTitle className="text-lg">🔥 3</CardTitle>
+                                <CardTitle className="text-lg">🔥 {streakDays}</CardTitle>
                             </CardHeader>
                         </Card>
                     </div>
@@ -207,7 +189,7 @@ export default function FocusPage() {
 
                 {/* Task Column */}
                 <div className="space-y-6">
-                    <Card className="h-full flex flex-col border-2 bg-card/50 backdrop-blur-sm">
+                    <Card className="h-full flex flex-col border-2 bg-card/50">
                         <CardHeader className="p-4">
                             <CardTitle className="flex items-center gap-2 text-lg">
                                 <CheckCircle2 className="h-5 w-5 text-primary" />

@@ -20,10 +20,9 @@ const MODEL_KEY = 'modern-chatbot-selected-model';
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
-    const [selectedModel] = useState('qwen-max'); // Fixed to Cognitive Core
-    const setSelectedModel = (_model?: string) => { }; // Dummy function to avoid ReferenceError
+    const [selectedModel, setSelectedModel] = useState('qwen-2.5-coder-32b');
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -37,10 +36,31 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     const availableModels: AIModel[] = [
         {
-            id: 'qwen-max',
+            id: 'qwen-2.5-coder-32b',
+            name: 'Qwen 2.5 Coder',
+            provider: 'Qwen',
+            description: 'Altamente estable, de alta velocidad y especialista en código. Recomendado.',
+            enabled: true
+        },
+        {
+            id: 'llama-3.3-70b-versatile',
             name: 'Cognitive Core',
-            provider: 'Novo AI',
-            description: 'Advanced reasoning and conversation',
+            provider: 'Llama 3.3 70B',
+            description: 'Razonamiento lógico avanzado y conversación general.',
+            enabled: true
+        },
+        {
+            id: 'llama-3.1-8b-instant',
+            name: 'Fast Engine',
+            provider: 'Llama 3.1 8B',
+            description: 'Velocidad ultra rápida e ideal para tareas cotidianas.',
+            enabled: true
+        },
+        {
+            id: 'llama-3.2-11b-vision-preview',
+            name: 'Vision Scout',
+            provider: 'Llama 3.2 Vision',
+            description: 'Análisis visual y procesamiento de imágenes de forma precisa.',
             enabled: true
         }
     ];
@@ -92,7 +112,19 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         const storedModel = localStorage.getItem(MODEL_KEY);
         if (storedModel) {
-            setSelectedModel(storedModel);
+            let mappedModel = storedModel;
+            if (mappedModel === 'qwen/qwen3-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'openai/gpt-oss-120b') {
+                mappedModel = 'qwen-2.5-coder-32b';
+            } else if (mappedModel === 'meta-llama/llama-4-scout-17b-16e-instruct') {
+                mappedModel = 'llama-3.2-11b-vision-preview';
+            }
+
+            // Ensure it is one of the available models
+            const isValid = ['qwen-2.5-coder-32b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.2-11b-vision-preview'].includes(mappedModel);
+            const finalModel = isValid ? mappedModel : 'qwen-2.5-coder-32b';
+            
+            setSelectedModel(finalModel);
+            localStorage.setItem(MODEL_KEY, finalModel);
         }
     }, []);
 
@@ -115,11 +147,12 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 try {
                     savingRef.current.add(conv.id);
 
-                    const isPersisted = persistedRef.current.has(conv.id);
+                    const cleanId = conv.id.replace(/\/$/, '');
+                    const isPersisted = persistedRef.current.has(cleanId);
 
                     if (isPersisted) {
                         // Update existing
-                        await fetch(`/api/ai-conversations/${conv.id}`, {
+                        await fetch(`/api/ai-conversations/${cleanId}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -134,14 +167,14 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                id: conv.id,
+                                id: cleanId,
                                 title: conv.title,
                                 messages: conv.messages,
                                 model: conv.model
                             })
                         });
                         if (response.ok) {
-                            persistedRef.current.add(conv.id);
+                            persistedRef.current.add(cleanId);
                         }
                     }
                 } catch (error) {
@@ -209,7 +242,23 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const sendMessage = useCallback(async (content: string, files?: File[], webSearchEnabled?: boolean) => {
-        if (!content.trim() || !currentConversationId) return;
+        if (!content.trim()) return;
+
+        // Auto-create a conversation if none is active
+        let activeConversationId = currentConversationId;
+        if (!activeConversationId) {
+            const newConv: Conversation = {
+                id: crypto.randomUUID(),
+                title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+                messages: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                model: selectedModel
+            };
+            setConversations(prev => [newConv, ...prev]);
+            setCurrentConversationId(newConv.id);
+            activeConversationId = newConv.id;
+        }
 
         // Convert files to attachments for persistence
         let messageAttachments: Attachment[] = [];
@@ -314,7 +363,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         // Add user message using functional update to ensure we have latest state
         setConversations(prev => prev.map(c =>
-            c.id === currentConversationId
+            c.id === activeConversationId
                 ? {
                     ...c,
                     messages: [...c.messages, userMessage],
@@ -345,7 +394,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         try {
             // Get latest messages for history from the ref
-            const currentConv = conversationsRef.current.find(c => c.id === currentConversationId);
+            const currentConv = conversationsRef.current.find(c => c.id === activeConversationId);
             let history = currentConv?.messages || [];
 
             // Ensure the user message we just added is included in the history sent to the API
@@ -360,7 +409,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     message: processedContent,
                     history: history.map(m => ({ role: m.role, content: m.content })),
                     attachments: messageAttachments,
-                    webSearchEnabled
+                    webSearchEnabled,
+                    model: selectedModel
                 })
             });
 
@@ -381,8 +431,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 role: 'assistant',
                 content: '',
                 timestamp: new Date().toISOString(),
-                model: 'qwen3-32b'
+                model: 'auto'
             });
+
+            let activeModelLabel = '💬 Cognitive Core';
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -398,6 +450,17 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
                         try {
                             const json = JSON.parse(data);
+
+                            // Parse model metadata from orchestra
+                            if (json.meta) {
+                                activeModelLabel = json.meta.label || activeModelLabel;
+                                setStreamingMessage(prev => prev ? {
+                                    ...prev,
+                                    model: activeModelLabel
+                                } : prev);
+                                continue;
+                            }
+
                             if (json.content) {
                                 accumulatedContent += json.content;
                                 setStreamingMessage({
@@ -405,7 +468,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     role: 'assistant',
                                     content: accumulatedContent,
                                     timestamp: new Date().toISOString(),
-                                    model: 'qwen3-32b'
+                                    model: activeModelLabel
                                 });
                             }
                         } catch (e) { }
@@ -515,7 +578,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE',
                                     'ADD_GRADE', 'UPDATE_GRADE', 'DELETE_GRADE',
                                     'CREATE_NOTE', 'UPDATE_NOTE',
-                                    'ANALYZE_PROGRESS', 'SYSTEM_QUERY', 'DELETE_ALL_TASKS'
+                                    'ANALYZE_PROGRESS', 'SYSTEM_QUERY', 'DELETE_ALL_TASKS',
+                                    'GENERATE_FILE', 'UPDATE_COGNITIVE_STATE', 'COGNITIVE_PIPELINE'
                                 ];
 
                                 let finalType = mapped.action.type;
@@ -581,7 +645,87 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     type: finalType,
                                     name: finalType
                                 };
-                                blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: action, status: 'waiting' });
+
+                                // Handle auto-executed actions (short-circuits)
+                                if (mapped.action?._executed && mapped.action?._result) {
+                                    const res = mapped.action._result;
+                                    blocks.push({
+                                        id: crypto.randomUUID(),
+                                        type: 'result',
+                                        content: res.message || 'Operación completada.',
+                                        status: res.success ? 'success' : 'failed',
+                                        metadata: res.metadata || {}
+                                    });
+                                } else {
+                                    blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: action, status: 'waiting' });
+                                }
+                            }
+
+                            // Extract Cognitive, Music and Outfit blocks if present
+                            if (parsed.cognitive_update || parsed.cognitiveUpdate) {
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'cognitive_update',
+                                    content: parsed.cognitive_update || parsed.cognitiveUpdate
+                                });
+                            } else if (mapped.action?.type === 'UPDATE_COGNITIVE_STATE') {
+                                const p = mapped.action.payload || {};
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'cognitive_update',
+                                    content: {
+                                        focusScore: p.focusTimeToday !== undefined ? Math.min(100, Math.round(p.focusTimeToday * 10)) : 75,
+                                        fatigueEstimate: p.fatigueEstimate || 'medium',
+                                        burnoutRisk: p.productivityScore !== undefined ? Math.round(100 - p.productivityScore) : 35,
+                                        energyLevel: p.fatigueEstimate === 'low' ? 'alta' : p.fatigueEstimate === 'medium' ? 'media' : 'baja',
+                                        recommendation: p.styleRecommendation?.suggestion || p.musicRecommendation?.mood || 'Considera tomar un breve descanso.'
+                                    }
+                                });
+                            }
+
+                            if (parsed.music_recommendation || parsed.musicRecommendation) {
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'music_recommendation',
+                                    content: parsed.music_recommendation || parsed.musicRecommendation
+                                });
+                            } else if (mapped.action?.type === 'UPDATE_COGNITIVE_STATE' && mapped.action.payload?.musicRecommendation) {
+                                const mr = mapped.action.payload.musicRecommendation;
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'music_recommendation',
+                                    content: {
+                                        mood: mr.mood || 'Focus',
+                                        searchQuery: mr.searchQuery || 'ambient music',
+                                        reason: 'Optimizado para reducir la fatiga cognitiva estimulando el foco.',
+                                        frequency: 'Binaural Beats (40Hz)'
+                                    }
+                                });
+                            }
+
+                            if (parsed.outfit_recommendation || parsed.outfitRecommendation) {
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'outfit_recommendation',
+                                    content: parsed.outfit_recommendation || parsed.outfitRecommendation
+                                });
+                            } else if (mapped.action?.type === 'UPDATE_COGNITIVE_STATE' && mapped.action.payload?.styleRecommendation) {
+                                const sr = mapped.action.payload.styleRecommendation;
+                                blocks.push({
+                                    id: crypto.randomUUID(),
+                                    type: 'outfit_recommendation',
+                                    content: {
+                                        outfit: sr.suggestion || 'Prendas cómodas de tonos neutros.',
+                                        style: 'Minimalista & Confort',
+                                        context: sr.context || 'Trabajo enfocado y recuperación',
+                                        psychology: sr.colorPsychology || 'Los colores neutros reducen la carga cognitiva.',
+                                        colorPalette: ['#f5f5f5', '#d4d4d8', '#71717a', '#27272a'],
+                                        items: [
+                                            { name: 'Sudadera Cómoda', category: 'Superior' },
+                                            { name: 'Pantalón Neutro', category: 'Inferior' }
+                                        ]
+                                    }
+                                });
                             }
 
                             if (mapped.message && mapped.message !== explanation) {
@@ -604,7 +748,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 content: finalContent,
                 blocks: blocks.length > 0 ? blocks : undefined,
                 timestamp: new Date().toISOString(),
-                model: 'qwen3-32b'
+                model: activeModelLabel
             };
 
             setConversations(prev => prev.map(c =>
@@ -655,11 +799,18 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         updateConversation(currentConversationId!, { messages: updatedMessages });
 
         try {
-            console.log('[Chatbot] Executing action:', block.content);
+            const confirmedAction = {
+                ...(block.content || {}),
+                payload: {
+                    ...((block.content as any)?.payload || {}),
+                    confirmed: true
+                }
+            };
+            console.log('[Chatbot] Executing action with confirmation:', confirmedAction);
             const response = await fetch('/api/ai/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: block.content })
+                body: JSON.stringify({ action: confirmedAction })
             });
 
             const result = await response.json();
@@ -689,6 +840,113 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 m.id === messageId ? { ...m, blocks: finalBlocks } : m
             );
             updateConversation(currentConversationId!, { messages: finalMessages });
+
+            // --- Auto-follow-up: Send data back to AI for formatting ---
+            const actionContent = block.content as any;
+            const actionType = actionContent?.type || actionContent?.name || '';
+            const hasResultData = result.success && result.metadata;
+
+            // For SYSTEM_QUERY or actions with complex data, auto-generate a formatted follow-up
+            if (hasResultData && (actionType === 'SYSTEM_QUERY' || (result.metadata && typeof result.metadata === 'object'))) {
+                try {
+                    // Build a compact summary of the result data for the AI
+                    let dataSummary = '';
+                    if (result.metadata && typeof result.metadata === 'object') {
+                        // For SYSTEM_QUERY, the data is in the result output or metadata
+                        const rawData = result.output || JSON.stringify(result.metadata);
+                        // Truncate if too large to avoid token overflow
+                        dataSummary = typeof rawData === 'string' ? rawData.slice(0, 4000) : JSON.stringify(rawData).slice(0, 4000);
+                    }
+
+                    if (dataSummary && actionType === 'SYSTEM_QUERY') {
+                        setIsLoading(true);
+                        setIsTyping(true);
+                        setStatusMessage('Formatting results...');
+
+                        // Find the original user message that triggered this action
+                        const userMessages = conversation.messages.filter(m => m.role === 'user');
+                        const lastUserMessage = userMessages[userMessages.length - 1];
+                        const originalRequest = lastUserMessage?.content || 'Show me the results';
+
+                        const followUpResponse = await fetch('/api/ai/stream', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: `The user originally asked: "${originalRequest}". The system returned the following data from a SYSTEM_QUERY. Please present this data in a clean, formatted, and readable way using markdown. Highlight the most important/critical items. Do NOT create any action or JSON - just format the data nicely:\n\n${dataSummary}`,
+                                history: conversation.messages.slice(-4).map(m => ({ role: m.role, content: m.content })),
+                            })
+                        });
+
+                        if (followUpResponse.ok && followUpResponse.body) {
+                            const reader = followUpResponse.body.getReader();
+                            const decoder = new TextDecoder();
+                            let followUpContent = '';
+                            const followUpMsgId = crypto.randomUUID();
+
+                            setStreamingMessage({
+                                id: followUpMsgId,
+                                role: 'assistant',
+                                content: '',
+                                timestamp: new Date().toISOString(),
+                                model: 'auto'
+                            });
+
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                const chunk = decoder.decode(value, { stream: true });
+                                const lines = chunk.split('\n');
+                                for (const line of lines) {
+                                    if (line.startsWith('data: ')) {
+                                        const data = line.slice(6);
+                                        if (data === '[DONE]') continue;
+                                        try {
+                                            const json = JSON.parse(data);
+                                            if (json.content) {
+                                                followUpContent += json.content;
+                                                setStreamingMessage({
+                                                    id: followUpMsgId,
+                                                    role: 'assistant',
+                                                    content: followUpContent,
+                                                    timestamp: new Date().toISOString(),
+                                                    model: 'auto'
+                                                });
+                                            }
+                                        } catch (e) { }
+                                    }
+                                }
+                            }
+
+                            setStreamingMessage(null);
+
+                            if (followUpContent.trim()) {
+                                const followUpMessage: Message = {
+                                    id: followUpMsgId,
+                                    role: 'assistant',
+                                    content: followUpContent,
+                                    timestamp: new Date().toISOString(),
+                                    model: 'qwen-2.5-coder-32b'
+                                };
+
+                                setConversations(prev => prev.map(c =>
+                                    c.id === currentConversationId
+                                        ? { ...c, messages: [...c.messages, followUpMessage], updatedAt: new Date().toISOString() }
+                                        : c
+                                ));
+                            }
+                        }
+
+                        setIsLoading(false);
+                        setIsTyping(false);
+                        setStatusMessage(null);
+                    }
+                } catch (followUpError) {
+                    console.error('[Chatbot] Auto-follow-up error:', followUpError);
+                    setIsLoading(false);
+                    setIsTyping(false);
+                    setStatusMessage(null);
+                }
+            }
 
         } catch (error) {
             console.error('Execution error:', error);

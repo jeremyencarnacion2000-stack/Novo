@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, author, coverUrl, totalPages, isbn, status } = body
+    const { title, author, coverUrl, totalPages, isbn, status, genre, categories, description, format } = body
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -45,7 +45,11 @@ export async function POST(request: NextRequest) {
         totalPages,
         isbn,
         status: status || 'to-read',
-        currentPage: 0
+        currentPage: 0,
+        genre,
+        categories,
+        description,
+        format: format || 'digital',
       }
     })
 

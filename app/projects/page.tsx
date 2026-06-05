@@ -11,10 +11,12 @@ import { TasksView } from "@/components/projects/tasks-view"
 import type { Project, ProjectStatus } from "@/types/project"
 import { useToast } from "@/hooks/use-toast"
 import { useProjects } from "@/hooks/use-swr"
+import { useCognitiveEngine } from "@/lib/cognitive-context"
 
 export default function ProjectsPage() {
   const { data: projects, error, isLoading, mutate } = useProjects()
   const { toast } = useToast()
+  const { bioState } = useCognitiveEngine()
 
   useEffect(() => {
     if (error) {
@@ -25,6 +27,24 @@ export default function ProjectsPage() {
       })
     }
   }, [error, toast])
+
+  useEffect(() => {
+    const handleVoiceCommand = (e: any) => {
+      const action = e.detail?.action || e.detail?.result?.action
+      if (
+        action === "create_project" ||
+        action === "update_project" ||
+        action === "delete_project"
+      ) {
+        mutate()
+      }
+    }
+
+    window.addEventListener("voice-command-executed", handleVoiceCommand)
+    return () => {
+      window.removeEventListener("voice-command-executed", handleVoiceCommand)
+    }
+  }, [mutate])
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | undefined>()
@@ -167,13 +187,76 @@ export default function ProjectsPage() {
     return <div>Loading...</div>
   }
 
+  // ── Reduced Capacity Override: Single macro-task focus shield ─────────────────
+  if (bioState.phase === 'REDUCED_CAPACITY_MODE') {
+    const primaryTask = projects?.[0]
+    return (
+      <div className="flex flex-col gap-8 max-w-2xl mx-auto py-12 animate-in fade-in zoom-in duration-500">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">
+            ⚠️ Reduced Capacity Mode Active
+          </div>
+          <h1 className="text-3xl md:text-5xl font-light tracking-tight italic">Single Priority Shield</h1>
+          <p className="text-xs text-white/40 uppercase tracking-widest leading-relaxed">
+            Attentional capacity constrained by biometric fatigue. Secondary directive complexity hidden.
+          </p>
+        </div>
+
+        <div className="rounded-[2rem] p-8 border border-amber-500/20 relative overflow-hidden shadow-2xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(20, 10, 5, 0.8), rgba(9, 9, 11, 0.9))',
+            backdropFilter: 'blur(24px)',
+          }}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="space-y-6">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-400/80">Active Macro-Task</span>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-white/95">
+                {primaryTask ? primaryTask.name : "Deep Circadian Rest & Reset"}
+              </h2>
+              <p className="text-sm text-white/50 leading-relaxed">
+                {primaryTask && primaryTask.description 
+                  ? primaryTask.description 
+                  : "Your current heart rate variability and sleep deficit require visual relief. Minimize complex decision paths."}
+              </p>
+            </div>
+
+            <div className="h-px bg-white/[0.06]" />
+
+            <div className="space-y-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Suggested Immediate Sub-Actions</span>
+              
+              <div className="space-y-3">
+                {[
+                  "Take a 5-minute warm water break",
+                  "Enable the ambient lofi audio stream in the Context Capsule",
+                  "Engage in deep-breathing cycle (4s in, 4s hold, 4s out)"
+                ].map((action, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full border border-amber-500/30 flex items-center justify-center text-[10px] text-amber-400 bg-amber-500/5">
+                      ✓
+                    </div>
+                    <span className="text-xs text-white/70 font-medium">{action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6 md:gap-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">Projects & Tasks</h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            Manage your projects and tasks with detailed tracking
+    <div className="flex flex-col gap-10 md:gap-16">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-4xl md:text-6xl font-light tracking-tight italic opacity-90">Projects & Tasks</h1>
+          <p className="subtitle-technical">
+            Active directives · system initiatives
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { safeViewTransition } from '@/hooks/use-view-transition'
 import {
   Dialog,
   DialogContent,
@@ -172,8 +173,11 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => safeViewTransition(() => !o && handleClose())}>
+      <DialogContent
+        style={{ viewTransitionName: 'import-routine-modal' } as React.CSSProperties}
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>Import Routine</DialogTitle>
           <DialogDescription>

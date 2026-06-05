@@ -1,4 +1,5 @@
 import { NextAuthOptions } from 'next-auth'
+import { JWT } from 'next-auth/jwt'
 import GoogleProvider from 'next-auth/providers/google'
 import SpotifyProvider from 'next-auth/providers/spotify' // Import SpotifyProvider
 import CredentialsProvider from 'next-auth/providers/credentials'
@@ -24,6 +25,213 @@ if (!process.env.NEXTAUTH_SECRET) {
   console.error('NEXTAUTH_SECRET is missing. Please set it.')
 }
 
+/**
+ * Type-Safe function with Exponential Backoff retry to refresh Google OAuth Access Token.
+ */
+async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
+  try {
+    console.log('⏰ [OAuth Refresh] Starting Google token rotation for user ID:', token.id)
+
+    let refreshToken = token.refreshToken as string | undefined
+
+    // Fallback: Query the database if the refresh token is missing from the JWT session
+    if (!refreshToken && token.id) {
+      console.log('🔍 [OAuth Refresh] Refresh token missing in JWT. Querying Prisma DB Account model...')
+      const dbAccount = await prisma.account.findFirst({
+        where: {
+          userId: token.id,
+          provider: 'google'
+        }
+      })
+      refreshToken = dbAccount?.refresh_token || undefined
+    }
+
+    if (!refreshToken) {
+      console.error('❌ [OAuth Refresh] Critical: No Google refresh token found.')
+      throw new Error('GoogleRefreshMissing')
+    }
+
+    const url = 'https://oauth2.googleapis.com/token'
+    const body = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    })
+
+    // Type-safe Exponential Backoff helper
+    const fetchWithBackoff = async (retries = 3, delay = 1000): Promise<Response> => {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        })
+        return response
+      } catch (err) {
+        if (retries > 0) {
+          console.warn(`⚠️ [OAuth Refresh] Network error during token rotation. Retrying in ${delay}ms... Error:`, err)
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          return fetchWithBackoff(retries - 1, delay * 2)
+        }
+        throw err
+      }
+    }
+
+    const response = await fetchWithBackoff()
+    const refreshedTokens = await response.json()
+
+    if (!response.ok) {
+      console.error('❌ [OAuth Refresh] Google returned token rotation error:', refreshedTokens)
+      
+      // If client has revoked access or refresh token is invalid (invalid_grant), trigger custom error code
+      if (refreshedTokens.error === 'invalid_grant' || response.status === 400 || response.status === 401) {
+        console.error('🚫 [OAuth Refresh] Credentials revoked/invalid. Forcing login redirection.')
+      }
+      throw refreshedTokens
+    }
+
+    console.log('✅ [OAuth Refresh] Google token successfully rotated.')
+    const expiresAt = Math.floor(Date.now() / 1000 + refreshedTokens.expires_in)
+
+    // Synchronize and update the new tokens in our Prisma database Account model
+    if (token.id) {
+      try {
+        const dbAccount = await prisma.account.findFirst({
+          where: {
+            userId: token.id,
+            provider: 'google'
+          }
+        })
+        if (dbAccount) {
+          await prisma.account.update({
+            where: { id: dbAccount.id },
+            data: {
+              access_token: refreshedTokens.access_token,
+              expires_at: expiresAt,
+              refresh_token: refreshedTokens.refresh_token ?? refreshToken,
+            }
+          })
+          console.log('💾 [OAuth Refresh] Prisma DB Account synchronized successfully.')
+        }
+      } catch (dbError) {
+        console.error('⚠️ [OAuth Refresh] Failed to update Prisma DB Account:', dbError)
+      }
+    }
+
+    return {
+      ...token,
+      accessToken: refreshedTokens.access_token,
+      expiresAt,
+      refreshToken: refreshedTokens.refresh_token ?? refreshToken,
+      error: undefined,
+    }
+  } catch (error) {
+    console.error('💥 [OAuth Refresh] Unhandled exception during Google token refresh:', error)
+    return {
+      ...token,
+      error: 'RefreshAccessTokenError',
+    }
+  }
+}
+
+/**
+ * Type-Safe function to refresh Spotify OAuth Access Token.
+ */
+async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
+  try {
+    console.log('⏰ [OAuth Refresh] Starting Spotify token rotation for user ID:', token.id)
+
+    let refreshToken = token.refreshToken as string | undefined
+
+    if (!refreshToken && token.id) {
+      const dbAccount = await prisma.account.findFirst({
+        where: {
+          userId: token.id,
+          provider: 'spotify'
+        }
+      })
+      refreshToken = dbAccount?.refresh_token || undefined
+    }
+
+    if (!refreshToken) {
+      throw new Error('SpotifyRefreshMissing')
+    }
+
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
+
+    const refreshedTokens = await response.json()
+
+    if (!response.ok) {
+      throw refreshedTokens
+    }
+
+    console.log('✅ [OAuth Refresh] Spotify token successfully rotated.')
+    const expiresAt = Math.floor(Date.now() / 1000 + refreshedTokens.expires_in)
+
+    // Synchronize DB
+    if (token.id) {
+      try {
+        const dbAccount = await prisma.account.findFirst({
+          where: {
+            userId: token.id,
+            provider: 'spotify'
+          }
+        })
+        if (dbAccount) {
+          await prisma.account.update({
+            where: { id: dbAccount.id },
+            data: {
+              access_token: refreshedTokens.access_token,
+              expires_at: expiresAt,
+              refresh_token: refreshedTokens.refresh_token ?? refreshToken,
+            }
+          })
+          console.log('💾 [OAuth Refresh] Prisma DB synchronized for Spotify.')
+        }
+      } catch (dbError) {
+        console.error('⚠️ [OAuth Refresh] Failed to update Prisma DB for Spotify:', dbError)
+      }
+    }
+
+    return {
+      ...token,
+      accessToken: refreshedTokens.access_token,
+      expiresAt,
+      refreshToken: refreshedTokens.refresh_token ?? refreshToken,
+      error: undefined,
+    }
+  } catch (error) {
+    console.error('💥 [OAuth Refresh] Unhandled exception during Spotify token refresh:', error)
+    return {
+      ...token,
+      error: 'RefreshAccessTokenError',
+    }
+  }
+}
+
+/**
+ * High-order unified Type-Safe function that evaluates and routes OAuth rotations based on provider.
+ */
+async function refreshAccessToken(token: JWT): Promise<JWT> {
+  if (token.provider === 'google') {
+    return refreshGoogleAccessToken(token)
+  }
+  if (token.provider === 'spotify') {
+    return refreshSpotifyAccessToken(token)
+  }
+  return token
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -179,11 +387,11 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      // Removed Gmail and Fitness scopes to reduce verification requirements
-      // Keeping: Calendar, Contacts (People API), Books
       authorization: {
         params: {
-          scope: 'openid profile email https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books',
+          scope: 'openid profile email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read',
+          access_type: 'offline',
+          prompt: 'consent'
         },
       },
     }),
@@ -220,38 +428,12 @@ export const authOptions: NextAuthOptions = {
         token.provider = account.provider; // Store the provider (e.g., "google", "spotify")
       }
 
-      // If accessToken has expired, try to refresh it (only for Spotify)
-      if (token.provider === 'spotify' && token.expiresAt && (Date.now() / 1000) > token.expiresAt) {
-        console.log('⏰ [JWT Callback] Spotify token expired, refreshing...')
-        // Token has expired, try to refresh
-        try {
-          const response = await fetch("https://accounts.spotify.com/api/token", {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "Authorization": `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
-            },
-            body: new URLSearchParams({
-              grant_type: "refresh_token",
-              refresh_token: token.refreshToken as string,
-            }),
-            method: "POST",
-          });
+      // Check if access token is about to expire or has expired
+      const shouldRefresh = token.expiresAt && (Date.now() / 1000) > (token.expiresAt - 60)
 
-          const refreshedTokens = await response.json();
-
-          if (!response.ok) {
-            throw refreshedTokens;
-          }
-
-          console.log('✅ [JWT Callback] Spotify token refreshed successfully')
-          token.accessToken = refreshedTokens.access_token;
-          token.expiresAt = Date.now() / 1000 + refreshedTokens.expires_in;
-          token.refreshToken = refreshedTokens.refresh_token ?? token.refreshToken; // Fall back to old refresh token
-        } catch (error) {
-          console.error("💥 [JWT Callback] Error refreshing Spotify access token:", error);
-          // Force sign out if refresh fails
-          return { ...token, error: "RefreshAccessTokenError" as const };
-        }
+      if (shouldRefresh) {
+        console.log(`⏰ [JWT Callback] Access token expired/expiring for ${token.provider}. Triggering rotation...`)
+        return refreshAccessToken(token)
       }
 
       // Add user ID to token

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { safeViewTransition } from '@/hooks/use-view-transition'
 import {
   Dialog,
   DialogContent,
@@ -142,8 +143,11 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => safeViewTransition(() => !o && onClose())}>
+      <DialogContent
+        style={{ viewTransitionName: 'routine-form-modal' } as React.CSSProperties}
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{routine ? 'Edit Routine' : 'Create New Routine'}</DialogTitle>

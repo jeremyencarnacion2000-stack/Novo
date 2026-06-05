@@ -9,9 +9,9 @@ interface ThinkingIndicatorProps {
 }
 
 const steps = [
-    { id: 'thinking', label: 'Pensando...', icon: Brain, color: 'text-purple-400' },
-    { id: 'searching', label: 'Buscando en la web...', icon: Search, color: 'text-blue-400' },
-    { id: 'analyzing', label: 'Analizando información...', icon: Lightbulb, color: 'text-yellow-400' },
+    { id: 'thinking', label: 'Pensando...', icon: Brain, color: 'text-primary' },
+    { id: 'searching', label: 'Buscando en la web...', icon: Search, color: 'text-primary' },
+    { id: 'analyzing', label: 'Analizando información...', icon: Lightbulb, color: 'text-primary' },
     { id: 'creating', label: 'Generando respuesta...', icon: PenTool, color: 'text-green-400' },
 ];
 
@@ -40,7 +40,7 @@ export function ThinkingIndicator({ status }: ThinkingIndicatorProps) {
     return (
         <div className="flex items-center gap-3 px-4 py-3">
             <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full blur animate-pulse opacity-50" />
+                <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/80 to-primary/60 rounded-full blur animate-pulse opacity-50" />
                 <div className="relative bg-background/80 backdrop-blur-sm border border-white/10 rounded-full p-2 shadow-lg">
                     <Icon className={`w-4 h-4 ${activeStep.color} animate-pulse`} />
                 </div>
@@ -54,7 +54,7 @@ export function ThinkingIndicator({ status }: ThinkingIndicatorProps) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.3 }}
-                        className="text-sm font-medium bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400"
+                        className="text-sm font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-primary/60"
                     >
                         {status || activeStep.label}
                     </motion.span>

@@ -1,0 +1,20 @@
+﻿node.exe : [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline 
+data, please update: `npm i baseline-browser-mapping@latest -D`
+At C:\Users\Administrator\AppData\Roaming\npm\pnpm.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([baseline-brows...ping@latest -D`:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Γû▓ Next.js 16.0.7 (webpack)
+   - Environments: .env.local, .env
+   - Experiments (use with caution):
+     ┬╖ optimizePackageImports
+
+   Creating an optimized production build ...
+
+> Build error occurred
+Error: The packages specified in the 'transpilePackages' conflict with the 'serverExternalPackages': 
+@xenova/transformers
+    at ignore-listed frames
+

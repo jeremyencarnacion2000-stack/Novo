@@ -46,11 +46,12 @@ export function PomodoroWidget() {
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className={cn(
-                    "fixed z-50 shadow-2xl border-white/10 backdrop-blur-xl overflow-hidden",
+                    "fixed z-50 shadow-2xl border-white/10 overflow-hidden",
                     isFocusPage
                         ? "bottom-20 left-1/2 -translate-x-1/2 w-[400px] h-16 rounded-full flex items-center px-6 justify-between bg-black/60 border border-white/20"
                         : "top-6 right-6 w-[160px] p-4 rounded-3xl bg-black/60 border-white/10 flex flex-col items-center gap-3"
                 )}
+                style={{ backdropFilter: 'blur(var(--glass-blur))', WebkitBackdropFilter: 'blur(var(--glass-blur))' }}
             >
                 {/* Left Section: Badge */}
                 <motion.div layout className="flex items-center gap-2">

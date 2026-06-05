@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
             prisma.checklistItem.findMany({
                 where: {
                     userId: user.id,
-                    createdAt: { gte: startDate },
+                    updatedAt: { gte: startDate },
                 },
             }),
             // Projects
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
                 include: {
                     tasks: {
                         where: {
-                            createdAt: { gte: startDate },
+                            updatedAt: { gte: startDate },
                         },
                     },
                 },
@@ -75,16 +75,16 @@ export async function GET(request: NextRequest) {
             prisma.routine.findMany({
                 where: { userId: user.id },
                 include: {
-                    items: true,
+                    tasks: true,
                 },
             }),
             // Habits (trackers)
-            prisma.habitTracker.findMany({
+            prisma.tracker.findMany({
                 where: { userId: user.id },
                 include: {
                     entries: {
                         where: {
-                            date: { gte: startDate },
+                            updatedAt: { gte: startDate.toISOString() }, // TrackerEntry date is string
                         },
                     },
                 },
@@ -103,24 +103,24 @@ export async function GET(request: NextRequest) {
         ]);
 
         // Calculate task statistics
-        const completedTasks = tasks.filter(t => t.completed).length;
+        const completedTasks = tasks.filter((t: any) => t.completed).length;
         const totalTasks = tasks.length;
         const taskCompletionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
         // Calculate project statistics
-        const activeProjects = projects.filter(p => p.status === 'in_progress').length;
-        const completedProjects = projects.filter(p => p.status === 'completed').length;
-        const projectTasks = projects.flatMap(p => p.tasks);
-        const completedProjectTasks = projectTasks.filter(t => t.completed).length;
+        const activeProjects = projects.filter((p: any) => p.status === 'in-progress').length;
+        const completedProjects = projects.filter((p: any) => p.status === 'completed').length;
+        const projectTasks = projects.flatMap((p: any) => p.tasks);
+        const completedProjectTasks = projectTasks.filter((t: any) => t.completed).length;
 
         // Calculate focus statistics
         const totalFocusMinutes = focusSessions
-            .filter(s => s.completed)
-            .reduce((sum, s) => sum + (s.actualDuration || s.duration), 0);
-        const focusSessiosnCount = focusSessions.filter(s => s.completed).length;
+            .filter((s: any) => s.completed)
+            .reduce((sum: number, s: any) => sum + (s.actualDuration || s.duration), 0);
+        const focusSessiosnCount = focusSessions.filter((s: any) => s.completed).length;
         const avgFocusQuality = focusSessions
-            .filter(s => s.focusQuality)
-            .reduce((sum, s, _, arr) => sum + (s.focusQuality || 0) / arr.length, 0);
+            .filter((s: any) => s.focusQuality)
+            .reduce((sum: number, s: any, _: any, arr: any[]) => sum + (s.focusQuality || 0) / arr.length, 0);
 
         // Calculate habit statistics
         const habitCompletionRates = habits.map(h => {
@@ -132,16 +132,16 @@ export async function GET(request: NextRequest) {
             };
         });
         const avgHabitCompletion = habitCompletionRates.length > 0
-            ? habitCompletionRates.reduce((sum, h) => sum + h.rate, 0) / habitCompletionRates.length
+            ? habitCompletionRates.reduce((sum: number, h: any) => sum + h.rate, 0) / habitCompletionRates.length
             : 0;
 
         // Calculate goal progress
-        const goalsWithProgress = goals.map(g => ({
+        const goalsWithProgress = goals.map((g: any) => ({
             title: g.title,
             progress: g.progress || 0,
         }));
         const avgGoalProgress = goalsWithProgress.length > 0
-            ? goalsWithProgress.reduce((sum, g) => sum + g.progress, 0) / goalsWithProgress.length
+            ? goalsWithProgress.reduce((sum: number, g: any) => sum + g.progress, 0) / goalsWithProgress.length
             : 0;
 
         // Calculate productivity score (weighted average)
@@ -161,24 +161,24 @@ export async function GET(request: NextRequest) {
             dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-            const dayTasks = tasks.filter(t => {
-                const created = new Date(t.createdAt);
+            const dayTasks = tasks.filter((t: any) => {
+                const created = new Date(t.updatedAt || t.dueDate || now);
                 return created >= dayStart && created < dayEnd;
             });
 
-            const dayFocus = focusSessions.filter(s => {
+            const dayFocus = focusSessions.filter((s: any) => {
                 const start = new Date(s.startTime);
                 return start >= dayStart && start < dayEnd;
             });
 
             dailyStats.unshift({
                 date: dayStart.toISOString().split('T')[0],
-                tasksCompleted: dayTasks.filter(t => t.completed).length,
+                tasksCompleted: dayTasks.filter((t: any) => t.completed).length,
                 tasksCreated: dayTasks.length,
                 focusMinutes: dayFocus
-                    .filter(s => s.completed)
-                    .reduce((sum, s) => sum + (s.actualDuration || s.duration), 0),
-                focusSessions: dayFocus.filter(s => s.completed).length,
+                    .filter((s: any) => s.completed)
+                    .reduce((sum: number, s: any) => sum + (s.actualDuration || s.duration), 0),
+                focusSessions: dayFocus.filter((s: any) => s.completed).length,
             });
         }
 
@@ -233,8 +233,8 @@ export async function GET(request: NextRequest) {
 async function calculateCurrentStreak(userId: string): Promise<number> {
     const tasks = await prisma.checklistItem.findMany({
         where: { userId, completed: true },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true },
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
     });
 
     if (tasks.length === 0) return 0;
@@ -245,8 +245,8 @@ async function calculateCurrentStreak(userId: string): Promise<number> {
 
     for (let i = 0; i <= 365; i++) {
         const checkDate = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
-        const hasActivity = tasks.some(t => {
-            const taskDate = new Date(t.createdAt);
+        const hasActivity = tasks.some((t: any) => {
+            const taskDate = new Date(t.updatedAt);
             taskDate.setHours(0, 0, 0, 0);
             return taskDate.getTime() === checkDate.getTime();
         });
@@ -264,8 +264,8 @@ async function calculateCurrentStreak(userId: string): Promise<number> {
 async function calculateLongestStreak(userId: string): Promise<number> {
     const tasks = await prisma.checklistItem.findMany({
         where: { userId, completed: true },
-        orderBy: { createdAt: 'asc' },
-        select: { createdAt: true },
+        orderBy: { updatedAt: 'asc' },
+        select: { updatedAt: true },
     });
 
     if (tasks.length === 0) return 0;
@@ -274,8 +274,8 @@ async function calculateLongestStreak(userId: string): Promise<number> {
     let currentStreak = 1;
     let prevDate: Date | null = null;
 
-    for (const task of tasks) {
-        const taskDate = new Date(task.createdAt);
+    for (const task of tasks as any[]) {
+        const taskDate = new Date(task.updatedAt);
         taskDate.setHours(0, 0, 0, 0);
 
         if (prevDate) {

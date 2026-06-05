@@ -1,168 +1,363 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Edit, Trash2, CheckCircle2, Circle } from 'lucide-react'
-import { Tracker } from '@/types/tracker'
-import { useNotifications } from '@/lib/notification-context'
-import { useNotificationScheduler } from '@/lib/notification-scheduler'
+'use client';
+
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Edit, Trash2, CheckCircle2, Circle, Sparkles } from 'lucide-react';
+import { Tracker } from '@/types/tracker';
+import { useNotifications } from '@/lib/notification-context';
+import { useNotificationScheduler } from '@/lib/notification-scheduler';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface HabitTrackersProps {
-  trackers: Tracker[]
-  onEdit: (tracker: Tracker) => void
-  onDelete: (id: string) => void
-  onLogEntry: (id: string, value: number) => void
+  trackers: Tracker[];
+  onEdit: (tracker: Tracker) => void;
+  onDelete: (id: string) => void;
+  onLogEntry: (id: string, value: number) => void;
+}
+
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotate: number;
 }
 
 export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitTrackersProps) {
-  const { showNotification, settings: notificationSettings } = useNotifications()
-  const { scheduleProgressAchievement } = useNotificationScheduler()
+  const { showNotification, settings: notificationSettings } = useNotifications();
+  const { scheduleProgressAchievement } = useNotificationScheduler();
 
   const getLast7Days = () => {
-    const days = []
+    const days = [];
     for (let i = 6; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      days.push(date.toISOString().split('T')[0])
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      days.push(date.toISOString().split('T')[0]);
     }
-    return days
-  }
+    return days;
+  };
 
-  const last7Days = getLast7Days()
+  const last7Days = getLast7Days();
 
   const handleLogEntry = (trackerId: string, value: number) => {
-    const tracker = trackers.find(t => t.id === trackerId)
-    if (!tracker) return
+    const tracker = trackers.find(t => t.id === trackerId);
+    if (!tracker) return;
 
     const wasCompletedToday = (Array.isArray(tracker.entries) ? tracker.entries : []).some(
       (e) => e.date === new Date().toISOString().split('T')[0]
-    )
+    );
 
     // Log the entry
-    onLogEntry(trackerId, value)
+    onLogEntry(trackerId, value);
 
     // Check for achievements if this is a new completion
     if (value === 1 && !wasCompletedToday && notificationSettings.progressAchievements) {
-      const progress = getWeeklyProgress(tracker)
-      const newProgress = { completed: progress.completed + 1, total: progress.total }
+      const progress = getWeeklyProgress(tracker);
+      const newProgress = { completed: progress.completed + 1, total: progress.total };
 
       // Check for streak milestones
       if (newProgress.completed === 7) {
-        showNotification('Habit Streak!', {
-          body: `Congratulations! You've completed ${tracker.name} for 7 days straight!`,
+        showNotification('¡Racha de Hábito!', {
+          body: `¡Felicidades! Has completado ${tracker.name} durante 7 días seguidos.`,
           tag: `habit-streak-${trackerId}`
-        })
+        });
       } else if (newProgress.completed === 3) {
-        showNotification('Habit Milestone!', {
-          body: `Great job! You've completed ${tracker.name} for 3 days this week.`,
+        showNotification('¡Hito de Hábito!', {
+          body: `¡Buen trabajo! Has completado ${tracker.name} 3 días esta semana.`,
           tag: `habit-milestone-${trackerId}`
-        })
+        });
       }
     }
-  }
+  };
 
   const getWeeklyProgress = (tracker: Tracker) => {
     const completed = (Array.isArray(tracker.entries) ? tracker.entries : []).filter((e) =>
       last7Days.includes(e.date)
-    ).length
-    return { completed, total: 7 }
-  }
+    ).length;
+    return { completed, total: 7 };
+  };
 
   if (trackers.length === 0) {
     return (
-      <Card>
+      <Card className="border border-white/5 bg-black/20 backdrop-blur-xl">
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <p className="text-muted-foreground text-center">
+          <p className="text-white/40 text-center text-sm font-medium">
             No habit trackers yet. Create one to start building consistency.
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {trackers.map((tracker) => {
-        const progress = getWeeklyProgress(tracker)
+        const progress = getWeeklyProgress(tracker);
         const todayEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).find(
           (e) => e.date === new Date().toISOString().split('T')[0]
-        )
+        );
 
         return (
-          <Card key={tracker.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-lg">{tracker.name}</CardTitle>
-                <Badge variant="outline">
-                  {progress.completed}/{progress.total} this week
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-1">
-                {last7Days.map((date) => {
-                  const hasEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).some((e) => e.date === date)
-                  const isToday = date === new Date().toISOString().split('T')[0]
-                  
-                  return (
-                    <div
-                      key={date}
-                      className="flex-1 flex flex-col items-center gap-1"
-                    >
-                      <div
-                        className={`w-full aspect-square rounded-md flex items-center justify-center ${
-                          hasEntry
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        } ${isToday ? 'ring-2 ring-ring' : ''}`}
-                      >
-                        {hasEntry && <CheckCircle2 className="h-4 w-4" />}
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(date).toLocaleDateString('en-US', { weekday: 'narrow' })}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant={todayEntry ? 'secondary' : 'default'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleLogEntry(tracker.id, todayEntry ? 0 : 1)}
-                >
-                  {todayEntry ? (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 mr-2" />
-                      Completed Today
-                    </>
-                  ) : (
-                    <>
-                      <Circle className="h-3 w-3 mr-2" />
-                      Mark Complete
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(tracker)}
-                >
-                  <Edit className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onDelete(tracker.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )
+          <HabitCard
+            key={tracker.id}
+            tracker={tracker}
+            progress={progress}
+            todayEntry={todayEntry}
+            last7Days={last7Days}
+            onLog={handleLogEntry}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        );
       })}
     </div>
-  )
+  );
+}
+
+/* Subcomponent handling rich visual particle explosions and card state */
+function HabitCard({
+  tracker,
+  progress,
+  todayEntry,
+  last7Days,
+  onLog,
+  onEdit,
+  onDelete
+}: {
+  tracker: Tracker;
+  progress: { completed: number; total: number };
+  todayEntry: any;
+  last7Days: string[];
+  onLog: (id: string, value: number) => void;
+  onEdit: (t: Tracker) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [particles, setParticles] = useState<Particle[]>([]);
+
+  const triggerExplosion = () => {
+    // Generate 12 premium glassmorphic crystals expanding outwards
+    const newParticles: Particle[] = Array.from({ length: 12 }).map((_, idx) => ({
+      id: Date.now() + idx,
+      x: (Math.random() - 0.5) * 180,
+      y: (Math.random() - 0.5) * 110 - 25,
+      scale: Math.random() * 0.7 + 0.35,
+      rotate: Math.random() * 360,
+    }));
+    setParticles(newParticles);
+    setTimeout(() => setParticles([]), 900);
+  };
+
+  const handleAction = () => {
+    const isActivating = !todayEntry;
+    if (isActivating) {
+      triggerExplosion();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('habit-completed'));
+      }
+    }
+    onLog(tracker.id, todayEntry ? 0 : 1);
+  };
+
+  return (
+    <Card className="relative overflow-hidden border border-white/5 bg-white/[0.02] backdrop-blur-2xl transition-all duration-300 hover:border-white/10 hover:bg-white/[0.03]">
+      {/* Dynamic Crystal Particles Container */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
+        <AnimatePresence>
+          {particles.map((p) => (
+            <motion.div
+              key={p.id}
+              initial={{ x: 0, y: 0, scale: 0.1, opacity: 1, rotate: 0 }}
+              animate={{ x: p.x, y: p.y, scale: p.scale, opacity: 0, rotate: p.rotate }}
+              exit={{ opacity: 0 }}
+              transition={{
+                type: 'spring',
+                stiffness: 160,
+                damping: 14,
+                mass: 0.5,
+              }}
+              className="absolute w-3 h-3 rounded-[3px] bg-gradient-to-tr from-white/30 to-white/10 border border-white/50 backdrop-blur-sm shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+              style={{ left: '50%', top: '75%' }}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <CardTitle className="text-base font-bold tracking-tight text-white/90">
+            {tracker.name}
+          </CardTitle>
+
+          {/* Elastic progress counter badge */}
+          <motion.div
+            key={progress.completed}
+            initial={{ scale: 0.85, y: 0 }}
+            animate={progress.completed > 0 ? { scale: [1, 1.25, 1], y: [-6, 0] } : { scale: 1 }}
+            transition={{
+              type: 'spring',
+              stiffness: 450,
+              damping: 15,
+            }}
+          >
+            <Badge className="bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 font-mono tracking-wide text-xs">
+              {progress.completed}/{progress.total}
+            </Badge>
+          </motion.div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Weekly Grid with spring scale down/overshoot */}
+        <div className="flex gap-1.5">
+          {last7Days.map((date) => {
+            const hasEntry = (Array.isArray(tracker.entries) ? tracker.entries : []).some(
+              (e) => e.date === date
+            );
+            const isToday = date === new Date().toISOString().split('T')[0];
+
+            return (
+              <HabitDaySquare
+                key={date}
+                date={date}
+                hasEntry={hasEntry}
+                isToday={isToday}
+                onToggle={() => onLog(tracker.id, hasEntry ? 0 : 1)}
+              />
+            );
+          })}
+        </div>
+
+        {/* Confirmation Buttons and Actions */}
+        <div className="flex gap-2">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={handleAction}
+            className={`
+              flex-1 h-9 rounded-xl flex items-center justify-center font-black uppercase text-[10px] tracking-wider transition-all duration-300 select-none cursor-pointer
+              ${
+                todayEntry
+                  ? 'bg-white/10 hover:bg-white/15 text-white/95 border border-white/10'
+                  : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white hover:brightness-110'
+              }
+            `}
+          >
+            {todayEntry ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-indigo-400" />
+                Completed Today
+              </>
+            ) : (
+              <>
+                <Circle className="h-3.5 w-3.5 mr-2 text-white/70" />
+                Mark Complete
+              </>
+            )}
+          </motion.button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 rounded-xl border border-white/5 bg-white/5 p-0 hover:bg-white/10"
+            onClick={() => onEdit(tracker)}
+          >
+            <Edit className="h-3.5 w-3.5 text-white/60" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 rounded-xl border border-white/5 bg-white/5 p-0 hover:bg-white/10"
+            onClick={() => onDelete(tracker.id)}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* Individual grid square subcomponent for perfect spring interactions */
+function HabitDaySquare({
+  date,
+  hasEntry,
+  isToday,
+  onToggle
+}: {
+  date: string;
+  hasEntry: boolean;
+  isToday: boolean;
+  onToggle: () => void;
+}) {
+  const [showRipple, setShowRipple] = useState(false);
+
+  const handlePress = () => {
+    if (!hasEntry) {
+      setShowRipple(true);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('habit-completed'));
+      }
+      setTimeout(() => setShowRipple(false), 700);
+    }
+    onToggle();
+  };
+
+  const weekdayLabel = new Date(date).toLocaleDateString('en-US', { weekday: 'narrow' });
+
+  return (
+    <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.8 }}
+        animate={hasEntry ? { scale: [1, 1.22, 1], rotate: [0, 5, -5, 0] } : { scale: 1 }}
+        transition={{
+          type: 'spring',
+          stiffness: 420,
+          damping: 13, // Low damping for aggressive bounce overshoot
+          mass: 0.45,
+        }}
+        onClick={handlePress}
+        className={`
+          w-full aspect-square rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-indigo-500
+          ${
+            hasEntry
+              ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
+              : 'bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08] hover:border-white/10'
+          }
+          ${isToday ? 'ring-1.5 ring-indigo-500/50 border-indigo-500/20' : ''}
+        `}
+      >
+        {/* Pulse Ripple overlay */}
+        <AnimatePresence>
+          {showRipple && (
+            <motion.span
+              initial={{ scale: 0.4, opacity: 0.9 }}
+              animate={{ scale: 2.2, opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.55, ease: 'easeOut' }}
+              className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 pointer-events-none"
+            />
+          )}
+        </AnimatePresence>
+
+        {hasEntry ? (
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 14 }}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]" />
+          </motion.div>
+        ) : (
+          <Circle className="h-3 w-3 text-white/20 group-hover:text-white/40" />
+        )}
+      </motion.button>
+
+      <span className="text-[10px] font-bold text-white/40 tracking-wider">
+        {weekdayLabel}
+      </span>
+    </div>
+  );
 }

@@ -1,0 +1,8 @@
+1:"$Sreact.fragment"
+2:I[833487,["/_next/static/chunks/dd52a10f3c6a357e.js","/_next/static/chunks/001312a9c5bdc7c4.js"],"ViewportBoundary"]
+4:I[833487,["/_next/static/chunks/dd52a10f3c6a357e.js","/_next/static/chunks/001312a9c5bdc7c4.js"],"MetadataBoundary"]
+5:"$Sreact.suspense"
+7:I[808747,["/_next/static/chunks/dd52a10f3c6a357e.js","/_next/static/chunks/001312a9c5bdc7c4.js"],"IconMark"]
+0:{"buildId":"QGFHwd19VPAjiC3DqGgd3","rsc":["$","$1","h",{"children":[null,["$","$L2",null,{"children":"$@3"}],["$","div",null,{"hidden":true,"children":["$","$L4",null,{"children":["$","$5",null,{"name":"Next.Metadata","children":"$@6"}]}]}],null]}],"loading":null,"isPartial":false}
+3:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+6:[["$","title","0",{"children":"Novo - Productivity Hub"}],["$","meta","1",{"name":"description","content":"Your all-in-one productivity platform for routines, tasks, projects, and tracking"}],["$","meta","2",{"name":"generator","content":"v0.app"}],["$","link","3",{"rel":"icon","href":"/icon.svg","type":"image/svg+xml"}],["$","link","4",{"rel":"icon","href":"/icon-light-32x32.png","sizes":"32x32","type":"image/png"}],["$","link","5",{"rel":"apple-touch-icon","href":"/apple-icon.png"}],["$","$L7","6",{}]]

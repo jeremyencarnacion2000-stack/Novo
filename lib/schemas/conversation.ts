@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const conversationMessageSchema = z.object({
+  id: z.string().optional(),
   role: z.string().min(1, 'Message role is required'),
   content: z.string().min(1, 'Message content is required'),
   createdAt: z.string().datetime('Invalid date').optional(),

@@ -1,7 +1,5 @@
 import { Task } from './types';
 
-import { Task } from './types';
-
 export class TaskManager {
   async addTask(task: Task): Promise<void> {
     try {

@@ -40,13 +40,17 @@ function ScrollArea({
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn('relative', className)}
+      className={cn('relative overflow-hidden', className)}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
         ref={viewportRef}
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        className="focus-visible:ring-ring/50 h-full w-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        style={horizontalWheel 
+          ? { overflowX: 'auto', overflowY: 'hidden' }
+          : { overflowY: 'auto', overflowX: 'hidden' }
+        }
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
@@ -78,7 +82,7 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="bg-white/20 hover:bg-white/40 transition-colors relative flex-1 rounded-full"
+        className="bg-white/30 hover:bg-white/50 transition-all relative flex-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)]"
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   )

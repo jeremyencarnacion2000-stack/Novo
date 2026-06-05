@@ -54,14 +54,14 @@ export async function GET(request: NextRequest) {
             semester,
             gpa: calculateGPA(courses.filter(c => c.finalGrade !== undefined)),
             courses: courses.length,
-            credits: courses.reduce((sum, c) => sum + c.credits, 0),
+            credits: courses.reduce((sum, c) => sum + (c.credits || 0), 0),
         }));
 
         // Calculate total and completed credits
-        const totalCredits = courses.reduce((sum, c) => sum + c.credits, 0);
+        const totalCredits = courses.reduce((sum, c) => sum + (c.credits || 0), 0);
         const creditsCompleted = coursesWithGrades
             .filter(c => c.letterGrade && c.letterGrade !== 'F')
-            .reduce((sum, c) => sum + c.credits, 0);
+            .reduce((sum, c) => sum + (c.credits || 0), 0);
 
         // Get grade distribution
         const distribution = getGradeDistribution(coursesWithGrades.filter(c => c.finalGrade !== undefined));

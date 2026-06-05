@@ -10,16 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
-import { Moon, Sun, Bell, Database, User, Lock, Globe, Download, Trash2, RefreshCw, History, Bot, Upload, CheckCircle, XCircle } from 'lucide-react'
+import { Moon, Sun, Bell, Database, User, Lock, Globe, Download, Trash2, RefreshCw, History, Bot, Upload, CheckCircle, XCircle, Check, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Music, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Timer, Brain, ArrowUp, ArrowDown, Star, Plus } from 'lucide-react'
 import { useSettings } from '@/lib/settings-context'
 import { useNotifications } from '@/lib/notification-context'
 import { DataIntegrator } from '@/lib/data-integrator'
 import type { AIModel } from '@/types/ai'
 import { useState, useRef, useEffect } from 'react'
-import { signIn, signOut, useSession } from 'next-auth/react' // New: signIn, signOut, useSession
-import { SiSpotify } from 'react-icons/si' // New: Spotify Icon
+import { signIn, signOut, useSession } from 'next-auth/react'
+import { FaGoogle, FaWindows, FaApple, FaGoogleDrive } from 'react-icons/fa'
+import { SiNotion, SiApple } from 'react-icons/si'
 import { useTranslation } from '@/lib/i18n'
 import { aiModelManager } from '@/lib/ai-models'
+import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 
 export function SettingsSections() {
   const { t } = useTranslation()
@@ -31,6 +33,120 @@ export function SettingsSections() {
   const [availableBackups, setAvailableBackups] = useState<{ date: string, data: any }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { data: session } = useSession() // New: useSession hook
+
+  const { twin, updateTwin } = useCognitiveTwin()
+
+  const handleToggleModule = (moduleId: string) => {
+    const currentEnabled = twin.workspaceLayout?.enabledModules || []
+    let nextEnabled: string[]
+    if (currentEnabled.includes(moduleId)) {
+      nextEnabled = currentEnabled.filter(id => id !== moduleId)
+    } else {
+      nextEnabled = [...currentEnabled, moduleId]
+    }
+    
+    const updated = {
+      ...twin,
+      workspaceLayout: {
+        ...(twin.workspaceLayout || {}),
+        enabledModules: nextEnabled
+      }
+    }
+    
+    updateTwin(updated)
+    
+    // Sync with server
+    fetch('/api/cognitive-twin/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
+  }
+
+  const handleReorderModule = (index: number, direction: 'up' | 'down') => {
+    const currentEnabled = [...(twin.workspaceLayout?.enabledModules || [])]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= currentEnabled.length) return
+    
+    const temp = currentEnabled[index]
+    currentEnabled[index] = currentEnabled[targetIndex]
+    currentEnabled[targetIndex] = temp
+    
+    const updated = {
+      ...twin,
+      workspaceLayout: {
+        ...(twin.workspaceLayout || {}),
+        enabledModules: currentEnabled
+      }
+    }
+    
+    updateTwin(updated)
+    
+    fetch('/api/cognitive-twin/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
+  }
+
+  const handleTogglePinModule = (moduleId: string) => {
+    const currentPinned = twin.workspaceLayout?.pinnedModules || []
+    let nextPinned: string[]
+    if (currentPinned.includes(moduleId)) {
+      nextPinned = currentPinned.filter(id => id !== moduleId)
+    } else {
+      nextPinned = [...currentPinned, moduleId]
+    }
+    
+    const updated = {
+      ...twin,
+      workspaceLayout: {
+        ...(twin.workspaceLayout || {}),
+        pinnedModules: nextPinned
+      }
+    }
+    
+    updateTwin(updated)
+    
+    fetch('/api/cognitive-twin/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
+  }
+
+  const handleRestoreTwinRecommendations = () => {
+    const role = twin.identity?.role || 'professional'
+    let recommended = ['today', 'ai', 'cognitive', 'focus']
+    if (role === 'student') recommended.push('school', 'library', 'focus')
+    else if (role === 'founder') recommended.push('business', 'projects', 'focus')
+    else if (role === 'developer') recommended.push('projects', 'focus', 'library')
+    else if (role === 'creator') recommended.push('business', 'music', 'spiritual')
+    else recommended.push('business', 'routines', 'checklist')
+
+    const nextEnabled = Array.from(new Set(recommended))
+    
+    const updated = {
+      ...twin,
+      workspaceLayout: {
+        ...(twin.workspaceLayout || {}),
+        enabledModules: nextEnabled
+      }
+    }
+    
+    updateTwin(updated)
+    
+    fetch('/api/cognitive-twin/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
+
+    toast({
+      title: 'Recommendations Applied',
+      description: `Enabled recommended modules based on your role as ${role}.`,
+    })
+  }
 
   // AI Models state
   const [models, setModels] = useState<AIModel[]>([])
@@ -45,7 +161,7 @@ export function SettingsSections() {
   const [isUploadingBg, setIsUploadingBg] = useState(false)
   const bgInputRef = useRef<HTMLInputElement>(null)
 
-  const compressImage = (dataUrl: string, maxWidth = 1200, quality = 0.6): Promise<string> => {
+  const compressImage = (dataUrl: string, maxWidth = 2560, quality = 0.85): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image()
       img.onload = () => {
@@ -89,11 +205,11 @@ export function SettingsSections() {
         const result = e.target?.result as string
         const compressed = await compressImage(result)
 
-        // Check if compressed result is still too large (e.g. > 1MB)
-        if (compressed.length > 1.5 * 1024 * 1024) {
-          // Try again with lower quality
-          const superCompressed = await compressImage(result, 800, 0.4)
-          updateSetting('backgroundImage', superCompressed)
+        // Check if compressed result is still too large (e.g. > 2MB)
+        if (compressed.length > 2 * 1024 * 1024) {
+          // Try again with lower quality but keeping resolution high
+          const optimized = await compressImage(result, 1920, 0.7)
+          updateSetting('backgroundImage', optimized)
         } else {
           updateSetting('backgroundImage', compressed)
         }
@@ -407,7 +523,7 @@ export function SettingsSections() {
   return (
     <div className="flex flex-col gap-4 md:gap-6">
       {/* Appearance */}
-      <Card>
+      <Card className="glass-card border-white/5">
         <CardHeader>
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -479,7 +595,7 @@ export function SettingsSections() {
 
           <Separator />
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>Background Image</Label>
             <p className="text-sm text-muted-foreground">
               Upload a custom background image for the application.
@@ -511,6 +627,55 @@ export function SettingsSections() {
                 </Button>
               )}
             </div>
+
+            {/* Recent Wallpapers — Windows 10/11 style */}
+            {settings.backgroundHistory && settings.backgroundHistory.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <Label className="text-xs text-muted-foreground">Recent backgrounds</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {settings.backgroundHistory.map((img, i) => (
+                    <div
+                      key={i}
+                      className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all aspect-video ${settings.backgroundImage === img
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-white/10 hover:border-white/30'
+                        }`}
+                      onClick={() => updateSetting('backgroundImage', img)}
+                    >
+                      <img
+                        src={img}
+                        alt={`Background ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Remove from history */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const updated = settings.backgroundHistory.filter((_, idx) => idx !== i)
+                          updateSetting('backgroundHistory', updated)
+                          // If removing the active background, clear it
+                          if (settings.backgroundImage === img) {
+                            updateSetting('backgroundImage', '')
+                          }
+                        }}
+                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white/80 hover:text-white hover:bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                        title="Remove from history"
+                      >
+                        ×
+                      </button>
+                      {/* Active indicator */}
+                      {settings.backgroundImage === img && (
+                        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                          <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                            <span className="text-white text-[8px]">✓</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -518,43 +683,48 @@ export function SettingsSections() {
           <div className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-0.5">
-                <Label>Background Blur</Label>
-                <p className="text-sm text-muted-foreground">
-                  Adjust the blur intensity of the background ({settings.backgroundBlur}px)
-                </p>
-              </div>
-              <div className="w-full sm:w-[200px]">
-                <Progress value={(settings.backgroundBlur / 100) * 100} className="h-2" />
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={settings.backgroundBlur}
-                  onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
-                  className="w-full mt-2"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-0.5">
                 <Label>Background Dimness</Label>
                 <p className="text-sm text-muted-foreground">
                   Adjust the darkness of the background ({settings.backgroundDimness}%)
                 </p>
               </div>
-              <div className="w-full sm:w-[200px]">
-                <Progress value={settings.backgroundDimness} className="h-2" />
+              <div className="w-full sm:w-[200px] space-y-3">
+                <Progress value={settings.backgroundDimness} className="h-1.5 bg-foreground/10" />
                 <input
                   type="range"
                   min="0"
                   max="90"
                   value={settings.backgroundDimness}
                   onChange={(e) => updateSetting('backgroundDimness', parseInt(e.target.value))}
-                  className="w-full mt-2"
+                  className="w-full h-1.5 bg-foreground/10 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
               </div>
             </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Background Blur</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjust the blur intensity of the background image ({settings.backgroundBlur}px)
+                </p>
+              </div>
+              <div className="w-full sm:w-[200px] space-y-3">
+                <Progress value={(settings.backgroundBlur / 50) * 100} className="h-1.5 bg-foreground/10" />
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  step="1"
+                  value={settings.backgroundBlur}
+                  onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-foreground/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+            </div>
+
+            <Separator />
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-0.5">
@@ -567,6 +737,317 @@ export function SettingsSections() {
                 checked={settings.autoContrast}
                 onCheckedChange={(checked) => updateSetting('autoContrast', checked)}
               />
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Glass Opacity</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjust the transparency of glass panels ({settings.glassOpacity}%)
+                </p>
+              </div>
+              <div className="w-full sm:w-[200px] space-y-3">
+                <Progress value={settings.glassOpacity} className="h-1.5 bg-foreground/10" />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={settings.glassOpacity}
+                  onChange={(e) => updateSetting('glassOpacity', parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-foreground/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label>Glass Blur</Label>
+                <p className="text-sm text-muted-foreground">
+                  Adjust the blur intensity of glass panels ({settings.glassBlur}px)
+                </p>
+              </div>
+              <div className="w-full sm:w-[200px] space-y-3">
+                <Progress value={(settings.glassBlur / 50) * 100} className="h-1.5 bg-foreground/10" />
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  step="1"
+                  value={settings.glassBlur}
+                  onChange={(e) => updateSetting('glassBlur', parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-foreground/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Are you sure you want to reset all appearance settings to default?')) {
+                    resetSettings()
+                    toast({
+                      title: "Settings Reset",
+                      description: "Appearance settings have been restored to defaults.",
+                    })
+                  }
+                }}
+                className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reset to Defaults
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <Label>Accent Color</Label>
+                <p className="text-sm text-muted-foreground">
+                  Choose your preferred accent color
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { id: 'indigo', color: '#6366f1' },
+                  { id: 'purple', color: '#a855f7' },
+                  { id: 'violet', color: '#8b5cf6' },
+                  { id: 'blue', color: '#3b82f6' },
+                  { id: 'cyan', color: '#06b6d4' },
+                  { id: 'green', color: '#22c55e' },
+                  { id: 'orange', color: '#f97316' },
+                  { id: 'red', color: '#ef4444' },
+                  { id: 'pink', color: '#ec4899' },
+                  { id: 'rose', color: '#f43f5e' },
+                ].map((color) => (
+                  <button
+                    key={color.id}
+                    onClick={() => updateSetting('accentColor', color.id)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${settings.accentColor === color.id
+                      ? 'ring-2 ring-offset-2 ring-primary scale-110'
+                      : 'hover:scale-110 opacity-70 hover:opacity-100'
+                      }`}
+                    style={{ backgroundColor: color.color }}
+                    title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
+                  >
+                    {settings.accentColor === color.id && (
+                      <Check className="w-4 h-4 text-white drop-shadow-md" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Workspace Modules Configuration */}
+      <Card className="glass-card border-white/5">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Brain className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg md:text-xl">Workspace Modules</CardTitle>
+                <CardDescription className="text-sm">
+                  Configure, enable, reorder, and pin favorite modules inside your Cognitive OS.
+                </CardDescription>
+              </div>
+            </div>
+            {twin.isInitialized && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRestoreTwinRecommendations}
+                className="text-xs border-primary/30 hover:bg-primary/10 gap-1.5"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Restore AI Recommendations
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {twin.isInitialized && twin.identity?.role && (
+            <div className="p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm space-y-2">
+              <div className="flex items-center gap-2 font-bold text-violet-400">
+                <Brain className="h-4 w-4" />
+                <span>Twin Intelligence Analysis</span>
+              </div>
+              <p className="text-muted-foreground">
+                Your Cognitive Twin has identified your focus role as <span className="text-foreground font-semibold capitalize">{twin.identity.role}</span>.
+                The recommended workspace modules for this profile are:
+                <span className="text-foreground font-semibold ml-1">
+                  {twin.identity.role === 'student' ? 'School, Library, Focus, Today' :
+                   twin.identity.role === 'founder' ? 'Business, Projects, Focus, Today' :
+                   twin.identity.role === 'developer' ? 'Projects, Focus, Library, Today' :
+                   twin.identity.role === 'creator' ? 'Business, Music, Spiritual, Today' :
+                   'Business, Routines, Checklist, Today'}
+                </span>.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground/60 text-xs">
+              Active Workspace Modules ({(twin.workspaceLayout?.enabledModules || []).length})
+            </h4>
+            
+            <div className="space-y-2">
+              {(twin.workspaceLayout?.enabledModules || []).map((moduleId, index) => {
+                const modInfo = [
+                  { id: 'today', title: 'Daily Dashboard', icon: Sun, desc: 'Central workspace view.' },
+                  { id: 'ai', title: 'AI Assistant', icon: Bot, desc: 'Interact with Gemini & Groq.' },
+                  { id: 'cognitive', title: 'Cognitive Engine', icon: Brain, desc: 'View twin cognitive analytics.' },
+                  { id: 'focus', title: 'Focus & Pomodoro', icon: Timer, desc: 'Deep work focus timers.' },
+                  { id: 'school', title: 'School', icon: GraduationCap, desc: 'Track academic courses, semesters, and grades.' },
+                  { id: 'business', title: 'Business', icon: Briefcase, desc: 'Manage clients, deals, and projects.' },
+                  { id: 'library', title: 'Library', icon: BookOpen, desc: 'Track reading lists and page logs.' },
+                  { id: 'spiritual', title: 'Spiritual', icon: Sparkles, desc: 'Record gratitude and affirmations.' },
+                  { id: 'appearance', title: 'Appearance', icon: Heart, desc: 'Log fitness workouts and routines.' },
+                  { id: 'music', title: 'Music Player', icon: Music, desc: 'Play ambient background music.' },
+                  { id: 'routines', title: 'Routines', icon: ListChecks, desc: 'Habits and daily repeaters.' },
+                  { id: 'checklist', title: 'Checklist', icon: CheckSquare, desc: 'Rapid tasks and checklists.' },
+                  { id: 'projects', title: 'Projects', icon: KanbanSquare, desc: 'Goal-based project pipelines.' },
+                  { id: 'trackers', title: 'Trackers', icon: TrendingUp, desc: 'Track numeric metrics and stats.' },
+                ].find(m => m.id === moduleId) || { id: moduleId, title: moduleId, icon: Brain, desc: '' };
+
+                const isPinned = (twin.workspaceLayout?.pinnedModules || []).includes(moduleId);
+                const Icon = modInfo.icon;
+
+                return (
+                  <div
+                    key={moduleId}
+                    className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Reorder Buttons */}
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 p-0"
+                          disabled={index === 0}
+                          onClick={() => handleReorderModule(index, 'up')}
+                        >
+                          <ArrowUp className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 p-0"
+                          disabled={index === (twin.workspaceLayout?.enabledModules || []).length - 1}
+                          onClick={() => handleReorderModule(index, 'down')}
+                        >
+                          <ArrowDown className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                        <Icon className="h-4 w-4" />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{modInfo.title}</span>
+                          {isPinned && (
+                            <span className="text-[9px] font-black tracking-widest uppercase bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">
+                              Pinned
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{modInfo.desc}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Pin Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 ${isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => handleTogglePinModule(moduleId)}
+                        title={isPinned ? 'Unpin from dashboard' : 'Pin to dashboard'}
+                      >
+                        <Star className={`h-4 w-4 ${isPinned ? 'fill-current' : ''}`} />
+                      </Button>
+
+                      {/* Enable/Disable Toggle */}
+                      <Switch
+                        checked={true}
+                        onCheckedChange={() => handleToggleModule(moduleId)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground/60 text-xs">
+              Available Modules
+            </h4>
+            
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                { id: 'today', title: 'Daily Dashboard', icon: Sun, desc: 'Central workspace view.' },
+                { id: 'ai', title: 'AI Assistant', icon: Bot, desc: 'Interact with Gemini & Groq.' },
+                { id: 'cognitive', title: 'Cognitive Engine', icon: Brain, desc: 'View twin cognitive analytics.' },
+                { id: 'focus', title: 'Focus & Pomodoro', icon: Timer, desc: 'Deep work focus timers.' },
+                { id: 'school', title: 'School', icon: GraduationCap, desc: 'Track academic courses, semesters, and grades.' },
+                { id: 'business', title: 'Business', icon: Briefcase, desc: 'Manage clients, deals, and projects.' },
+                { id: 'library', title: 'Library', icon: BookOpen, desc: 'Track reading lists and page logs.' },
+                { id: 'spiritual', title: 'Spiritual', icon: Sparkles, desc: 'Record gratitude and affirmations.' },
+                { id: 'appearance', title: 'Appearance', icon: Heart, desc: 'Log fitness workouts and routines.' },
+                { id: 'music', title: 'Music Player', icon: Music, desc: 'Play ambient background music.' },
+                { id: 'routines', title: 'Routines', icon: ListChecks, desc: 'Habits and daily repeaters.' },
+                { id: 'checklist', title: 'Checklist', icon: CheckSquare, desc: 'Rapid tasks and checklists.' },
+                { id: 'projects', title: 'Projects', icon: KanbanSquare, desc: 'Goal-based project pipelines.' },
+                { id: 'trackers', title: 'Trackers', icon: TrendingUp, desc: 'Track numeric metrics and stats.' },
+              ]
+                .filter(m => !(twin.workspaceLayout?.enabledModules || []).includes(m.id))
+                .map((modInfo) => {
+                  const Icon = modInfo.icon;
+                  return (
+                    <div
+                      key={modInfo.id}
+                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.005] hover:bg-white/[0.015] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-white/5 text-muted-foreground">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-sm text-muted-foreground">{modInfo.title}</span>
+                          <p className="text-xs text-muted-foreground/60">{modInfo.desc}</p>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/20 text-muted-foreground hover:text-primary"
+                        onClick={() => handleToggleModule(modInfo.id)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </CardContent>
@@ -1005,55 +1486,7 @@ export function SettingsSections() {
         </CardContent>
       </Card>
 
-      {/* Integrations */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <SiSpotify className="h-4 w-4 text-[#1DB954]" />
-            </div>
-            <div>
-              <CardTitle className="text-lg md:text-xl">Integrations</CardTitle>
-              <CardDescription className="text-sm">Connect with other services</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 md:space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <Label>Spotify</Label>
-              <p className="text-sm text-muted-foreground">
-                Connect your Spotify account to play music
-              </p>
-            </div>
-            {session?.provider === 'spotify' || (session?.user && session.accessToken) ? (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/spotify/disconnect', { method: 'POST' });
-                    if (res.ok) {
-                      toast({ title: 'Spotify disconnected', description: 'Your Spotify account has been unlinked.' });
-                      window.location.reload(); // Reload to refresh session state
-                    } else {
-                      throw new Error('Failed to disconnect');
-                    }
-                  } catch (error) {
-                    toast({ title: 'Error', description: 'Failed to disconnect Spotify', variant: 'destructive' });
-                  }
-                }}
-                className="text-red-500 hover:text-red-600"
-              >
-                Disconnect
-              </Button>
-            ) : (
-              <Button onClick={() => signIn('spotify')} className="bg-[#1DB954] hover:bg-[#1ed760] text-white">
-                Connect Spotify
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* General */}
       <Card>
@@ -1312,61 +1745,7 @@ export function SettingsSections() {
         </CardContent>
       </Card>
 
-      {/* Spotify Integration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <SiSpotify className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-lg md:text-xl">Spotify Integration</CardTitle>
-              <CardDescription className="text-sm">Connect to Spotify to manage your music and playlists</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 md:space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <Label>Connect Spotify</Label>
-              <p className="text-sm text-muted-foreground">
-                Link your Spotify account to access your music library and control playback.
-              </p>
-            </div>
-            {session?.provider === 'spotify' || (session?.user && session.accessToken) ? ( // Check if Spotify session exists
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto text-red-500 hover:text-red-600"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/spotify/disconnect', { method: 'POST' });
-                    if (res.ok) {
-                      toast({ title: 'Spotify disconnected', description: 'Your Spotify account has been unlinked.' });
-                      window.location.reload();
-                    } else {
-                      throw new Error('Failed to disconnect');
-                    }
-                  } catch (error) {
-                    toast({ title: 'Error', description: 'Failed to disconnect Spotify', variant: 'destructive' });
-                  }
-                }}
-              >
-                <SiSpotify className="mr-2 h-4 w-4" />
-                Disconnect Spotify
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => signIn('spotify')}
-              >
-                <SiSpotify className="mr-2 h-4 w-4" />
-                Connect Spotify
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Account Actions */}
       <Card className="border-destructive/20 bg-destructive/5">
@@ -1398,6 +1777,6 @@ export function SettingsSections() {
           Save Changes
         </Button>
       </div>
-    </div>
+    </div >
   )
 }

@@ -43,11 +43,12 @@ export async function GET(request: NextRequest) {
     manualItems.forEach((item) => {
       tasks.push({
         ...item,
+        priority: (item.priority as any) || 'medium',
         source: item.task ? 'project-task' : 'manual',
         metadata: item.task?.project ? {
-          projectName: item.task.project.title
+          projectName: (item.task.project as any).title
         } : undefined
-      })
+      } as any)
     })
 
     // 2. Get Routine Tasks
@@ -84,13 +85,13 @@ export async function GET(request: NextRequest) {
             id: `project-${project.id}-${subtask.id}`,
             text: subtask.title,
             completed: subtask.completed,
-            priority: project.priority,
+            priority: (project.priority as any) || 'medium',
             source: 'project',
             sourceId: project.id,
             originalId: subtask.id,
             metadata: {
               projectName: project.title,
-              dueDate: project.dueDate
+              dueDate: project.dueDate || undefined
             }
           })
         })
@@ -144,13 +145,18 @@ export async function GET(request: NextRequest) {
           id: `task-${task.id}`,
           text: task.title,
           completed: task.status === "done",
-          priority: task.priority,
+          priority: (task.priority as any) || 'medium',
           source: "standalone",
           sourceId: "standalone",
           originalId: task.id,
+          task: {
+            ...task,
+            status: task.status as any,
+            priority: task.priority as any
+          } as any,
           metadata: {
             projectName: "Standalone Task",
-            dueDate: task.dueDate,
+            dueDate: task.dueDate || undefined,
           },
         })
       }

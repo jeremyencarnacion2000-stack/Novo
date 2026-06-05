@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { SkinToneSuggestions } from '@/components/appearance/skin-tone-suggestions'
+import { CognitiveOutfitSuggestions } from '@/components/appearance/cognitive-outfit-suggestions'
 
 interface Routine {
   id: string
@@ -31,6 +32,7 @@ export default function AppearanceClient() {
   const [newRoutine, setNewRoutine] = useState({ name: '', type: 'skincare', steps: '' })
   const [isCompareMode, setIsCompareMode] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([])
+
   useEffect(() => {
     setIsClient(true)
   }, [])
@@ -52,6 +54,7 @@ export default function AppearanceClient() {
         .catch(console.error)
     }
   }, [session?.user?.id])
+
   if (!isClient) return null
 
   const handleAddRoutine = async () => {
@@ -90,9 +93,8 @@ export default function AppearanceClient() {
     if (!routine) return
 
     try {
-      // Safely get tasks array - could be either 'tasks' or 'steps'
       const tasksArray = Array.isArray((routine as any).tasks) ? (routine as any).tasks : []
-      const updatedTasks = tasksArray.map(task => ({ ...task, completed: true }))
+      const updatedTasks = tasksArray.map((task: any) => ({ ...task, completed: true }))
       const res = await fetch(`/api/routines/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -120,16 +122,6 @@ export default function AppearanceClient() {
     } catch (error) {
       console.error('Failed to delete routine:', error)
       toast({ title: 'Error', description: 'Failed to delete routine', variant: 'destructive' })
-    }
-  }
-
-  const togglePhotoSelection = (id: string) => {
-    if (selectedPhotos.includes(id)) {
-      setSelectedPhotos(selectedPhotos.filter(p => p !== id))
-    } else {
-      if (selectedPhotos.length < 2) {
-        setSelectedPhotos([...selectedPhotos, id])
-      }
     }
   }
 
@@ -248,172 +240,34 @@ export default function AppearanceClient() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Progress Photos</CardTitle>
-              <CardDescription>Track visual changes</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={isCompareMode ? "secondary" : "outline"}
-                onClick={() => {
-                  setIsCompareMode(!isCompareMode)
-                  setSelectedPhotos([])
-                }}
-              >
-                <SplitSquareHorizontal className="h-4 w-4 mr-2" />
-                {isCompareMode ? 'Cancel' : 'Compare'}
-              </Button>
-              <Button size="sm" variant="outline">
-                <Camera className="h-4 w-4 mr-2" />
-                Add
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isCompareMode && selectedPhotos.length === 2 && (
-              <div className="mb-6 p-4 border rounded-lg bg-secondary/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium">Comparison View</h4>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedPhotos([])}>
-                    <X className="h-4 w-4 mr-2" /> Clear
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedPhotos.map(id => {
-                    const photo = routines.find(r => r.id === id)
-                    return (
-                      <div key={id} className="space-y-2">
-                        <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border-2 border-primary">
-                          <Camera className="h-8 w-8 text-primary" />
-                        </div>
-                        <p className="text-center text-sm font-medium">{photo?.date || 'Unknown Date'}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              {routines.map((photo) => (
-                <div
-                  key={photo.id}
-                  className={`aspect-square bg-muted rounded-lg flex items-center justify-center relative group cursor-pointer transition-all ${isCompareMode
-                    ? selectedPhotos.includes(photo.id)
-                      ? 'ring-2 ring-primary ring-offset-2'
-                      : 'opacity-60 hover:opacity-100'
-                    : ''
-                    }`}
-                >
-                  {/* Photo content would go here */}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Progress Photos</CardTitle>
-              <CardDescription>Track visual changes</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={isCompareMode ? "secondary" : "outline"}
-                onClick={() => {
-                  setIsCompareMode(!isCompareMode)
-                  setSelectedPhotos([])
-                }}
-              >
-                <SplitSquareHorizontal className="h-4 w-4 mr-2" />
-                {isCompareMode ? 'Cancel' : 'Compare'}
-              </Button>
-              <Button size="sm" variant="outline">
-                <Camera className="h-4 w-4 mr-2" />
-                Add
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isCompareMode && selectedPhotos.length === 2 && (
-              <div className="mb-6 p-4 border rounded-lg bg-secondary/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium">Comparison View</h4>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedPhotos([])}>
-                    <X className="h-4 w-4 mr-2" /> Clear
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedPhotos.map(id => {
-                    const photo = routines.find(r => r.id === id)
-                    return (
-                      <div key={id} className="space-y-2">
-                        <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border-2 border-primary">
-                          <Camera className="h-8 w-8 text-primary" />
-                        </div>
-                        <p className="text-center text-sm font-medium">{photo?.date || 'Unknown Date'}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              {routines.map((photo) => (
-                <div
-                  key={photo.id}
-                  className={`aspect-square bg-muted rounded-lg flex items-center justify-center relative group cursor-pointer transition-all ${isCompareMode
-                    ? selectedPhotos.includes(photo.id)
-                      ? 'ring-2 ring-primary ring-offset-2'
-                      : 'opacity-60 hover:opacity-100'
-                    : ''
-                    }`}
-                  onClick={() => isCompareMode && togglePhotoSelection(photo.id)}
-                >
-                  <Camera className="h-8 w-8 text-muted-foreground" />
-                  <div className="absolute bottom-2 left-2 right-2 bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                    <p className="text-xs font-medium">{photo.date || 'Today'}</p>
-                  </div>
-                  {isCompareMode && selectedPhotos.includes(photo.id) && (
-                    <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                      <Check className="h-3 w-3" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Cognitive Outfit Recommendations */}
+        <CognitiveOutfitSuggestions />
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Style Notes</CardTitle>
-            <CardDescription>Hair, outfits, and grooming tips</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="p-3 border rounded-lg">
-              <h4 className="font-medium text-sm mb-1">Current Hairstyle</h4>
-              <p className="text-sm text-muted-foreground">Medium fade with textured top</p>
+      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Style Notes</CardTitle>
+              <CardDescription>Hair, outfits, and grooming tips</CardDescription>
             </div>
-            <div className="p-3 border rounded-lg">
-              <h4 className="font-medium text-sm mb-1">Favorite Products</h4>
-              <p className="text-sm text-muted-foreground">Cerave cleanser, The Ordinary serum</p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Current Hairstyle</h4>
+                <p className="text-sm text-muted-foreground">Medium fade with textured top</p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Favorite Products</h4>
+                <p className="text-sm text-muted-foreground">Cerave cleanser, The Ordinary serum</p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <SkinToneSuggestions />
+        <SkinToneSuggestions />
+      </div>
     </div>
   )
 }

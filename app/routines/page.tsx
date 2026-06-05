@@ -10,10 +10,9 @@ import { Routine } from '@/types/routine'
 import { RoutineDetailDialog } from '@/components/routines/routine-detail-dialog'
 import { useRoutines, ROUTINE_STATS_KEY } from '@/hooks/use-swr'
 import { useSWRConfig } from 'swr'
-
 import { useToast } from '@/hooks/use-toast'
-
 import { RoutineStatsCard } from '@/components/routines/routine-stats'
+import { safeViewTransition } from '@/hooks/use-view-transition'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
@@ -46,7 +45,10 @@ export default function RoutinesPage() {
       if (response.ok) {
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
-        setDialogOpen(false)
+        globalMutate('/api/analytics')
+        safeViewTransition(() => {
+          setDialogOpen(false)
+        })
         toast({
           title: 'Routine created',
           description: 'Your new routine has been created successfully.',
@@ -78,8 +80,11 @@ export default function RoutinesPage() {
       if (response.ok) {
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
-        setDialogOpen(false)
-        setEditingRoutine(undefined)
+        globalMutate('/api/analytics')
+        safeViewTransition(() => {
+          setDialogOpen(false)
+          setEditingRoutine(undefined)
+        })
         toast({
           title: 'Routine updated',
           description: 'Your routine has been updated successfully.',
@@ -109,6 +114,7 @@ export default function RoutinesPage() {
       if (response.ok) {
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
+        globalMutate('/api/analytics')
         toast({
           title: 'Routine deleted',
           description: 'Your routine has been deleted successfully.',
@@ -131,13 +137,17 @@ export default function RoutinesPage() {
   }
 
   const handleEdit = (routine: Routine) => {
-    setEditingRoutine(routine)
-    setDialogOpen(true)
+    safeViewTransition(() => {
+      setEditingRoutine(routine)
+      setDialogOpen(true)
+    })
   }
 
   const handleDialogClose = () => {
-    setDialogOpen(false)
-    setEditingRoutine(undefined)
+    safeViewTransition(() => {
+      setDialogOpen(false)
+      setEditingRoutine(undefined)
+    })
   }
 
   const handleImport = async (payload: any) => {
@@ -175,8 +185,10 @@ export default function RoutinesPage() {
   }
 
   const handleView = (routine: Routine) => {
-    setViewingRoutine(routine)
-    setDetailDialogOpen(true)
+    safeViewTransition(() => {
+      setViewingRoutine(routine)
+      setDetailDialogOpen(true)
+    })
   }
 
   const handleUpdateProgress = async (routineId: string, taskId: string, completed: boolean) => {
@@ -216,6 +228,7 @@ export default function RoutinesPage() {
         }
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
+        globalMutate('/api/analytics')
       } catch (error) {
         console.error('Error updating routine progress:', error)
         toast({
@@ -252,11 +265,20 @@ export default function RoutinesPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
+          <Button
+            onClick={() => safeViewTransition(() => setImportDialogOpen(true))}
+            style={!importDialogOpen ? { viewTransitionName: 'routine-modal' } as React.CSSProperties : undefined}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
             <Upload className="h-4 w-4 mr-2" />
             Import
           </Button>
-          <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+          <Button
+            onClick={() => safeViewTransition(() => setDialogOpen(true))}
+            style={!dialogOpen ? { viewTransitionName: 'routine-modal' } as React.CSSProperties : undefined}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Routine
           </Button>
@@ -271,6 +293,7 @@ export default function RoutinesPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onView={handleView}
+        activeTransitionId={viewingRoutine?.id || editingRoutine?.id}
       />
 
 
@@ -284,13 +307,13 @@ export default function RoutinesPage() {
 
       <ImportRoutineDialog
         open={importDialogOpen}
-        onClose={() => setImportDialogOpen(false)}
+        onClose={() => safeViewTransition(() => setImportDialogOpen(false))}
         onImport={handleImport}
       />
 
       <RoutineDetailDialog
         open={detailDialogOpen}
-        onClose={() => setDetailDialogOpen(false)}
+        onClose={() => safeViewTransition(() => setDetailDialogOpen(false))}
         routine={viewingRoutine}
         onUpdateProgress={handleUpdateProgress}
       />

@@ -4,16 +4,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { calculateGPA } from '@/lib/gpa-calculator';
-
-interface Course {
-    id: string;
-    name: string;
-    semester: string;
-    year: number;
-    credits: number;
-    finalGrade?: number;
-    letterGrade?: string;
-}
+import { Course } from '@/types/school';
 
 interface SchoolAnalyticsProps {
     courses: Course[];
@@ -24,7 +15,7 @@ export function SchoolAnalytics({ courses }: SchoolAnalyticsProps) {
     const getGPATrendData = () => {
         // Group courses by semester
         const semesters: Record<string, Course[]> = {};
-        courses.forEach(course => {
+        courses.forEach((course: any) => {
             const key = `${course.semester} ${course.year}`;
             if (!semesters[key]) semesters[key] = [];
             semesters[key].push(course);
@@ -32,7 +23,7 @@ export function SchoolAnalytics({ courses }: SchoolAnalyticsProps) {
 
         // Calculate GPA for each semester
         const data = Object.entries(semesters).map(([semester, semesterCourses]) => {
-            const gpa = calculateGPA(semesterCourses);
+            const gpa = calculateGPA(semesterCourses as any);
             // Parse semester for sorting (Fall > Summer > Spring for same year)
             const [sem, yearStr] = semester.split(' ');
             const year = parseInt(yearStr);
@@ -63,7 +54,7 @@ export function SchoolAnalytics({ courses }: SchoolAnalyticsProps) {
             'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0
         };
 
-        courses.forEach(course => {
+        courses.forEach((course: any) => {
             if (course.letterGrade) {
                 // Normalize letter grade (A+, A- -> A)
                 const letter = course.letterGrade.charAt(0).toUpperCase();

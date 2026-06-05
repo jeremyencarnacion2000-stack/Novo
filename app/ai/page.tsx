@@ -3,11 +3,8 @@ import ModernChatbot from '@/components/ai/modern-chatbot';
 
 export default function AIPage() {
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
-      {/* Mobile Header - Optional, can be kept if needed for mobile specific view, but DashboardShell has MobileNav */}
-
-      {/* Chatbot - Full height */}
-      <div className="flex-1 min-h-0">
+    <div className="flex-1 min-h-0 w-full p-4 lg:p-6 flex flex-col overflow-hidden bg-transparent">
+      <div className="flex-1 min-h-0 w-full bg-[#0B0B0F] border border-white/10 rounded-[2rem] flex flex-col overflow-hidden shadow-2xl relative">
         <ModernChatbot />
       </div>
     </div>

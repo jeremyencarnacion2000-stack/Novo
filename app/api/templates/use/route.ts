@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
         }
 
+        const templateContent = template.content as any;
+        const tasksToCreate = templateContent.tasks || [];
+
         // Instantiate based on type
         if (template.type === 'routine') {
             const routine = await prisma.routine.create({
@@ -27,10 +30,10 @@ export async function POST(request: NextRequest) {
                     name: template.name,
                     description: template.description || '',
                     timeOfDay: 'morning', // Default
-                    duration: template.content.tasks.reduce((acc: number, t: any) => acc + (t.duration || 0), 0),
+                    duration: tasksToCreate.reduce((acc: number, t: any) => acc + (t.duration || 0), 0),
                     isActive: true,
                     tasks: {
-                        create: template.content.tasks.map((t: any) => ({
+                        create: tasksToCreate.map((t: any) => ({
                             text: t.text,
                             completed: false
                         }))
@@ -50,9 +53,9 @@ export async function POST(request: NextRequest) {
                     priority: 'medium',
                     tags: '[]',
                     tasks: {
-                        create: template.content.tasks.map((t: any) => ({
-                            title: t.title,
-                            status: t.status,
+                        create: tasksToCreate.map((t: any) => ({
+                            title: t.title || t.text,
+                            status: t.status || 'todo',
                             priority: 'medium',
                             tags: '[]',
                             userId: session.user.id
@@ -67,10 +70,10 @@ export async function POST(request: NextRequest) {
             const tracker = await prisma.tracker.create({
                 data: {
                     userId: session.user.id,
-                    name: template.content.name,
+                    name: templateContent.name,
                     type: 'metric',
-                    unit: template.content.unit,
-                    goal: template.content.goal
+                    unit: templateContent.unit,
+                    goal: templateContent.goal
                 }
             })
             return NextResponse.json({ success: true, type: 'tracker', id: tracker.id })

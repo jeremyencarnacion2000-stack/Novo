@@ -1,11 +1,18 @@
 import React from 'react';
-import { View } from 'react-big-calendar';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Search, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-interface CalendarToolbarProps extends ToolbarProps {
+// Local View type — removes dependency on react-big-calendar
+export type CalendarView = 'month' | 'week' | 'day' | 'agenda';
+
+interface CalendarToolbarProps {
+    label: string;
+    onNavigate: (action: 'PREV' | 'NEXT' | 'TODAY') => void;
+    onView: (view: CalendarView) => void;
+    view: CalendarView;
+    date: Date;
     searchQuery?: string;
     onSearchChange?: (query: string) => void;
     onSettingsClick?: () => void;
@@ -20,11 +27,6 @@ export function CalendarToolbar({
     onSearchChange,
     onSettingsClick
 }: CalendarToolbarProps) {
-    const goToBack = () => onNavigate('PREV');
-    const goToNext = () => onNavigate('NEXT');
-    const goToCurrent = () => onNavigate('TODAY');
-    const handleViewChange = (newView: View) => onView(newView);
-
     return (
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 w-full">
             {/* Left: Navigation & Title */}
@@ -32,15 +34,15 @@ export function CalendarToolbar({
                 <h2 className="text-2xl font-bold tracking-tight min-w-[200px] text-foreground">{label}</h2>
 
                 <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={goToBack} className="h-8 w-8 rounded-full hover:bg-muted">
+                    <Button variant="ghost" size="icon" onClick={() => onNavigate('PREV')} className="h-8 w-8 rounded-full hover:bg-muted">
                         <ChevronLeft className="h-5 w-5" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={goToNext} className="h-8 w-8 rounded-full hover:bg-muted">
+                    <Button variant="ghost" size="icon" onClick={() => onNavigate('NEXT')} className="h-8 w-8 rounded-full hover:bg-muted">
                         <ChevronRight className="h-5 w-5" />
                     </Button>
                 </div>
 
-                <Button variant="outline" size="sm" onClick={goToCurrent} className="rounded-full px-4 h-8 text-xs font-medium border-muted-foreground/20">
+                <Button variant="outline" size="sm" onClick={() => onNavigate('TODAY')} className="rounded-full px-4 h-8 text-xs font-medium border-muted-foreground/20">
                     Today
                 </Button>
             </div>
@@ -67,10 +69,10 @@ export function CalendarToolbar({
                 </Button>
 
                 <div className="flex items-center bg-muted/30 rounded-full p-1 border border-border/20">
-                    {['month', 'week', 'day'].map((v) => (
+                    {(['month', 'week', 'day'] as CalendarView[]).map((v) => (
                         <button
                             key={v}
-                            onClick={() => handleViewChange(v)}
+                            onClick={() => onView(v)}
                             className={cn(
                                 "px-4 py-1.5 text-xs font-medium rounded-full transition-all capitalize",
                                 view === v

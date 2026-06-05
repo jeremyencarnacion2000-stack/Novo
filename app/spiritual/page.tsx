@@ -127,7 +127,7 @@ export default function SpiritualPage() {
     }
   }
 
-  const handleToggleGoal = async (goal: Goal) => {
+  const handleToggleGoal = async (goal: any) => {
     try {
       const response = await fetch(`/api/goals/${goal.id}`, {
         method: 'PUT',
@@ -204,7 +204,7 @@ export default function SpiritualPage() {
           <div className="mt-6 space-y-2">
             {gratitudes?.map((g) => (
               <div key={g.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                <p className="text-sm">{g.text}</p>
+                <p className="text-sm">{g.content}</p>
                 <Button variant="ghost" size="icon" onClick={() => handleDeleteGratitude(g.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>

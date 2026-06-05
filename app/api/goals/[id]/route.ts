@@ -69,6 +69,14 @@ export async function PUT(
       }
     })
 
+    if (status === 'completed') {
+      const { trackServerCompletion } = await import('@/lib/analytics-server')
+      await trackServerCompletion(session.user.id, 'task', 'goals', {
+        goalId: id,
+        title: updatedGoal.title
+      })
+    }
+
     return NextResponse.json(updatedGoal)
   } catch (error) {
     if (error instanceof z.ZodError) {

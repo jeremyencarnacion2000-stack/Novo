@@ -14,17 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface Course {
-    id?: string;
-    name: string;
-    code?: string;
-    credits?: number;
-    semester: string;
-    year: number;
-    professor?: string;
-    color: string;
-    educationType: string;
-}
+import { Course } from '@/types/school';
 
 interface CourseDialogProps {
     open: boolean;
@@ -47,7 +37,7 @@ const COLOR_OPTIONS = [
 
 export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProps) {
     const currentYear = new Date().getFullYear();
-    const [formData, setFormData] = React.useState<Course>({
+    const [formData, setFormData] = React.useState<Partial<Course>>({
         name: '',
         code: '',
         credits: 1,
@@ -77,7 +67,7 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        onSave(formData as Course);
         onClose();
     };
 

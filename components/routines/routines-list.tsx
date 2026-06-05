@@ -8,9 +8,10 @@ interface RoutinesListProps {
   onEdit: (routine: Routine) => void
   onDelete: (id: string) => void
   onView: (routine: Routine) => void
+  activeTransitionId?: string
 }
 
-export function RoutinesList({ routines, onEdit, onDelete, onView }: RoutinesListProps) {
+export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransitionId }: RoutinesListProps) {
   if (routines.length === 0) {
     return (
       <Card>
@@ -36,6 +37,7 @@ export function RoutinesList({ routines, onEdit, onDelete, onView }: RoutinesLis
           onEdit={onEdit}
           onDelete={onDelete}
           onView={onView}
+          isActiveTransition={activeTransitionId === routine.id}
         />
       ))}
     </div>

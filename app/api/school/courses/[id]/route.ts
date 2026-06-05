@@ -7,9 +7,10 @@ import { calculateCourseGrade, percentageToLetter } from '@/lib/gpa-calculator';
 // GET /api/school/courses/[id] - Get single course with grades
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
@@ -26,7 +27,7 @@ export async function GET(
 
         const course = await prisma.course.findFirst({
             where: {
-                id: params.id,
+                id,
                 userId: user.id,
             },
             include: {
@@ -66,9 +67,10 @@ export async function GET(
 // PUT /api/school/courses/[id] - Update course
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
@@ -88,7 +90,7 @@ export async function PUT(
 
         const course = await prisma.course.findFirst({
             where: {
-                id: params.id,
+                id,
                 userId: user.id,
             },
         });
@@ -98,7 +100,7 @@ export async function PUT(
         }
 
         const updated = await prisma.course.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 name: name ?? course.name,
                 code: code !== undefined ? (code || null) : course.code,
@@ -127,9 +129,10 @@ export async function PUT(
 // DELETE /api/school/courses/[id] - Delete course
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
@@ -146,7 +149,7 @@ export async function DELETE(
 
         const course = await prisma.course.findFirst({
             where: {
-                id: params.id,
+                id,
                 userId: user.id,
             },
         });
@@ -156,7 +159,7 @@ export async function DELETE(
         }
 
         await prisma.course.delete({
-            where: { id: params.id },
+            where: { id },
         });
 
         return NextResponse.json({ success: true });

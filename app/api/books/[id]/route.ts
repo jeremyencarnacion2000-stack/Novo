@@ -5,20 +5,24 @@ import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { currentPage, status, rating, review, notes, pageNotes, startedAt, finishedAt } = body
+    const {
+      currentPage, status, rating, review, notes, pageNotes,
+      startedAt, finishedAt, genre, categories, description, format
+    } = body
 
     const book = await prisma.book.update({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       },
       data: {
@@ -28,6 +32,10 @@ export async function PATCH(
         review,
         notes,
         pageNotes,
+        genre,
+        categories,
+        description,
+        format,
         startedAt: startedAt ? new Date(startedAt) : undefined,
         finishedAt: finishedAt ? new Date(finishedAt) : undefined,
       }
@@ -42,9 +50,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -52,7 +61,7 @@ export async function DELETE(
 
     await prisma.book.delete({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id
       }
     })

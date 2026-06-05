@@ -21,7 +21,7 @@ export interface Attachment {
     size?: number;
 }
 
-export type BlockType = 'text' | 'markdown' | 'analysis' | 'plan' | 'confirmation' | 'result';
+export type BlockType = 'text' | 'markdown' | 'analysis' | 'plan' | 'confirmation' | 'result' | 'preview' | 'cognitive_update' | 'music_recommendation' | 'outfit_recommendation';
 
 export interface MessageBlock {
     id: string;

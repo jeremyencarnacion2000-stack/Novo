@@ -1,5 +1,7 @@
 // lib/storage.ts
 
+export { };
+
 declare global {
   interface Window {
     storage: {

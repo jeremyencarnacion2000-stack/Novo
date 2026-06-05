@@ -1,24 +1,30 @@
 // Service Worker for Novo Offline Support
 
-const CACHE_NAME = 'novo-v1';
-const API_CACHE_NAME = 'novo-api-v1';
+const CACHE_NAME = 'novo-v2';
+const API_CACHE_NAME = 'novo-api-v2';
 
-// Static assets to cache
+// Only cache assets that are guaranteed to exist as static files.
+// NOTE: Next.js hashes CSS/JS at build time — never list hashed assets here.
 const STATIC_ASSETS = [
   '/',
-  '/globals.css',
   '/icon.svg',
-  '/icon-light-32x32.png',
-  '/icon-dark-32x32.png',
   '/apple-icon.png'
 ];
 
-// Install event - cache static resources
+// Install event - cache static resources individually (fail-safe)
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing.');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Use individual adds wrapped in try-catch so a single 404
+      // doesn't abort the entire SW installation.
+      for (const asset of STATIC_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`[SW] Could not cache ${asset}:`, err.message);
+        }
+      }
     })
   );
   self.skipWaiting();

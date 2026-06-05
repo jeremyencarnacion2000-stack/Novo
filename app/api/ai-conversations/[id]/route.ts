@@ -83,10 +83,20 @@ export async function PUT(
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
-    console.error('Error updating AI conversation:', error)
+
+    console.error('Error updating AI conversation:', error);
+
+    // Safely attempt to get body for error reporting if it was parsed
+    let payloadSize = 0;
+    try {
+      // Since we can't easily re-read the stream here if it failed mid-parsing,
+      // we just report what we can.
+    } catch (e) { }
+
     return NextResponse.json({
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      details: error instanceof Error ? error.message : String(error),
+      code: error.code
     }, { status: 500 })
   }
 }

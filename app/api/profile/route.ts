@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
             console.error('Error fetching stats:', e);
         }
 
-        // Use current date if createdAt doesn't exist
+        // Use current date
         const memberSince = new Date();
         const daysSinceMember = 0;
 
@@ -80,11 +80,10 @@ export async function GET(request: NextRequest) {
                 id: g.id,
                 title: g.title,
                 description: g.description,
-                category: g.category,
                 progress: g.progress,
-                targetDate: g.targetDate,
+                deadline: g.deadline,
                 status: g.status,
-                createdAt: g.createdAt,
+                updatedAt: g.updatedAt,
             })),
         });
     } catch (error) {
@@ -100,8 +99,8 @@ async function calculateStreak(userId: string): Promise<number> {
     try {
         const tasks = await prisma.checklistItem.findMany({
             where: { userId, completed: true },
-            orderBy: { createdAt: 'desc' },
-            select: { createdAt: true },
+            orderBy: { updatedAt: 'desc' },
+            select: { updatedAt: true },
             take: 365,
         });
 
@@ -114,7 +113,7 @@ async function calculateStreak(userId: string): Promise<number> {
         for (let i = 0; i <= 30; i++) { // Check only last 30 days for performance
             const checkDate = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
             const hasActivity = tasks.some(t => {
-                const taskDate = new Date(t.createdAt);
+                const taskDate = new Date(t.updatedAt);
                 taskDate.setHours(0, 0, 0, 0);
                 return taskDate.getTime() === checkDate.getTime();
             });

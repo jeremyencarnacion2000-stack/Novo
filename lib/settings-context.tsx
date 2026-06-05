@@ -11,9 +11,13 @@ export interface AppSettings {
   compactMode: boolean
   showAnimations: boolean
   backgroundImage?: string
+  backgroundHistory: string[]  // Recent wallpapers (Windows 10/11 style)
   backgroundBlur: number
   backgroundDimness: number
   autoContrast: boolean
+  glassOpacity: number
+  glassBlur: number
+  accentColor: string
 
   // Notifications
   dailyReminder: boolean
@@ -40,6 +44,14 @@ export interface AppSettings {
   preferences: Record<string, any>
 }
 
+export interface SettingsContextType {
+  settings: AppSettings
+  updateSettings: (updates: Partial<AppSettings>) => void
+  resetSettings: () => void
+  isSettingsOpen: boolean
+  setSettingsOpen: (open: boolean) => void
+}
+
 const defaultSettings: AppSettings = {
   theme: 'light',
   autoThemeEnabled: false,
@@ -47,9 +59,13 @@ const defaultSettings: AppSettings = {
   compactMode: false,
   showAnimations: true,
   backgroundImage: '',
-  backgroundBlur: 40,
-  backgroundDimness: 20,
+  backgroundHistory: [],
+  backgroundBlur: 0,
+  backgroundDimness: 15,
   autoContrast: false,
+  glassOpacity: 12,
+  glassBlur: 20,
+  accentColor: 'indigo',
   dailyReminder: true,
   routineNotifications: true,
   projectDeadlines: true,
@@ -66,17 +82,12 @@ const defaultSettings: AppSettings = {
   preferences: {},
 }
 
-interface SettingsContextType {
-  settings: AppSettings
-  updateSettings: (updates: Partial<AppSettings>) => void
-  resetSettings: () => void
-}
-
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession()
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
+  const [isSettingsOpen, setSettingsOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Load settings from database when user logs in
@@ -109,6 +120,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     loadSettings()
   }, [session?.user?.id, status])
+
+
 
   // Helper function to determine if it's daytime
   const isDaytime = () => {
@@ -151,20 +164,84 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     // Apply background settings
-    root.style.setProperty('--bg-blur', `${settings.backgroundBlur}px`)
     root.style.setProperty('--bg-dimness', `${settings.backgroundDimness / 100}`)
+    root.style.setProperty('--bg-blur-px', `${settings.backgroundBlur}px`)
 
-    // Apply background image if set
+    // Apply glass opacity & blur
+    const gOpacity = Math.max(0.05, settings.glassOpacity / 100)
+    const effectiveOpacity = isDark ? Math.max(0.35, gOpacity) : gOpacity
+    const gBlur = settings.glassBlur
+    const gBlurPx = `${settings.glassBlur}px`
+
+    const rgbBase = isDark ? '0, 0, 0' : '255, 255, 255'
+    const borderAlpha = isDark ? '0.08' : '0.12'
+
+    console.log(`[SettingsProvider] Apply: Opacity=${effectiveOpacity}, GlassBlur=${gBlurPx}`);
+
+    root.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
+    root.style.setProperty('--glass-blur', `${gBlur}`)
+    root.style.setProperty('--glass-blur-px', gBlurPx)
+    root.style.setProperty('--card-rgb', rgbBase)
+    root.style.setProperty('--card-border-alpha', borderAlpha)
+
+    // Also apply to body to ensure inheritance
+    document.body.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
+    document.body.style.setProperty('--glass-blur', `${gBlur}`)
+    document.body.style.setProperty('--glass-blur-px', gBlurPx)
+    document.body.style.setProperty('--card-rgb', rgbBase)
+    document.body.style.setProperty('--card-border-alpha', borderAlpha)
+
+    // Apply accent color
+    const colors: Record<string, string> = {
+      indigo: '#6366f1',
+      purple: '#a855f7',
+      blue: '#3b82f6',
+      cyan: '#06b6d4',
+      green: '#22c55e',
+      pink: '#ec4899',
+      red: '#ef4444',
+      orange: '#f97316',
+      rose: '#f43f5e',
+      violet: '#8b5cf6',
+    }
+
+    const color = colors[settings.accentColor] || colors.indigo
+    root.style.setProperty('--primary', color)
+    root.style.setProperty('--ring', color)
+
+    // Helper to Convert Hex to RGB for shadows/glows
+    const hexToRgb = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16)
+      const g = parseInt(hex.slice(3, 5), 16)
+      const b = parseInt(hex.slice(5, 7), 16)
+      return `${r}, ${g}, ${b}`
+    }
+    const rgb = hexToRgb(color)
+    root.style.setProperty('--primary-rgb', rgb)
+    root.style.setProperty('--primary-glow', `rgba(${rgb}, 0.5)`)
+
+    // Calculate a darker/lighter variant for other uses if needed, or just let Tailwind handles opacity variants
+    // converting hex to rgb for tailwind using --primary: R G B format if we were using that method, 
+    // but here we are using hex directly in --primary. 
+    // Note: Tailwind v4 might handle this differently, but v3 usually needs RGB numbers for opacity modifiers.
+    // However, the current globals.css defines --primary as a HEX.
+    // So distinct --primary-foreground might be needed for contrast.
+    // For now, let's assume white foreground is fine for all these bright colors.
+    root.style.setProperty('--primary-foreground', '#ffffff')
+
+
+    // Check if background image is present
     if (settings.backgroundImage) {
-      root.classList.add('has-bg-image')
+      document.body.classList.add('has-bg-image')
       root.style.setProperty('--bg-image', `url(${settings.backgroundImage})`)
+      // Apply background image directly to body to bypass stacking context issues from SidebarProvider
       document.body.style.backgroundImage = `url(${settings.backgroundImage})`
       document.body.style.backgroundSize = 'cover'
       document.body.style.backgroundPosition = 'center'
       document.body.style.backgroundAttachment = 'fixed'
     } else {
-      root.classList.remove('has-bg-image')
-      root.style.setProperty('--bg-image', 'none')
+      document.body.classList.remove('has-bg-image')
+      root.style.removeProperty('--bg-image')
       document.body.style.backgroundImage = ''
       document.body.style.backgroundSize = ''
       document.body.style.backgroundPosition = ''
@@ -210,7 +287,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.backgroundImage, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.glassOpacity, settings.glassBlur, settings.accentColor, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return
@@ -273,7 +350,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings, isLoaded, session?.user?.id, status])
 
   const updateSettings = (updates: Partial<AppSettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates }))
+    setSettings((prev) => {
+      const next = { ...prev, ...updates }
+
+      // Auto-track background image history (keep last 8, no duplicates)
+      if (updates.backgroundImage && updates.backgroundImage.length > 0) {
+        const history = [updates.backgroundImage, ...(prev.backgroundHistory || []).filter(img => img !== updates.backgroundImage)].slice(0, 8)
+        next.backgroundHistory = history
+      }
+
+      return next
+    })
   }
 
   const resetSettings = async () => {
@@ -292,7 +379,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, resetSettings }}>
+    <SettingsContext.Provider value={{
+      settings,
+      updateSettings,
+      resetSettings,
+      isSettingsOpen,
+      setSettingsOpen
+    }}>
       {children}
     </SettingsContext.Provider>
   )
@@ -304,7 +397,9 @@ export function useSettings() {
     return {
       settings: defaultSettings,
       updateSettings: () => { },
-      resetSettings: () => { }
+      resetSettings: () => { },
+      isSettingsOpen: false,
+      setSettingsOpen: () => { }
     }
   }
   return context

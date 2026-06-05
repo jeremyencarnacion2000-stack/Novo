@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { isSameDay, parseISO } from 'date-fns'
 import { taskSchema } from '@/lib/schemas/task'
 import { z } from 'zod'
+import { emitTwinSignal } from '@/lib/twin-signal'
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,6 +97,9 @@ export async function POST(request: NextRequest) {
         console.error('Failed to create linked checklist item:', checklistError)
       }
     }
+
+    // Emit behavioral signal (fire-and-forget)
+    emitTwinSignal({ userId: session.user.id, signal: 'task_created' })
 
     return NextResponse.json(task, { status: 201 })
   } catch (error) {

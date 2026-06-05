@@ -6,5 +6,5 @@ export interface ChecklistItem {
   completed: boolean
   priority: 'low' | 'medium' | 'high'
   taskId?: string
-  task?: Task
+  task?: Task | null
 }

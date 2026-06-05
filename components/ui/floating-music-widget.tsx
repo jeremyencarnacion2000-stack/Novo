@@ -136,11 +136,13 @@ export function FloatingMusicWidget({
     <div
       ref={widgetRef}
       className={cn(
-        'fixed z-50 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out',
+        'fixed z-50 bg-white/10 border border-white/20 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out',
         isMinimized ? 'w-72 h-16' : 'w-96 h-20',
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       )}
       style={{
+        backdropFilter: 'blur(var(--glass-blur))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur))',
         left: `${position.x}px`,
         top: `${position.y}px`,
       }}

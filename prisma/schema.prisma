@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -58,6 +58,8 @@ model User {
   analyticsEvents AnalyticsEvent[]
   userSessions   UserSession[]
   dailyAnalytics DailyAnalytics[]
+  cognitiveSnapshot UserCognitiveSnapshot?
+  insights       Insight[]
   conversations  Conversation[]
   aiConversations AIConversation[]
   businessClients BusinessClient[]
@@ -76,6 +78,8 @@ model User {
   deals Deal[]
   templates Template[]
   quickNotes QuickNote[]
+  timeBlocks TimeBlock[]
+  cognitiveTwinRecord CognitiveTwinRecord?
 
   // Social
   // Social
@@ -87,6 +91,12 @@ model User {
 
   // AI Chat
   aiChats       ChatSession[]
+
+  // Music
+  likedTracks     LikedTrack[]
+  musicPlaylists  MusicPlaylist[]
+  musicHistory    MusicHistory[]
+  followedArtists MusicArtist[]
 }
 
 model VerificationToken {
@@ -158,6 +168,7 @@ model Routine {
   // Relations
   days          RoutineDay[]
   logs          WorkoutLog[]
+  timeBlocks    TimeBlock[]
   
   // Legacy support (optional)
   tasks         RoutineTask[]
@@ -262,6 +273,7 @@ model Project {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   subtasks  Subtask[]
   tasks     Task[]
+  timeBlocks TimeBlock[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
@@ -485,6 +497,10 @@ model Book {
   notes       String?  // General notes
   pageNotes   Json?    // Array of { page: Int, note: String, date: DateTime }
   isbn        String?
+  genre       String?  // Primary genre/subject
+  categories  String?  // Comma-separated categories
+  description String?  // Book description/synopsis
+  format      String   @default("digital") // 'digital' | 'physical' | 'audiobook'
   startedAt   DateTime?
   finishedAt  DateTime?
   userId      String
@@ -745,4 +761,213 @@ model DirectMessage {
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@map("direct_messages")
+}
+
+model UserCognitiveSnapshot {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focusTimeToday         Int       @default(0) // in minutes
+  productivityScore      Float     @default(0) // 0-10 or 0-100 scale
+  fatigueEstimate        String    @default("low") // 'low' | 'medium' | 'high'
+  overdueTasks           Int       @default(0)
+  lastInsightGeneratedAt DateTime?
+  updatedAt              DateTime  @updatedAt
+
+  @@index([updatedAt])
+  @@map("user_cognitive_snapshots")
+}
+
+model Insight {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  type      String   // e.g., 'fatigue', 'productivity', 'habit'
+  status    String   @default("unread") // 'unread', 'read', 'archived'
+  createdAt DateTime @default(now())
+
+  @@index([userId, status])
+  @@map("insights")
+}
+
+model LikedTrack {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String   // YTMusic track ID
+  title     String
+  artist    String
+  artistId  String?
+  album     String?
+  thumbnail String?
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, trackId])
+  @@map("music_liked_tracks")
+}
+
+model MusicHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String   // YTMusic track ID
+  title     String
+  artist    String
+  artistId  String?
+  thumbnail String?
+  playedAt  DateTime @default(now())
+
+  @@index([userId, playedAt])
+  @@map("music_history")
+}
+
+model MusicPlaylist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  thumbnail   String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks      Json     // JSON array of tracks for simplicity metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("music_playlists")
+}
+
+model MusicArtist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artistId  String   // YTMusic artist channel ID
+  name      String
+  imageUrl  String?
+  followedAt DateTime @default(now())
+
+  @@unique([userId, artistId])
+  @@map("music_followed_artists")
+}
+
+model TimeBlock {
+  id             String   @id @default(uuid())
+  title          String
+  type           String   // 'task' | 'project_deadline' | 'google_event' | 'cognitive_rest'
+  startTime      DateTime
+  endTime        DateTime
+  googleEventId  String?  @unique
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  routineId      String?
+  routine        Routine? @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  energyRequired String   @default("medium") // 'high' | 'medium' | 'low'
+  status         String   @default("pending") // 'pending' | 'completed'
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([googleEventId])
+  @@index([userId])
+  @@map("time_blocks")
+}
+
+// ─── Cognitive Twin Evolution Models ─────────────────────────────────────────
+
+model CognitiveTwinRecord {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  confidenceScore  Float    @default(42)
+  trustLevel       String   @default("initial") // 'initial' | 'learning' | 'adapted' | 'validated'
+  isInitialized    Boolean  @default(false)
+
+  // Serialized JSON blobs — mirrors CognitiveTwin TypeScript interface
+  identity         Json     @default("{}")
+  energyCurve      Json     @default("{}")
+  metrics          Json     @default("{}")
+  bottlenecks      Json     @default("{}")
+  workspaceLayout  Json     @default("{}")
+
+  totalSignals     Int      @default(0) // running count, used for confidence math
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  signals          BehavioralSignal[]
+  evolutionLog     TwinEvolutionLog[]
+  snapshots        TwinSnapshot[]
+
+  @@map("cognitive_twin_records")
+}
+
+model BehavioralSignal {
+  id         String   @id @default(cuid())
+  userId     String
+  twinId     String
+  twin       CognitiveTwinRecord @relation(fields: [twinId], references: [id], onDelete: Cascade)
+
+  // Signal type
+  signal     String   // 'task_created' | 'task_completed' | 'task_deferred' |
+                      // 'focus_started' | 'focus_finished' | 'routine_completed' | 'routine_skipped'
+
+  // Rich metadata (all optional)
+  hour       Int?     // Hour of day 0-23 — chronotype inference
+  duration   Int?     // Minutes — focus session length
+  quality    Int?     // 1-5 — focus quality rating
+  metadata   Json?    // Arbitrary extra data
+
+  occurredAt DateTime @default(now())
+
+  @@index([userId, signal])
+  @@index([userId, occurredAt])
+  @@index([twinId, occurredAt])
+  @@map("behavioral_signals")
+}
+
+model TwinEvolutionLog {
+  id          String   @id @default(cuid())
+  twinId      String
+  twin        CognitiveTwinRecord @relation(fields: [twinId], references: [id], onDelete: Cascade)
+  userId      String
+
+  changeType  String   // 'confidence_increase' | 'chronotype_updated' | 'peak_window_detected' |
+                       // 'friction_detected' | 'burnout_risk_raised' | 'trust_level_up' | etc.
+  description String   // Human-readable: "Morning lark pattern detected over 14 days"
+  prevValue   String?  // JSON string of old value
+  newValue    String?  // JSON string of new value
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([twinId, createdAt])
+  @@map("twin_evolution_logs")
+}
+
+model TwinSnapshot {
+  id               String   @id @default(cuid())
+  twinId           String
+  twin             CognitiveTwinRecord @relation(fields: [twinId], references: [id], onDelete: Cascade)
+  userId           String
+
+  // Key metrics snapshot — for trend graphs and visualizations
+  confidenceScore  Float
+  trustLevel       String
+  cognitiveLoad    Float
+  burnoutIndex     Float
+  chronotype       String   // '' | 'morning_lark' | 'night_owl' | 'afternoon_peak'
+  mainFrictionPoint String  // '' | 'procrastination' | 'context_switching' | etc.
+  peakFocusStart   String   // e.g. '09:00'
+  peakFocusEnd     String   // e.g. '12:00'
+  totalSignals     Int
+
+  snapshotDate     DateTime @default(now())
+
+  @@unique([twinId, snapshotDate]) // one snapshot per day
+  @@index([userId, snapshotDate])
+  @@map("twin_snapshots")
 }

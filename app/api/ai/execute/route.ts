@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: result.success,
             output: result.success ? (result.message || JSON.stringify(result.data, null, 2)) : (result.error || result.message || 'Unknown execution error'),
-            metadata: result.data
+            metadata: {
+                ...(result.metadata || {}),
+                ...(result.data || {})
+            }
         });
 
     } catch (error) {

@@ -98,8 +98,19 @@ export async function PUT(
     if (completed !== undefined) {
       const itemWithTaskId = await prisma.checklistItem.findUnique({
         where: { id },
-        select: { taskId: true }
+        select: { taskId: true, text: true }
       })
+
+      if (completed) {
+        // Track analytics
+        const { trackServerCompletion } = await import('@/lib/analytics-server')
+        await trackServerCompletion(session.user.id, 'task', 'checklist', {
+          itemId: id,
+          text: itemWithTaskId?.text,
+          taskId: itemWithTaskId?.taskId
+        })
+      }
+
       if (itemWithTaskId?.taskId) {
         await prisma.task.update({
           where: {

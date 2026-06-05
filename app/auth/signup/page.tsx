@@ -63,11 +63,13 @@ export default function SignUpPage() {
 
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-black text-white p-4">
-                <div className="flex flex-col items-center justify-center space-y-4 text-center">
-                    <CheckCircle2 className="h-16 w-16 text-green-500" />
-                    <h2 className="text-2xl font-bold">Account Created!</h2>
-                    <p className="text-gray-400">Redirecting to login...</p>
+            <div className="min-h-screen flex items-center justify-center bg-[#050505] text-white p-4 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-transparent to-transparent opacity-50" />
+                <div className="absolute inset-0 backdrop-blur-[40px]" />
+                <div className="flex flex-col items-center justify-center space-y-4 text-center relative z-10">
+                    <CheckCircle2 className="h-16 w-16 text-green-500 animate-bounce-slow" />
+                    <h2 className="text-2xl font-bold tracking-tight">Account Created!</h2>
+                    <p className="text-white/40">Redirecting to login...</p>
                 </div>
             </div>
         )
@@ -115,8 +117,9 @@ export default function SignUpPage() {
             </div>
 
             {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-black">
-                <div className="w-full max-w-md space-y-8">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-[#050505] relative">
+                <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/5 to-transparent pointer-events-none" />
+                <div className="w-full max-w-md space-y-8 relative z-10">
                     <div className="space-y-2">
                         <h2 className="text-3xl font-bold tracking-tight">Sign Up Account</h2>
                         <p className="text-gray-400">Enter your personal data to create your account.</p>
@@ -167,7 +170,7 @@ export default function SignUpPage() {
                                     placeholder="eg. Francisco"
                                     value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
-                                    className="bg-gray-900/50 border-gray-800 h-12 focus:border-violet-500 transition-colors"
+                                    className="bg-white/5 border-white/10 h-12 backdrop-blur-md focus:border-violet-500 transition-colors"
                                     required
                                 />
                             </div>
@@ -181,7 +184,7 @@ export default function SignUpPage() {
                                 placeholder="eg. johnfrans@gmail.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="bg-gray-900/50 border-gray-800 h-12 focus:border-violet-500 transition-colors"
+                                className="bg-white/5 border-white/10 h-12 backdrop-blur-md focus:border-violet-500 transition-colors"
                                 required
                             />
                         </div>
@@ -195,7 +198,7 @@ export default function SignUpPage() {
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="bg-gray-900/50 border-gray-800 h-12 pr-10 focus:border-violet-500 transition-colors"
+                                    className="bg-white/5 border-white/10 h-12 pr-10 backdrop-blur-md focus:border-violet-500 transition-colors"
                                     required
                                 />
                                 <button

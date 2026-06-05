@@ -10,6 +10,7 @@ import type { Project, ProjectStatus } from "@/types/project"
 import { Progress } from "@/components/ui/progress"
 import { useState } from "react"
 import { TiltCard } from "@/components/ui/tilt-card"
+import { cn } from "@/lib/utils"
 
 interface KanbanBoardProps {
   projects: Project[]
@@ -19,9 +20,9 @@ interface KanbanBoardProps {
 }
 
 const columns: { status: ProjectStatus; title: string; color: string }[] = [
-  { status: "not-started", title: "Not Started", color: "bg-secondary text-secondary-foreground" },
-  { status: "in-progress", title: "In Progress", color: "bg-accent text-accent-foreground" },
-  { status: "completed", title: "Completed", color: "bg-primary/10 text-primary" },
+  { status: "not-started", title: "Not Started", color: "text-muted-foreground" },
+  { status: "in-progress", title: "In Progress", color: "text-accent-foreground" },
+  { status: "completed", title: "Completed", color: "text-primary" },
 ]
 
 export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: KanbanBoardProps) {
@@ -77,10 +78,10 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, column.status)}
           >
-            <div className={`rounded-lg border p-4 ${column.color} transition-all hover:shadow-sm`}>
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{column.title}</h3>
-                <Badge variant="outline">{columnProjects.length}</Badge>
+            <div className={cn("glass-header border-none bg-white/[0.03] rounded-2xl mb-2", column.color)}>
+              <div className="flex items-center justify-between px-3">
+                <h3 className="subtitle-technical px-0">{column.title}</h3>
+                <Badge variant="secondary" className="bg-white/5 border-none opacity-50 px-2 h-5 text-[9px] font-black">{columnProjects.length}</Badge>
               </div>
             </div>
 
@@ -96,30 +97,24 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
                 return (
                   <TiltCard
                     key={project.id}
-                    className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === project.id ? "opacity-50" : ""}`}
+                    className={`transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-grab active:cursor-grabbing hover-glow-border ${draggedId === project.id ? "opacity-30" : ""}`}
                     draggable
-                    onDragStart={(e) => handleDragStart(e, project.id)}
+                    onDragStart={(e: any) => handleDragStart(e, project.id)}
                   >
-                    <Card className="h-full">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base leading-tight line-clamp-2">{project.title}</CardTitle>
+                    <Card className="h-full border-white/5 transition-all duration-500 hover:border-white/10">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <CardTitle className="text-[15px] font-semibold leading-snug tracking-tight line-clamp-2 opacity-90">{project.title}</CardTitle>
                           <Badge
-                            variant={
-                              project.priority === "high"
-                                ? "destructive"
-                                : project.priority === "medium"
-                                  ? "default"
-                                  : "secondary"
-                            }
-                            className="shrink-0 capitalize"
+                            variant="secondary"
+                            className="shrink-0 capitalize text-[9px] font-black tracking-wider bg-white/5 border-none opacity-40 hover:opacity-100 transition-opacity"
                           >
                             {project.priority}
                           </Badge>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                      <CardContent className="space-y-5">
+                        <p className="text-[12px] text-white/30 font-medium leading-relaxed line-clamp-2">{project.description}</p>
 
                         {((typeof project.tags === 'string' ? JSON.parse(project.tags) : project.tags) as string[]).length > 0 && (
                           <div className="flex flex-wrap gap-1">
@@ -185,7 +180,7 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 bg-transparent"
+                              className="flex-1 bg-transparent btn-press"
                               onClick={() => onStatusChange(project.id, nextStatus)}
                             >
                               Move

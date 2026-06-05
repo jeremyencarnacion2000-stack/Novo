@@ -91,7 +91,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
         )
 
         return (
-          <Card key={tracker.id}>
+          <Card variant="primary" key={tracker.id}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <CardTitle className="text-lg">{tracker.name}</CardTitle>

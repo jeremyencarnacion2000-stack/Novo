@@ -163,15 +163,15 @@ export class IntegrationEngine {
                     // Upcoming assignment (no score yet)
                     tasks.push({
                         id: `school:${course.id}:grade:${grade.id}`,
-                        text: `${course.code}: ${grade.name}`,
+                        text: `${course.code || 'COURSE'}: ${grade.name}`,
                         completed: false,
                         priority: this.calculateSchoolPriority(grade.weight, grade.date),
                         source: 'school',
                         sourceId: course.id,
                         dueDate: grade.date,
                         metadata: {
-                            courseCode: course.code,
-                            category: grade.category
+                            courseCode: course.code || undefined,
+                            category: grade.category || undefined
                         }
                     });
                 }
@@ -229,11 +229,11 @@ export class IntegrationEngine {
                         id: `school:${course.id}:grade:${grade.id}`,
                         title: grade.name,
                         dueDate: grade.date,
-                        type: grade.category.toLowerCase() as 'assignment' | 'exam' | 'project',
+                        type: (grade.category?.toLowerCase() || 'assignment') as 'assignment' | 'exam' | 'project',
                         courseName: course.name,
-                        courseCode: course.code,
+                        courseCode: course.code || '',
                         urgencyLevel,
-                        weight: grade.weight
+                        weight: grade.weight || 0
                     });
                 }
             }

@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react'
 import { Tracker } from '@/types/tracker'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
-export function DashboardHabits() {
+export const DashboardHabits = React.memo(function DashboardHabits() {
   const [habits, setHabits] = useState<Tracker[]>([])
 
   useEffect(() => {
@@ -24,7 +25,8 @@ export function DashboardHabits() {
 
   const handleToggleHabit = async (id: string) => {
     const today = new Date().toISOString().split('T')[0]
-    const hasEntry = habits.find(h => h.id === id)?.entries ? (Array.isArray(habits.find(h => h.id === id)?.entries) ? habits.find(h => h.id === id)?.entries : []).some(e => e.date === today) : false
+    const habit = habits.find(h => h.id === id);
+    const hasEntry = habit?.entries ? (Array.isArray(habit.entries) ? habit.entries : []).some(e => e.date === today) : false;
 
     try {
       if (hasEntry) {
@@ -54,34 +56,39 @@ export function DashboardHabits() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg font-medium">Quick Habits</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="subtitle-technical">Quick Habits</CardTitle>
         <Link href="/trackers">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <ArrowRight className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full bg-white/5 hover:bg-white/10 transition-all duration-300">
+            <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100" />
           </Button>
         </Link>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {habits.map(habit => {
           const today = new Date().toISOString().split('T')[0]
           const isCompleted = Array.isArray(habit.entries) ? habit.entries.some(e => e.date === today) : false
-          
+
           return (
-            <div key={habit.id} className="flex items-center justify-between p-2 rounded-md hover:bg-secondary/50 transition-colors">
-              <span className="text-sm font-medium">{habit.name}</span>
+            <div key={habit.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08] transition-all duration-300 group">
+              <span className="text-xs font-semibold opacity-70 group-hover:opacity-100 transition-opacity">{habit.name}</span>
               <Button
                 variant={isCompleted ? "default" : "outline"}
                 size="sm"
-                className={`h-8 ${isCompleted ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                className={cn(
+                  "h-8 rounded-xl px-4 transition-all duration-300",
+                  isCompleted 
+                    ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" 
+                    : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
+                )}
                 onClick={() => handleToggleHabit(habit.id)}
               >
                 {isCompleted ? (
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
                 ) : (
-                  <Circle className="h-4 w-4 mr-1" />
+                  <Circle className="h-3.5 w-3.5 mr-2" />
                 )}
-                {isCompleted ? 'Done' : 'Mark'}
+                <span className="text-[10px] font-black uppercase tracking-wider">{isCompleted ? 'Done' : 'Mark'}</span>
               </Button>
             </div>
           )
@@ -89,4 +96,4 @@ export function DashboardHabits() {
       </CardContent>
     </Card>
   )
-}
+})

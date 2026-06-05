@@ -1,18 +1,41 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone', // Temporarily add this to bypass prerendering errors
+  output: process.env.NEXT_PUBLIC_CAPACITOR === 'true' ? 'export' : undefined,
+  trailingSlash: true,
+  reactStrictMode: true,
+  compress: true,
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     formats: ['image/avif', 'image/webp'],
-    unoptimized: false,
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+        port: '',
+        pathname: '/microsoft/fluentui-emoji/**',
+      },
+    ],
   },
   experimental: {
-    optimizePackageImports: ['@xenova/transformers'],
+    // Deep tree-shaking: only ship icons/components actually imported
+    optimizePackageImports: [
+      'lucide-react',
+      'framer-motion',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+      '@radix-ui/react-select',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-scroll-area',
+    ],
   },
   turbopack: {},
-  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma'],
+  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma', 'onnxruntime-node', '@xenova/transformers'],
   // Optimize for Vercel serverless functions
   poweredByHeader: false,
   async headers() {

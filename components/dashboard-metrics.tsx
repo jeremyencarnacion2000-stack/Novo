@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle, Zap, Target, TrendingUp, Clock } from 'lucide-react'
+import Image from 'next/image'
 import { useAnalytics } from '@/hooks/use-swr'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import { TrendingUp } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 interface DashboardMetricsProps {
   refreshKey: number
 }
 
-export function DashboardMetrics({ refreshKey }: DashboardMetricsProps) {
+export const DashboardMetrics = React.memo(
+  function DashboardMetrics({ refreshKey }: DashboardMetricsProps) {
   const { data, error, isLoading } = useAnalytics()
 
   const metrics = [
@@ -19,27 +23,67 @@ export function DashboardMetrics({ refreshKey }: DashboardMetricsProps) {
       title: 'Tasks Completed',
       value: data?.tasksCompleted,
       progress: data?.taskCompletionRate,
-      icon: <CheckCircle className="h-6 w-6 text-green-500" />,
+      icon: (
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <Image
+            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Clipboard/3D/clipboard_3d.png"
+            alt="Tasks"
+            width={48}
+            height={48}
+            className="drop-shadow-[0_10px_10px_rgba(34,197,94,0.3)] group-hover:scale-110 transition-transform duration-500"
+          />
+        </div>
+      ),
       change: data?.taskTrend,
     },
     {
       title: 'Focus Time',
       value: data?.focusTime,
-      icon: <Clock className="h-6 w-6 text-blue-500" />,
+      icon: (
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <Image
+            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Stopwatch/3D/stopwatch_3d.png"
+            alt="Focus"
+            width={48}
+            height={48}
+            className="drop-shadow-[0_10px_10px_rgba(59,130,246,0.3)] group-hover:rotate-12 group-hover:scale-110 transition-all duration-500"
+          />
+        </div>
+      ),
       change: data?.focusTrend,
     },
     {
       title: 'Habits Mastered',
       value: data?.habitsMastered,
       progress: data?.habitCompletionRate,
-      icon: <Zap className="h-6 w-6 text-yellow-500" />,
+      icon: (
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <Image
+            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Fire/3D/fire_3d.png"
+            alt="Habits"
+            width={48}
+            height={48}
+            className="drop-shadow-[0_10px_10px_rgba(234,179,8,0.4)] group-hover:scale-125 transition-transform duration-700 ease-out"
+          />
+        </div>
+      ),
       change: data?.habitTrend,
     },
     {
       title: 'Goals Achieved',
       value: data?.goalsAchieved,
       progress: data?.goalCompletionRate,
-      icon: <Target className="h-6 w-6 text-red-500" />,
+      icon: (
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <Image
+            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bullseye/3D/bullseye_3d.png"
+            alt="Goals"
+            width={48}
+            height={48}
+            className="drop-shadow-[0_10px_10px_rgba(239,68,68,0.3)] group-hover:scale-110 group-hover:brightness-110 transition-all duration-500"
+          />
+        </div>
+      ),
       change: data?.goalTrend,
     },
   ]
@@ -91,37 +135,81 @@ export function DashboardMetrics({ refreshKey }: DashboardMetricsProps) {
         const isHero = index === 0;
         const cardClass = isHero ? 'card--hero' : 'card--primary';
 
+        // Specific polish for 'Focus Time' card
+        const isFocusCard = metric.title === 'Focus Time' || metric.title === 'Tiempo de Enfoque';
+
         return (
-          <Card
+          <motion.div
             key={metric.title}
-            className={`transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${borderColor} group ${cardClass} ${metric.title === 'Focus Time' ? 'animate-pulse-slow shadow-glow-sm border-indigo-500/20' : ''}`}
+            layoutId={isFocusCard ? "focus-time-metric-card" : undefined}
+            className="flex flex-col h-full"
+            style={{ originX: 0.5, originY: 0.5 }}
           >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                {metric.title}
-              </CardTitle>
-              <div className="p-2 rounded-full bg-secondary/50 group-hover:bg-secondary transition-colors">
-                {metric.icon}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {typeof metric.value === 'number' || typeof metric.value === 'string' ? metric.value : '-'}
-              </div>
-              {metric.progress !== undefined && (
-                <Progress value={metric.progress} className="mt-2 h-1.5" />
+            <Card
+              className={cn(
+                "relative transition-[transform,box-shadow,border-color,opacity] duration-300",
+                "hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]",
+                "group overflow-hidden border-white/5",
+                cardClass,
+                isFocusCard && "animate-pulse-slow shadow-[0_0_20px_rgba(99,102,241,0.15)] border-indigo-500/30",
+                borderColor
               )}
-              {metric.change !== undefined && (
-                <p className={`text-xs mt-2 font-medium flex items-center gap-1 ${trendColor}`}>
-                  {metric.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingUp className="w-3 h-3 rotate-180" />}
-                  {metric.change >= 0 ? '+' : ''}
-                  {metric.change}% from last week
-                </p>
-              )}
-            </CardContent>
-          </Card>
+            >
+              {/* Glossy Overlay Reflection */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors duration-300">
+                  {metric.title}
+                </CardTitle>
+                <div className={cn(
+                  "p-2.5 rounded-2xl transition-all duration-300",
+                  isHero ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground group-hover:bg-white/10 group-hover:text-foreground"
+                )}>
+                  {metric.icon}
+                </div>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="flex items-baseline gap-1">
+                  <div className={cn(
+                    "text-3xl font-black tracking-tighter transition-transform duration-300 group-hover:scale-105 origin-left",
+                    isHero ? "text-primary" : "text-foreground"
+                  )}>
+                    {typeof metric.value === 'number' || typeof metric.value === 'string' ? metric.value : '-'}
+                  </div>
+                </div>
+
+                {metric.progress !== undefined && (
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                      <span>Performance</span>
+                      <span>{metric.progress}%</span>
+                    </div>
+                    <Progress value={metric.progress} className="h-1.5 bg-white/5" />
+                  </div>
+                )}
+
+                {metric.change !== undefined && (
+                  <div className={cn(
+                    "text-[11px] mt-4 font-bold flex items-center gap-1.5 py-1 px-2 rounded-lg w-fit transition-colors",
+                    metric.change >= 0 ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400",
+                    !metric.change && "bg-yellow-500/10 text-yellow-500"
+                  )}>
+                    {metric.change >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5 rotate-180" />}
+                    <span>
+                      {metric.change >= 0 ? '+' : ''}{metric.change}%
+                      <span className="opacity-50 ml-1 font-medium">vs last week</span>
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         );
       })}
     </div>
   )
-}
+},
+// Only re-render when the parent explicitly increments refreshKey
+(prev, next) => prev.refreshKey === next.refreshKey
+)

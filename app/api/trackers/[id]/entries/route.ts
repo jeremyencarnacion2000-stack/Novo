@@ -61,6 +61,15 @@ export async function POST(
           value
         }
       })
+
+      // Track analytics only for new entries (completions)
+      const { trackServerCompletion } = await import('@/lib/analytics-server')
+      await trackServerCompletion(session.user.id, 'habit', 'trackers', {
+        trackerId: id,
+        trackerName: tracker.name,
+        value,
+        date
+      })
     }
 
     return NextResponse.json(entry, { status: 201 })

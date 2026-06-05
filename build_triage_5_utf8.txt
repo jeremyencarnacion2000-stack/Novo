@@ -1,0 +1,138 @@
+﻿
+> my-v0-project@0.1.0 vercel-build C:\Users\Administrator\Downloads\novo-desktop-mvp (2)
+> prisma generate && next build --webpack
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+Γ£ö Generated Prisma Client (v5.22.0) to .\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client in 782ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+
+node.exe : [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline 
+data, please update: `npm i baseline-browser-mapping@latest -D`
+At C:\Users\Administrator\AppData\Roaming\npm\pnpm.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([baseline-brows...ping@latest -D`:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Γû▓ Next.js 16.0.7 (webpack)
+   - Environments: .env.local, .env
+   - Experiments (use with caution):
+     ┬╖ optimizePackageImports
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/darwin/arm64/onnxruntime_binding
+.node
+Module parse failed: Unexpected character '∩┐╜' (1:0)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. 
+See https://webpack.js.org/concepts#loaders
+(Source code omitted for this binary file)
+
+Import trace for requested module:
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/darwin/arm64/onnxruntime_binding
+.node
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/ sync 
+^\.\/.*\/.*\/onnxruntime_binding\.node$
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/binding.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/backend.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/index.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/backends/onnx.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/env.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/transformers.js
+./lib/ai-models.ts
+./components/settings/settings-sections.tsx
+
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/darwin/x64/onnxruntime_binding.n
+ode
+Module parse failed: Unexpected character '∩┐╜' (1:0)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. 
+See https://webpack.js.org/concepts#loaders
+(Source code omitted for this binary file)
+
+Import trace for requested module:
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/darwin/x64/onnxruntime_binding.n
+ode
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/ sync 
+^\.\/.*\/.*\/onnxruntime_binding\.node$
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/binding.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/backend.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/index.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/backends/onnx.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/env.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/transformers.js
+./lib/ai-models.ts
+./components/settings/settings-sections.tsx
+
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/onnxruntime_binding.
+node
+Module parse failed: Unexpected character '' (1:0)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. 
+See https://webpack.js.org/concepts#loaders
+(Source code omitted for this binary file)
+
+Import trace for requested module:
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/onnxruntime_binding.
+node
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/ sync 
+^\.\/.*\/.*\/onnxruntime_binding\.node$
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/binding.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/backend.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/index.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/backends/onnx.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/env.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/transformers.js
+./lib/ai-models.ts
+./components/settings/settings-sections.tsx
+
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/linux/x64/onnxruntime_binding.no
+de
+Module parse failed: Unexpected character '' (1:0)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. 
+See https://webpack.js.org/concepts#loaders
+(Source code omitted for this binary file)
+
+Import trace for requested module:
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/linux/x64/onnxruntime_binding.no
+de
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/ sync 
+^\.\/.*\/.*\/onnxruntime_binding\.node$
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/binding.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/backend.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/index.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/backends/onnx.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/env.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/transformers.js
+./lib/ai-models.ts
+./components/settings/settings-sections.tsx
+
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/win32/arm64/onnxruntime_binding.
+node
+Module parse failed: Unexpected character '∩┐╜' (1:2)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. 
+See https://webpack.js.org/concepts#loaders
+(Source code omitted for this binary file)
+
+Import trace for requested module:
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/win32/arm64/onnxruntime_binding.
+node
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/bin/napi-v3/ sync 
+^\.\/.*\/.*\/onnxruntime_binding\.node$
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/binding.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/backend.js
+./node_modules/.pnpm/onnxruntime-node@1.14.0/node_modules/onnxruntime-node/dist/index.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/backends/onnx.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/env.js
+./node_modules/.pnpm/@xenova+transformers@2.17.2/node_modules/@xenova/transformers/src/transformers.js
+./lib/ai-models.ts
+./components/settings/settings-sections.tsx
+
+
+> Build failed because of webpack errors
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.
+

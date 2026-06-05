@@ -7,15 +7,17 @@ import { z } from 'zod'
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
+        const conversationId = id;
+
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const conversationId = params.id
         const body = await request.json()
         const parsedBody = conversationMessageSchema.safeParse(body)
 

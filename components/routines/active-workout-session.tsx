@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { Routine, RoutineDay, RoutineExercise } from '@/types/routine'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -52,13 +53,59 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
         let interval: NodeJS.Timeout
         if (isResting) {
             interval = setInterval(() => {
-                setRestTime((prev) => prev + 1)
+                setRestTime((prev) => {
+                    const next = prev + 1
+
+                    // Notification Logic: Trigger 5 seconds before a target rest time
+                    // For now, let's assume a default rest target of 60s or 90s, or just notify every minute?
+                    // The user specifically asked for "when 5 seconds are left to prepare".
+                    // Since we don't have a fixed countdown for all exercises yet, we'll notify at 55s, 85s, 115s etc.
+                    // Or if we hit a specific "Get Ready" threshold.
+
+                    // USER REQUEST specific: "beep when 5 seconds left"
+                    // If we assume a standard 60s rest for now as a default for the beep test
+                    if (next === 55 || next === 85 || next === 115) {
+                        playBeep()
+                        triggerVibration()
+                    }
+
+                    return next
+                })
             }, 1000)
         } else {
             setRestTime(0)
         }
         return () => clearInterval(interval)
     }, [isResting])
+
+    // Audio & Vibration Helpers
+    const playBeep = () => {
+        try {
+            const context = new (window.AudioContext || (window as any).webkitAudioContext)()
+            const oscillator = context.createOscillator()
+            const gainNode = context.createGain()
+
+            oscillator.connect(gainNode)
+            gainNode.connect(context.destination)
+
+            oscillator.type = 'sine'
+            oscillator.frequency.setValueAtTime(880, context.currentTime) // A5 note
+            gainNode.gain.setValueAtTime(0, context.currentTime)
+            gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.05)
+            gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.3)
+
+            oscillator.start(context.currentTime)
+            oscillator.stop(context.currentTime + 0.3)
+        } catch (e) {
+            console.warn('AudioContext not supported or blocked:', e)
+        }
+    }
+
+    const triggerVibration = () => {
+        if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]) // Short double pulse
+        }
+    }
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60)
@@ -96,20 +143,62 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
         setIsTimerRunning(false)
         setIsResting(false)
 
+        // Calculate stats for completion
+        let tasksTotal = 0
+        let tasksCompleted = 0
+
+        activeDay.exercises.forEach(ex => {
+            tasksTotal += ex.sets
+            const exerciseLog = logs[ex.id] || {}
+            Object.values(exerciseLog).forEach(set => {
+                if (set.completed) tasksCompleted++
+            })
+        })
+
         // Track completion if user is logged in
         if (session?.user?.id) {
-            await trackActivity('routine', true, { id: routine.id, name: routine.name, module: 'routines' })
+            try {
+                // 1. Activity tracker (legacy/feed)
+                await trackActivity('routine', true, { id: routine.id, name: routine.name, module: 'routines' })
+
+                // 2. Specialized routine completions API (for stats)
+                await fetch('/api/routines/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        routineId: routine.id,
+                        tasksTotal,
+                        tasksCompleted
+                    })
+                })
+            } catch (e) {
+                console.error('[Workout] Failed to track completion:', e)
+            }
         }
 
-        // Here we would save the log to the database
-        // For MVP, we just simulate success
+        // Refresh stats and show success
         mutate(ROUTINE_STATS_KEY)
+        mutate('/api/analytics')
+        mutate('/api/routines')
         toast({
             title: "Workout Completed!",
             description: `Great job! You finished in ${formatTime(elapsedTime)}.`,
         })
         onComplete()
     }
+
+    // Smart Day Detection: Select the day that matches today's weekday
+    useEffect(() => {
+        if (!routine.days) return
+
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+        const todayWeekday = days[new Date().getDay()]
+
+        const todayDay = routine.days.find(d => d.weekday?.toLowerCase() === todayWeekday)
+        if (todayDay) {
+            setActiveDayId(todayDay.id)
+        }
+    }, [routine.days])
 
     // Reset timer when active day changes
     useEffect(() => {
@@ -123,38 +212,48 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     const activeDay = routine.days.find(d => d.id === activeDayId) || routine.days[0]
 
     return (
-        <div className="fixed inset-0 bg-[#09090b] z-[100] flex flex-col font-sans">
-            {/* Glassmorphic Header */}
-            <div className="absolute top-0 left-0 right-0 h-16 bg-[#09090b]/90 backdrop-blur-md border-b border-white/5 z-20 flex items-center justify-between px-4 sm:px-6">
+        <motion.div
+            className="fixed inset-0 h-[100dvh] bg-black z-[9999] flex flex-col font-sans overflow-hidden"
+            data-lenis-prevent
+            initial={{ opacity: 0, y: '100%', scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: '60%', scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 38, mass: 0.9 }}
+        >
+            {/* Header Layer */}
+            <div className="absolute top-0 left-0 right-0 h-16 bg-black/60 border-b border-white/10 z-[100] flex items-center justify-between px-4 sm:px-6 backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={onCancel} className="hover:bg-white/10 rounded-full text-muted-foreground hover:text-white">
                         <X className="h-5 w-5" />
                     </Button>
                     <div className="flex flex-col">
                         <h2 className="font-bold text-base sm:text-lg tracking-tight leading-none text-white">{routine.name}</h2>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">{activeDay.name}</p>
+                        <p className="text-xs text-white/50 font-medium mt-1 uppercase tracking-tight">{activeDay.name}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 sm:gap-6">
-                    <div className="hidden sm:flex items-center gap-2 font-mono text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-full border border-emerald-400/20 shadow-[0_0_10px_rgba(52,211,153,0.2)]">
+                    <div className="hidden sm:flex items-center gap-2 font-mono text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-full border border-emerald-400/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
                         <Timer className="h-4 w-4" />
                         {formatTime(elapsedTime)}
                     </div>
-                    <Button onClick={handleFinish} size="sm" className="rounded-full px-6 font-medium bg-white text-black hover:bg-white/90 shadow-lg shadow-white/10 transition-all hover:scale-105 active:scale-95">
+                    <Button onClick={handleFinish} size="sm" className="rounded-full px-6 font-medium bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5 transition-all hover:scale-105 active:scale-95">
                         Finish Workout
                     </Button>
                 </div>
             </div>
 
-            {/* Main Layout */}
-            <div className="flex-1 flex flex-col md:flex-row pt-16 h-full overflow-hidden">
+            {/* Main Layout Area */}
+            <div className="flex-1 flex flex-col md:flex-row pt-16 h-full overflow-hidden min-h-0 relative z-0">
 
-                {/* Sidebar (Desktop) / Top Bar (Mobile) */}
-                <div className="w-full md:w-72 bg-card/30 backdrop-blur-xl border-b md:border-b-0 md:border-r border-border/40 flex flex-col z-10 shrink-0">
-                    <div className="p-5 border-b border-border/40 hidden md:block">
-                        <h2 className="font-bold text-xl tracking-tight text-foreground/90">Schedule</h2>
-                        <p className="text-xs text-muted-foreground mt-1 font-medium">Select a day to view exercises</p>
-                    </div>
+                {/* Sidebar with isolated glass layer */}
+                <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0 relative bg-white/[0.02] backdrop-blur-xl z-0">
+                    
+                    {/* Sharp Sidebar Content */}
+                    <div className="flex flex-col h-full overflow-hidden w-full relative z-10">
+                        <div className="p-5 border-b border-white/5 hidden md:block">
+                            <h2 className="font-bold text-lg tracking-tight text-white/90">Schedule</h2>
+                            <p className="text-[10px] text-white/40 mt-1 font-bold uppercase tracking-wider">Plan del día</p>
+                        </div>
 
                     <div className="flex md:flex-col overflow-x-auto md:overflow-y-auto p-3 gap-3 scrollbar-hide h-full">
                         {routine.days.map((day) => (
@@ -208,9 +307,10 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                         )}
                     </div>
                 </div>
+            </div>
 
                 {/* Exercises Area */}
-                <ScrollArea className="flex-1 bg-background relative">
+                <div className="flex-1 bg-background relative overflow-y-auto">
                     <div className="max-w-4xl mx-auto p-4 sm:p-8 pb-40 space-y-8">
                         {activeDay.exercises.map((exercise, exIdx) => (
                             <div key={exercise.id} className="group animate-in fade-in-50 slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${exIdx * 50}ms` }}>
@@ -329,13 +429,13 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                                                         <button
                                                             onClick={() => handleLogChange(exercise.id, idx, 'completed', !log.completed)}
                                                             className={cn(
-                                                                "h-8 w-8 rounded-xl flex items-center justify-center transition-all duration-300 border-2",
+                                                                "h-9 w-9 sm:h-8 sm:w-8 rounded-xl flex items-center justify-center transition-all duration-300 border-2",
                                                                 isCompleted
                                                                     ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/25 scale-105"
                                                                     : "border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 text-transparent"
                                                             )}
                                                         >
-                                                            <CheckCircle2 className={cn("h-5 w-5 transition-transform duration-300", isCompleted ? "scale-100" : "scale-50")} />
+                                                            <CheckCircle2 className={cn("h-5 w-5 sm:h-4 sm:w-4 transition-transform duration-300", isCompleted ? "scale-100" : "scale-50")} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -346,47 +446,60 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                             </div>
                         ))}
                     </div>
-                </ScrollArea>
+                </div>
             </div>
 
             {/* Floating Rest Timer */}
             {
                 isResting && (
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 animate-in slide-in-from-bottom-10 fade-in duration-500">
-                        <div className="bg-background/90 backdrop-blur-xl border border-primary/20 shadow-2xl shadow-primary/10 rounded-2xl p-4 flex items-center justify-between ring-1 ring-white/10">
-                            <div className="flex items-center gap-4">
-                                <div className="relative">
-                                    <div className="h-12 w-12 rounded-full border-2 border-primary/20 flex items-center justify-center">
-                                        <Timer className="h-5 w-5 text-primary animate-pulse" />
+                    <div className="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 w-[95%] sm:w-[90%] max-w-sm z-50 animate-in slide-in-from-bottom-10 fade-in duration-500">
+                        <div
+                            className="bg-background/90 border border-primary/20 shadow-2xl shadow-primary/10 rounded-2xl p-3 sm:p-4 flex items-center justify-between ring-1 ring-white/10 overflow-hidden"
+                            style={{ backdropFilter: 'blur(var(--glass-blur-px))', WebkitBackdropFilter: 'blur(var(--glass-blur-px))' }}
+                        >
+                            <div className="flex items-center gap-3 sm:gap-4">
+                                <div className="relative shrink-0">
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 border-primary/20 flex items-center justify-center">
+                                        <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-primary animate-pulse" />
                                     </div>
-                                    <svg className="absolute inset-0 h-12 w-12 -rotate-90 pointer-events-none">
+                                    <svg className="absolute inset-0 h-10 w-10 sm:h-12 sm:w-12 -rotate-90 pointer-events-none">
                                         <circle
-                                            className="text-primary"
+                                            className={cn(
+                                                "transition-colors duration-500",
+                                                (restTime >= 55 && restTime < 60) || (restTime >= 85 && restTime < 90)
+                                                    ? "text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                                                    : "text-primary"
+                                            )}
                                             strokeWidth="2"
                                             stroke="currentColor"
                                             fill="transparent"
-                                            r="22"
-                                            cx="24"
-                                            cy="24"
-                                            strokeDasharray="138"
-                                            strokeDashoffset={138 - (Math.min(restTime, 120) / 120) * 138}
+                                            r="18"
+                                            cx="20"
+                                            cy="20"
+                                            strokeDasharray="113"
+                                            strokeDashoffset={113 - (Math.min(restTime, 120) / 120) * 113}
                                             strokeLinecap="round"
                                         />
                                     </svg>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Resting</p>
-                                    <p className="text-2xl font-bold font-mono tabular-nums leading-none">{formatTime(restTime)}</p>
+                                <div className="flex flex-col min-w-0">
+                                    <p className={cn(
+                                        "text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors truncate",
+                                        (restTime >= 55 && restTime < 60) || (restTime >= 85 && restTime < 90) ? "text-amber-500" : "text-primary"
+                                    )}>
+                                        {(restTime >= 55 && restTime < 60) || (restTime >= 85 && restTime < 90) ? "Get Ready!" : "Resting"}
+                                    </p>
+                                    <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums leading-none">{formatTime(restTime)}</p>
                                 </div>
                             </div>
-                            <Button onClick={skipRest} variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full px-4 h-9 font-medium transition-colors">
+                            <Button onClick={skipRest} variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full px-3 sm:px-4 h-8 sm:h-9 font-medium transition-colors ml-2">
                                 Skip
-                                <SkipForward className="h-4 w-4 ml-1.5" />
+                                <SkipForward className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1.5" />
                             </Button>
                         </div>
-                    </div>
-                )
-            }
-        </div >
+                </div>
+            )
+        }
+        </motion.div>
     )
 }

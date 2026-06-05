@@ -4,7 +4,9 @@ export const runtime = 'nodejs';
 
 // Dynamic imports to avoid issues during build
 async function parsePDF(buffer: Buffer): Promise<string> {
-    const pdfParse = (await import('pdf-parse')).default;
+    const pdf = await import('pdf-parse');
+    // Handle both default and direct function call for CJS compatibility
+    const pdfParse = (pdf as any).default || pdf;
     const data = await pdfParse(buffer);
     return data.text;
 }

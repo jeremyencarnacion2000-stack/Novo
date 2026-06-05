@@ -1,16 +1,17 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { MusicAlgorithm } from './music-algorithm'
 
 // BroadcastChannel for cross-tab synchronization
 const playerChannel = typeof window !== 'undefined' ? new BroadcastChannel('player-state') : null
 
 export interface CurrentTrack {
-  id: string;
-  uri: string; // Spotify URI for playback
+  id: string; // YouTube Video ID
+  uri: string; // Fallback or direct YT Video ID
   name: string;
   artist: string;
-  artistId?: string; // Spotify artist ID for continuous playback
-  albumId?: string; // Spotify album ID for context-aware playback
+  artistId?: string; // YT Music channel/artist ID
+  albumId?: string; // YT Music playlist/album ID
   image: string | undefined;
   duration_ms?: number;
 }
@@ -29,21 +30,23 @@ export interface PlayerState {
   volume: number;
   isOpen: boolean;
   progress: number; // Current position in milliseconds
-  deviceId: string | null; // Spotify Web Playback SDK device ID
-  isReady: boolean; // Whether the Spotify SDK is ready
+  isReady: boolean; // Whether the YouTube IFrame SDK is ready
   isShuffle: boolean; // Shuffle mode
   repeatMode: 'off' | 'track' | 'playlist'; // Repeat mode
   queue: CurrentTrack[]; // Queue for upcoming tracks
   autoPlay: boolean; // Automatic playback of next tracks
-  accessToken: string | null; // Spotify Access Token for API calls
+  playHistory: string[]; // History for similarity algorithm
+  likedTracks: string[]; // List of liked track IDs
+  followedArtists: string[]; // List of followed artist IDs
+  recommendations: CurrentTrack[]; // Radio mode recommendations
 }
 
-interface PlayerActions {
-  playTrack: (track: CurrentTrack) => void;
+export interface PlayerActions {
+  playTrack: (track: CurrentTrack) => Promise<void>;
   playPlaylist: (playlist: Playlist, startIndex?: number) => void;
-  togglePlayPause: () => void;
-  nextTrack: () => Promise<void>; // Changed to Promise
-  previousTrack: () => void;
+  togglePlayPause: () => Promise<void>;
+  nextTrack: () => Promise<void>; 
+  previousTrack: () => Promise<void>;
   setVolume: (volume: number) => void;
   setProgress: (progress: number) => void;
   seekTo: (position: number) => void;
@@ -51,14 +54,19 @@ interface PlayerActions {
   toggleRepeat: () => void;
   toggleOpen: () => void;
   setOpen: (isOpen: boolean) => void;
-  setDeviceId: (deviceId: string) => void;
   setReady: (isReady: boolean) => void;
   resetPlayer: () => void;
   addToQueue: (tracks: CurrentTrack[]) => void;
   clearQueue: () => void;
   playNext: (track: CurrentTrack) => void;
   setAutoPlay: (autoPlay: boolean) => void;
-  setAccessToken: (token: string | null) => void;
+  syncWithSDK: (track: CurrentTrack, isPlaying: boolean, progress: number) => void;
+  toggleLike: (track: any) => void;
+  setLikedTracks: (ids: string[]) => void;
+  toggleFollow: (artistId: string, artistName: string, imageUrl: string) => Promise<void>;
+  setFollowedArtists: (artistIds: string[]) => void;
+  fetchAutoplayQueue: (track: CurrentTrack) => Promise<void>;
+  clearRecommendations: () => void;
 }
 
 const initialState: PlayerState = {
@@ -69,13 +77,15 @@ const initialState: PlayerState = {
   volume: 0.5,
   isOpen: false,
   progress: 0,
-  deviceId: null,
   isReady: false,
   isShuffle: false,
   repeatMode: 'off',
   queue: [],
   autoPlay: true,
-  accessToken: null,
+  playHistory: [],
+  likedTracks: [],
+  followedArtists: [],
+  recommendations: [],
 }
 
 export const usePlayerStore = create<PlayerState & PlayerActions>()(
@@ -85,13 +95,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       let isUpdatingFromBroadcast = false
 
       // Listen for BroadcastChannel messages
-      if (playerChannel) {
+      if (typeof window !== 'undefined' && playerChannel) {
         playerChannel.onmessage = (event) => {
           const { type, payload } = event.data
           if (type === 'PLAYER_STATE_UPDATE' && !isUpdatingFromBroadcast) {
             isUpdatingFromBroadcast = true
             set(payload)
-            // Reset flag after a short delay to allow state to settle
             setTimeout(() => { isUpdatingFromBroadcast = false }, 100)
           }
         }
@@ -99,292 +108,348 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       return {
         ...initialState,
-        setAccessToken: (token) => set({ accessToken: token }),
-        playTrack: (track) => {
-          set((state) => {
-            const updatedState = {
-              ...state,
-              currentTrack: track,
-              currentPlaylist: null,
-              currentTrackIndex: 0,
-              isPlaying: true,
-              isOpen: true,
-              progress: 0
-            };
-            if (playerChannel) {
-              playerChannel.postMessage({
-                type: 'PLAYER_STATE_UPDATE',
-                payload: {
-                  currentTrack: updatedState.currentTrack,
-                  currentPlaylist: updatedState.currentPlaylist,
-                  currentTrackIndex: updatedState.currentTrackIndex,
-                  isPlaying: updatedState.isPlaying,
-                  isOpen: updatedState.isOpen,
-                  progress: updatedState.progress,
-                  volume: updatedState.volume,
-                }
-              });
-            }
-            return updatedState;
-          });
-        },
-        playPlaylist: (playlist, startIndex = 0) => {
-          set((state) => {
-            const updatedState = {
-              ...state,
-              currentPlaylist: playlist,
-              currentTrack: playlist.tracks[startIndex] || null,
-              currentTrackIndex: startIndex,
-              isPlaying: true,
-              isOpen: true,
-              progress: 0
-            };
-            if (playerChannel) {
-              playerChannel.postMessage({
-                type: 'PLAYER_STATE_UPDATE',
-                payload: {
-                  currentPlaylist: updatedState.currentPlaylist,
-                  currentTrack: updatedState.currentTrack,
-                  currentTrackIndex: updatedState.currentTrackIndex,
-                  isPlaying: updatedState.isPlaying,
-                  isOpen: updatedState.isOpen,
-                  progress: updatedState.progress,
-                  volume: updatedState.volume,
-                }
-              });
-            }
-            return updatedState;
-          });
-        },
-        nextTrack: async () => {
-          const state = get();
 
-          // 1. First check if there are tracks in the queue
+        playTrack: async (track: CurrentTrack) => {
+          const state = get()
+          set({
+            currentTrack: track,
+            currentPlaylist: null,
+            currentTrackIndex: 0,
+            isPlaying: true,
+            isOpen: true,
+            progress: 0,
+            queue: [],
+            recommendations: []
+          })
+
+          if (playerChannel) {
+            playerChannel.postMessage({
+              type: 'PLAYER_STATE_UPDATE',
+              payload: {
+                currentTrack: track,
+                currentPlaylist: null,
+                isPlaying: true,
+                isOpen: true,
+                progress: 0,
+                queue: [],
+                recommendations: []
+              }
+            })
+          }
+
+          if (state.autoPlay) {
+            await get().fetchAutoplayQueue(track)
+          }
+
+          // Sync with centralized status API
+          fetch('/api/ytmusic/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currentTrack: track,
+              isPlaying: true,
+              progress: 0
+            })
+          }).catch(e => console.error("Status sync failed", e))
+        },
+
+        playPlaylist: (playlist: Playlist, startIndex: number = 0) => {
+          const track = playlist.tracks[startIndex] || null
+          set({
+            currentPlaylist: playlist,
+            currentTrack: track,
+            currentTrackIndex: startIndex,
+            isPlaying: true,
+            isOpen: true,
+            progress: 0,
+            queue: [],
+            recommendations: []
+          })
+
+          if (playerChannel) {
+            playerChannel.postMessage({
+              type: 'PLAYER_STATE_UPDATE',
+              payload: {
+                currentPlaylist: playlist,
+                currentTrack: track,
+                currentTrackIndex: startIndex,
+                isPlaying: true,
+                isOpen: true,
+                progress: 0,
+                queue: [],
+                recommendations: []
+              }
+            })
+          }
+        },
+
+        nextTrack: async () => {
+          const state = get()
+          if (state.currentTrack) {
+            set((s) => ({
+              playHistory: [state.currentTrack!.id, ...s.playHistory].slice(0, 50)
+            }))
+          }
+
+          // 1. Queue
           if (state.queue.length > 0) {
-            const [nextInQueue, ...remainingQueue] = state.queue;
-            console.log('PlayerStore: Playing next from queue:', nextInQueue.name);
+            const [nextInQueue, ...remainingQueue] = state.queue
             set({
               currentTrack: nextInQueue,
               queue: remainingQueue,
               progress: 0,
-              isPlaying: true,
-              isOpen: true
-            });
-            return;
+              isPlaying: true
+            })
+            return
           }
 
-          // 2. Then check playlist
+          // 2. Playlist (Album Sequence)
           if (state.currentPlaylist && state.currentPlaylist.tracks.length > 0) {
-            let nextIndex: number;
-
+            let nextIndex = state.currentTrackIndex + 1
             if (state.isShuffle) {
-              // Random track (excluding current)
-              const availableIndices = state.currentPlaylist.tracks
-                .map((_, i) => i)
-                .filter(i => i !== state.currentTrackIndex);
-              nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)] || 0;
-            } else {
-              nextIndex = state.currentTrackIndex + 1;
-
-              // Check if we've reached the end
-              if (nextIndex >= state.currentPlaylist.tracks.length) {
-                if (state.repeatMode === 'playlist') {
-                  nextIndex = 0; // Loop back to start
-                } else {
-                  // End of playlist
-                  // 3. Fallback to Autoplay / Recommendations
-                  if (state.autoPlay && state.currentTrack) {
-                    console.log('PlayerStore: End of playlist. Fetching recommendations...');
-                    try {
-                      const seedTrack = state.currentTrack.id;
-                      const seedArtist = state.currentTrack.artistId;
-
-                      let url = `/api/spotify/recommendations?limit=5`;
-                      if (seedTrack) url += `&seed_tracks=${seedTrack}`;
-                      else if (seedArtist) url += `&seed_artists=${seedArtist}`;
-
-                      // We need to fetch from our API route which handles the token
-                      // But here we have the token in state, so we can call Spotify directly or use our API
-                      // Using our API is safer if we don't want to manage token refresh here, 
-                      // but we stored the token. Let's try calling our API first.
-
-                      // Actually, we can't easily call our own API with relative path if we are on server, 
-                      // but this is client-side store.
-
-                      const response = await fetch(url);
-                      if (response.ok) {
-                        const data = await response.json();
-                        const recommendations = data.tracks || [];
-                        if (recommendations.length > 0) {
-                          // Add to queue and play first
-                          const [first, ...rest] = recommendations;
-                          set({
-                            currentTrack: first,
-                            queue: rest,
-                            progress: 0,
-                            isPlaying: true,
-                            isOpen: true,
-                            // Clear playlist so we don't go back to it
-                            currentPlaylist: null,
-                            currentTrackIndex: 0
-                          });
-                          return;
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Failed to fetch recommendations", e);
-                    }
-                  }
-
-                  set({ isPlaying: false, progress: 0 });
-                  return;
-                }
-              }
+              const available = state.currentPlaylist.tracks.length
+              nextIndex = Math.floor(Math.random() * available)
             }
 
+            if (nextIndex < state.currentPlaylist.tracks.length) {
+              const nextTrack = state.currentPlaylist.tracks[nextIndex]
+              set({
+                currentTrack: nextTrack,
+                currentTrackIndex: nextIndex,
+                progress: 0,
+                isPlaying: true
+              })
+              return
+            } else {
+              // Playlist finished
+              if (state.repeatMode === 'playlist') {
+                set({
+                  currentTrack: state.currentPlaylist.tracks[0],
+                  currentTrackIndex: 0,
+                  progress: 0,
+                  isPlaying: true
+                })
+                return
+              }
+              // If not repeating, fall through to recommendations (Radio mode)
+              set({ currentPlaylist: null })
+            }
+          }
+
+          // 3. Automated Recommendations (Radio Mode)
+          if (state.recommendations.length > 0) {
+            const [nextRec, ...remainingRecs] = state.recommendations
             set({
-              currentTrack: state.currentPlaylist.tracks[nextIndex],
-              currentTrackIndex: nextIndex,
+              currentTrack: nextRec,
+              recommendations: remainingRecs,
               progress: 0,
               isPlaying: true
-            });
-            return;
+            })
+            
+            // Refill recommendations if running low
+            if (remainingRecs.length < 3 && state.autoPlay) {
+              get().fetchAutoplayQueue(nextRec)
+            }
+            return
           }
 
-          // 4. No playlist, but we have a current track (Single track mode) -> Fetch recommendations
+          // 4. If nothing left, try to fetch new recommendations
           if (state.autoPlay && state.currentTrack) {
-            console.log('PlayerStore: End of playback. Fetching recommendations for infinite playback...');
-            try {
-              const seedTrack = state.currentTrack.id;
-              const seedArtist = state.currentTrack.artistId;
-
-              let url = `/api/spotify/recommendations?limit=10`;
-              if (seedTrack) url += `&seed_tracks=${seedTrack}`;
-              else if (seedArtist) url += `&seed_artists=${seedArtist}`;
-
-              console.log('PlayerStore: Fetching from:', url);
-              const response = await fetch(url);
-              if (response.ok) {
-                const data = await response.json();
-                const recommendations = data.tracks || [];
-                console.log(`PlayerStore: Found ${recommendations.length} recommendations.`);
-                if (recommendations.length > 0) {
-                  const [first, ...rest] = recommendations;
-                  console.log('PlayerStore: Playing recommended track:', first.name);
-                  set({
-                    currentTrack: first,
-                    queue: rest,
-                    progress: 0,
-                    isPlaying: true,
-                    isOpen: true
-                  });
-                  return;
-                }
-              } else {
-                console.error('PlayerStore: Recommendations fetch failed with status:', response.status);
-              }
-            } catch (e) {
-              console.error("PlayerStore: Failed to fetch recommendations", e);
+            await get().fetchAutoplayQueue(state.currentTrack)
+            const newState = get()
+            if (newState.recommendations.length > 0) {
+              const [nextRec, ...remainingRecs] = newState.recommendations
+              set({
+                currentTrack: nextRec,
+                recommendations: remainingRecs,
+                progress: 0,
+                isPlaying: true
+              })
+              return
             }
           }
 
-          console.log('PlayerStore: End of playback. No recommendations found or autoPlay is off.');
-          set({ isPlaying: false, progress: 0 });
+          set({ isPlaying: false, progress: 0 })
+
+          // Sync with centralized status API
+          fetch('/api/ytmusic/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currentTrack: state.currentTrack,
+              isPlaying: state.isPlaying,
+              progress: state.progress
+            })
+          }).catch(e => console.error("Status sync failed", e))
         },
-        previousTrack: () => {
-          const state = get();
-          // If more than 3 seconds into track, restart it
-          if (state.progress > 3000) {
-            set({ progress: 0 });
-            return;
+
+        fetchAutoplayQueue: async (track: CurrentTrack) => {
+          const state = get()
+          if (!track.id) return
+          
+          try {
+            let url = `/api/ytmusic/recommendations?limit=15&seed_tracks=${track.id}`
+            if (track.artistId) url += `&seed_artists=${track.artistId}`
+
+            const response = await fetch(url)
+            if (response.ok) {
+              const data = await response.json()
+              let recommendations = data.tracks || []
+              
+              recommendations = recommendations.filter((t: any) => 
+                t.id !== track.id && 
+                !state.queue.some((q) => q.id === t.id) &&
+                !state.playHistory.includes(t.id)
+              )
+
+              if (recommendations.length > 0) {
+                set((s) => ({
+                  recommendations: [...s.recommendations, ...recommendations].slice(0, 30)
+                }))
+              }
+            }
+          } catch (e) {
+            console.error("PlayerStore: Autoplay fetch failed", e)
+          }
+        },
+
+        previousTrack: async () => {
+          const state = get()
+          if (state.progress > 5000) {
+            set({ progress: 0 })
+            return
           }
 
           if (state.currentPlaylist && state.currentPlaylist.tracks.length > 0) {
-            const prevIndex = state.currentTrackIndex === 0
-              ? state.currentPlaylist.tracks.length - 1
-              : state.currentTrackIndex - 1;
+            const prevIndex = (state.currentTrackIndex - 1 + state.currentPlaylist.tracks.length) % state.currentPlaylist.tracks.length
             set({
               currentTrack: state.currentPlaylist.tracks[prevIndex],
               currentTrackIndex: prevIndex,
               progress: 0,
               isPlaying: true
-            });
+            })
           }
         },
-        togglePlayPause: () => {
-          set((state) => {
-            const updatedState = { ...state, isPlaying: !state.isPlaying };
-            if (playerChannel) {
-              playerChannel.postMessage({
-                type: 'PLAYER_STATE_UPDATE',
-                payload: {
-                  currentTrack: updatedState.currentTrack,
-                  currentPlaylist: updatedState.currentPlaylist,
-                  currentTrackIndex: updatedState.currentTrackIndex,
-                  isPlaying: updatedState.isPlaying,
-                  isOpen: updatedState.isOpen,
-                  progress: updatedState.progress,
-                  volume: updatedState.volume,
-                }
-              });
-            }
-            return updatedState;
-          });
+
+        togglePlayPause: async () => {
+          const isPlaying = !get().isPlaying
+          set({ isPlaying })
+          if (playerChannel) {
+            playerChannel.postMessage({
+              type: 'PLAYER_STATE_UPDATE',
+              payload: { isPlaying }
+            })
+          }
+
+          // Sync with centralized status API
+          fetch('/api/ytmusic/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currentTrack: get().currentTrack,
+              isPlaying: isPlaying,
+              progress: get().progress
+            })
+          }).catch(e => console.error("Status sync failed", e))
         },
-        setVolume: (volume) => {
-          set({ volume });
-        },
-        setProgress: (progress) => {
-          set({ progress });
-        },
-        seekTo: (position) => {
-          set({ progress: position });
-        },
-        toggleShuffle: () => {
-          set((state) => ({ isShuffle: !state.isShuffle }));
-        },
-        toggleRepeat: () => {
-          set((state) => {
-            const modes: Array<'off' | 'track' | 'playlist'> = ['off', 'playlist', 'track'];
-            const currentIndex = modes.indexOf(state.repeatMode);
-            const nextIndex = (currentIndex + 1) % modes.length;
-            return { repeatMode: modes[nextIndex] };
-          });
-        },
-        toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
-        setOpen: (isOpen) => set({ isOpen }),
-        setDeviceId: (deviceId) => set({ deviceId }),
-        setReady: (isReady) => set({ isReady }),
+
+        setVolume: (volume: number) => set({ volume }),
+        setProgress: (progress: number) => set({ progress }),
+        seekTo: (position: number) => set({ progress: position }),
+        toggleShuffle: () => set((s) => ({ isShuffle: !s.isShuffle })),
+        toggleRepeat: () => set((s) => {
+          const modes: Array<'off' | 'playlist' | 'track'> = ['off', 'playlist', 'track']
+          const next = modes[(modes.indexOf(s.repeatMode) + 1) % modes.length]
+          return { repeatMode: next }
+        }),
+        toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
+        setOpen: (isOpen: boolean) => set({ isOpen }),
+        setReady: (isReady: boolean) => set({ isReady }),
         resetPlayer: () => set(initialState),
-        addToQueue: (tracks) => {
-          set((state) => ({
-            queue: [...state.queue, ...tracks]
-          }));
+        addToQueue: (tracks: CurrentTrack[]) => set((s) => ({ queue: [...s.queue, ...tracks] })),
+        clearQueue: () => set({ queue: [] }),
+        playNext: (track: CurrentTrack) => set((s) => ({ queue: [track, ...s.queue] })),
+        setAutoPlay: (autoPlay: boolean) => set({ autoPlay }),
+        
+        syncWithSDK: (track, isPlaying, progress) => {
+          const state = get()
+          if (state.currentTrack?.id !== track.id || state.isPlaying !== isPlaying || Math.abs(state.progress - progress) > 5000) {
+            set({ currentTrack: track, isPlaying, progress })
+          }
         },
-        clearQueue: () => {
-          set({ queue: [] });
+
+        toggleLike: (track: any) => {
+          const state = get()
+          if (!track) return
+
+          const trackId = typeof track === 'string' ? track : (track.id || track.videoId || track.trackId)
+          if (!trackId) return
+
+          const isLiked = state.likedTracks.includes(trackId)
+          
+          set((s) => ({
+            likedTracks: isLiked 
+              ? s.likedTracks.filter(id => id !== trackId)
+              : [...s.likedTracks, trackId]
+          }))
+
+          const name = track.name || track.title || state.currentTrack?.name || 'Unknown'
+          const artist = track.artist || (track.artists?.[0]?.name) || state.currentTrack?.artist || 'Unknown'
+          const artistId = track.artistId || (track.artists?.[0]?.id) || state.currentTrack?.artistId || ''
+          const album = track.album?.name || track.album || state.currentTrack?.albumId || ''
+          const thumbnail = track.image || track.thumbnail || track.thumbnails?.[0]?.url || track.album?.images?.[0]?.url || state.currentTrack?.image || ''
+          const duration = track.duration_ms || track.duration || state.currentTrack?.duration_ms || 0
+
+          fetch('/api/music/liked', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trackId,
+              action: isLiked ? 'remove' : 'add',
+              title: name,
+              artist: artist,
+              artistId: artistId,
+              album: album,
+              thumbnail: thumbnail,
+              duration: duration
+            })
+          }).catch(e => console.error("Like sync failed", e))
         },
-        playNext: (track) => {
-          set((state) => ({
-            queue: [track, ...state.queue]
-          }));
+
+        toggleFollow: async (artistId, artistName, imageUrl) => {
+          const isFollowing = get().followedArtists.includes(artistId)
+          try {
+            const res = await fetch('/api/music/follow', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ artistId, artistName, imageUrl, action: isFollowing ? 'unfollow' : 'follow' })
+            })
+            if (res.ok) {
+              set((s) => ({
+                followedArtists: isFollowing 
+                  ? s.followedArtists.filter(id => id !== artistId)
+                  : [...s.followedArtists, artistId]
+              }))
+            }
+          } catch (e) {
+            console.error("Follow sync failed", e)
+          }
         },
-        setAutoPlay: (autoPlay) => {
-          set({ autoPlay });
-        },
+        setFollowedArtists: (artistIds) => set({ followedArtists: artistIds }),
+        setLikedTracks: (ids) => set({ likedTracks: ids }),
+        clearRecommendations: () => set({ recommendations: [] }),
       }
     },
     {
-      name: 'novo-player',
+      name: 'novo-player-v2',
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        currentTrack: state.currentTrack,
-        currentPlaylist: state.currentPlaylist,
-        currentTrackIndex: state.currentTrackIndex,
         volume: state.volume,
-        isOpen: state.isOpen,
         isShuffle: state.isShuffle,
         repeatMode: state.repeatMode,
-        accessToken: state.accessToken, // Persist token
+        playHistory: state.playHistory,
+        likedTracks: state.likedTracks,
+        followedArtists: state.followedArtists,
       }),
     }
   )

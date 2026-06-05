@@ -70,10 +70,10 @@ const generateAIResponse = async (
         .join('\n');
 
       // Add function results to history and ask Gemini to respond
-      const updatedHistory = [
+      const updatedHistory: ConversationMessage[] = [
         ...history,
-        { role: 'user' as const, content: message },
-        { role: 'assistant' as const, content: `[Executed functions]\n${resultsSummary}` }
+        { id: 'msg-' + Date.now(), role: 'user' as const, content: message, timestamp: new Date().toISOString() },
+        { id: 'msg-' + (Date.now() + 1), role: 'assistant' as const, content: `[Executed functions]\n${resultsSummary}`, timestamp: new Date().toISOString() }
       ];
 
       // Second call to Gemini to generate natural language response

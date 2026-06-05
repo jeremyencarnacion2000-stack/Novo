@@ -1,185 +1,135 @@
 'use client';
 
-import React from 'react';
-import { Loader2, ListTodo, Timer, CalendarDays, Sparkles, Lightbulb, MessageSquare } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Bot, Sparkles, Calendar, FolderPlus } from 'lucide-react';
 import { useChatbot } from './context';
-import { Message } from './message';
+import { Message as ChatMessage } from './message';
 import { ChatInput } from './chat-input';
-import { ThinkingIndicator } from './thinking-indicator';
-import { useSession } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-// Quick action suggestions
-const quickActions = [
-    { icon: ListTodo, label: 'Crear una tarea', prompt: 'Ayúdame a crear una nueva tarea para hoy' },
-    { icon: Timer, label: 'Iniciar enfoque', prompt: 'Quiero comenzar una sesión de enfoque de 25 minutos' },
-    { icon: CalendarDays, label: 'Ver mi agenda', prompt: '¿Qué tengo programado para hoy?' },
-    { icon: Lightbulb, label: 'Dame una idea', prompt: 'Dame una idea para ser más productivo hoy' },
-];
-
-function getGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return '¡Buenos días';
-    if (hour >= 12 && hour < 18) return '¡Buenas tardes';
-    if (hour >= 18 && hour < 22) return '¡Buenas noches';
-    return '¡Hola';
-}
+import { useSession } from 'next-auth/react';
 
 export function ChatArea() {
-    const { messages, isTyping, streamingMessage, retryMessage, likeMessage, dislikeMessage, statusMessage, sendMessage } = useChatbot();
+    const { messages, isLoading, streamingMessage, sendMessage } = useChatbot();
     const { data: session } = useSession();
-    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const prevLengthRef = useRef(0);
 
-    // Auto-scroll to bottom
-    React.useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping, streamingMessage]);
-
-    // Listen for follow-up suggestions
-    React.useEffect(() => {
-        const handleFollowup = (e: CustomEvent) => {
-            if (e.detail) {
-                sendMessage(e.detail);
-            }
-        };
-        window.addEventListener('chat-followup', handleFollowup as EventListener);
-        return () => window.removeEventListener('chat-followup', handleFollowup as EventListener);
-    }, [sendMessage]);
-
-    const handleCopy = async (content: string) => {
-        try {
-            await navigator.clipboard.writeText(content);
-        } catch (err) {
-            console.error('Failed to copy:', err);
-        }
+    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+        requestAnimationFrame(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior });
+        });
     };
 
-    const handleQuickAction = (prompt: string) => {
-        sendMessage(prompt);
-    };
+    useEffect(() => {
+        const currentLength = messages.length;
+        if (currentLength === 0) { prevLengthRef.current = 0; return; }
+        const isHistoryLoad = currentLength - prevLengthRef.current > 1;
+        scrollToBottom(isHistoryLoad ? 'instant' : 'smooth');
+        prevLengthRef.current = currentLength;
+    }, [messages]);
 
-    const userName = session?.user?.name?.split(' ')[0] || 'Usuario';
+    useEffect(() => {
+        if (streamingMessage) scrollToBottom('smooth');
+    }, [streamingMessage]);
+
     const isChatActive = messages.length > 0 || streamingMessage !== null;
+    const firstName = session?.user?.name ? session.user.name.split(' ')[0] : 'Alex';
 
     return (
-        <div className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
-            {/* Scrollable container */}
-            <div className="absolute inset-0 bottom-0">
-                <div
-                    className={cn(
-                        "h-full w-full overflow-y-auto overscroll-contain custom-scrollbar",
-                        !isChatActive ? "flex items-center justify-center" : "px-4"
-                    )}
-                >
-                    {!isChatActive ? (
-                        <div className="w-full max-w-2xl px-6 py-12 animate-in fade-in zoom-in duration-1000 flex flex-col items-center">
-                            {/* Greeting with user name */}
-                            <div className="mb-10 text-center">
-                                <div className="relative w-24 h-24 mx-auto mb-8 group">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-700 animate-pulse" />
-                                    <div className="relative w-full h-full rounded-3xl bg-white/[0.03] border border-white/10 flex items-center justify-center shadow-2xl backdrop-blur-xl transform group-hover:scale-110 transition-transform duration-700">
-                                        <Sparkles className="w-10 h-10 text-indigo-400 animate-pulse" />
-                                    </div>
+        <div className="flex-1 flex flex-col relative min-h-0 bg-transparent overflow-hidden">
+            {/* Messages scroll area — always flex-1, never changes */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar min-h-0 relative" data-lenis-prevent>
+                {!isChatActive ? (
+                    /* Welcome screen: centered inside the scroll area */
+                    <div className="min-h-full flex flex-col items-center justify-center p-4 py-6 sm:py-10">
+                        <div className="flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500 w-full max-w-3xl">
+                            <div className="relative w-28 h-28 flex items-center justify-center mb-3 select-none pointer-events-none">
+                                <div className="absolute inset-0 rounded-full bg-primary/10 blur-xl animate-pulse" style={{ animationDuration: '4s' }} />
+                                <div className="absolute w-22 h-22 border border-dashed border-primary/30 rounded-full animate-spin" style={{ animationDuration: '30s' }} />
+                                <div className="absolute w-18 h-18 border border-dotted border-primary/20 rounded-full animate-spin" style={{ animationDuration: '15s', animationDirection: 'reverse' }} />
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-primary/60 shadow-[0_0_24px_var(--primary-glow)] animate-pulse flex items-center justify-center">
+                                    <Bot className="w-4.5 h-4.5 text-black stroke-[2.5]" />
                                 </div>
-
-                                <h2 className="text-5xl font-bold text-white mb-6 tracking-tight">
-                                    {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">{userName}</span>! 👋
-                                </h2>
-                                <p className="text-white/40 text-xl max-w-md mx-auto leading-relaxed font-light">
-                                    Soy tu asistente de productividad inteligente. ¿Qué increíble proyecto vamos a avanzar hoy?
-                                </p>
                             </div>
 
-                            {/* Centered Input */}
-                            <div className="w-full max-w-2xl mx-auto mb-12 transform transition-all duration-700 hover:scale-[1.02]">
-                                <ChatInput />
+                            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-1">
+                                <span className="bg-gradient-to-r from-primary via-primary/50 to-white bg-clip-text text-transparent">Welcome back,</span>{' '}
+                                <span className="text-white">{firstName}!</span>
+                            </h2>
+                            <p className="text-white/40 text-[10px] sm:text-xs font-semibold tracking-widest uppercase mb-6">
+                                How can I help you organize your day?
+                            </p>
+
+                            <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+                                <ChatInput variant="center" />
                             </div>
 
-                            {/* Quick actions */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-                                {quickActions.map((action, index) => (
-                                    <Button
-                                        key={index}
-                                        variant="outline"
-                                        className="h-auto py-5 px-4 flex flex-col items-center gap-3 bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all duration-500 group rounded-2xl backdrop-blur-sm"
-                                        onClick={() => handleQuickAction(action.prompt)}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-2xl mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
+                                {[
+                                    { text: "Crear una tarea", description: "Organiza tu día al instante", icon: Sparkles },
+                                    { text: "Crear un proyecto", description: "Define objetivos y fases", icon: FolderPlus },
+                                    { text: "Crear una rutina", description: "Crea hábitos productivos", icon: Calendar }
+                                ].map((suggestion, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => sendMessage(suggestion.text)}
+                                        className="flex items-center gap-3 p-3 bg-white/[0.01] hover:bg-primary/[0.03] border border-white/5 hover:border-primary/20 rounded-2xl transition-all duration-300 text-left group shadow-lg"
                                     >
-                                        <div className="p-2.5 rounded-xl bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors">
-                                            <action.icon className="w-5 h-5 text-indigo-400 transition-transform group-hover:scale-110" />
+                                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:scale-105 transition-transform duration-300">
+                                            <suggestion.icon className="w-3.5 h-3.5" />
                                         </div>
-                                        <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 group-hover:text-white/80 transition-colors">{action.label}</span>
-                                    </Button>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-semibold text-white/80 group-hover:text-primary transition-colors">{suggestion.text}</div>
+                                            <div className="text-[10px] text-white/30 truncate mt-0.5">{suggestion.description}</div>
+                                        </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>
-                    ) : (
-                        <div className="pb-32 pt-6 max-w-4xl mx-auto w-full">
-                            {messages.map((message) => (
-                                <Message
-                                    key={message.id}
-                                    message={message}
-                                    onCopy={() => handleCopy(message.content)}
-                                    onRetry={() => retryMessage(message.id)}
-                                    onLike={() => likeMessage(message.id)}
-                                    onDislike={() => dislikeMessage(message.id)}
-                                />
-                            ))}
-
-                            {/* Streaming message */}
-                            {streamingMessage && (
-                                <Message
-                                    key="streaming"
-                                    message={streamingMessage}
-                                    onCopy={() => { }}
-                                    onRetry={() => { }}
-                                    onLike={() => { }}
-                                    onDislike={() => { }}
-                                />
-                            )}
-
-                            {/* Typing indicator */}
-                            {isTyping && !streamingMessage && (
-                                <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <ThinkingIndicator status={statusMessage} />
-                                </div>
-                            )}
-
-                            <div ref={messagesEndRef} />
-                        </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    /* Messages list */
+                    <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6 pb-10">
+                        {messages.map((message) => (
+                            <ChatMessage key={message.id} message={message} />
+                        ))}
+                        {streamingMessage && (
+                            <ChatMessage message={streamingMessage} />
+                        )}
+                        {isLoading && !streamingMessage && (
+                            <div className="flex items-center gap-3 p-6 text-primary animate-pulse bg-white/[0.01] border-y border-white/5">
+                                <Bot className="w-5 h-5 animate-spin" />
+                                <span className="text-xs font-medium tracking-wider uppercase">Pensando...</span>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+                )}
             </div>
 
-            {/* Bottom Input - Fixed at bottom */}
-            {isChatActive && (
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-sm">
-                    <div className="max-w-3xl mx-auto transform transition-all duration-500 hover:scale-[1.01]">
-                        <ChatInput />
-                    </div>
-                    <div className="flex items-center justify-center gap-4 mt-3">
-                        {/* Context Memory Indicator */}
-                        <div className="flex items-center gap-2 text-[10px] text-white/30" title="Uso de memoria de contexto">
-                            <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                    className={cn(
-                                        "h-full rounded-full transition-all duration-500",
-                                        messages.length > 8 ? "bg-red-500/50" : "bg-indigo-500/50"
-                                    )}
-                                    style={{ width: `${Math.min((messages.length / 10) * 100, 100)}%` }}
-                                />
-                            </div>
-                            <span>
-                                {Math.min(messages.length, 10)}/10
-                            </span>
-                        </div>
-                        <span className="text-white/10">•</span>
-                        <p className="text-[10px] text-white/20 font-medium tracking-wide uppercase">
-                            AI can make mistakes. Check important info.
-                        </p>
-                    </div>
+            {/*
+              ─── Bottom ChatInput ────────────────────────────────────────────────
+              The outer div is ALWAYS in the flex layout as flex-shrink-0.
+              When inactive → height collapses to 0 (overflow-hidden + h-0).
+              When active   → height auto, content visible.
+              This prevents the scroll area from changing height when isChatActive
+              toggles, eliminating the layout shift on history load.
+            */}
+            <div
+                className={cn(
+                    'flex-shrink-0 overflow-hidden transition-none z-20',
+                    isChatActive ? 'h-auto' : 'h-0'
+                )}
+            >
+                <div
+                    className="p-3 pb-6 md:pb-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent border-t border-white/5"
+                    style={{ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
+                >
+                    <ChatInput variant="bottom" />
                 </div>
-            )}
+            </div>
         </div>
     );
 }
+
+export default ChatArea;

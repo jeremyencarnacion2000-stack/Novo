@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Clock, AlertTriangle, CheckCircle2, Circle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Sun, AlertTriangle, CheckCircle2, Circle, Clock,
+    ListChecks, FolderKanban, GraduationCap, Pencil,
+    ChevronRight, Flame, Target, Zap
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface IntegratedTask {
     id: string;
     text: string;
@@ -36,6 +39,244 @@ interface UrgentItem {
     weight?: number;
 }
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+function TodaySkeleton() {
+    return (
+        <div className="flex flex-col gap-6 animate-pulse">
+            {/* Header skeleton */}
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="h-8 w-32 bg-white/5 rounded-2xl" />
+                    <div className="h-4 w-48 bg-white/[0.03] rounded-xl" />
+                </div>
+                <div className="h-16 w-16 bg-white/5 rounded-2xl" />
+            </div>
+            {/* Progress skeleton */}
+            <div className="h-2 w-full bg-white/5 rounded-full" />
+            {/* Card skeletons */}
+            {[1, 2, 3].map(i => (
+                <div key={i} className="h-40 bg-white/[0.03] rounded-3xl border border-white/5" />
+            ))}
+        </div>
+    );
+}
+
+// ─── Progress Ring ────────────────────────────────────────────────────────────
+function ProgressRing({ progress, completed, total }: { progress: number; completed: number; total: number }) {
+    const r = 28;
+    const circ = 2 * Math.PI * r;
+    const offset = circ - (progress / 100) * circ;
+    return (
+        <div className="relative flex items-center justify-center w-16 h-16">
+            <svg width="64" height="64" className="-rotate-90">
+                <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+                <circle
+                    cx="32" cy="32" r={r} fill="none"
+                    stroke="var(--primary)" strokeWidth="4"
+                    strokeDasharray={circ} strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-sm font-black text-white leading-none">{completed}</span>
+                <span className="text-[9px] text-white/30 font-medium">/{total}</span>
+            </div>
+        </div>
+    );
+}
+
+// ─── Priority pill ───────────────────────────────────────────────────────────
+function PriorityPill({ priority }: { priority: string }) {
+    const map: Record<string, string> = {
+        high: 'bg-red-500/10 text-red-400 border-red-500/20',
+        medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        low: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    };
+    return (
+        <span className={cn('text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border', map[priority] ?? map.low)}>
+            {priority}
+        </span>
+    );
+}
+
+// ─── Source icon ─────────────────────────────────────────────────────────────
+function SourceIcon({ source }: { source: string }) {
+    const map: Record<string, React.ReactNode> = {
+        routine: <ListChecks className="w-3 h-3" />,
+        project: <FolderKanban className="w-3 h-3" />,
+        school:  <GraduationCap className="w-3 h-3" />,
+        manual:  <Pencil className="w-3 h-3" />,
+    };
+    return <span className="text-white/30">{map[source] ?? map.manual}</span>;
+}
+
+// ─── Task Row ────────────────────────────────────────────────────────────────
+function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: IntegratedTask) => void }) {
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+                'flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors duration-200 group cursor-pointer select-none',
+                task.completed
+                    ? 'bg-white/[0.01] opacity-50'
+                    : 'hover:bg-white/[0.04] active:bg-white/[0.06]'
+            )}
+            onClick={() => onToggle(task)}
+        >
+            {/* Checkbox */}
+            <div className={cn(
+                'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
+                task.completed
+                    ? 'bg-primary border-primary'
+                    : 'border-white/20 group-hover:border-primary/60'
+            )}>
+                <AnimatePresence>
+                    {task.completed && (
+                        <motion.div
+                            initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-white fill-white" />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+                <p className={cn(
+                    'text-sm font-medium truncate transition-all duration-200',
+                    task.completed ? 'line-through text-white/20' : 'text-white/80'
+                )}>
+                    {task.text}
+                </p>
+                {task.metadata && (
+                    <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1">
+                        <SourceIcon source={task.source} />
+                        {task.metadata.routineName || task.metadata.projectTitle || task.metadata.courseCode}
+                    </p>
+                )}
+            </div>
+
+            {/* Priority */}
+            <PriorityPill priority={task.priority} />
+        </motion.div>
+    );
+}
+
+// ─── Section Card ─────────────────────────────────────────────────────────────
+const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent: string }> = {
+    morning:   { label: 'Mañana',    icon: <Sun className="w-4 h-4" />,           accent: 'text-amber-400' },
+    afternoon: { label: 'Tarde',     icon: <Zap className="w-4 h-4" />,           accent: 'text-orange-400' },
+    evening:   { label: 'Noche',     icon: <Circle className="w-4 h-4" />,        accent: 'text-indigo-400' },
+    anytime:   { label: 'Cuando sea',icon: <Clock className="w-4 h-4" />,         accent: 'text-white/40' },
+    project:   { label: 'Proyectos', icon: <FolderKanban className="w-4 h-4" />, accent: 'text-blue-400' },
+    school:    { label: 'Escuela',   icon: <GraduationCap className="w-4 h-4" />,accent: 'text-violet-400' },
+    manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-white/50' },
+};
+
+function SectionCard({
+    sectionKey, tasks, onToggle,
+}: {
+    sectionKey: string;
+    tasks: IntegratedTask[];
+    onToggle: (t: IntegratedTask) => void;
+}) {
+    const [open, setOpen] = useState(true);
+    const meta = sectionMeta[sectionKey] ?? { label: sectionKey, icon: <ListChecks className="w-4 h-4" />, accent: 'text-white/50' };
+    const done = tasks.filter(t => t.completed).length;
+
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-white/[0.07] overflow-hidden"
+            style={{
+                background: 'rgba(255,255,255,0.018)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}
+        >
+            {/* Section header */}
+            <button
+                onClick={() => setOpen(o => !o)}
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+            >
+                <div className="flex items-center gap-2.5">
+                    <span className={meta.accent}>{meta.icon}</span>
+                    <span className="text-xs font-black tracking-widest uppercase text-white/60">{meta.label}</span>
+                    <span className="text-[10px] text-white/20 font-medium">{done}/{tasks.length}</span>
+                </div>
+                <ChevronRight className={cn('w-4 h-4 text-white/20 transition-transform duration-300', open && 'rotate-90')} />
+            </button>
+
+            {/* Tasks */}
+            <AnimatePresence>
+                {open && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                    >
+                        <div className="px-2 pb-3 flex flex-col gap-0.5">
+                            {tasks.map(task => (
+                                <TaskRow key={task.id} task={task} onToggle={onToggle} />
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
+    );
+}
+
+// ─── Urgent Banner ────────────────────────────────────────────────────────────
+function UrgentBanner({ items }: { items: UrgentItem[] }) {
+    const urgencyStyle: Record<string, string> = {
+        critical: 'bg-red-500/8 border-red-500/20 text-red-400',
+        high:     'bg-orange-500/8 border-orange-500/20 text-orange-400',
+        medium:   'bg-amber-500/8 border-amber-500/20 text-amber-400',
+    };
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-red-500/15 overflow-hidden"
+            style={{ background: 'rgba(239,68,68,0.04)', backdropFilter: 'blur(12px)' }}
+        >
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-red-500/10">
+                <Flame className="w-4 h-4 text-red-400 animate-pulse" />
+                <span className="text-xs font-black tracking-widest uppercase text-red-400/80">Urgente</span>
+                <span className="text-[10px] text-red-400/40">{items.length} pendiente{items.length > 1 ? 's' : ''}</span>
+            </div>
+            <div className="px-4 py-3 flex flex-col gap-2">
+                {items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-white/75 truncate">
+                                {item.courseCode}: {item.title}
+                            </p>
+                            <p className="text-[10px] text-white/30 mt-0.5">
+                                Vence: {new Date(item.dueDate).toLocaleDateString('es', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </p>
+                        </div>
+                        <span className={cn('text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full border flex-shrink-0', urgencyStyle[item.urgencyLevel] ?? urgencyStyle.medium)}>
+                            {item.urgencyLevel}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </motion.div>
+    );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TodayPage() {
     const { toast } = useToast();
     const [tasks, setTasks] = useState<IntegratedTask[]>([]);
@@ -44,25 +285,22 @@ export default function TodayPage() {
 
     const fetchData = async () => {
         try {
-            const [todayResponse, urgentResponse] = await Promise.all([
+            const [todayRes, urgentRes] = await Promise.all([
                 fetch('/api/integration/today'),
-                fetch('/api/integration/urgent')
+                fetch('/api/integration/urgent'),
             ]);
-
-            if (todayResponse.ok) {
-                const { tasks: todayTasks } = await todayResponse.json();
-                setTasks(todayTasks);
+            if (todayRes.ok) {
+                const { tasks: t } = await todayRes.json();
+                setTasks(t ?? []);
             }
-
-            if (urgentResponse.ok) {
-                const { urgentItems: urgent } = await urgentResponse.json();
-                setUrgentItems(urgent);
+            if (urgentRes.ok) {
+                const { urgentItems: u } = await urgentRes.json();
+                setUrgentItems(u ?? []);
             }
-        } catch (error) {
-            console.error('Error fetching today data:', error);
+        } catch {
             toast({
-                title: 'Error',
-                description: 'Failed to load today tasks',
+                title: 'No se pudo cargar tus tareas',
+                description: 'Revisa tu conexión e intenta de nuevo.',
                 variant: 'destructive',
             });
         } finally {
@@ -70,291 +308,147 @@ export default function TodayPage() {
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    useEffect(() => { fetchData(); }, []);
 
-    const handleToggleComplete = async (task: IntegratedTask) => {
-        // Optimistic update
-        setTasks(tasks.map(t =>
-            t.id === task.id ? { ...t, completed: !t.completed } : t
-        ));
-
+    const handleToggle = async (task: IntegratedTask) => {
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
         try {
-            const response = await fetch('/api/integration/sync', {
+            const res = await fetch('/api/integration/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: task.id, completed: !task.completed })
+                body: JSON.stringify({ taskId: task.id, completed: !task.completed }),
             });
-
-            if (!response.ok) {
-                throw new Error('Sync failed');
-            }
-        } catch (error) {
-            // Revert on error
-            setTasks(tasks.map(t =>
-                t.id === task.id ? { ...t, completed: task.completed } : t
-            ));
-            toast({
-                title: 'Error',
-                description: 'Failed to update task',
-                variant: 'destructive',
-            });
+            if (!res.ok) throw new Error();
+        } catch {
+            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: task.completed } : t));
+            toast({ title: 'No se pudo actualizar la tarea', description: 'Intenta de nuevo.', variant: 'destructive' });
         }
     };
 
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'high': return 'text-red-600 dark:text-red-400';
-            case 'medium': return 'text-yellow-600 dark:text-yellow-400';
-            default: return 'text-blue-600 dark:text-blue-400';
-        }
-    };
+    const completed = tasks.filter(t => t.completed).length;
+    const total = tasks.length;
+    const progress = total > 0 ? (completed / total) * 100 : 0;
 
-    const getSourceIcon = (source: string) => {
-        switch (source) {
-            case 'routine': return '🔄';
-            case 'project': return '📋';
-            case 'school': return '🎓';
-            default: return '✓';
-        }
-    };
+    // Group tasks
+    const routines = tasks.filter(t => t.source === 'routine');
+    const groups: Array<{ key: string; tasks: IntegratedTask[] }> = [
+        { key: 'morning',   tasks: routines.filter(t => t.timeOfDay === 'morning') },
+        { key: 'afternoon', tasks: routines.filter(t => t.timeOfDay === 'afternoon') },
+        { key: 'evening',   tasks: routines.filter(t => t.timeOfDay === 'evening') },
+        { key: 'anytime',   tasks: routines.filter(t => t.timeOfDay === 'anytime') },
+        { key: 'project',   tasks: tasks.filter(t => t.source === 'project') },
+        { key: 'school',    tasks: tasks.filter(t => t.source === 'school') },
+        { key: 'manual',    tasks: tasks.filter(t => t.source === 'manual') },
+    ].filter(g => g.tasks.length > 0);
 
-    const getUrgencyColor = (level: string) => {
-        switch (level) {
-            case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-            case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-            default: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-        }
-    };
-
-    const completedCount = tasks.filter(t => t.completed).length;
-    const totalCount = tasks.length;
-    const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-    // Group tasks by source and time of day
-    const routineTasks = tasks.filter(t => t.source === 'routine');
-    const projectTasks = tasks.filter(t => t.source === 'project');
-    const schoolTasks = tasks.filter(t => t.source === 'school');
-    const manualTasks = tasks.filter(t => t.source === 'manual');
-
-    const morningTasks = routineTasks.filter(t => t.timeOfDay === 'morning');
-    const afternoonTasks = routineTasks.filter(t => t.timeOfDay === 'afternoon');
-    const eveningTasks = routineTasks.filter(t => t.timeOfDay === 'evening');
-    const anytimeTasks = routineTasks.filter(t => t.timeOfDay === 'anytime');
-
-    if (loading) {
-        return (
-            <div>Loading...</div>
-        );
-    }
+    const dayLabel = new Date().toLocaleDateString('es', { weekday: 'long', month: 'long', day: 'numeric' });
 
     return (
-        <div className="flex flex-col gap-6 md:gap-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-5 max-w-2xl mx-auto">
+
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start justify-between gap-4"
+            >
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                        Today
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        {new Date().toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'long',
-                            day: 'numeric'
-                        })}
-                    </p>
+                    <h1 className="text-2xl font-black tracking-tight text-white/90">Hoy</h1>
+                    <p className="text-xs text-white/30 font-medium mt-0.5 capitalize">{dayLabel}</p>
                 </div>
-                <div className="text-right">
-                    <div className="text-2xl font-bold">
-                        {completedCount}/{totalCount}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Tasks completed</div>
-                </div>
-            </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-secondary rounded-full h-3">
-                <div
-                    className="bg-primary h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
+                {loading ? (
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 animate-pulse" />
+                ) : (
+                    <ProgressRing progress={progress} completed={completed} total={total} />
+                )}
+            </motion.div>
 
-            {/* Urgency Panel */}
-            {urgentItems.length > 0 && (
-                <Card className="border-orange-200 dark:border-orange-800">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-orange-600" />
-                            Urgent School Items
-                        </CardTitle>
-                        <CardDescription>
-                            Assignments and exams in the next 72 hours
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {urgentItems.map(item => (
-                                <div
-                                    key={item.id}
-                                    className="flex items-center justify-between p-3 rounded-lg border"
-                                >
-                                    <div className="flex-1">
-                                        <div className="font-medium">{item.courseCode}: {item.title}</div>
-                                        <div className="text-sm text-muted-foreground">
-                                            Due: {new Date(item.dueDate).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                    <Badge className={getUrgencyColor(item.urgencyLevel)}>
-                                        {item.urgencyLevel.toUpperCase()}
-                                    </Badge>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* ── Progress bar ────────────────────────────────────────────── */}
+            {!loading && total > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className="relative h-1.5 w-full rounded-full overflow-hidden bg-white/[0.05]"
+                    style={{ transformOrigin: 'left' }}
+                >
+                    <motion.div
+                        className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
+                        style={{ boxShadow: '0 0 8px var(--primary)' }}
+                    />
+                </motion.div>
             )}
 
-            {/* Morning Routines */}
-            {morningTasks.length > 0 && (
-                <TaskSection
-                    title="🌅 Morning Routine"
-                    tasks={morningTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Afternoon Routines */}
-            {afternoonTasks.length > 0 && (
-                <TaskSection
-                    title="☀️ Afternoon Routine"
-                    tasks={afternoonTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Evening Routines */}
-            {eveningTasks.length > 0 && (
-                <TaskSection
-                    title="🌙 Evening Routine"
-                    tasks={eveningTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Anytime Tasks */}
-            {anytimeTasks.length > 0 && (
-                <TaskSection
-                    title="⏰ Anytime"
-                    tasks={anytimeTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Project Tasks */}
-            {projectTasks.length > 0 && (
-                <TaskSection
-                    title="📋 Projects"
-                    tasks={projectTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* School Tasks */}
-            {schoolTasks.length > 0 && (
-                <TaskSection
-                    title="🎓 School"
-                    tasks={schoolTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Manual Tasks */}
-            {manualTasks.length > 0 && (
-                <TaskSection
-                    title="✏️ Manual Tasks"
-                    tasks={manualTasks}
-                    onToggle={handleToggleComplete}
-                    getPriorityColor={getPriorityColor}
-                    getSourceIcon={getSourceIcon}
-                />
-            )}
-
-            {/* Empty State */}
-            {totalCount === 0 && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="text-center py-12">
-                            <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-lg font-medium">No tasks for today!</p>
-                            <p className="text-sm text-muted-foreground mt-2">
-                                You're all caught up 🎉
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
-    );
-}
-
-// Task Section Component
-function TaskSection({
-    title,
-    tasks,
-    onToggle,
-    getPriorityColor,
-    getSourceIcon
-}: any) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">{title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-2">
-                    {tasks.map((task: IntegratedTask) => (
+            {/* ── Stats strip ─────────────────────────────────────────────── */}
+            {!loading && total > 0 && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.15 }}
+                    className="grid grid-cols-3 gap-2"
+                >
+                    {[
+                        { label: 'Total', value: total, icon: <Target className="w-3.5 h-3.5" /> },
+                        { label: 'Completadas', value: completed, icon: <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> },
+                        { label: 'Restantes', value: total - completed, icon: <Circle className="w-3.5 h-3.5 text-white/30" /> },
+                    ].map(stat => (
                         <div
-                            key={task.id}
-                            className="flex items-center gap-3 p-2 rounded hover:bg-secondary/50 transition-colors"
+                            key={stat.label}
+                            className="flex flex-col gap-1 px-4 py-3 rounded-2xl border border-white/[0.06]"
+                            style={{ background: 'rgba(255,255,255,0.015)' }}
                         >
-                            <Checkbox
-                                checked={task.completed}
-                                onCheckedChange={() => onToggle(task)}
-                            />
-                            <div className="flex-1">
-                                <div className={`${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                    {getSourceIcon(task.source)} {task.text}
-                                </div>
-                                {task.metadata && (
-                                    <div className="text-xs text-muted-foreground">
-                                        {task.metadata.routineName || task.metadata.projectTitle || task.metadata.courseCode}
-                                    </div>
-                                )}
-                            </div>
-                            <Badge
-                                variant="outline"
-                                className={getPriorityColor(task.priority)}
-                            >
-                                {task.priority}
-                            </Badge>
+                            <span className="text-white/30 flex items-center gap-1">{stat.icon}
+                                <span className="text-[9px] font-black tracking-widest uppercase">{stat.label}</span>
+                            </span>
+                            <span className="text-xl font-black text-white/80 tabular-nums">{stat.value}</span>
                         </div>
                     ))}
-                </div>
-            </CardContent>
-        </Card>
+                </motion.div>
+            )}
+
+            {/* ── Loading skeleton ─────────────────────────────────────────── */}
+            {loading && <TodaySkeleton />}
+
+            {/* ── Urgent banner ────────────────────────────────────────────── */}
+            {!loading && urgentItems.length > 0 && (
+                <UrgentBanner items={urgentItems} />
+            )}
+
+            {/* ── Task sections ────────────────────────────────────────────── */}
+            {!loading && groups.map((g, i) => (
+                <motion.div
+                    key={g.key}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                >
+                    <SectionCard sectionKey={g.key} tasks={g.tasks} onToggle={handleToggle} />
+                </motion.div>
+            ))}
+
+            {/* ── Empty state ──────────────────────────────────────────────── */}
+            {!loading && total === 0 && (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center py-24 gap-4 text-center"
+                >
+                    <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <CheckCircle2 className="w-7 h-7 text-primary" />
+                    </div>
+                    <div>
+                        <p className="text-base font-bold text-white/70">Todo al día</p>
+                        <p className="text-xs text-white/30 mt-1">No tienes tareas pendientes para hoy 🎉</p>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Bottom padding for mobile nav */}
+            <div className="h-4" />
+        </div>
     );
 }

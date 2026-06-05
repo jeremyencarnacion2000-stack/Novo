@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import '@testing-library/jest-dom';
 import fetch from 'node-fetch';
 

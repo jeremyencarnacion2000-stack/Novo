@@ -7,10 +7,10 @@ import { FocusProvider, useFocus } from '@/lib/focus-context'
 window.HTMLMediaElement.prototype.play = jest.fn()
 
 const TestComponent = () => {
-    const { setIsFocusModeActive } = useFocus()
+    const { toggleTimer } = useFocus()
     return (
         <div>
-            <button onClick={() => setIsFocusModeActive(true)}>Activate</button>
+            <button onClick={() => toggleTimer()}>Activate</button>
             <FocusTimerWidget />
         </div>
     )

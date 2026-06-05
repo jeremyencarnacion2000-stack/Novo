@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { emitTwinSignal } from '@/lib/twin-signal'
 
 // POST - Log a routine completion
 export async function POST(request: NextRequest) {
@@ -46,6 +47,20 @@ export async function POST(request: NextRequest) {
                 scheduledDay: todayDay,
             },
         })
+
+        // Track analytics
+        const { trackServerCompletion } = await import('@/lib/analytics-server')
+        await trackServerCompletion(user.id, 'routine', 'routines', {
+            routineId,
+            routineName: routine.name,
+            tasksCompleted: tasksCompleted || 0,
+            tasksTotal: tasksTotal || 0
+        })
+
+        // Emit behavioral signal: completed if >50% tasks done, skipped if 0% (fire-and-forget)
+        const completedRatio = tasksTotal > 0 ? (tasksCompleted || 0) / tasksTotal : 0
+        const signalType = completedRatio === 0 ? 'routine_skipped' : 'routine_completed'
+        emitTwinSignal({ userId: user.id, signal: signalType })
 
         return NextResponse.json(completion)
     } catch (error) {

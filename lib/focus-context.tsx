@@ -253,9 +253,22 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
 
   const saveFocusSession = async (duration: number) => {
     if (!session?.user?.id) return
+    const durationMins = Math.round(duration / 60)
+    if (durationMins < 1) return // ignore accidental sub-minute sessions
 
     try {
-      await fetch('/api/analytics', {
+      // Emit to twin evolution engine (persists FocusSession + fires twin.signal)
+      fetch('/api/focus-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'finished',
+          duration: durationMins,
+        })
+      }).catch(() => {})
+
+      // Legacy analytics event (kept for backward compatibility)
+      fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -265,7 +278,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
           module: `focus-${mode}`,
           metadata: { duration, profileId: activeProfileId, taskId: selectedTaskId }
         })
-      })
+      }).catch(() => {})
     } catch (error) {
       console.error('Failed to save focus session:', error)
     }
@@ -273,7 +286,14 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
 
   // Actions
   const toggleTimer = () => {
-    if (isActive && sessionStartTime) {
+    if (!isActive) {
+      // Starting — emit focus_started signal
+      fetch('/api/focus-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'started' })
+      }).catch(() => {})
+    } else if (isActive && sessionStartTime) {
       // Stopping: save partial time
       const actualDuration = Math.floor((Date.now() - sessionStartTime) / 1000)
       if (actualDuration > 0) saveFocusSession(actualDuration)

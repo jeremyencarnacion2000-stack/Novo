@@ -12,4 +12,5 @@ export interface AnalyticsData {
     goalsAchieved: number
     goalCompletionRate: number
     goalTrend: number
+    streak?: number
 }

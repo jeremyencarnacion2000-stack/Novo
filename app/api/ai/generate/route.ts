@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { groqAPI } from '@/lib/groq';
-import { SYSTEM_PROMPT, COGNITIVE_CORE_PROMPT, SYSTEM_AGENT_PROMPT, HYBRID_PROMPT } from '@/lib/ai/system-prompt';
-import { classifyIntent, requiresSystemContext } from '@/lib/ai/classifier';
+import { CONVERSATION_PROMPT, ACTION_PROMPT, KNOWLEDGE_PROMPT } from '@/lib/ai/system-prompt';
+import { routeIntent, IntentType } from '@/lib/ai/router';
 import { buildUserContext } from '@/lib/ai/context-builder';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -84,10 +84,18 @@ function normalizeHistory(history: any[]): any[] {
 async function callModelWithFallback(
   message: string,
   history: any[],
-  systemPrompt: string
+  systemPrompt: string,
+  requestedModel?: string
 ): Promise<{ content: string; model: string }> {
 
-  const availableModels = getAvailableModels();
+  let availableModels = getAvailableModels();
+
+  if (requestedModel && requestedModel !== 'auto') {
+    const matched = availableModels.find(m => m.name === requestedModel || m.modelId === requestedModel);
+    if (matched) {
+      availableModels = [matched, ...availableModels.filter(m => m.modelId !== matched.modelId)];
+    }
+  }
 
   if (availableModels.length === 0) {
     throw new Error('No AI models configured. Add GROQ_API_KEY to environment.');
@@ -168,57 +176,263 @@ function normalizeResponse(content: string): string {
 }
 
 // =============================================================================
-// MAIN HANDLER
+// MAIN HANDLER & ANTI-HALLUCINATION GUARDRAILS
 // =============================================================================
 
+import { prisma } from '@/lib/prisma';
+
+async function validateAndSanitizeAction(action: any, userId: string): Promise<any> {
+  if (!action || !action.type) return action;
+  
+  const type = String(action.type).toUpperCase();
+  const payload = action.payload || {};
+
+  console.log(`[Anti-Hallucination] Validating action ${type} for user ${userId}`);
+
+  // 1. Validate TASK mutations (UPDATE/DELETE)
+  if (type === 'UPDATE_TASK' || type === 'DELETE_TASK') {
+    if (!payload.id) {
+      console.warn(`[Anti-Hallucination] Task action lacks ID, attempting fallback match by title: ${payload.title}`);
+      if (payload.title) {
+        const found = await prisma.task.findFirst({
+          where: { userId, title: { contains: payload.title } }
+        });
+        if (found) {
+          payload.id = found.id;
+          console.log(`[Anti-Hallucination] Matched task ID: ${found.id}`);
+        }
+      }
+    } else {
+      const exists = await prisma.task.findFirst({
+        where: { id: payload.id, userId }
+      });
+      if (!exists) {
+        console.warn(`[Anti-Hallucination] Task ID ${payload.id} does not exist. Trying title match.`);
+        if (payload.title) {
+          const found = await prisma.task.findFirst({
+            where: { userId, title: { contains: payload.title } }
+          });
+          if (found) {
+            payload.id = found.id;
+          } else {
+            // Convert update to create to prevent crash and preserve user request
+            if (type === 'UPDATE_TASK') {
+              console.log(`[Anti-Hallucination] Task not found. Converting UPDATE to CREATE.`);
+              action.type = 'CREATE_TASK';
+            } else {
+              action.type = 'SYSTEM_QUERY'; // Neutral safe action
+            }
+          }
+        } else {
+          action.type = 'SYSTEM_QUERY';
+        }
+      }
+    }
+  }
+
+  // 2. Validate ROUTINE mutations
+  if (type === 'UPDATE_ROUTINE' || type === 'DELETE_ROUTINE') {
+    if (payload.id) {
+      const exists = await prisma.routine.findFirst({
+        where: { id: payload.id, userId }
+      });
+      if (!exists) {
+        console.warn(`[Anti-Hallucination] Routine ID ${payload.id} does not exist.`);
+        if (payload.name) {
+          const found = await prisma.routine.findFirst({
+            where: { userId, name: { contains: payload.name } }
+          });
+          if (found) {
+            payload.id = found.id;
+          } else {
+            action.type = 'SYSTEM_QUERY';
+          }
+        } else {
+          action.type = 'SYSTEM_QUERY';
+        }
+      }
+    }
+  }
+
+  // 3. Validate Cognitive State Updates
+  if (type === 'UPDATE_COGNITIVE_STATE') {
+    // Standardize fatigue levels
+    if (payload.fatigueEstimate) {
+      const normalized = String(payload.fatigueEstimate).toLowerCase();
+      if (normalized.includes('crit') || normalized.includes('alarm')) {
+        payload.fatigueEstimate = 'critical';
+      } else if (normalized.includes('hi') || normalized.includes('alt')) {
+        payload.fatigueEstimate = 'high';
+      } else if (normalized.includes('med') || normalized.includes('mod')) {
+        payload.fatigueEstimate = 'medium';
+      } else {
+        payload.fatigueEstimate = 'low';
+      }
+    }
+
+    // Keep productivityScore bounded
+    if (payload.productivityScore !== undefined) {
+      let score = Number(payload.productivityScore);
+      if (isNaN(score)) score = 8.0;
+      if (score < 0) score = 0;
+      if (score > 100) score = 100;
+      payload.productivityScore = score;
+    }
+
+    // Keep focusTimeToday bounded
+    if (payload.focusTimeToday !== undefined) {
+      let focus = Number(payload.focusTimeToday);
+      if (isNaN(focus) || focus < 0) focus = 0;
+      payload.focusTimeToday = focus;
+    }
+  }
+
+  // 4. Validate Pipeline sub-actions recursively
+  if (type === 'COGNITIVE_PIPELINE' && Array.isArray(payload.actions)) {
+    for (let i = 0; i < payload.actions.length; i++) {
+      payload.actions[i] = await validateAndSanitizeAction(payload.actions[i], userId);
+    }
+  }
+
+  action.payload = payload;
+  return action;
+}
+
 export async function POST(request: NextRequest) {
+  console.log('[AI API] Incoming POST request to /api/ai/generate');
   try {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id || 'demo-user-id';
-    const { message, history, webSearchEnabled } = await request.json();
+    const body = await request.json();
+    console.log('[AI API] Payload:', JSON.stringify(body));
+    const { message, history, webSearchEnabled, model: requestedModel } = body;
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Classify Intent
-    const classification = classifyIntent(message);
-    console.log('[AI] Intent:', classification.type);
+    // Classify Intent using the deterministic router
+    const classification = await routeIntent(message);
+    console.log('[AI] Intent:', classification.type, '| Confidence:', classification.confidence, '| Reason:', classification.reasoning);
 
-    // Build Context
-    let userContext = '';
-    if (requiresSystemContext(classification)) {
-      try {
-        const context = await buildUserContext(userId);
-        userContext = context.summary;
-      } catch (e) { console.error('[AI] Context error:', e); }
+    // =========================================================================
+    // GENERATE_FILE SHORT-CIRCUIT: Skip AI model, auto-execute, return SSE
+    // =========================================================================
+    if (classification.type === 'GENERATE_FILE') {
+      console.log('[AI] GENERATE_FILE short-circuit: bypassing model, auto-executing');
+
+      // Extract context from conversation history
+      const lastAssistantMsg = (history || [])
+        .filter((m: any) => m.role === 'assistant')
+        .pop();
+      const previousContent = lastAssistantMsg?.content || '';
+
+      // Check if there's HTML in previous messages
+      const htmlInHistory = previousContent.match(/```html\s*([\s\S]*?)```/);
+      const existingContent = htmlInHistory ? htmlInHistory[1].trim() : '';
+
+      const description = existingContent
+        ? `Genera un documento basado en este contenido previo: ${previousContent.slice(0, 500)}`
+        : message;
+
+      // Only short-circuit if we actually have content to work with, otherwise let the model generate it
+      if (!existingContent && classification.confidence < 1.0) {
+        console.log('[AI] GENERATE_FILE short-circuit skipped: no existing content found for "create from previous" request');
+      } else if (existingContent || classification.confidence >= 0.9) {
+        const autoAction = {
+          type: 'GENERATE_FILE' as const,
+          payload: {
+            filename: existingContent ? 'documento.html' : 'nuevo_documento.html',
+            content: existingContent,
+            mimeType: 'text/html' as const,
+            description: description.slice(0, 500),
+          }
+        };
+
+        try {
+          const { executeAIAction } = await import('@/lib/ai/executor');
+          const execResult = await executeAIAction(autoAction, userId);
+
+          // Build a structured JSON that context.tsx can parse from the SSE stream
+          const resultJson = {
+            analysis: 'Procesando solicitud de generación de archivo mediante acceso interno al sistema.',
+            plan: execResult.metadata?.steps || [
+              { id: '1', label: 'Iniciando proceso de generación', status: 'completed' },
+              { id: '2', label: 'Ejecutando generador de Novo', status: 'completed' }
+            ],
+            action: {
+              type: 'GENERATE_FILE',
+              payload: autoAction.payload,
+              _executed: true,
+              _result: {
+                success: execResult.success,
+                message: execResult.message,
+                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
+              }
+            },
+            message: execResult.success
+              ? `${execResult.message || 'He generado tu archivo.'}`
+              : `Hubo un error al generar el archivo: ${execResult.error || 'Error desconocido'}`
+          };
+
+          // Return as SSE stream so context.tsx can read it
+          const encoder = new TextEncoder();
+          const jsonStr = JSON.stringify(resultJson);
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: jsonStr })}\n\n`));
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            }
+          });
+
+          return new Response(stream, {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+            }
+          });
+        } catch (e) {
+          console.error('[AI] GENERATE_FILE short-circuit failed:', e);
+        }
+      }
     }
 
-    // Select Prompt
+    // Build Context
+    let userContextStr = '';
+    try {
+      const context = await buildUserContext(userId);
+      userContextStr = context.summary;
+    } catch (e) { console.error('[AI] Context error:', e); }
+
+    // Select Prompt based on intent (unified 3-layer system)
     let selectedPrompt: string;
     let expectStructured = false;
 
     switch (classification.type) {
-      case 'GENERAL_KNOWLEDGE':
-        selectedPrompt = COGNITIVE_CORE_PROMPT;
+      case 'KNOWLEDGE_RAG':
+        selectedPrompt = KNOWLEDGE_PROMPT;
         break;
-      case 'SYSTEM_ACTION':
-      case 'SYSTEM_QUERY':
-        selectedPrompt = SYSTEM_AGENT_PROMPT;
+      case 'UI_COMMAND':
+      case 'SIMPLE_TASK':
+      case 'DOCUMENT_CREATION':
+      case 'SCHEDULE_ACTION':
+      case 'GENERATE_FILE':
+      case 'COMPLEX_PLANNING':
+      case 'COGNITIVE_AUTOMATION':
+        selectedPrompt = ACTION_PROMPT;
         expectStructured = true;
         break;
-      case 'MIXED':
-        selectedPrompt = HYBRID_PROMPT;
-        expectStructured = classification.confidence >= 0.7;
-        break;
+      case 'CONVERSATION':
       default:
-        selectedPrompt = SYSTEM_PROMPT;
-        expectStructured = true;
+        selectedPrompt = CONVERSATION_PROMPT;
+        expectStructured = false;
     }
 
-    // Enhance with web search
+    // Enhance with web search (only for Knowledge or Conversation where relevant, simple heuristic)
     let enhancedMessage = message;
-    if (webSearchEnabled) {
+    if (webSearchEnabled && (classification.type === 'KNOWLEDGE_RAG' || classification.type === 'CONVERSATION')) {
       try {
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         const res = await fetch(`${baseUrl}/api/ai/web-search`, {
@@ -241,21 +455,21 @@ export async function POST(request: NextRequest) {
     // Build final prompt
     const now = new Date();
     const timeCtx = `Time: ${now.toLocaleTimeString('en-US')}\nDate: ${now.toLocaleDateString('en-US')}`;
-    const finalPrompt = `${selectedPrompt}\n\nCONTEXT:\n${timeCtx}\n${userContext}`;
+    const finalPrompt = `${selectedPrompt}\n\nCOGNITIVE CONTEXT (JSON):\n${userContextStr}\n\nCurrent Time Info:\n${timeCtx}`;
 
     // Call AI
-    const result = await callModelWithFallback(enhancedMessage, history || [], finalPrompt);
+    const result = await callModelWithFallback(enhancedMessage, history || [], finalPrompt, requestedModel);
     let content = normalizeResponse(result.content);
 
     // Return based on intent
-    if (classification.type === 'GENERAL_KNOWLEDGE' && !expectStructured) {
+    if (classification.type === 'CONVERSATION' || classification.type === 'KNOWLEDGE_RAG') {
       return NextResponse.json({
         content,
-        metadata: { intentType: classification.type, model: result.model }
+        metadata: { intentType: classification.type, model: result.model, reasoning: classification.reasoning }
       });
     }
 
-    // Try JSON parse
+    // Attempt to parse JSON for structured intents
     let parsed;
     try {
       const match = content.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -264,9 +478,53 @@ export async function POST(request: NextRequest) {
         const i = content.indexOf('{'), j = content.lastIndexOf('}');
         if (i !== -1 && j > i) parsed = JSON.parse(content.substring(i, j + 1));
       }
-    } catch (e) { /* not JSON */ }
+    } catch (e) {
+      console.error("Failed to parse expected structured output", content);
+    }
+
+    if (classification.type === 'COMPLEX_PLANNING' && parsed && parsed.phases) {
+      return NextResponse.json({
+        content: `Here is a proposed plan for "${parsed.project_title}". Please review and approve it.`,
+        blocks: [
+          { id: crypto.randomUUID(), type: 'plan_preview', content: parsed, status: 'waiting' }
+        ],
+        metadata: { intentType: classification.type, model: result.model }
+      });
+    }
 
     if (parsed) {
+      // 1. Run the Anti-Hallucination & Anti-Deception validation middleware!
+      if (parsed.action) {
+        parsed.action = await validateAndSanitizeAction(parsed.action, userId);
+      }
+
+      const actionType = (parsed.action?.type || '').toUpperCase();
+
+      // 2. Auto-execute GENERATE_FILE or COGNITIVE_AUTOMATION actions
+      if (actionType === 'GENERATE_FILE' || actionType === 'UPDATE_COGNITIVE_STATE' || actionType === 'COGNITIVE_PIPELINE' || classification.type === 'COGNITIVE_AUTOMATION') {
+        try {
+          const { executeAIAction } = await import('@/lib/ai/executor');
+          const execResult = await executeAIAction(parsed.action, userId);
+          return NextResponse.json({
+            content: parsed.message || execResult.message || 'He realizado los cambios en tu estado cognitivo.',
+            blocks: [
+              parsed.analysis ? { id: crypto.randomUUID(), type: 'analysis', content: parsed.analysis, isVisible: true } : null,
+              {
+                id: crypto.randomUUID(),
+                type: 'result',
+                content: execResult.message || 'Calibración cognitiva realizada con éxito.',
+                status: execResult.success ? 'success' : 'failed',
+                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}), ...(execResult.payload || {}) }
+              },
+            ].filter(Boolean),
+            metadata: { intentType: classification.type, model: result.model }
+          });
+        } catch (e) {
+          console.error('[AI] Auto-execute failed:', e);
+        }
+      }
+
+      // All other actions: show confirmation
       return NextResponse.json({
         content: parsed.message || '',
         blocks: [
@@ -276,6 +534,50 @@ export async function POST(request: NextRequest) {
         ].filter(Boolean),
         metadata: { intentType: classification.type, model: result.model }
       });
+    }
+
+    // Fallback: if GENERATE_FILE intent but AI returned text instead of JSON, auto-execute
+    if (classification.type === 'GENERATE_FILE' && !parsed) {
+      const htmlMatch = content.match(/```(?:html)?\s*([\s\S]*?)```/i);
+      const fileContent = htmlMatch ? htmlMatch[1].trim() : (content.includes('<html>') ? content.trim() : '');
+      const description = message.slice(0, 200);
+
+      const autoAction = {
+        type: 'GENERATE_FILE' as const,
+        payload: {
+          filename: 'documento.html',
+          content: fileContent,
+          mimeType: 'text/html',
+          description: description,
+        }
+      };
+
+      try {
+        const { executeAIAction } = await import('@/lib/ai/executor');
+        const execResult = await executeAIAction(autoAction, userId);
+        return NextResponse.json({
+          content: execResult.message || 'Archivo generado.',
+          blocks: [
+            {
+              id: crypto.randomUUID(),
+              type: 'result',
+              content: execResult.message || 'Archivo listo.',
+              status: execResult.success ? 'success' : 'failed',
+              metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
+            },
+          ],
+          metadata: { intentType: classification.type, model: result.model }
+        });
+      } catch (e) {
+        console.error('[AI] Auto-execute GENERATE_FILE fallback failed:', e);
+        return NextResponse.json({
+          content: 'Generando archivo...',
+          blocks: [
+            { id: crypto.randomUUID(), type: 'confirmation', content: autoAction, status: 'waiting', actionId: crypto.randomUUID() },
+          ],
+          metadata: { intentType: classification.type, model: result.model }
+        });
+      }
     }
 
     return NextResponse.json({
@@ -291,3 +593,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

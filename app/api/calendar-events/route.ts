@@ -42,21 +42,25 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // 2. School Events
-    const subjects = await prisma.schoolSubject.findMany({
+    // 2. School Courses
+    const courses = await prisma.course.findMany({
       where: { userId: session.user.id },
-      include: { events: true }
+      include: { grades: true }
     })
-    subjects.forEach((subject) => {
-      if (subject.events) {
-        subject.events.forEach((event) => {
+    courses.forEach((course) => {
+      // Courses don't have events in this schema, but we can add the course itself
+      // or its grades as events if they have dates.
+      // For now, let's just use the course if it has a specific date (it doesn't in schema)
+      // or grades.
+      if (course.grades) {
+        course.grades.forEach((grade: any) => {
           events.push({
-            id: `school-${event.id}`,
-            title: `${subject.name}: ${event.title}`,
-            date: parseISO(event.date),
-            type: 'school',
-            completed: event.completed,
-            metadata: { type: event.type }
+            id: `school-${grade.id}`,
+            title: `${course.name}: ${grade.name}`,
+            date: grade.date, // grade.date is already a Date in Prisma
+            type: 'school' as any,
+            completed: true,
+            metadata: { score: grade.score }
           })
         })
       }

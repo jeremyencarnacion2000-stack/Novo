@@ -6,9 +6,10 @@ import { authOptions } from '@/lib/auth';
 // PUT /api/school/grades/[id] - Update grade
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
@@ -28,7 +29,7 @@ export async function PUT(
 
         const grade = await prisma.grade.findFirst({
             where: {
-                id: params.id,
+                id,
                 userId: user.id,
             },
         });
@@ -38,7 +39,7 @@ export async function PUT(
         }
 
         const updated = await prisma.grade.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 name: name ?? grade.name,
                 score: score !== undefined ? parseFloat(score) : grade.score,
@@ -62,9 +63,10 @@ export async function PUT(
 // DELETE /api/school/grades/[id] - Delete grade
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
@@ -81,7 +83,7 @@ export async function DELETE(
 
         const grade = await prisma.grade.findFirst({
             where: {
-                id: params.id,
+                id,
                 userId: user.id,
             },
         });
@@ -91,7 +93,7 @@ export async function DELETE(
         }
 
         await prisma.grade.delete({
-            where: { id: params.id },
+            where: { id },
         });
 
         return NextResponse.json({ success: true });

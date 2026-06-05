@@ -235,13 +235,14 @@ interface Conflict {
 
 // Types for our integrated data
 export interface IntegratedTask extends ChecklistItem {
-  source: "manual" | "routine" | "project" | "standalone" | "project-task"
-  sourceId?: string // ID of the routine, project, or subject
+  source: "manual" | "routine" | "project" | "standalone" | "project-task" | "school"
+  sourceId?: string | null // ID of the routine, project, or subject
   originalId?: string // ID of the task within the source
-  task?: Task // For linked tasks
+  task?: Task | null // For linked tasks
   metadata?: {
     routineName?: string
     projectName?: string
+    subjectName?: string
     dueDate?: string
   }
 }
@@ -766,6 +767,28 @@ export const DataIntegrator = {
       console.error('Failed to fetch tasks:', error)
     }
 
+    try {
+      // 5. Get School Tasks (Assignments/Grades)
+      const courses = await fetchWithCache<any[]>('/api/school/courses', userId, 'school-courses')
+      courses.forEach((course: any) => {
+        // Example: Add a task for each course to "Review [Course Name]"
+        tasks.push({
+          id: `school-${course.id}`,
+          text: `Review ${course.name}`,
+          completed: false, // Local state or derived?
+          priority: 'medium',
+          source: 'school',
+          sourceId: course.id,
+          metadata: {
+            subjectName: course.name,
+            dueDate: new Date().toISOString()
+          }
+        })
+      })
+    } catch (error) {
+      console.error('Failed to fetch school tasks:', error)
+    }
+
     return tasks
   },
 
@@ -927,6 +950,16 @@ export const DataIntegrator = {
           )
           await setCachedData('tasks', userId, updatedTasks)
         }
+      } else if (task.source === "school") {
+        // School sync logic placeholder - usually schools tasks are grades or assignments
+        // For now just update local cache
+        const courses = await getCachedData<any[]>('school-courses', userId)
+        if (courses) {
+          const updatedCourses = courses.data.map(c =>
+            c.id === task.sourceId ? { ...c, lastReviewed: new Date().toISOString() } : c
+          )
+          await setCachedData('school-courses', userId, updatedCourses)
+        }
       }
     } catch (error) {
       console.error('Failed to sync task completion:', error)
@@ -934,6 +967,7 @@ export const DataIntegrator = {
 
     return updatedTask
   },
+
 
   // Create a new manual task
   createManualTask: async (userId: string, taskData: any) => {

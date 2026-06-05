@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { executeAIAction } from '../executor';
 import { prisma } from '@/lib/prisma';
 

@@ -115,6 +115,7 @@ export async function PUT(
             data: {
               routineId: id,
               name: day.name,
+              weekday: day.weekday,
               order: index,
               exercises: {
                 create: day.exercises.map((ex: any, exIndex: number) => ({

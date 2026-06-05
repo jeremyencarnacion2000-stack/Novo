@@ -11,12 +11,17 @@
 export type IntentType =
     | 'GENERAL'             // General knowledge or conversation
     | 'STUDY'               // Study, explanation, or learning
+    | 'CODE'                // Programming / coding request
+    | 'QUIZ'                // Quiz / exam / test generation
+    | 'DESIGN'              // UI design / web page / creative design
+    | 'CREATIVE'            // Creative writing, brainstorming
     | 'TASK'                // Task-related action or instruction
     | 'ROUTINE'             // Routine-related action or instruction
     | 'ROUTINE_EXPLORATION' // Wanting to start training/routine
     | 'PROJECT'             // Project-related action or instruction
     | 'SYSTEM_META'          // System-related meta interaction
     | 'CRITICAL_ACTION'     // Dangerous actions like deletion
+    | 'COGNITIVE'           // Cognitive, fatigue, productivity, or styling context
     | 'MIXED';              // Combination (legacy/mixed)
 
 export type SystemEntity =
@@ -59,6 +64,48 @@ const STUDY_KEYWORDS = [
     'what is', 'explain', 'how does', 'why', 'define', 'meaning'
 ];
 
+// Code / Programming keywords
+const CODE_KEYWORDS = [
+    'programa', 'codigo', 'code', 'function', 'funcion', 'clase', 'class',
+    'api', 'endpoint', 'script', 'html', 'css', 'javascript', 'typescript',
+    'python', 'react', 'next', 'component', 'componente', 'variable',
+    'loop', 'array', 'object', 'database', 'sql', 'json', 'fetch',
+    'programar', 'programame', 'codear', 'codeame', 'codificar',
+    'desarrollar', 'desarrolla', 'debuggear', 'debug', 'compilar',
+    'algoritmo', 'algorithm', 'deploy', 'servidor', 'server',
+    'backend', 'frontend', 'fullstack', 'web app', 'webapp',
+    'calculadora', 'calculator', 'landing', 'todo list', 'todolist',
+    'login', 'signup', 'crud', 'dashboard', 'app',
+    'pagina web', 'pagina', 'sitio web', 'website'
+];
+
+// Quiz / Educational keywords
+const QUIZ_KEYWORDS = [
+    'quiz', 'examen', 'test', 'trivia', 'pregunta', 'preguntas',
+    'cuestionario', 'evaluacion', 'prueba', 'respuestas',
+    'opcion multiple', 'multiple choice', 'flashcard', 'flashcards',
+    'exam', 'questionnaire', 'assessment'
+];
+
+// Design keywords
+const DESIGN_KEYWORDS = [
+    'diseña', 'diseno', 'design', 'ui', 'ux', 'interfaz', 'interface',
+    'maqueta', 'mockup', 'prototipo', 'prototype', 'wireframe',
+    'layout', 'estilo', 'style', 'animacion', 'animation',
+    'responsivo', 'responsive', 'tema', 'theme', 'paleta', 'palette',
+    'tipografia', 'typography', 'iconos', 'icons'
+];
+
+// Cognitive, fatigue, sleep, and styling keywords
+const COGNITIVE_KEYWORDS = [
+    'fatiga', 'cansado', 'cansada', 'cansancio', 'agotado', 'agotada', 'abrumado', 'abrumada', 'estres', 'estresado',
+    'estresada', 'stress', 'sueño', 'dormir', 'durmiendo', 'dormi', 'insomnio', 'fatigue', 'tired', 'exhausted',
+    'sleepy', 'focus', 'concentrado', 'concentracion', 'productivo', 'productividad', 'productivity',
+    'outfit', 'vestimenta', 'ropa', 'recomienda ropa', 'que me pongo', 'vestir', 'style', 'estilo', 'look',
+    'musica', 'cancion', 'canciones', 'recomienda musica', 'ambient', 'binaural', 'focus music', 'relaxing',
+    'calma', 'calmar', 'relajar', 'recuperar', 'recuperacion', 'recovery', 'descanso', 'descansar'
+];
+
 /**
  * Classifies user intent based on message content
  * Follows the definitive "Novo Brain" specification.
@@ -82,21 +129,45 @@ export function classifyIntent(message: string): IntentClassification {
     if (lowerMessage.includes('habito') || lowerMessage.includes('habit')) entities.push('habit');
     if (lowerMessage.includes('nota') || lowerMessage.includes('note')) entities.push('note');
 
-    // 4. Detect Exploration
+    // 4. Detect Code intent
+    const isCode = CODE_KEYWORDS.some(kw => lowerMessage.includes(kw));
+
+    // 5. Detect Quiz intent
+    const isQuiz = QUIZ_KEYWORDS.some(kw => lowerMessage.includes(kw));
+
+    // 6. Detect Design intent
+    const isDesign = DESIGN_KEYWORDS.some(kw => lowerMessage.includes(kw));
+
+    // 6b. Detect Cognitive intent
+    const isCognitive = COGNITIVE_KEYWORDS.some(kw => lowerMessage.includes(kw));
+
+    // 7. Detect Exploration
     const explorationKeywords = ['quiero empezar', 'quiero entrenar', 'want to start', 'want to train'];
     const isExploration = explorationKeywords.some(kw => lowerMessage.includes(kw));
 
-    // 5. Detect Study Keywords
+    // 8. Detect Study Keywords
     const studyKeywords = ['que es', 'explicame', 'como', 'por que', 'define', 'what is', 'explain', 'how', 'why'];
     const isStudy = studyKeywords.some(kw => lowerMessage.startsWith(kw) || lowerMessage.includes(' ' + kw));
 
-    // 6. Classification Logic
+    // 9. Classification Logic — specialized intents take priority
     let intentType: IntentType = 'GENERAL';
     let confidence = 0.5;
 
     if (isCritical && entities.length > 0) {
         intentType = 'CRITICAL_ACTION';
         confidence = 0.95;
+    } else if (isCognitive) {
+        intentType = 'COGNITIVE';
+        confidence = 0.95;
+    } else if (isQuiz) {
+        intentType = 'QUIZ';
+        confidence = 0.92;
+    } else if (isCode) {
+        intentType = 'CODE';
+        confidence = 0.92;
+    } else if (isDesign) {
+        intentType = 'DESIGN';
+        confidence = 0.90;
     } else if (isExploration) {
         intentType = 'ROUTINE_EXPLORATION';
         confidence = 0.9;
@@ -124,7 +195,7 @@ export function classifyIntent(message: string): IntentClassification {
  * Determines if a message requires system context injection
  */
 export function requiresSystemContext(classification: IntentClassification): boolean {
-    return classification.type !== 'GENERAL_KNOWLEDGE' ||
+    return classification.type !== 'GENERAL' ||
         classification.entities.length > 0;
 }
 
@@ -132,6 +203,7 @@ export function requiresSystemContext(classification: IntentClassification): boo
  * Determines if the response should use structured JSON format
  */
 export function requiresStructuredResponse(classification: IntentClassification): boolean {
-    return classification.type === 'SYSTEM_ACTION' ||
+    return classification.type === 'TASK' ||
+        classification.type === 'COGNITIVE' ||
         (classification.type === 'MIXED' && classification.confidence >= 0.7);
 }

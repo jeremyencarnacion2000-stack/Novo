@@ -21,7 +21,12 @@ export type AIActionType =
     | 'DELETE_COURSE'
     | 'ADD_GRADE'
     | 'UPDATE_GRADE'
-    | 'DELETE_GRADE';
+    | 'DELETE_GRADE'
+    | 'CREATE_CHECKLIST'
+    | 'CREATE_HABIT'
+    | 'GENERATE_FILE'
+    | 'UPDATE_COGNITIVE_STATE'
+    | 'COGNITIVE_PIPELINE';
 
 export interface BaseAction {
     type: AIActionType;
@@ -274,12 +279,51 @@ export interface DeleteGradeAction extends BaseAction {
     };
 }
 
+export interface UpdateCognitiveStateAction extends BaseAction {
+    type: 'UPDATE_COGNITIVE_STATE';
+    payload: {
+        fatigueEstimate?: 'low' | 'medium' | 'high' | 'critical';
+        productivityScore?: number;
+        focusTimeToday?: number;
+        moodSignal?: string;
+        triggerRecovery?: boolean;
+        musicRecommendation?: {
+            mood: string;
+            searchQuery: string;
+        };
+        styleRecommendation?: {
+            context: string;
+            suggestion: string;
+            colorPsychology: string;
+        };
+    };
+}
+
+export interface CognitivePipelineAction extends BaseAction {
+    type: 'COGNITIVE_PIPELINE';
+    payload: {
+        actions: Array<{
+            type: AIActionType;
+            payload: any;
+        }>;
+    };
+}
+
 // --- System Query ---
 export interface SystemQueryAction extends BaseAction {
     type: 'SYSTEM_QUERY';
     payload: {
         entity: 'routines' | 'tasks' | 'workouts' | 'notes' | 'stats' | 'projects' | 'courses' | 'grades';
         filters?: Record<string, any>;
+    };
+}
+
+export interface GenerateFileAction extends BaseAction {
+    type: 'GENERATE_FILE';
+    payload: {
+        filename: string;
+        content: string;
+        mimeType: string;
     };
 }
 
@@ -306,4 +350,8 @@ export type AIAction =
     | DeleteCourseAction
     | AddGradeAction
     | UpdateGradeAction
-    | DeleteGradeAction;
+    | DeleteGradeAction
+    | GenerateFileAction
+    | UpdateCognitiveStateAction
+    | CognitivePipelineAction;
+

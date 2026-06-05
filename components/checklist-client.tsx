@@ -26,10 +26,28 @@ export default function ChecklistClient() {
     setIsClient(true)
   }, [])
 
-  // Load tasks on mount
+  // Load tasks on mount and listen to voice execution events
   useEffect(() => {
     if (session?.user?.id && isClient) {
       loadTasks()
+
+      const handleVoiceCommand = (e: any) => {
+        const action = e.detail?.action || e.detail?.result?.action
+        if (
+          action === "create_task" ||
+          action === "update_task" ||
+          action === "delete_task" ||
+          action === "defer_task" ||
+          action === "move_task_to_peak"
+        ) {
+          loadTasks()
+        }
+      }
+
+      window.addEventListener("voice-command-executed", handleVoiceCommand)
+      return () => {
+        window.removeEventListener("voice-command-executed", handleVoiceCommand)
+      }
     }
   }, [session?.user?.id, isClient])
 
@@ -55,21 +73,38 @@ export default function ChecklistClient() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (newItemText.trim() && session?.user?.id) {
+      const textToCreate = newItemText
+      const tempId = `temp-${Date.now()}`
+      const optimisticTask: IntegratedTask = {
+        id: tempId,
+        text: textToCreate,
+        completed: false,
+        priority: "medium",
+        source: "manual",
+        userId: session.user.id
+      }
+
+      // Optimistically insert task
+      const previousItems = items
+      setItems(prev => [...prev, optimisticTask])
+      setNewItemText("")
+      toast.success("Task added")
+
       try {
-        await DataIntegrator.createManualTask(session.user.id, {
-          text: newItemText,
+        const createdTask = await DataIntegrator.createManualTask(session.user.id, {
+          text: textToCreate,
           completed: false,
           priority: "medium",
           userId: session.user.id
         })
-
-        setNewItemText("")
-        // We reload tasks to potentially get the real ID if online, 
-        // or just to ensure consistency.
-        loadTasks()
-        toast.success("Task added")
+        
+        // Swap out the temp ID for the server/DB-generated ID to prevent duplicate keys or sync issues
+        if (createdTask?.id) {
+          setItems(prev => prev.map(item => item.id === tempId ? { ...item, id: createdTask.id } : item))
+        }
       } catch (error) {
         console.error('Error adding task:', error)
+        setItems(previousItems)
         toast.error("Failed to add task")
       }
     }
@@ -78,8 +113,17 @@ export default function ChecklistClient() {
   const handleToggleComplete = async (task: IntegratedTask) => {
     if (!session?.user?.id) return
 
+    const nextCompleted = !task.completed;
+
     // Optimistic update
-    setItems(items.map((i) => (i.id === task.id ? { ...i, completed: !i.completed } : i)))
+    setItems(items.map((i) => (i.id === task.id ? { ...i, completed: nextCompleted } : i)))
+
+    if (nextCompleted) {
+      // Dispatch dopamine reward event to ContextHub
+      window.dispatchEvent(new CustomEvent('cognitive:task-completed', {
+        detail: { taskId: task.id, text: task.text }
+      }));
+    }
 
     // Sync with source
     try {
@@ -95,12 +139,16 @@ export default function ChecklistClient() {
     // Only manual tasks can be deleted from here for now
     const task = items.find((i) => i.id === id)
     if (task && task.source === "manual" && session?.user?.id) {
+      const previousItems = items
+      // Optimistic delete
+      setItems(prev => prev.filter(item => item.id !== id))
+      toast.success("Task deleted")
+
       try {
         await DataIntegrator.deleteManualTask(session.user.id, id)
-        loadTasks()
-        toast.success("Task deleted")
       } catch (error) {
         console.error('Error deleting task:', error)
+        setItems(previousItems)
         toast.error("Failed to delete task")
       }
     } else {
@@ -135,7 +183,7 @@ export default function ChecklistClient() {
     if (task.source === "routine") return task.metadata?.routineName
     if (task.source === "project") return task.metadata?.projectName
     if (task.source === "school") return task.metadata?.subjectName
-    if (task.source === "standalone") return "Standalone Task"
+    if (task.source === "standalone" as any) return "Standalone Task"
     return null
   }
 

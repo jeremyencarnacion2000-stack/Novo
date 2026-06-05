@@ -2,34 +2,12 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, Plus } from 'lucide-react';
 import { percentageToLetter } from '@/lib/gpa-calculator';
 
-interface Grade {
-    id: string;
-    name: string;
-    score: number;
-    maxScore: number;
-    weight: number;
-    category: string;
-    date: Date;
-}
-
-interface Course {
-    id: string;
-    name: string;
-    code?: string;
-    credits?: number;
-    semester: string;
-    year: number;
-    professor?: string;
-    color: string;
-    finalGrade?: number;
-    letterGrade?: string;
-    educationType: string;
-    grades: Grade[];
-}
+import { Course, Grade } from '@/types/school';
 
 interface CourseCardProps {
     course: Course;
@@ -128,20 +106,17 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
-                        <div
-                            className="h-full transition-all duration-300"
-                            style={{
-                                width: `${progressWidth}%`,
-                                backgroundColor: course.color,
-                            }}
-                        />
-                    </div>
-
-                    {/* Grades Count */}
-                    <div className="text-xs text-muted-foreground">
-                        {course.grades.length} grade{course.grades.length !== 1 ? 's' : ''} recorded
-                    </div>
+                    {course.grades && course.grades.length > 0 ? (
+                        <div className="space-y-2 mb-4">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                <span>Grades ({course.grades.length})</span>
+                                <span>Latest: {(course.grades[0] as any).score}%</span>
+                            </div>
+                            <Progress value={(course.grades[0] as any).score} className="h-1.5" />
+                        </div>
+                    ) : (
+                        <div className="text-xs text-muted-foreground mb-4">No grades yet</div>
+                    )}
                 </div>
             </CardContent>
         </Card>

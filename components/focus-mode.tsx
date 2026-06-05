@@ -14,12 +14,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { usePomodoro } from '@/lib/pomodoro-context'
 
+import { CloudRain, Coffee, Waves, Trees, Flame } from 'lucide-react'
+
 const AMBIENT_SOUNDS = [
-  { id: 'rain', name: 'Rain', emoji: '🌧️' },
-  { id: 'coffee', name: 'Coffee Shop', emoji: '☕' },
-  { id: 'ocean', name: 'Ocean Waves', emoji: '🌊' },
-  { id: 'forest', name: 'Forest', emoji: '🌲' },
-  { id: 'fire', name: 'Fireplace', emoji: '🔥' },
+  { id: 'rain', name: 'Rain', icon: CloudRain },
+  { id: 'coffee', name: 'Coffee Shop', icon: Coffee },
+  { id: 'ocean', name: 'Ocean Waves', icon: Waves },
+  { id: 'forest', name: 'Forest', icon: Trees },
+  { id: 'fire', name: 'Fireplace', icon: Flame },
 ]
 
 export function FocusMode() {
@@ -189,7 +191,7 @@ export function FocusMode() {
                       onClick={() => setSelectedSound(selectedSound === sound.id ? null : sound.id)}
                       className="justify-start"
                     >
-                      <span className="mr-2">{sound.emoji}</span>
+                      <sound.icon className="h-4 w-4 mr-2" />
                       {sound.name}
                     </Button>
                   ))}
@@ -207,8 +209,9 @@ export function FocusMode() {
                 </div>
 
                 {selectedSound && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    🎵 Reproduciendo: {AMBIENT_SOUNDS.find(s => s.id === selectedSound)?.name}
+                  <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5 animate-pulse" />
+                    Reproduciendo: {AMBIENT_SOUNDS.find(s => s.id === selectedSound)?.name}
                   </p>
                 )}
               </div>

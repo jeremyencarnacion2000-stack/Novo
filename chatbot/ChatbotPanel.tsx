@@ -113,7 +113,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen = false, isFocusMode
         const docRef = await addDoc(collection(db, 'tasks'), task);
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, id: docRef.id } : t));
       } else {
-        await updateDoc(doc(db, 'tasks', task.id), task);
+        await updateDoc(doc(db, 'tasks', task.id), task as any);
       }
     } catch (error) {
       console.error('Error saving task:', error);

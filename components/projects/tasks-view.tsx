@@ -15,11 +15,15 @@ import { toast } from "sonner"
 import { useSession } from "next-auth/react"
 import { DataIntegrator } from "@/lib/data-integrator"
 import { TiltCard } from "@/components/ui/tilt-card"
+import { cn } from "@/lib/utils"
+import { NovoSkeleton } from "@/components/ui/NovoSkeleton"
+import { NovoEmptyState } from "@/components/ui/NovoEmptyState"
+import { AnimatePresence, motion } from "framer-motion"
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
-  { status: "todo", title: "Not Started", color: "bg-secondary text-secondary-foreground" },
-  { status: "in-progress", title: "In Progress", color: "bg-accent text-accent-foreground" },
-  { status: "done", title: "Completed", color: "bg-primary/10 text-primary" },
+  { status: "todo", title: "Not Started", color: "text-muted-foreground" },
+  { status: "in-progress", title: "In Progress", color: "text-accent-foreground" },
+  { status: "done", title: "Completed", color: "text-primary" },
 ]
 
 export function TasksView() {
@@ -29,24 +33,51 @@ export function TasksView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>()
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const loadTasks = async () => {
+    if (!session?.user?.id) return
+    setIsLoading(true)
+    try {
+      const tasksData = await DataIntegrator.getTasks(session.user.id)
+      const tasksArray = Array.isArray(tasksData) ? tasksData : []
+      const parsedTasks = tasksArray.map(task => ({
+        ...task,
+        tags: Array.isArray(task.tags)
+          ? task.tags
+          : typeof task.tags === 'string'
+            ? (task.tags ? JSON.parse(task.tags) : [])
+            : []
+      }))
+      setTasks(parsedTasks)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (session?.user?.id) {
-      DataIntegrator.getTasks(session.user.id)
-        .then((tasksData) => {
-          const tasksArray = Array.isArray(tasksData) ? tasksData : []
-          // Parse tags from JSON string to array and ensure it's always an array
-          const parsedTasks = tasksArray.map(task => ({
-            ...task,
-            tags: Array.isArray(task.tags)
-              ? task.tags
-              : typeof task.tags === 'string'
-                ? (task.tags ? JSON.parse(task.tags) : [])
-                : []
-          }))
-          setTasks(parsedTasks)
-        })
-        .catch(console.error)
+      loadTasks()
+
+      const handleVoiceCommand = (e: any) => {
+        const action = e.detail?.action || e.detail?.result?.action
+        if (
+          action === "create_task" ||
+          action === "update_task" ||
+          action === "delete_task" ||
+          action === "defer_task" ||
+          action === "move_task_to_peak"
+        ) {
+          loadTasks()
+        }
+      }
+
+      window.addEventListener("voice-command-executed", handleVoiceCommand)
+      return () => {
+        window.removeEventListener("voice-command-executed", handleVoiceCommand)
+      }
     }
   }, [session?.user?.id])
 
@@ -193,119 +224,146 @@ export function TasksView() {
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, column.status)}
             >
-              <div className={`rounded-lg border p-4 ${column.color} transition-all hover:shadow-sm`}>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">{column.title}</h3>
-                  <Badge variant="outline">{columnTasks.length}</Badge>
+              <div className={cn("glass-header border-none bg-white/[0.03] rounded-2xl mb-2", column.color)}>
+                <div className="flex items-center justify-between px-3">
+                  <h3 className="subtitle-technical px-0">{column.title}</h3>
+                  <Badge variant="secondary" className="bg-white/5 border-none opacity-50 px-2 h-5 text-[9px] font-black">{columnTasks.length}</Badge>
                 </div>
               </div>
 
               <div
-                className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""
+                className={`space-y-3 min-h-[260px] relative rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""
                   }`}
               >
-                {columnTasks.map((task) => {
-                  const nextStatus = getNextStatus(task.status)
-                  const isOverdue =
-                    task.dueDate &&
-                    task.status !== "done" &&
-                    isPast(parseISO(task.dueDate)) &&
-                    !isToday(parseISO(task.dueDate))
-
-                  return (
-                    <TiltCard
-                      key={task.id}
-                      className={`transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${draggedId === task.id ? "opacity-50" : ""
-                        }`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, task.id)}
+                <AnimatePresence mode="wait">
+                  {isLoading ? (
+                    <motion.div
+                      key="skeleton-container"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="space-y-3"
                     >
-                      <Card className="h-full">
-                        <CardContent className="p-4 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <span
-                              className={`font-medium leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""
-                                }`}
-                            >
-                              {task.title}
-                            </span>
-                            <Badge
-                              variant={getPriorityColor(task.priority) as any}
-                              className="shrink-0 text-[10px] h-5 px-1.5 capitalize"
-                            >
-                              {task.priority}
-                            </Badge>
-                          </div>
+                      <NovoSkeleton variant="card" />
+                      <NovoSkeleton variant="card" />
+                    </motion.div>
+                  ) : columnTasks.length > 0 ? (
+                    <motion.div
+                      key="tasks-container"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="space-y-3"
+                    >
+                      {columnTasks.map((task) => {
+                        const nextStatus = getNextStatus(task.status)
+                        const isOverdue =
+                          task.dueDate &&
+                          task.status !== "done" &&
+                          isPast(parseISO(task.dueDate)) &&
+                          !isToday(parseISO(task.dueDate))
 
-                          {Array.isArray(task.tags) && task.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.tags.map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-[10px] px-1 h-5">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between text-xs">
-                            {task.dueDate && (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                                  <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
-                                    {format(parseISO(task.dueDate), "MMM d")}
+                        return (
+                          <TiltCard
+                            key={task.id}
+                            className={`transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-grab active:cursor-grabbing ${draggedId === task.id ? "opacity-30" : ""
+                              }`}
+                            draggable
+                            onDragStart={(e: any) => handleDragStart(e, task.id)}
+                          >
+                            <Card className="h-full border-white/5 transition-all duration-500 hover:border-white/10">
+                              <CardContent className="p-5 space-y-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <span
+                                    className={cn(
+                                      "text-[14px] font-semibold leading-snug tracking-tight opacity-90",
+                                      task.status === "done" && "line-through opacity-40"
+                                    )}
+                                  >
+                                    {task.title}
                                   </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="shrink-0 text-[9px] font-black tracking-wider bg-white/5 border-none opacity-40 hover:opacity-100 transition-opacity uppercase h-5 px-1.5"
+                                  >
+                                    {task.priority}
+                                  </Badge>
                                 </div>
-                                {!isOverdue && task.status !== "done" && (
-                                  <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
-                                    {getDaysRemaining(task.dueDate) === 0
-                                      ? "Due today"
-                                      : `${getDaysRemaining(task.dueDate)} days left`}
-                                  </span>
+
+                                {Array.isArray(task.tags) && task.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {task.tags.map((tag) => (
+                                      <Badge key={tag} variant="outline" className="text-[10px] px-1 h-5">
+                                        {tag}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 )}
-                                {isOverdue && <AlertCircle className="h-3 w-3 text-destructive" />}
-                              </div>
-                            )}
-                          </div>
 
-                          <div className="flex gap-2 pt-1">
-                            {nextStatus && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 h-7 text-xs bg-transparent"
-                                onClick={() => handleStatusChange(task.id, nextStatus)}
-                              >
-                                Move
-                                <ChevronRight className="h-3 w-3 ml-1" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => {
-                                setEditingTask(task)
-                                setDialogOpen(true)
-                              }}
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(task.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TiltCard>
-                  )
-                })}
+                                <div className="flex items-center justify-between text-xs">
+                                  {task.dueDate && (
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1">
+                                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                                        <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                                          {format(parseISO(task.dueDate), "MMM d")}
+                                        </span>
+                                      </div>
+                                      {!isOverdue && task.status !== "done" && (
+                                        <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
+                                          {getDaysRemaining(task.dueDate) === 0
+                                            ? "Due today"
+                                            : `${getDaysRemaining(task.dueDate)} days left`}
+                                        </span>
+                                      )}
+                                      {isOverdue && <AlertCircle className="h-3 w-3 text-destructive" />}
+                                    </div>
+                                  )}
+                                </div>
 
-                {columnTasks.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg opacity-50">
-                    <p className="text-xs text-muted-foreground">No tasks</p>
-                  </div>
-                )}
+                                <div className="flex gap-2 pt-1">
+                                  {nextStatus && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex-1 h-7 text-xs bg-transparent"
+                                      onClick={() => handleStatusChange(task.id, nextStatus)}
+                                    >
+                                      Move
+                                      <ChevronRight className="h-3 w-3 ml-1" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => {
+                                      setEditingTask(task)
+                                      setDialogOpen(true)
+                                    }}
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(task.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </TiltCard>
+                        )
+                      })}
+                    </motion.div>
+                  ) : (
+                    <NovoEmptyState
+                      key="empty-container"
+                      message="Your cognitive slate is clean. Enjoy the open space or command a macro-focus block."
+                      actionLabel="Breathe"
+                      onAction={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
+                      className="py-10 min-h-[260px] w-full"
+                    />
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           )

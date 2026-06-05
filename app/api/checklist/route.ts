@@ -7,7 +7,10 @@ import { z } from 'zod'
 const checklistItemSchema = z.object({
   text: z.string().min(1, 'Text is required'),
   completed: z.boolean().optional().default(false),
-  priority: z.enum(['low', 'medium', 'high']).optional().default('medium')
+  priority: z.enum(['low', 'medium', 'high']).optional().default('medium'),
+  dueDate: z.string().optional().nullable(),
+  source: z.string().optional().default('manual'),
+  sourceId: z.string().optional().nullable()
 })
 
 export async function GET(request: NextRequest) {
@@ -50,13 +53,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
 
-    const { text, completed, priority } = parsedBody.data
+    const { text, completed, priority, dueDate, source, sourceId } = parsedBody.data
 
     const item = await prisma.checklistItem.create({
       data: {
         text,
         completed,
         priority,
+        source,
+        sourceId: sourceId || undefined,
+        dueDate: dueDate ? new Date(dueDate) : null,
         userId: session.user.id
       }
     })

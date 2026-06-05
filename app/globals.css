@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 @import 'tailwindcss';
 /* @import 'tw-animate-css'; */
 
@@ -51,9 +52,30 @@
   --shadow-blue:
     0 20px 60px rgba(90, 120, 255, 0.12),
     0 8px 24px rgba(90, 120, 255, 0.18);
-  --shadow-dark:
-    0 20px 60px rgba(0, 0, 0, 0.45),
-    0 6px 18px rgba(0, 0, 0, 0.35);
+  /* App Background Overlay - Light Mode */
+  --app-bg-overlay:
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.05) 0%, transparent 60%),
+    radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 15% 60%, rgba(56, 189, 248, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.05) 0%, transparent 50%);
+
+  /* Glass System - Light Mode (Frosted White) */
+  --glass-opacity: 0.3;
+  --glass-opacity-high: 0.7;
+  --glass-blur: 24;
+  --glass-blur-px: 24px;
+  --glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+  --glass-panel-bg: rgba(255, 255, 255, calc(var(--glass-opacity) + 0.15));
+
+  --card-hero-bg: rgba(255, 255, 255, var(--glass-opacity-high));
+  --card-hero-border: rgba(255, 255, 255, 0.5);
+
+  --card-primary-bg: rgba(255, 255, 255, 0.85);
+  --card-primary-border: rgba(255, 255, 255, 0.8);
+
+  --glass-highlight: rgba(255, 255, 255, 0.8);
+  --glass-text: #1e293b;
+  --glass-text-muted: #64748b;
 }
 
 .dark {
@@ -96,6 +118,33 @@
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(99, 102, 241, 0.5);
+
+  /* App Background Overlay - Dark Mode */
+  --app-bg-overlay:
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 15% 60%, rgba(56, 189, 248, 0.10) 0%, transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.10) 0%, transparent 50%);
+
+  /* Glass System - Dark Mode (Crystalline - UPDATED) */
+  --glass-opacity: 0.12;
+  --glass-opacity-high: 0.35;
+  --glass-blur: 24;
+  --glass-blur-px: 24px;
+
+  --glass-panel-bg: rgba(20, 20, 23, var(--glass-opacity));
+  --glass-panel-border: rgba(255, 255, 255, 0.08);
+  --glass-panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+
+  --card-hero-bg: rgba(25, 25, 28, var(--glass-opacity-high));
+  --card-hero-border: rgba(255, 255, 255, 0.08);
+
+  --card-primary-bg: rgba(30, 30, 35, calc(var(--glass-opacity-high) + 0.1));
+  --card-primary-border: rgba(255, 255, 255, 0.06);
+
+  --glass-highlight: rgba(255, 255, 255, 0.04);
+  --glass-text: #ffffff;
+  --glass-text-muted: #a1a1aa;
 }
 
 @theme inline {
@@ -134,90 +183,198 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --backdrop-blur-custom: calc(var(--glass-blur) * 1px);
 }
 
-/* Card Hierarchy System - Frosted Matte */
-
-/* 1. MAIN CONTAINER (Panel grande translúcido) */
-@utility glass-panel {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(25, 25, 25, 0.35);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+/* Soft Ambient Shadow Utility */
+@utility soft-shadow {
+  box-shadow: var(--shadow-ambient);
 }
 
-/* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
 @utility card--hero {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(30, 30, 30, 0.45);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  background: var(--card-hero-bg);
+  border: 1px solid var(--card-hero-border);
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(180%);
 }
 
-/* 3. SMALL CARDS (Items individuales) */
 @utility card--primary {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(40, 40, 40, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+  background: var(--card-primary-bg);
+  border: 1px solid var(--card-primary-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
 }
 
-/* Reusing card--primary style for secondary/tertiary to maintain consistency with the new system, 
-   or slightly adjusting if needed. Mapping 'card--secondary' to 'Small Cards' style as well for now. */
 @utility card--secondary {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(40, 40, 40, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
 }
 
 @utility card--tertiary {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(40, 40, 40, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
 }
 
-/* 5. BUTTONS (Glass sólido) */
-@utility btn-glass {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(25, 25, 25, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+/* Glass Blur Utility — heavier for 'milky' look */
+@utility glass-blur {
+  backdrop-filter: blur(var(--glass-blur-px, 32px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 32px)) saturate(180%);
+}
+
+@utility glass-blur-sm {
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+@utility glass-blur-lg {
+  backdrop-filter: blur(48px) saturate(200%);
+  -webkit-backdrop-filter: blur(48px) saturate(200%);
+}
+
+/* Card Hierarchy System - Soft Frosted */
+
+/* 1. MAIN CONTAINER (Panel grande translúcido) */
+@utility glass-panel {
+  @apply relative overflow-hidden;
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(var(--glass-blur-px, 24px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 24px)) saturate(160%);
+  border: 1px solid var(--glass-panel-border);
+  border-radius: 24px;
+  box-shadow:
+    var(--glass-panel-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.card-bg-primary {
+  background-color: rgba(var(--card-rgb, 255, 255, 255), var(--glass-opacity));
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, var(--card-border-alpha, 0.12));
+}
+
+.card-bg-secondary {
+  background-color: rgba(var(--card-rgb, 255, 255, 255), calc(var(--glass-opacity) * 1.5));
+  backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, var(--card-border-alpha, 0.12));
+}
+
+.card-bg-tertiary {
+  background-color: rgba(var(--card-rgb, 255, 255, 255), calc(var(--glass-opacity) * 0.75));
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, calc(var(--card-border-alpha, 0.12) * 0.6));
+}
+
+
+@utility glass-blur-xl {
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+/* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
+@utility glass-card {
+  @apply relative overflow-hidden;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(var(--glass-blur-px, 16px)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 16px)) saturate(120%);
+  border: 1px solid var(--glass-panel-border);
+  border-radius: 20px;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
   }
 }
 
-/* Generic Glass Utility (Componente Base Completo) */
+/* 2.5 Column Headers */
+@utility glass-header {
+  @apply rounded-xl border p-4 transition-all duration-300;
+  background: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur-px, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 12px));
+  border-color: var(--glass-panel-border);
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* 5. GENERIC GLASS (Crystalline look) */
 @utility glass {
-  @apply relative overflow-hidden transition-all duration-300;
-  background: rgba(25, 25, 25, 0.35);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  @apply relative overflow-hidden;
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(var(--glass-blur-px, 20px)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 20px)) saturate(140%);
+  border-radius: 24px;
+  border: 1px solid var(--glass-panel-border);
   box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.45),
+    var(--glass-panel-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* 3. BUTTONS (Soft Capsule) */
+@utility btn-glass {
+  @apply relative overflow-hidden transition-all duration-300 flex items-center justify-center;
+  background: var(--secondary);
+  border-radius: 999px;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* ─── Global Focus-Visible Ring System — WCAG 2.1 AA ──────────────────────────
+   Uses :focus-visible so mouse users see no ring, keyboard users get a clear indicator.
+   The indigo glow matches the Novo design DNA and passes AA contrast on dark surfaces. */
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.8);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Override for elements that define their own focus ring via Tailwind focus-visible: utilities */
+.focus-visible\:ring-2:focus-visible,
+.focus-visible\:outline-none:focus-visible {
+  outline: none;
 }
 
 @layer base {
@@ -231,136 +388,69 @@
   }
 
   body {
-    @apply overflow-hidden;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    @apply overflow-hidden font-sans;
+    transition: background-color 0.5s ease, color 0.5s ease;
 
-    /* Light Theme - Clean & Minimal */
-    background: #f8fafc;
-    color: #0f172a;
+    /* Light Theme - Soft Warm Solid */
+    background: var(--background);
+    color: var(--foreground);
+    background-image: radial-gradient(circle at 50% -20%, rgba(255, 184, 0, 0.05), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  /* Ultra-smooth interaction defaults */
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  [data-slot="tabs-trigger"],
+  [data-slot="sidebar-menu-button"] {
+    transition: all 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  /* Smooth card interactions */
+  .glass-card,
+  .glass-panel,
+  .card,
+  [data-slot="card"] {
+    transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+      box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+      border-color 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+      opacity 0.2s ease;
   }
 
   .dark body {
-    /* Dark Theme - Silent Dark Base */
-    background: #050505;
-    color: #ffffff;
+    background: var(--background);
+    color: var(--foreground);
+    background-image: radial-gradient(circle at 50% -20%, rgba(255, 184, 0, 0.02), transparent 70%);
   }
 
-  /* Background Image Transparency Overrides */
-  .has-bg-image body,
-  .has-bg-image [data-slot="sidebar-inset"],
-  .has-bg-image [data-slot="sidebar-wrapper"] {
-    background: transparent !important;
+  /* Scrollbar — Hidden for premium spatial layout where Capsule acts as scrollbar */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
-
-  .has-bg-image .dark body,
-  .has-bg-image .dark [data-slot="sidebar-inset"],
-  .has-bg-image .dark [data-slot="sidebar-wrapper"] {
-    background: transparent !important;
-  }
-
-  /* Cinematic Directional Light Overlay (Sunlight Effect) */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(circle at 15% 10%,
-        rgba(99, 102, 241, 0.08),
-        transparent 50%);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.8;
-  }
-
-  .dark body::before {
-    background: radial-gradient(circle at 15% 10%,
-        rgba(99, 102, 241, 0.1),
-        transparent 60%);
-    opacity: 1;
-  }
-
-  /* Add compact mode styles */
-  .compact-mode .dashboard-shell {
-    @apply gap-4;
-  }
-
-  .compact-mode .card {
-    @apply p-4;
-  }
-
-  .compact-mode h1 {
-    @apply text-2xl;
-  }
-
-  .compact-mode h2 {
-    @apply text-xl;
-  }
-
-  /* Add animation control */
-  .no-animations * {
-    animation-duration: 0s !important;
-    transition-duration: 0s !important;
-  }
-
-  /* Custom scrollbar styles */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--muted-foreground) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  /* Ultra-smooth scrolling — 240fps feel */
+  * {
+    -webkit-overflow-scrolling: touch;
   }
 
-  *::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 4px;
+  /* NOTE: transform:translateZ(0) intentionally removed from `main`.
+     It creates a new stacking context that breaks position:fixed for floating
+     elements (GeminiLiveOrb, modals). Smooth scrolling is handled by the
+     SmoothScrollProvider component instead. */
+  [data-slot="sidebar"] {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
-
-  *::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
-  *::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
-  *::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-
-  .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(139, 92, 246, 0.4) rgba(255, 255, 255, 0.05);
-  }
-
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(139, 92, 246, 0.5), rgba(99, 102, 241, 0.5));
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(139, 92, 246, 0.7), rgba(99, 102, 241, 0.7));
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
 }
 
 @layer utilities {
@@ -373,46 +463,41 @@
 
   /* Typography - Systemic Micro-copy */
   .section-title {
-    @apply text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40;
+    @apply text-[10px] font-black uppercase tracking-[0.3em] opacity-60;
   }
 
-  .dark .card--primary {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-  }
-
-  .dark .card--secondary {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  /* Global glass noise texture overlay - Frosted Grain */
-  .card--hero::after,
-  .card--primary::after,
-  .card--secondary::after,
-  .card--tertiary::after,
-  .glass-sidebar::after,
-  .glass-card::after,
-  .glass-panel::after {
+  .glass-card::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
     /* High frequency noise for premium feel */
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.04;
+    opacity: 0.03;
     pointer-events: none;
     mix-blend-mode: overlay;
-    z-index: 1;
+    z-index: -1;
   }
 
-  .dark .card--tertiary {
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  /* 4. TEXTO (Importante - Light Mode default handled by base, override for dark) */
+  h1,
+  h2,
+  h3,
+  .text-title {
+    color: #0f172a;
+    font-weight: 600;
   }
 
-  /* 4. TEXTO (Importante) */
+  p,
+  .text-body {
+    color: #334155;
+  }
+
+  .text-meta,
+  .text-muted-foreground {
+    color: #64748b;
+  }
+
   .dark h1,
   .dark h2,
   .dark h3,
@@ -436,11 +521,11 @@
     position: relative;
     padding: var(--space-6);
     /* Defaulting to small card style as base */
-    background: rgba(40, 40, 40, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    background: var(--card-primary-bg);
+    backdrop-filter: blur(calc(var(--glass-blur) * 0.6px));
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.6px));
+    border: 1px solid var(--card-primary-border);
+    border-radius: 20px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
   }
 
@@ -466,15 +551,15 @@
   /* Sidebar - Clean Anchor */
   .glass-sidebar {
     @apply transition-all duration-300 ease-out relative overflow-hidden;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(24px) saturate(120%);
-    -webkit-backdrop-filter: blur(24px) saturate(120%);
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, var(--glass-opacity));
+    backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(120%);
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 10px 0 50px rgba(0, 0, 0, 0.2);
   }
 
   .dark .glass-sidebar {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, var(--glass-opacity));
     border-right: 1px solid rgba(255, 255, 255, 0.04);
   }
 
@@ -482,12 +567,25 @@
 
 
 
-  /* Active Item (Elegant Indigo) */
-  .sidebar-active-item {
-    @apply relative bg-primary text-primary-foreground shadow-lg shadow-primary/20 font-semibold;
+  /* Active Sidebar Item — clean glass accent with inset accent line */
+  .sidebar-active-item,
+  [data-active=true].sidebar-active-item {
+    @apply relative font-semibold !text-foreground;
+    background: color-mix(in srgb, var(--primary) 10%, rgba(255, 255, 255, 0.05)) !important;
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+    /*
+     * Left accent line via inset box-shadow — avoids ::before clipping caused
+     * by overflow:hidden on SidebarMenuButton parent.
+     * 3px inset left = the elegant route indicator.
+     */
+    box-shadow:
+      inset 3px 0 0 color-mix(in srgb, var(--primary) 70%, transparent),
+      0 2px 10px rgba(0, 0, 0, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
     border-radius: 9999px !important;
     z-index: 10;
   }
+
 
   /* Section Transitions */
   .section-enter {
@@ -509,10 +607,11 @@
   /* Legacy & Utilities */
   .glass-card {
     @apply relative overflow-hidden transition-all duration-300;
-    background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(32px) saturate(110%);
-    -webkit-backdrop-filter: blur(32px) saturate(110%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--glass-panel-bg);
+    backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(120%);
+    border: 1px solid var(--glass-panel-border);
+    border-radius: 24px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   }
 
@@ -525,6 +624,60 @@
   }
 
   /* Liquid Switch Utility */
+  @layer base {
+    :root {
+      --background: 240 10% 3.9%;
+      --foreground: 0 0% 98%;
+      /* ... (rest of the vars) */
+      --radius: 32px;
+    }
+
+    .dark {
+      --background: 240 10% 2%;
+      --foreground: 0 0% 98%;
+      /* ... */
+    }
+
+    * {
+      @apply border-border;
+    }
+
+    body {
+      @apply bg-background text-foreground font-sans antialiased;
+      font-size: 15px;
+      /* Slightly larger base for modern feel */
+      line-height: 1.6;
+      letter-spacing: -0.01em;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      @apply font-light tracking-tight;
+      line-height: 1.1;
+    }
+    
+    h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+    }
+    
+    h2 {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+    }
+
+    h5,
+    h6,
+    .subtitle-technical {
+      @apply font-black tracking-[0.3em] uppercase text-[10px] opacity-60;
+    }
+
+    ::selection {
+      background: color-mix(in srgb, var(--primary) 30%, transparent);
+      color: inherit;
+    }
+  }
+
   .liquid-switch {
     --primary: #000;
     --secondary: #8b5cf6;
@@ -575,4 +728,484 @@
   .liquid-switch:checked::before {
     transform: translate(-75%, -50%);
   }
+}
+
+/* =========================================================
+   CHATBOT OVERFLOW GUARDS
+   These rules prevent horizontal overflow in all chatbot surfaces
+   ========================================================= */
+
+/* 1. Radix ScrollArea viewport — force overflow-x hidden globally */
+[data-radix-scroll-area-viewport] {
+  overflow-x: hidden !important;
+  max-width: 100%;
+}
+
+/* 2. custom-scrollbar utility — thin styled vertical scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* 3. Guarantee chatbot message wrappers never expand the scroll container */
+[data-chatbot-messages] {
+  contain: inline-size;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+[data-chatbot-messages] * {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+/* Allow code blocks to scroll horizontally inside their own container */
+[data-chatbot-messages] pre,
+[data-chatbot-messages] .overflow-x-auto {
+  overflow-x: auto;
+  max-width: 100%;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+/* ==========================================================================
+   PREMIUM MICRO-INTERACTIONS & FLUID ANIMATIONS
+   Elevates every interactive element with buttery-smooth, high-end feel.
+   ========================================================================== */
+
+/* --- Keyframes --- */
+
+@keyframes shimmer-border {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(99, 102, 241, 0.0),
+      0 0 20px rgba(99, 102, 241, 0.0);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(99, 102, 241, 0.25),
+      0 0 30px rgba(99, 102, 241, 0.10);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes border-glow-rotate {
+  0% { --glow-angle: 0deg; }
+  100% { --glow-angle: 360deg; }
+}
+
+/* --- Hover Utilities --- */
+
+/* Subtle card border lift on hover — no glow, just border brightening */
+.hover-premium-glow {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.hover-premium-glow:hover {
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Card lift — smooth scale + translateY with premium shadow */
+.hover-card-lift {
+  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1),
+              box-shadow 0.35s cubic-bezier(0.25, 0.1, 0.25, 1),
+              border-color 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.hover-card-lift:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(99, 102, 241, 0.12);
+}
+
+/* Shimmering border — animated gradient border highlight */
+.hover-glow-border {
+  position: relative;
+  overflow: hidden;
+}
+.hover-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.0) 30%,
+    rgba(99, 102, 241, 0.35) 50%,
+    rgba(99, 102, 241, 0.0) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.hover-glow-border:hover::before {
+  opacity: 1;
+  animation: shimmer-border 2s linear infinite;
+}
+
+/* --- Animation Utilities --- */
+
+/* Staggered fade-in for lists/grids */
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* Stagger delays for child elements */
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-children > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 450ms; }
+
+/* Subtle floating animation for featured cards */
+.animate-subtle-float {
+  animation: subtle-float 4s ease-in-out infinite;
+}
+
+/* Ambient glow pulse for active/focused elements */
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* --- Button micro-interactions --- */
+
+/* Premium button press effect */
+.btn-press {
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.btn-press:active {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}
+
+/* Icon button spin on hover */
+.icon-hover-spin {
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.icon-hover-spin:hover {
+  transform: rotate(90deg);
+}
+
+/* --- Focus ring premium --- */
+.focus-premium:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px rgba(99, 102, 241, 0.5),
+    0 0 16px rgba(99, 102, 241, 0.15);
+}
+
+/* --- Smooth page transitions --- */
+.page-enter {
+  animation: fade-in-up 0.45s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* --- Interactive tooltip glow --- */
+.tooltip-glow {
+  transition: all 0.25s ease;
+}
+.tooltip-glow:hover {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
+}
+
+/* --- SVG Liquid Gooey Filter Utilities --- */
+.liquid-gooey-container {
+  filter: url('#liquid-gooey');
+  contain: paint;
+  will-change: transform;
+}
+
+.liquid-gooey-child {
+  will-change: transform;
+}
+
+/* --- View Transition Elastic Morphing Overrides --- */
+::view-transition-group(settings-window),
+::view-transition-group(routine-modal),
+::view-transition-group(routine-detail-modal),
+::view-transition-group(routine-form-modal),
+::view-transition-group(import-routine-modal) {
+  animation-duration: 0.58s;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); /* Premium Frictional/Elastic Spring Curve */
+}
+
+::view-transition-old(settings-window),
+::view-transition-old(routine-modal),
+::view-transition-old(routine-detail-modal),
+::view-transition-old(routine-form-modal),
+::view-transition-old(import-routine-modal) {
+  animation: vt-fade-out 0.18s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+::view-transition-new(settings-window),
+::view-transition-new(routine-modal),
+::view-transition-new(routine-detail-modal),
+::view-transition-new(routine-form-modal),
+::view-transition-new(import-routine-modal) {
+  animation: vt-scale-up-spring 0.58s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes vt-scale-up-spring {
+  from {
+    transform: scale(0.93) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes vt-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* --- Context Hub GPU Acceleration Layer --- */
+.context-hub-layer {
+  will-change: width, height, transform;
+  contain: layout style;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* --- Soundwave Equalizer Bar Animation --- */
+@keyframes soundbar-1 {
+  0%, 100% { height: 30%; }
+  50% { height: 80%; }
+}
+@keyframes soundbar-2 {
+  0%, 100% { height: 60%; }
+  50% { height: 100%; }
+}
+@keyframes soundbar-3 {
+  0%, 100% { height: 20%; }
+  50% { height: 55%; }
+}
+
+.soundbar-1 { animation: soundbar-1 0.6s ease-in-out infinite alternate; }
+.soundbar-2 { animation: soundbar-2 0.75s ease-in-out infinite alternate; }
+.soundbar-3 { animation: soundbar-3 0.5s ease-in-out infinite alternate; }
+
+/* --- Global Scrollbar Removal --- */
+/* Remove native scrollbar across all browsers — ContextHub is the scrollbar */
+html, body, * {
+  scrollbar-width: none !important;       /* Firefox */
+  -ms-overflow-style: none !important;    /* IE / Edge Legacy */
+}
+*::-webkit-scrollbar {
+  display: none !important;               /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ─── Cognitive Circadian Theming ──────────────────────────────────────────── */
+
+/**
+ * Blue-light warm filter — active during SYNAPTIC_FATIGUE or late night.
+ * Overlays a warm amber tint via a fixed pseudo-element without
+ * disrupting layout or pointer events.
+ */
+html.blue-light-filter::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(255, 160, 50, 0.07);
+  mix-blend-mode: multiply;
+  transition: opacity 1.5s ease;
+  opacity: 1;
+}
+
+html:not(.blue-light-filter)::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(255, 160, 50, 0.07);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+
+/**
+ * SYNAPTIC_FATIGUE — mute saturation, darken overall, warm shadows.
+ * Slightly lowers the perceived brightness to ease photosensitivity.
+ */
+html.cognitive-fatigue {
+  filter: saturate(0.75) brightness(0.92) sepia(0.10);
+  transition: filter 2s ease;
+}
+
+html.cognitive-fatigue .card,
+html.cognitive-fatigue [class*="rounded-"] {
+  box-shadow: 0 4px 24px rgba(255, 140, 50, 0.06) !important;
+}
+
+/**
+ * PEAK_FOCUS — ever-so-slightly sharpen and lift contrast.
+ * Reinforces the sense of clarity and sharpness during high attention.
+ */
+html.cognitive-peak {
+  filter: saturate(1.05) brightness(1.02) contrast(1.02);
+  transition: filter 2s ease;
+}
+
+/**
+ * LINEAR_EXECUTION — neutral baseline (no filter).
+ */
+html.cognitive-linear {
+  filter: none;
+  transition: filter 2s ease;
+}
+
+/* Notification collapse during fatigue (Focus Lock) */
+html.cognitive-fatigue [data-notification-center] {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: blur(1px);
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+
+/* =========================================================
+   CINEMATIC BIOMETRIC LIGHT AND COLOR SHUTTERS
+   ========================================================= */
+
+/* Warm sepia blue-light attenuation layer for organic relief */
+html.blue-light-filter,
+.cognitive-fatigue-active {
+  filter: sepia(0.16) contrast(0.96) brightness(0.92) saturate(0.95);
+  transition: filter 4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Dopaminergic elastic glow pulse on task completions */
+@keyframes border-glow-dopamine {
+  0% {
+    box-shadow: 
+      0 0 0 0 rgba(129, 140, 248, 0), 
+      inset 0 0 0 rgba(129, 140, 248, 0);
+    border-color: rgba(255, 255, 255, 0.10);
+    transform: scale(1);
+  }
+  20% {
+    box-shadow: 
+      0 0 25px 6px rgba(129, 140, 248, 0.45), 
+      inset 0 0 12px rgba(129, 140, 248, 0.25);
+    border-color: rgba(129, 140, 248, 0.85);
+    transform: scale(1.03);
+  }
+  40% {
+    transform: scale(0.985);
+  }
+  60% {
+    transform: scale(1.008);
+  }
+  100% {
+    box-shadow: 
+      0 0 0 0 rgba(129, 140, 248, 0), 
+      inset 0 0 0 rgba(129, 140, 248, 0);
+    border-color: rgba(255, 255, 255, 0.10);
+    transform: scale(1);
+  }
+}
+
+.animate-dopamine-pulse {
+  animation: border-glow-dopamine 1.2s cubic-bezier(0.25, 0.8, 0.25, 1.25) forwards;
+}
+
+/* ─── REDUCED_CAPACITY_MODE Cognitive Emergency Theming ───────────────────── */
+
+/**
+ * REDUCED_CAPACITY_MODE — high stress / poor sleep during peak focus.
+ * Drastically reduces visual complexity: mute/blur secondary dashboard cards,
+ * lower saturation, reduce brightness, and highlight soft recovery tones.
+ */
+html.cognitive-reduced-capacity {
+  filter: saturate(0.68) brightness(0.88) contrast(0.94) sepia(0.18);
+  transition: filter 3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Reduce contrast on all glass panels and cards */
+html.cognitive-reduced-capacity .glass-card,
+html.cognitive-reduced-capacity .card,
+html.cognitive-reduced-capacity [data-slot="card"] {
+  background: rgba(9, 9, 11, 0.40) !important; /* bg-zinc-950/40 equivalent */
+  backdrop-filter: blur(8px) !important;
+  border-color: rgba(255, 255, 255, 0.03) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Blur and de-saturate elements flagged as secondary during cognitive overload */
+html.cognitive-reduced-capacity [data-cognitive-secondary="true"],
+html.cognitive-reduced-capacity .cognitive-secondary-element {
+  filter: blur(0.5px) opacity(0.4) !important;
+  pointer-events: none;
+  transition: filter 0.8s ease, opacity 0.8s ease;
 }

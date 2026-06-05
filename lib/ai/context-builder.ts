@@ -1,81 +1,162 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+// @ts-ignore
+import { User, UserSettings, UserCognitiveSnapshot } from '@prisma/client';
+import { CalendarAggregator } from '@/lib/calendar-aggregator';
+import { startOfDay, endOfDay } from 'date-fns';
 
-/**
- * Context Builder - Definitive Novo Brain Specification
- * 
- * Builds a 3-layer memory context:
- * 1. User Profile (Stable)
- * 2. System State (Dynamic)
- * 3. Short-term (Session context)
- */
+export interface CognitiveContext {
+    system: {
+        timestamp: string;
+        timezone: string;
+    };
+    todaySchedule: {
+        title: string;
+        time: string;
+        source: string;
+    }[];
+    metrics: {
+        focusTimeToday: number;
+        productivityScore: number;
+        fatigueEstimate: string;
+    };
+    state: {
+        overdueTasks: number;
+        activeTasks: number;
+        activeRoutines: number;
+        activeProjects: number;
+        lastInsight?: string | null;
+        tasksList?: any[];
+        routinesList?: any[];
+        projectsList?: any[];
+    };
+    preferences: {
+        language: string;
+        theme: string;
+        compactMode: boolean;
+    };
+}
 
 export interface UserContext {
-    summary: string;
-    tasks: any[];
-    routines: any[];
-    projects: any[];
+    summary: string; // The physical string injected into the prompt
+    structured: CognitiveContext;
 }
 
 export async function buildUserContext(userId: string): Promise<UserContext> {
     try {
-        const [user, settings, tasks, routines, projects] = await Promise.all([
-            prisma.user.findUnique({ where: { id: userId }, select: { name: true, bio: true } }),
+        const now = new Date();
+        const start = startOfDay(now);
+        const end = endOfDay(now);
+
+        const [
+            settings,
+            snapshot,
+            taskCount,
+            overdueTaskCount,
+            routineCount,
+            projectCount,
+            todayEvents,
+            tasksList,
+            routinesList,
+            projectsList
+        ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
-            prisma.task.findMany({ where: { userId, status: 'todo' }, take: 5 }),
-            prisma.routine.findMany({ where: { userId, isActive: true }, take: 3 }),
-            prisma.project.findMany({ where: { userId, status: 'in-progress' }, take: 2 })
+            // @ts-ignore
+            prisma.userCognitiveSnapshot.findUnique({ where: { userId } }),
+            prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }),
+            prisma.task.count({
+                where: {
+                    userId,
+                    status: { in: ['todo', 'in-progress'] },
+                    dueDate: { lt: new Date().toISOString() } // simplified check
+                }
+            }),
+            prisma.routine.count({ where: { userId, isActive: true } }),
+            prisma.project.count({ where: { userId, status: 'in-progress' } }),
+            CalendarAggregator.getEventsForRange(userId, start, end),
+            prisma.task.findMany({
+                where: { userId, status: { in: ['todo', 'in-progress'] } },
+                orderBy: { updatedAt: 'desc' },
+                take: 15
+            }),
+            prisma.routine.findMany({
+                where: { userId, isActive: true },
+                include: {
+                    days: {
+                        include: {
+                            exercises: {
+                                orderBy: { order: 'asc' }
+                            }
+                        },
+                        orderBy: { order: 'asc' }
+                    }
+                }
+            }),
+            prisma.project.findMany({
+                where: { userId, status: 'in-progress' },
+                orderBy: { updatedAt: 'desc' },
+                take: 10
+            })
         ]);
 
-        // 1. USER PROFILE (Stable)
-        const userProfile = `[USER PROFILE]
-- Name: ${user?.name || 'User'}
-- Bio/Context: ${user?.bio || 'No bio provided'}
-- Preferences: ${settings?.preferences || 'Minimalist, calm tone'}
-- Language: ${settings?.language || 'es'}`;
+        const structuredContext: CognitiveContext = {
+            system: {
+                timestamp: now.toISOString(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+            todaySchedule: todayEvents.map((e: any) => ({
+                title: e.title,
+                time: e.allDay ? 'All Day' : e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                source: e.source
+            })),
+            metrics: {
+                focusTimeToday: snapshot?.focusTimeToday || 0,
+                productivityScore: snapshot?.productivityScore || 0,
+                fatigueEstimate: snapshot?.fatigueEstimate || 'low',
+            },
+            state: {
+                overdueTasks: overdueTaskCount,
+                activeTasks: taskCount,
+                activeRoutines: routineCount,
+                activeProjects: projectCount,
+                lastInsight: snapshot?.lastInsightGeneratedAt ? snapshot.lastInsightGeneratedAt.toISOString() : null,
+                tasksList,
+                routinesList,
+                projectsList
+            },
+            preferences: {
+                language: settings?.language || 'en',
+                theme: settings?.theme || 'system',
+                compactMode: settings?.compactMode || false,
+            }
+        };
 
-        // 2. SYSTEM STATE (Dynamic)
-        const systemState = `[SYSTEM STATE]
-- Active Tasks (${tasks.length}): ${tasks.map(t => t.title).join(', ') || 'None'}
-- Active Routines (${routines.length}): ${routines.map(r => r.name).join(', ') || 'None'}
-- Active Projects (${projects.length}): ${projects.map(p => p.title).join(', ') || 'None'}`;
-
-        // 3. SHORT-TERM CONTEXT
-        const shortTerm = `[SHORT-TERM CONTEXT]
-- Session: Active
-- Focus: Interaction with Novo Cognitive Core`;
-
-        const summary = `
---- NOVO COGNITIVE CONTEXT ---
-${userProfile}
-
-${systemState}
-
-${shortTerm}
---- END OF CONTEXT ---
-`;
+        const summary = JSON.stringify(structuredContext, null, 2);
 
         return {
             summary,
-            tasks,
-            routines,
-            projects
+            structured: structuredContext
         };
     } catch (error) {
         console.error('[Context Builder] Error:', error);
+
+        // Fallback simple context
+        const fallback: CognitiveContext = {
+            system: { timestamp: new Date().toISOString(), timezone: 'UTC' },
+            todaySchedule: [],
+            metrics: { focusTimeToday: 0, productivityScore: 0, fatigueEstimate: 'low' },
+            state: { overdueTasks: 0, activeTasks: 0, activeRoutines: 0, activeProjects: 0 },
+            preferences: { language: 'en', theme: 'system', compactMode: false }
+        };
+
         return {
-            summary: 'Error loading context',
-            tasks: [],
-            routines: [],
-            projects: []
+            summary: JSON.stringify(fallback, null, 2),
+            structured: fallback
         };
     }
 }
 
-/**
- * Builds a minimal context for quick queries
- */
 export async function buildMinimalContext(userId: string): Promise<string> {
     try {
         const [taskCount, routineCount] = await Promise.all([

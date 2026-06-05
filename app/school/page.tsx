@@ -13,20 +13,7 @@ import { SchoolAnalytics } from '@/components/school/school-analytics';
 import { useToast } from '@/hooks/use-toast';
 import { calculateGPA } from '@/lib/gpa-calculator';
 
-interface Course {
-  id: string;
-  name: string;
-  code?: string;
-  credits?: number;
-  semester: string;
-  year: number;
-  professor?: string;
-  color: string;
-  finalGrade?: number;
-  letterGrade?: string;
-  educationType: string;
-  grades: any[];
-}
+import { Course, Grade } from '@/types/school';
 
 export default function SchoolPage() {
   const { toast } = useToast();
@@ -171,14 +158,14 @@ export default function SchoolPage() {
   };
 
   // Calculate GPAs
-  const overallGPA = calculateGPA(courses);
+  const overallGPA = calculateGPA(courses as any);
   const currentSemester = courses.length > 0
     ? `${courses[0].semester} ${courses[0].year}`
     : 'No semester';
-  const currentSemesterCourses = courses.filter(
-    c => c.semester === courses[0]?.semester && c.year === courses[0]?.year
+  const currentSemesterCourses = (courses as any[]).filter(
+    (c: any) => c.semester === courses[0]?.semester && c.year === courses[0]?.year
   );
-  const semesterGPA = calculateGPA(currentSemesterCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
+  const semesterGPA = calculateGPA(currentSemesterCourses as any);
   const totalCredits = courses.reduce((sum, c) => sum + (c.credits ?? 0), 0);
 
   // Filtered courses
@@ -189,8 +176,8 @@ export default function SchoolPage() {
   // Separate GPAs
   const universityCourses = courses.filter(c => c.educationType === 'university');
   const highSchoolCourses = courses.filter(c => c.educationType === 'high_school');
-  const universityGPA = calculateGPA(universityCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
-  const highSchoolGPA = calculateGPA(highSchoolCourses.map(c => ({ ...c, credits: c.credits ?? 1 })));
+  const universityGPA = calculateGPA(universityCourses as any);
+  const highSchoolGPA = calculateGPA(highSchoolCourses as any);
 
   if (loading) {
     return (
@@ -280,7 +267,7 @@ export default function SchoolPage() {
         course={editingCourse}
       />
 
-      {selectedCourse && (
+      {selectedCourse && selectedCourse.id && (
         <GradeDialog
           open={gradeDialogOpen}
           onClose={() => {

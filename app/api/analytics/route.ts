@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAdvancedInsights } from '@/lib/analytics-server'
+import { inngest } from '@/lib/inngest/client'
+import { updateDailyAnalytics as sharedUpdateDailyAnalytics } from '@/lib/analytics-server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -168,56 +170,9 @@ function calculateProductivityScore(completions: number, totalTimeSeconds: numbe
   return Math.min(Math.round(score * 10) / 10, 100);
 }
 
+
 async function updateDailyAnalytics(userId: string, module: string, duration: number, isCompletion: boolean = false) {
-  try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const existing = await prisma.dailyAnalytics.findUnique({
-      where: {
-        userId_date: {
-          userId,
-          date: today,
-        },
-      },
-    })
-
-    if (existing) {
-      const parsedModulesUsed = JSON.parse(existing.modulesUsed) as string[]
-      const modulesUsed = module && !parsedModulesUsed.includes(module)
-        ? [...parsedModulesUsed, module]
-        : parsedModulesUsed
-
-      const newTotalTime = existing.totalTime + duration
-      const newCompletions = isCompletion ? existing.completions + 1 : existing.completions
-      const newScore = calculateProductivityScore(newCompletions, newTotalTime)
-
-      await prisma.dailyAnalytics.update({
-        where: { id: existing.id },
-        data: {
-          totalTime: newTotalTime,
-          completions: newCompletions,
-          modulesUsed: JSON.stringify(modulesUsed),
-          productivityScore: newScore,
-        },
-      })
-    } else {
-      const completions = isCompletion ? 1 : 0
-      const score = calculateProductivityScore(completions, duration)
-      await prisma.dailyAnalytics.create({
-        data: {
-          userId,
-          date: today,
-          totalTime: duration,
-          completions,
-          modulesUsed: JSON.stringify(module ? [module] : []),
-          productivityScore: score,
-        },
-      })
-    }
-  } catch (error) {
-    console.error('Failed to update daily analytics:', error)
-  }
+    return sharedUpdateDailyAnalytics(userId, module, duration, isCompletion)
 }
 
 export async function POST(request: NextRequest) {
@@ -282,6 +237,22 @@ export async function POST(request: NextRequest) {
         // If it's a focus session completion, update total time
         if (data.eventType === 'focus_session_complete' && data.metadata?.duration) {
           await updateDailyAnalytics(userId, data.module, data.metadata.duration)
+
+          // Dispatch Event to Cognitive Engine
+          // Note: duration from focus timer is in seconds, our engine expects minutes.
+          try {
+            await inngest.send({
+              name: 'focus.completed',
+              data: {
+                userId,
+                focusSessionId: data.metadata.taskId || 'session',
+                duration: Math.round(data.metadata.duration / 60),
+                quality: data.metadata.quality || 3
+              }
+            })
+          } catch (e) {
+            console.error('Failed to dispatch focus.completed to Inngest:', e)
+          }
         }
 
         return NextResponse.json({ success: true })

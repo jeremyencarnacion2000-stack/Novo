@@ -2,11 +2,26 @@ const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 export const whisperAPI = {
     transcribeAudio: async (audioBlob: Blob): Promise<string> => {
-        const WHISPER_API_KEY = process.env.WHISPER_API_KEY;
+        let whisperApiKey = '';
+        if (typeof window !== 'undefined') {
+            whisperApiKey = localStorage.getItem('novo_whisper_api_key') || localStorage.getItem('novo_openai_api_key') || '';
+        }
+        if (!whisperApiKey) {
+            whisperApiKey = process.env.NEXT_PUBLIC_WHISPER_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.WHISPER_API_KEY || '';
+        }
+        if (!whisperApiKey) {
+            // Check gemini key fallback if none other is configured, just in case
+            if (typeof window !== 'undefined') {
+                whisperApiKey = localStorage.getItem('novo_gemini_api_key') || '';
+            }
+            if (!whisperApiKey) {
+                whisperApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+            }
+        }
 
-        if (!WHISPER_API_KEY) {
-            console.error('WHISPER_API_KEY is not configured');
-            throw new Error('WHISPER_API_KEY environment variable is not set');
+        if (!whisperApiKey) {
+            console.error('Whisper API Key is not configured');
+            throw new Error('Por favor, configura tu API Key de Whisper en los ajustes del Copiloto.');
         }
 
         try {
@@ -25,7 +40,7 @@ export const whisperAPI = {
             const response = await fetch(WHISPER_API_URL, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${WHISPER_API_KEY}`,
+                    'Authorization': `Bearer ${whisperApiKey}`,
                 },
                 body: formData,
             });

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { updateTaskSchema } from '@/lib/schemas/task'
 import { z } from 'zod'
+import { emitTwinSignal } from '@/lib/twin-signal'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -45,6 +46,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(tags !== undefined && { tags: JSON.stringify(tags) })
       }
     })
+
+    // Emit behavioral signal based on status transition (fire-and-forget)
+    if (status === 'done' && existingTask.status !== 'done') {
+      emitTwinSignal({ userId: session.user.id, signal: 'task_completed' })
+    } else if (status === 'todo' && existingTask.status === 'in-progress') {
+      // Task moved back to todo after being started = deferred
+      emitTwinSignal({ userId: session.user.id, signal: 'task_deferred' })
+    }
 
     return NextResponse.json(updatedTask)
   } catch (error) {

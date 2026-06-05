@@ -3,7 +3,8 @@ export type AIActionType =
     | 'CREATE_ROUTINE'
     | 'CREATE_NOTE'
     | 'DELETE_ALL_TASKS'
-    | 'SYSTEM_QUERY';
+    | 'SYSTEM_QUERY'
+    | 'categorize_note';
 
 export interface AIAction {
     name: AIActionType;
