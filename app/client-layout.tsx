@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { SessionProvider, useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
-import { Toaster } from '@/components/ui/toaster'
+import { NovoToaster } from '@/components/ui/novo-toast'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
@@ -24,6 +24,18 @@ import { OfflineIndicator } from '@/components/offline-indicator'
 import { useSyncQueue } from '@/hooks/use-sync-queue'
 import { ScrollContainerProvider } from '@/lib/scroll-container-context'
 import { CognitiveProvider } from '@/lib/cognitive-context'
+import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
+
+/**
+ * CognitiveThemeSyncer — mounts once inside CognitiveProvider.
+ * Bridges live BioState → CSS custom properties on <html>.
+ * Renders nothing — pure side-effect component.
+ */
+function CognitiveThemeSyncer() {
+  useCognitiveTheme()
+  return null
+}
+
 
 // ─── Lazy-loaded widgets (not in initial bundle) ────────────────────────────
 // These components are heavy and not needed at FCP/LCP time.
@@ -142,6 +154,44 @@ export default function ClientLayout({
   useEffect(() => {
     setMounted(true)
     registerServiceWorker()
+
+    // Intercept ChunkLoadErrors (Next.js/Webpack compilation desync after new deploys)
+    const handleChunkLoadError = (e: ErrorEvent) => {
+      const errorMsg = e.message || ''
+      if (
+        errorMsg.includes('ChunkLoadError') ||
+        errorMsg.includes('Loading chunk') ||
+        errorMsg.includes('Failed to fetch dynamically imported module')
+      ) {
+        console.warn('[System] ChunkLoadError detected. Performing hard reload to update client chunks.', e)
+        window.location.reload()
+      }
+    }
+
+    const handlePromiseRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason
+      if (reason) {
+        const name = reason.name || ''
+        const msg = reason.message || ''
+        if (
+          name === 'ChunkLoadError' ||
+          msg.includes('ChunkLoadError') ||
+          msg.includes('Loading chunk') ||
+          msg.includes('Failed to fetch dynamically imported module')
+        ) {
+          console.warn('[System] Unhandled ChunkLoadError in Promise. Performing hard reload...', reason)
+          window.location.reload()
+        }
+      }
+    }
+
+    window.addEventListener('error', handleChunkLoadError)
+    window.addEventListener('unhandledrejection', handlePromiseRejection)
+
+    return () => {
+      window.removeEventListener('error', handleChunkLoadError)
+      window.removeEventListener('unhandledrejection', handlePromiseRejection)
+    }
   }, [])
 
   if (!mounted) return null
@@ -156,6 +206,7 @@ export default function ClientLayout({
                 <QuickCaptureProvider>
                   <ScrollContainerProvider>
                     <CognitiveProvider>
+                      <CognitiveThemeSyncer />
                       <CognitiveTwinProvider>
                         <GlobalPlayer>
                           <AuthWrapper>
@@ -173,7 +224,7 @@ export default function ClientLayout({
                 <OfflineIndicator />
                 <SyncQueueInit />
                 <NetworkStatus />
-                <Toaster />
+                <NovoToaster />
               </ChatbotProvider>
             </FocusProvider>
           </PomodoroProvider>
