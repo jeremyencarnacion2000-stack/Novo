@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import {
     LayoutDashboard, Calendar, BarChart3, Bot, Timer,
     ListChecks, CheckSquare, KanbanSquare, TrendingUp,
-    GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Music,
+    GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Music, Users,
     Settings, User
 } from 'lucide-react'
 
@@ -43,6 +43,7 @@ const sections = [
             { title: 'Business', href: '/business', icon: Briefcase },
             { title: 'Library', href: '/library', icon: BookOpen },
             { title: 'Spiritual', href: '/spiritual', icon: Sparkles },
+            { title: 'Social', href: '/social', icon: Users },
             { title: 'Style', href: '/appearance', icon: Heart },
             { title: 'Music', href: '/music', icon: Music },
         ],
@@ -64,12 +65,16 @@ export function MobileSectionDrawer({ open, onClose }: MobileSectionDrawerProps)
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+                className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm md:hidden"
+                style={{ animation: 'novo-fade-in var(--novo-duration-fast) var(--novo-spring) both' }}
                 onClick={onClose}
             />
 
             {/* Drawer — ultra-clean, premium glass feel */}
-            <div className="fixed inset-x-0 bottom-0 z-[5001] md:hidden animate-in slide-in-from-bottom duration-300 ease-out">
+            <div
+                className="fixed inset-x-0 bottom-0 z-[5001] md:hidden"
+                style={{ animation: 'novo-drawer-in var(--novo-duration) var(--novo-spring) both' }}
+            >
                 <div
                     className="mx-2 mb-2 rounded-[32px] border border-white/[0.06] shadow-[0_-16px_60px_rgba(0,0,0,0.6)] overflow-hidden glass-blur-xl"
                     style={{

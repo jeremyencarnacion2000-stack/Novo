@@ -136,15 +136,17 @@ export function FloatingMusicWidget({
     <div
       ref={widgetRef}
       className={cn(
-        'fixed z-50 bg-white/10 border border-white/20 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out',
+        'fixed z-50 bg-white/10 border border-white/20 rounded-lg shadow-lg overflow-hidden',
         isMinimized ? 'w-72 h-16' : 'w-96 h-20',
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       )}
       style={{
-        backdropFilter: 'blur(var(--glass-blur))',
-        WebkitBackdropFilter: 'blur(var(--glass-blur))',
+        backdropFilter: 'blur(var(--glass-blur-px))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur-px))',
         left: `${position.x}px`,
         top: `${position.y}px`,
+        animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both',
+        transition: 'width var(--novo-duration-fast) var(--novo-spring), height var(--novo-duration-fast) var(--novo-spring)',
       }}
       onMouseDown={handleMouseDown}
     >

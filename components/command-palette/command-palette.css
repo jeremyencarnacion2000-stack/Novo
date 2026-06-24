@@ -25,17 +25,7 @@
     z-index: 49;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
-    animation: fadeIn 0.15s ease-out;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
+    animation: novo-fade-in var(--novo-duration-fast) var(--novo-spring) both;
 }
 
 /* Header */
@@ -149,19 +139,20 @@
     font-family: monospace;
 }
 
-/* Animations */
+/* Animations — Sileo spring physics */
 [cmdk-dialog] {
-    animation: slideIn 0.2s ease-out;
+    animation: novo-cmd-in var(--novo-duration) var(--novo-spring) both;
 }
 
-@keyframes slideIn {
+@keyframes novo-cmd-in {
     from {
-        transform: translate(-50%, -48%);
+        transform: translate(-50%, -48%) scale(0.96);
         opacity: 0;
+        filter: blur(4px);
     }
-
     to {
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%) scale(1);
         opacity: 1;
+        filter: blur(0);
     }
 }

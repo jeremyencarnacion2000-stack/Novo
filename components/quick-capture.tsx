@@ -191,30 +191,32 @@ export function QuickCapture() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
                         onClick={onClose}
                     />
 
                     {/* Modal (Floating like Raycast/Spotlight) */}
                     <motion.div
                         className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-[5001] bg-[#0A0A0B]/90 border border-white/10 rounded-[32px] glass-blur shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden"
-                        initial={{ opacity: 0, y: -40, scale: 0.94 }}
-                        animate={{ 
-                            opacity: 1, 
-                            y: 0, 
+                        initial={{ opacity: 0, y: -20, scale: 0.94, filter: 'blur(4px)' }}
+                        animate={{
+                            opacity: 1,
+                            y: 0,
                             scale: 1,
+                            filter: 'blur(0px)',
                             transition: {
                                 type: 'spring',
-                                stiffness: 220,
-                                damping: 22,
-                                mass: 0.8
+                                stiffness: 380,
+                                damping: 30,
                             }
                         }}
-                        exit={{ 
-                            opacity: 0, 
-                            y: -20, 
-                            scale: 0.95,
+                        exit={{
+                            opacity: 0,
+                            y: -12,
+                            scale: 0.96,
+                            filter: 'blur(3px)',
                             transition: {
-                                duration: 0.15,
+                                duration: 0.2,
                                 ease: 'easeOut'
                             }
                         }}
