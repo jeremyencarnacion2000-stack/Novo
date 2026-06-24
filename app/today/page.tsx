@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Sun, AlertTriangle, CheckCircle2, Circle, Clock,
     ListChecks, FolderKanban, GraduationCap, Pencil,
-    ChevronRight, Flame, Target, Zap
+    ChevronRight, Flame, Target, Zap, Link2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion';
     sourceId: string;
     dueDate?: string;
     timeOfDay?: string;
@@ -107,6 +107,7 @@ function SourceIcon({ source }: { source: string }) {
         project: <FolderKanban className="w-3 h-3" />,
         school:  <GraduationCap className="w-3 h-3" />,
         manual:  <Pencil className="w-3 h-3" />,
+        notion:  <Link2 className="w-3 h-3" />,
     };
     return <span className="text-white/30">{map[source] ?? map.manual}</span>;
 }
@@ -176,6 +177,7 @@ const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent
     project:   { label: 'Proyectos', icon: <FolderKanban className="w-4 h-4" />, accent: 'text-blue-400' },
     school:    { label: 'Escuela',   icon: <GraduationCap className="w-4 h-4" />,accent: 'text-violet-400' },
     manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-white/50' },
+    notion:    { label: 'Notion',    icon: <Link2 className="w-4 h-4" />,        accent: 'text-teal-400' },
 };
 
 function SectionCard({
@@ -194,12 +196,7 @@ function SectionCard({
             layout
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-3xl border border-white/[0.07] overflow-hidden"
-            style={{
-                background: 'rgba(255,255,255,0.018)',
-                backdropFilter: 'blur(12px)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-            }}
+            className="liquid-glass rounded-3xl overflow-hidden"
         >
             {/* Section header */}
             <button
@@ -339,6 +336,7 @@ export default function TodayPage() {
         { key: 'project',   tasks: tasks.filter(t => t.source === 'project') },
         { key: 'school',    tasks: tasks.filter(t => t.source === 'school') },
         { key: 'manual',    tasks: tasks.filter(t => t.source === 'manual') },
+        { key: 'notion',    tasks: tasks.filter(t => t.source === 'notion') },
     ].filter(g => g.tasks.length > 0);
 
     const dayLabel = new Date().toLocaleDateString('es', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -389,7 +387,7 @@ export default function TodayPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.15 }}
-                    className="grid grid-cols-3 gap-2"
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-2"
                 >
                     {[
                         { label: 'Total', value: total, icon: <Target className="w-3.5 h-3.5" /> },
@@ -435,14 +433,26 @@ export default function TodayPage() {
                 <motion.div
                     initial={{ opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center justify-center py-24 gap-4 text-center"
+                    className="flex flex-col items-center justify-center py-20 gap-5 text-center"
                 >
-                    <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+                        style={{ boxShadow: '0 0 32px rgba(99,102,241,0.12)' }}>
                         <CheckCircle2 className="w-7 h-7 text-primary" />
                     </div>
-                    <div>
-                        <p className="text-base font-bold text-white/70">Todo al día</p>
-                        <p className="text-xs text-white/30 mt-1">No tienes tareas pendientes para hoy 🎉</p>
+                    <div className="max-w-sm space-y-2">
+                        <p className="text-base font-bold text-white/80">You have a clear day</p>
+                        <p className="text-sm text-white/35 leading-relaxed">
+                            No tasks are scheduled. This is a good moment to build structure —
+                            Novo will automatically surface tomorrow's priorities once you set up routines.
+                        </p>
+                    </div>
+                    {/* Forward action */}
+                    <div
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-white/40 cursor-default"
+                        style={{ background: 'rgba(255,255,255,0.025)' }}
+                    >
+                        <ChevronRight className="w-3.5 h-3.5 text-primary/60" />
+                        Go to <span className="text-primary/80 font-black">Routines</span> to build your consistency layer
                     </div>
                 </motion.div>
             )}

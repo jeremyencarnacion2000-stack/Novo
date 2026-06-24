@@ -80,9 +80,9 @@ export function FocusMode() {
 
   const getModeLabel = () => {
     switch (mode) {
-      case 'work': return 'Trabajo'
-      case 'shortBreak': return 'Descanso Corto'
-      case 'longBreak': return 'Descanso Largo'
+      case 'work': return 'Focus Block'
+      case 'shortBreak': return 'Short Break'
+      case 'longBreak': return 'Long Break'
     }
   }
 
@@ -113,7 +113,7 @@ export function FocusMode() {
               Focus Tools
             </h4>
             <p className="text-xs text-muted-foreground">
-              Herramientas para maximizar tu productividad
+              Tools to maximize your productivity and flow state
             </p>
           </div>
 
@@ -125,11 +125,11 @@ export function FocusMode() {
               </TabsTrigger>
               <TabsTrigger value="sounds" className="text-xs">
                 <Volume2 className="h-3 w-3 mr-1" />
-                Sonidos
+                Sounds
               </TabsTrigger>
               <TabsTrigger value="notes" className="text-xs">
                 <StickyNote className="h-3 w-3 mr-1" />
-                Notas
+                Notes
               </TabsTrigger>
             </TabsList>
 
@@ -153,12 +153,12 @@ export function FocusMode() {
                     {isRunning ? (
                       <>
                         <Pause className="h-4 w-4 mr-1" />
-                        Pausar
+                        Pause
                       </>
                     ) : (
                       <>
                         <Play className="h-4 w-4 mr-1" />
-                        Iniciar
+                        Start
                       </>
                     )}
                   </Button>
@@ -168,13 +168,13 @@ export function FocusMode() {
                     onClick={resetTimer}
                   >
                     <RotateCcw className="h-4 w-4 mr-1" />
-                    Reiniciar
+                    Reset
                   </Button>
                 </div>
 
                 <div className="text-xs text-muted-foreground">
                   <Clock className="h-3 w-3 inline mr-1" />
-                  Pomodoros completados: {completedPomodoros}
+                  Sessions completed: {completedPomodoros}
                 </div>
               </div>
             </TabsContent>
@@ -198,7 +198,7 @@ export function FocusMode() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium">Volumen</label>
+                  <label className="text-xs font-medium">Volume</label>
                   <Slider
                     value={volume}
                     onValueChange={setVolume}
@@ -211,7 +211,7 @@ export function FocusMode() {
                 {selectedSound && (
                   <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
                     <Volume2 className="h-3.5 w-3.5 animate-pulse" />
-                    Reproduciendo: {AMBIENT_SOUNDS.find(s => s.id === selectedSound)?.name}
+                    Now playing: {AMBIENT_SOUNDS.find(s => s.id === selectedSound)?.name}
                   </p>
                 )}
               </div>
@@ -220,13 +220,13 @@ export function FocusMode() {
             {/* Quick Notes */}
             <TabsContent value="notes" className="space-y-3">
               <Textarea
-                placeholder="Escribe tus ideas rápidas aquí..."
+                placeholder="Jot down quick ideas, blockers, or context..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="min-h-[150px] resize-none"
               />
               <p className="text-xs text-muted-foreground">
-                Tus notas se guardan automáticamente
+                Notes are saved automatically
               </p>
             </TabsContent>
           </Tabs>

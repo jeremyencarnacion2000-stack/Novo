@@ -2,11 +2,9 @@
 
 import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { SettingsSections } from './settings-sections'
+import { SettingsControlCenter } from './settings-control-center'
 import { useSettings } from '@/lib/settings-context'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { X } from 'lucide-react'
 import { safeViewTransition } from '@/hooks/use-view-transition'
 
 export function SettingsModal() {
@@ -46,7 +44,7 @@ export function SettingsModal() {
                     {/* Simple, robust overflow container */}
                     <div className="flex-1 w-full overflow-y-auto overflow-x-hidden min-h-0 custom-scrollbar pr-1 relative z-10">
                         <div className="p-6 pt-2 pb-10 space-y-6">
-                            <SettingsSections />
+                            <SettingsControlCenter />
                         </div>
                     </div>
                 </div>

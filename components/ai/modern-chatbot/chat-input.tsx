@@ -198,21 +198,21 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         </span>
                     </div>
                 )}
-                {/* Attached Files Preview */}
-                {attachedFiles.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2 animate-in fade-in duration-300">
-                        {attachedFiles.map((file, index) => (
-                            <FilePreviewItem
-                                key={index}
-                                file={file}
-                                onRemove={() => removeFile(index)}
-                            />
-                        ))}
-                    </div>
-                )}
-
                 <form onSubmit={handleSubmit} className="relative group">
                     <div className="flex flex-col bg-black/60 border border-white/10 rounded-[24px] p-3 focus-within:border-primary/30 focus-within:shadow-[0_0_30px_rgba(var(--primary-rgb),0.04)] transition-all duration-300 shadow-2xl backdrop-blur-3xl">
+
+                        {/* Attached Files Preview Inside the Capsule */}
+                        {attachedFiles.length > 0 && (
+                            <div className="mb-2.5 flex flex-wrap gap-2 animate-in fade-in duration-300 px-1 pt-1">
+                                {attachedFiles.map((file, index) => (
+                                    <FilePreviewItem
+                                        key={index}
+                                        file={file}
+                                        onRemove={() => removeFile(index)}
+                                    />
+                                ))}
+                            </div>
+                        )}
 
                         {/* Textarea */}
                         <textarea

@@ -250,7 +250,24 @@ export default function RoutinesPage() {
   }
 
   if (isLoading) {
-    return <div>Loading...</div>
+    return (
+      <div className="flex flex-col gap-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-28 bg-white/5 rounded-2xl" />
+            <div className="h-4 w-52 bg-white/[0.03] rounded-xl" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-24 bg-white/5 rounded-xl" />
+            <div className="h-9 w-32 bg-white/[0.06] rounded-xl" />
+          </div>
+        </div>
+        <div className="h-20 w-full bg-white/[0.03] rounded-2xl border border-white/5" />
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-36 bg-white/[0.03] rounded-3xl border border-white/5" />
+        ))}
+      </div>
+    )
   }
 
   return (

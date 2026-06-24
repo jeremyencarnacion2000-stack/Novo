@@ -7,7 +7,7 @@ export interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion';
     sourceId: string;
     dueDate?: Date;
     timeOfDay?: string; // for routine tasks
@@ -117,11 +117,13 @@ export class IntegrationEngine {
             }
         }
 
-        // 3. Get manual checklist items
+        // 3. Get manual and Notion checklist items
         const checklistItems = await prisma.checklistItem.findMany({
             where: {
                 userId,
-                source: 'manual'
+                source: {
+                    in: ['manual', 'notion']
+                }
             }
         });
 
@@ -131,7 +133,7 @@ export class IntegrationEngine {
                 text: item.text,
                 completed: item.completed,
                 priority: item.priority as 'low' | 'medium' | 'high',
-                source: 'manual',
+                source: item.source as 'manual' | 'notion',
                 sourceId: item.id,
                 dueDate: item.dueDate ?? undefined
             });
@@ -266,10 +268,34 @@ export class IntegrationEngine {
                 break;
 
             case 'checklist':
-                await prisma.checklistItem.update({
-                    where: { id: idParts[0] },
+                const checklistId = idParts[0];
+                const item = await prisma.checklistItem.update({
+                    where: { id: checklistId },
                     data: { completed }
                 });
+
+                if (item.source === 'notion' && item.sourceId) {
+                    try {
+                        const integrationAccount = await prisma.integrationAccount.findUnique({
+                            where: {
+                                userId_provider: {
+                                    userId: item.userId,
+                                    provider: 'notion'
+                                }
+                            }
+                        });
+                        if (integrationAccount) {
+                            const { notionService } = await import('./notion');
+                            await notionService.updatePageCompletion(
+                                integrationAccount.accessToken,
+                                item.sourceId,
+                                completed
+                            );
+                        }
+                    } catch (notionError) {
+                        console.error('Failed to sync completion to Notion:', notionError);
+                    }
+                }
                 break;
 
             case 'school':

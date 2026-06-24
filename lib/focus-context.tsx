@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { eventBus } from '@/lib/events/event-bus'
 
 export type FocusMode = 'work' | 'shortBreak' | 'longBreak'
 
@@ -251,7 +252,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const saveFocusSession = async (duration: number) => {
+  const saveFocusSession = async (duration: number, interrupted = false) => {
     if (!session?.user?.id) return
     const durationMins = Math.round(duration / 60)
     if (durationMins < 1) return // ignore accidental sub-minute sessions
@@ -279,6 +280,23 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
           metadata: { duration, profileId: activeProfileId, taskId: selectedTaskId }
         })
       }).catch(() => {})
+
+      // Dispatch to Central Event Bus
+      if (interrupted) {
+        eventBus.dispatch('FocusInterrupted', {
+          duration: durationMins,
+          mode,
+          profileId: activeProfileId,
+          taskId: selectedTaskId
+        })
+      } else {
+        eventBus.dispatch('FocusEnded', {
+          duration: durationMins,
+          mode,
+          profileId: activeProfileId,
+          taskId: selectedTaskId
+        })
+      }
     } catch (error) {
       console.error('Failed to save focus session:', error)
     }
@@ -288,6 +306,11 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
   const toggleTimer = () => {
     if (!isActive) {
       // Starting — emit focus_started signal
+      eventBus.dispatch('FocusStarted', {
+        mode,
+        profileId: activeProfileId,
+        taskId: selectedTaskId
+      })
       fetch('/api/focus-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -296,7 +319,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
     } else if (isActive && sessionStartTime) {
       // Stopping: save partial time
       const actualDuration = Math.floor((Date.now() - sessionStartTime) / 1000)
-      if (actualDuration > 0) saveFocusSession(actualDuration)
+      if (actualDuration > 0) saveFocusSession(actualDuration, true)
       setSessionStartTime(null)
     }
     setIsActive(!isActive)
@@ -305,7 +328,7 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
   const resetTimer = () => {
     if (isActive && sessionStartTime) {
       const actualDuration = Math.floor((Date.now() - sessionStartTime) / 1000)
-      if (actualDuration > 0) saveFocusSession(actualDuration)
+      if (actualDuration > 0) saveFocusSession(actualDuration, true)
     }
     setIsActive(false)
     setSessionStartTime(null)

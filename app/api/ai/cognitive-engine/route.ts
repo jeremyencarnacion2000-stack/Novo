@@ -31,6 +31,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const chronotypeOverride = searchParams.get('chronotype');
+    const phaseOverride = searchParams.get('phase');
+
     const userId = session.user.id;
     const now = new Date();
     const todayStart = new Date(now);
@@ -117,11 +121,11 @@ export async function GET(req: NextRequest) {
     ) + highPriorityPending.slice(0, 5).reduce((acc, t) =>
       acc + getCognitiveWeight(t.priority), 0
     );
-    const cognitiveLoad = Math.min(100, Math.round(cognitiveLoadRaw * 8));
+    let cognitiveLoad = Math.min(100, Math.round(cognitiveLoadRaw * 8));
 
     // Circadian energy at current hour
     const currentHour = now.getHours();
-    const currentEnergy = getCircadianEnergyAt(currentHour);
+    let currentEnergy = getCircadianEnergyAt(currentHour);
     const peakHour = 10;
     const dipHour = 14;
 
@@ -140,7 +144,7 @@ export async function GET(req: NextRequest) {
     const workloadDensity = Math.min(100, overdueTasks.length * 10 + todayTasks.length * 5);
 
     // Burnout risk composite
-    const burnoutRisk = Math.min(100, Math.round(
+    let burnoutRisk = Math.min(100, Math.round(
       (workloadDensity * 0.3) +
       (procrastinationScore * 0.25) +
       (focusFragmentation * 0.2) +
@@ -150,13 +154,42 @@ export async function GET(req: NextRequest) {
 
     // Focus score (composite of all positive signals)
     const recoveryBonus = recoveryState === 'optimal' ? 20 : recoveryState === 'moderate' ? 10 : 0;
-    const focusScore = Math.max(5, Math.min(100, Math.round(
+    let focusScore = Math.max(5, Math.min(100, Math.round(
       currentEnergy * 0.35 +
       (100 - cognitiveLoad) * 0.25 +
       (100 - procrastinationScore) * 0.2 +
       (avgFocusQuality / 5 * 100) * 0.1 +
       recoveryBonus * 0.1
     )));
+
+    // Apply Overrides if present
+    if (phaseOverride) {
+      if (phaseOverride === 'PEAK_FOCUS') {
+        focusScore = 95;
+        cognitiveLoad = 15;
+        recoveryState = 'optimal';
+        burnoutRisk = 12;
+        currentEnergy = 92;
+      } else if (phaseOverride === 'LINEAR_EXECUTION') {
+        focusScore = 70;
+        cognitiveLoad = 40;
+        recoveryState = 'optimal';
+        burnoutRisk = 30;
+        currentEnergy = 72;
+      } else if (phaseOverride === 'SYNAPTIC_FATIGUE') {
+        focusScore = 20;
+        cognitiveLoad = 85;
+        recoveryState = 'critical';
+        burnoutRisk = 80;
+        currentEnergy = 22;
+      } else if (phaseOverride === 'REDUCED_CAPACITY_MODE') {
+        focusScore = 30;
+        cognitiveLoad = 75;
+        recoveryState = 'impaired';
+        burnoutRisk = 75;
+        currentEnergy = 35;
+      }
+    }
 
     // Build the 24-hour energy timeline
     const energyTimeline = Array.from({ length: 24 }, (_, h) => ({

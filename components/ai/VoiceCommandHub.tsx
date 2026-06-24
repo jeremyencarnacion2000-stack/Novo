@@ -31,6 +31,8 @@ import {
 import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
+import { eventBus } from '@/lib/events/event-bus'
+import { sileo } from 'sileo'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -242,7 +244,39 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
             ...prev.slice(0, 4),
           ])
 
-          // Dispatch global event so other modules can react
+          // Trigger Sileo physics-based spring notification toast
+          if (result.success) {
+            if (result.deferred) {
+              sileo.warning({
+                title: 'Comando Diferido',
+                description: result.message,
+                duration: 5000,
+              })
+            } else {
+              sileo.success({
+                title: 'Comando Ejecutado',
+                description: result.message,
+                duration: 5000,
+              })
+            }
+          } else {
+            sileo.error({
+              title: 'Error de Comando',
+              description: result.message || 'Error al procesar el comando de voz.',
+              duration: 5000,
+            })
+          }
+
+          // Dispatch to Central Cognitive Event Bus (behavioral telemetry)
+          eventBus.dispatch('VoiceCommandExecuted', {
+            text,
+            action: result.action,
+            success: result.success,
+            deferred: result.deferred ?? false,
+            phase: bioState?.phase,
+          }, { path: typeof window !== 'undefined' ? window.location.pathname : undefined })
+
+          // Dispatch legacy window event so other modules can react
           window.dispatchEvent(new CustomEvent('voice-command-executed', {
             detail: { text, result, phase: bioState?.phase }
           }))

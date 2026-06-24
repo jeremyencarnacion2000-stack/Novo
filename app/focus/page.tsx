@@ -70,134 +70,178 @@ export default function FocusPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Timer Column */}
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="border-2 shadow-sm bg-card/50">
-                        <CardContent className="pt-8 pb-8">
-                            <div className="flex flex-col items-center gap-6">
-                                {/* Session Type Badge */}
-                                <Badge
-                                    variant={mode === 'work' ? 'default' : 'secondary'}
-                                    className="text-base px-5 py-1.5 transition-colors duration-300"
-                                >
-                                    {mode === 'work' ? '🎯 Focus Session' : (mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break')}
-                                </Badge>
+                    <div
+                        className="relative overflow-hidden rounded-3xl border border-white/[0.07] p-8"
+                        style={{
+                            background: 'rgba(255,255,255,0.015)',
+                            backdropFilter: 'blur(12px)',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                        }}
+                    >
+                        {/* Grain noise overlay */}
+                        <div 
+                            className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                            }}
+                        />
 
-                                {/* Timer Display */}
-                                <motion.div
-                                    className="relative"
-                                    animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
-                                    transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
-                                >
-                                    <div className="text-6xl sm:text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">
-                                        {formatTime(time)}
-                                    </div>
-                                </motion.div>
+                        <div className="relative z-10 flex flex-col items-center gap-6">
+                            {/* Session Type Badge */}
+                            <Badge
+                                variant={mode === 'work' ? 'default' : 'secondary'}
+                                className="text-base px-5 py-1.5 transition-colors duration-300"
+                            >
+                                {mode === 'work' ? '🎯 Focus Session' : (mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break')}
+                            </Badge>
 
-                                {/* Progress Bar */}
-                                <div className="w-full max-w-md space-y-2">
-                                    <Progress value={progress} className="h-2.5" />
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                        <span>{Math.round(progress)}%</span>
-                                        <span>{mode === 'work' ? 'Stay focused' : 'Relax'}</span>
-                                    </div>
+                            {/* Timer Display */}
+                            <motion.div
+                                className="relative"
+                                animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
+                                transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
+                            >
+                                <div className="text-6xl sm:text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">
+                                    {formatTime(time)}
                                 </div>
+                            </motion.div>
 
-                                {/* Controls */}
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        size="lg"
-                                        onClick={toggleTimer}
-                                        className={`px-8 h-12 text-base rounded-full transition-all ${isActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105'}`}
-                                    >
-                                        {isActive ? (
-                                            <>
-                                                <Pause className="h-5 w-5 mr-2" />
-                                                Pause
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Play className="h-5 w-5 mr-2" />
-                                                Start
-                                            </>
-                                        )}
-                                    </Button>
-
-                                    <Button
-                                        size="icon"
-                                        variant="outline"
-                                        onClick={resetTimer}
-                                        className="h-12 w-12 rounded-full"
-                                        title="Reset Timer"
-                                    >
-                                        <Square className="h-4 w-4" />
-                                    </Button>
-
-                                    <Button
-                                        size="icon"
-                                        variant="outline"
-                                        onClick={skipTimer}
-                                        className="h-12 w-12 rounded-full"
-                                        title="Skip Session"
-                                    >
-                                        <SkipForward className="h-4 w-4" />
-                                    </Button>
-                                </div>
-
-                                {/* Pomodoro Counter */}
-                                <div className="flex items-center gap-3 mt-2 bg-muted/30 px-4 py-1.5 rounded-full">
-                                    <span className="text-xs font-medium text-muted-foreground">Session:</span>
-                                    <div className="flex gap-1.5">
-                                        {[...Array(4)].map((_, i) => (
-                                            <div
-                                                key={i}
-                                                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i < pomodoroCount % 4
-                                                    ? 'bg-primary scale-110'
-                                                    : 'bg-muted-foreground/20'
-                                                    }`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span className="text-xs font-medium ml-1 text-foreground">
-                                        {pomodoroCount % 4}/4
-                                    </span>
+                            {/* Progress Bar */}
+                            <div className="w-full max-w-md space-y-2">
+                                <Progress value={progress} className="h-2.5" />
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>{Math.round(progress)}%</span>
+                                    <span>{mode === 'work' ? 'Stay focused' : 'Relax'}</span>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+
+                            {/* Controls */}
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    size="lg"
+                                    onClick={toggleTimer}
+                                    className={`px-8 h-12 text-base rounded-full transition-all ${isActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105'}`}
+                                >
+                                    {isActive ? (
+                                        <>
+                                            <Pause className="h-5 w-5 mr-2" />
+                                            Pause
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Play className="h-5 w-5 mr-2" />
+                                            Start
+                                        </>
+                                    )}
+                                </Button>
+
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={resetTimer}
+                                    className="h-12 w-12 rounded-full"
+                                    title="Reset Timer"
+                                >
+                                    <Square className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={skipTimer}
+                                    className="h-12 w-12 rounded-full"
+                                    title="Skip Session"
+                                >
+                                    <SkipForward className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            {/* Pomodoro Counter */}
+                            <div className="flex items-center gap-3 mt-2 bg-muted/30 px-4 py-1.5 rounded-full">
+                                <span className="text-xs font-medium text-muted-foreground">Session:</span>
+                                <div className="flex gap-1.5">
+                                    {[...Array(4)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i < pomodoroCount % 4
+                                                ? 'bg-primary scale-110'
+                                                : 'bg-muted-foreground/20'
+                                                }`}
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-xs font-medium ml-1 text-foreground">
+                                    {pomodoroCount % 4}/4
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Stats Cards Row */}
                     <div className="grid grid-cols-3 gap-4">
-                        <Card className="bg-card/50">
-                            <CardHeader className="p-4 pb-2">
-                                <CardDescription className="text-xs">Today</CardDescription>
-                                <CardTitle className="text-lg">{todayFocusTimeStr}</CardTitle>
-                            </CardHeader>
-                        </Card>
-                        <Card className="bg-card/50">
-                            <CardHeader className="p-4 pb-2">
-                                <CardDescription className="text-xs">Focus</CardDescription>
-                                <CardTitle className="text-lg">{pomodoroCount}</CardTitle>
-                            </CardHeader>
-                        </Card>
-                        <Card className="bg-card/50">
-                            <CardHeader className="p-4 pb-2">
-                                <CardDescription className="text-xs">Streak</CardDescription>
-                                <CardTitle className="text-lg">🔥 {streakDays}</CardTitle>
-                            </CardHeader>
-                        </Card>
+                        <div
+                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            style={{
+                                background: 'rgba(255,255,255,0.015)',
+                                backdropFilter: 'blur(12px)',
+                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                            }}
+                        >
+                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Deep work today</p>
+                            <p className="text-xl font-black text-white mt-1.5">{todayFocusTimeStr}</p>
+                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                                {parseFloat(todayFocusTimeStr) > 0 ? 'above yesterday\'s session' : 'establish focus index'}
+                            </p>
+                        </div>
+                        <div
+                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            style={{
+                                background: 'rgba(255,255,255,0.015)',
+                                backdropFilter: 'blur(12px)',
+                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                            }}
+                        >
+                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Sessions completed</p>
+                            <p className="text-xl font-black text-white mt-1.5">{pomodoroCount}</p>
+                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                                {pomodoroCount > 0 ? 'building consistency momentum' : 'no sessions registered today'}
+                            </p>
+                        </div>
+                        <div
+                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            style={{
+                                background: 'rgba(255,255,255,0.015)',
+                                backdropFilter: 'blur(12px)',
+                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                            }}
+                        >
+                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Active streak</p>
+                            <p className="text-xl font-black text-white mt-1.5">🔥 {streakDays}d</p>
+                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                                {streakDays > 0 ? 'maintaining execution fidelity' : 'start a streak today'}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
                 {/* Task Column */}
                 <div className="space-y-6">
-                    <Card className="h-full flex flex-col border-2 bg-card/50">
-                        <CardHeader className="p-4">
-                            <CardTitle className="flex items-center gap-2 text-lg">
+                    <div
+                        className="h-full flex flex-col relative overflow-hidden rounded-3xl border border-white/[0.07] p-4"
+                        style={{
+                            background: 'rgba(255,255,255,0.015)',
+                            backdropFilter: 'blur(12px)',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                        }}
+                    >
+                        <div className="p-0 pb-4">
+                            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
                                 <CheckCircle2 className="h-5 w-5 text-primary" />
                                 Tasks
-                            </CardTitle>
-                            <CardDescription className="text-xs">Select a task to track your focus</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0">
+                            </h2>
+                            <p className="text-xs text-white/40 mt-1">Select a task to track your focus</p>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-4">
                             <form onSubmit={handleAddTask} className="flex gap-2">
                                 <Input
                                     placeholder="Add a new task..."
@@ -213,8 +257,22 @@ export default function FocusPage() {
                             <ScrollArea className="flex-1 pr-4 -mr-4 h-[250px] lg:h-[350px]">
                                 <div className="space-y-2">
                                     {tasks.length === 0 && (
-                                        <div className="text-center text-muted-foreground py-8 text-xs">
-                                            No tasks yet. Add one to get started!
+                                        <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+                                            <div
+                                                className="w-10 h-10 rounded-xl border border-primary/15 flex items-center justify-center"
+                                                style={{ background: 'rgba(99,102,241,0.06)' }}
+                                            >
+                                                <CheckCircle2 className="h-4 w-4 text-primary/50" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-muted-foreground">
+                                                    No task selected for this session
+                                                </p>
+                                                <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">
+                                                    Linking a task lets Novo attribute this focus time to your
+                                                    completion rate and improve future scheduling.
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                     {tasks.map(task => (
@@ -242,8 +300,8 @@ export default function FocusPage() {
                                     ))}
                                 </div>
                             </ScrollArea>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

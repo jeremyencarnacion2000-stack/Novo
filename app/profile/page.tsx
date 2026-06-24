@@ -107,7 +107,7 @@ export default function ProfilePage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-7">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         {/* User Info & Stats */}
         <div className="lg:col-span-3 space-y-6">
           {/* Profile Card */}

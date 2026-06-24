@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { eventBus } from '@/lib/events/event-bus'
 import { motion } from 'framer-motion'
 import { Routine, RoutineDay, RoutineExercise } from '@/types/routine'
 import { Button } from '@/components/ui/button'
@@ -153,6 +154,14 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
             Object.values(exerciseLog).forEach(set => {
                 if (set.completed) tasksCompleted++
             })
+        })
+
+        // Dispatch to Central Event Bus
+        eventBus.dispatch('HabitCompleted', {
+            habitId: routine.id,
+            habitName: routine.name,
+            type: 'routine',
+            completionRate: tasksTotal > 0 ? (tasksCompleted / tasksTotal) : 1
         })
 
         // Track completion if user is logged in

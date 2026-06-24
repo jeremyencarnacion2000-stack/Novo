@@ -175,7 +175,7 @@ export default function LibraryPage() {
               )}
             </div>
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-              <SelectTrigger className="w-[160px] h-9 bg-background/50 backdrop-blur-sm border-border/50 rounded-xl text-sm">
+              <SelectTrigger className="w-full sm:w-[160px] h-9 bg-background/50 backdrop-blur-sm border-border/50 rounded-xl text-sm">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>

@@ -1,19 +1,20 @@
 
-import { SettingsSections } from '@/components/settings/settings-sections'
+import { SettingsControlCenter } from '@/components/settings/settings-control-center'
 
 export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6 md:gap-8">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
-          Settings
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 mb-1">Control Center</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white/90">
+          System Settings
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Manage your preferences and customize your Novo experience
+        <p className="text-white/40 mt-1 text-sm">
+          Cognitive Twin telemetry, behavioral controls, and advanced diagnostics.
         </p>
       </div>
 
-      <SettingsSections />
+      <SettingsControlCenter />
     </div>
   )
 }

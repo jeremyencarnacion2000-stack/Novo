@@ -71,7 +71,7 @@ export function QuickActions() {
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className="justify-between h-auto py-3 px-4 rounded-xl bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08] group transition-all"
+                  className="justify-between h-auto py-3 px-4 glass-card hover:!bg-white/[0.06] group transition-all duration-300"
                   asChild
                 >
                   <Link href={action.href}>
@@ -103,9 +103,9 @@ export function QuickActions() {
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className={`justify-between h-auto py-3 px-4 rounded-xl group transition-all duration-300 ${isProbable
-                    ? 'bg-primary/10 border border-primary/20 shadow-[0_10px_30px_rgba(var(--primary-rgb),0.1)] hover:bg-primary/20'
-                    : 'bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08]'
+                  className={`justify-between h-auto py-3 px-4 glass-card group transition-all duration-300 ${isProbable
+                    ? 'border-primary/20 bg-primary/10 bloom-soft hover:bg-primary/20'
+                    : 'hover:!bg-white/[0.06]'
                     }`}
                   asChild
                 >

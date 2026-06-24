@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, ArrowRight } from 'lucide-react'
 import { Tracker } from '@/types/tracker'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { eventBus } from '@/lib/events/event-bus'
 
 export const DashboardHabits = React.memo(function DashboardHabits() {
   const [habits, setHabits] = useState<Tracker[]>([])
@@ -38,6 +39,11 @@ export const DashboardHabits = React.memo(function DashboardHabits() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: today, value: 1 })
+        })
+        eventBus.dispatch('HabitCompleted', {
+          habitId: id,
+          habitName: habit?.name,
+          type: 'habit'
         })
       }
 

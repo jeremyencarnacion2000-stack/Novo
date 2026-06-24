@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Brain, ArrowRight, Sparkles, Send, RefreshCw, BarChart2, ShieldAlert, Cpu, Heart } from 'lucide-react'
+import { Brain, ArrowRight, Sparkles, Send, RefreshCw } from 'lucide-react'
+import { OrbPrimitive, ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 
 interface Message {
@@ -147,6 +148,19 @@ function OnboardingContent() {
     setStage('compilation')
     
     // Call analysis endpoint with conversation history
+    // 8-second timeout — fallback to default twin values to avoid infinite loading
+    const analyzeTimeout = setTimeout(() => {
+      if (!twinData) {
+        setTwinData({
+          confidenceScore: 42,
+          trustLevel: 'initial',
+          identity: { role: '', focusStyle: '', deepWorkCapacity: 3.5, industry: '' },
+          energyCurve: { chronotype: '', peakFocusStart: '', peakFocusEnd: '', typicalSlumpHour: 14 },
+          selfDiscoveryText: 'Tu perfil base ha sido creado. El Twin aprenderá de tus patrones reales con el tiempo.',
+        })
+      }
+    }, 8000)
+
     try {
       const response = await fetch('/api/onboarding/analyze', {
         method: 'POST',
@@ -154,9 +168,11 @@ function OnboardingContent() {
         body: JSON.stringify({ messages })
       })
       const data = await response.json()
+      clearTimeout(analyzeTimeout)
       setTwinData(data)
     } catch (e) {
       console.error(e)
+      // timeout fallback will fire at 8s
     }
 
     // Run compile visual steps
@@ -305,17 +321,9 @@ function OnboardingContent() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md w-full mx-auto relative z-10"
             >
-              {/* Pulsing Neural Center Core */}
-              <div className="relative mb-10">
-                <div className="absolute inset-[-12px] rounded-full border border-indigo-500/20 animate-ping opacity-70" />
-                <div className="absolute inset-[-4px] rounded-full border border-indigo-500/30 animate-pulse" />
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 6, ease: 'linear' }}
-                  className="w-20 h-20 rounded-3xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.2)]"
-                >
-                  <Cpu className="w-8 h-8 text-indigo-400" />
-                </motion.div>
+              {/* Cognitive Orb — uses standardized OrbPrimitive */}
+              <div className="mb-10">
+                <OrbPrimitive size="xl" variant="thinking" pulse glow />
               </div>
 
               <h2 className="text-xl font-bold tracking-tight text-white mb-2">
@@ -371,43 +379,40 @@ function OnboardingContent() {
             >
               <div className="space-y-6">
                 
-                {/* Confidence Meter Hero Header */}
+                {/* Confidence Header — uses standardized primitives */}
                 <div className="rounded-3xl border border-white/[0.08] p-5 bg-gradient-to-b from-indigo-500/10 to-transparent backdrop-blur-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <p className="text-[9px] font-black tracking-[0.25em] uppercase text-indigo-400 mb-1">COGNITIVE ACCURACY</p>
-                      <h3 className="text-2xl font-black text-white leading-none">
-                        {twinData?.confidenceScore ? `${twinData.confidenceScore}%` : '42%'}
-                      </h3>
-                      <p className="text-[10px] text-white/30 font-semibold tracking-wider mt-1.5">
-                        {twinData?.trustLevel ? `Confidence Status: ${twinData.trustLevel}` : 'Learning in progress...'}
+                  <div className="flex items-center gap-5">
+                    <ConfidenceGauge score={twinData?.confidenceScore ?? 42} size="md" />
+                    <div className="flex-1">
+                      <p className="text-[9px] font-black tracking-[0.25em] uppercase text-white/30 mb-1">COGNITIVE ACCURACY</p>
+                      <TrustBadge level={twinData?.trustLevel ?? 'initial'} />
+                      <p className="text-[10px] text-white/30 font-medium mt-2 leading-relaxed">
+                        {isDemoMode
+                          ? 'Simulación de 30 días completada con señales comportamentales históricas.'
+                          : 'Tu Twin aprenderá y aumentará su precisión analizando tus hábitos reales.'}
                       </p>
                     </div>
-                    <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[9px] font-bold text-white/70 tracking-widest uppercase">
-                      {isDemoMode ? 'Demo Seeding Done' : 'Twin Calibrated'}
+                    <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[9px] font-bold text-white/50 tracking-widest uppercase flex-shrink-0">
+                      {isDemoMode ? 'Demo' : 'Calibrado'}
                     </div>
                   </div>
-                  <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-4">
-                    <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${twinData?.confidenceScore ?? 42}%` }} />
-                  </div>
-                  <p className="text-[9px] text-white/25 mt-2.5 font-medium leading-relaxed">
-                    {isDemoMode
-                      ? 'Simulación completa: Se han generado 30 días de señales comportamentales, registros de evolución y gráficos de carga cognitiva.'
-                      : 'Tu Twin aprenderá y aumentará su precisión de forma dinámica analizando tus hábitos, tareas y descansos.'}
-                  </p>
                 </div>
 
                 {/* Profile Grid Cards */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] p-4">
-                    <span className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30">Focus Profile</span>
+                    <span className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30">Perfil de Foco</span>
                     <h4 className="text-sm font-bold text-white mt-1 capitalize">
-                      {twinData?.identity?.focusStyle ? twinData.identity.focusStyle.replace(/_/g, ' ') : 'Deep Builder'}
+                      {twinData?.identity?.focusStyle === 'deep_builder' ? 'Constructor Profundo' :
+                       twinData?.identity?.focusStyle === 'reactive_communicator' ? 'Comunicador Reactivo' :
+                       twinData?.identity?.focusStyle === 'frantic_juggler' ? 'Malabarista Frenético' :
+                       twinData?.identity?.focusStyle === 'consistent_planner' ? 'Planificador Consistente' :
+                       'Constructor Profundo'}
                     </h4>
                   </div>
                   <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] p-4">
-                    <span className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30">Peak Window</span>
+                    <span className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30">Ventana de Foco</span>
                     <h4 className="text-sm font-bold text-indigo-400 mt-1 uppercase">
                       {twinData?.energyCurve?.peakFocusStart
                         ? `${twinData.energyCurve.peakFocusStart} - ${twinData.energyCurve.peakFocusEnd}`
@@ -422,7 +427,7 @@ function OnboardingContent() {
                   <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] p-5 backdrop-blur-xl">
                     <p className="text-sm text-white/80 leading-relaxed font-medium">
                       {isDemoMode
-                        ? 'Usuario clasificado como Night Owl con alta capacidad de foco en horas de la noche. Detectada tendencia leve a la procrastinación en tareas complejas y fatiga acumulada durante las tardes.'
+                        ? 'Usuario clasificado como Búho Nocturno con alta capacidad de foco en horas de la noche. Detectada tendencia leve a la procrastinación en tareas complejas y fatiga acumulada durante las tardes.'
                         : (twinData?.selfDiscoveryText || 'Analizando perfil...')}
                     </p>
                   </div>

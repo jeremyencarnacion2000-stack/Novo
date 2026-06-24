@@ -1,8 +1,11 @@
+'use client'
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
+import { GlassSurface } from '@/components/ui/GlassSurface'
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-sm font-medium transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:scale-100 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
@@ -19,6 +22,7 @@ const buttonVariants = cva(
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',
+        glass: 'bg-transparent text-foreground border-transparent hover:bg-transparent shadow-none scale-100 active:scale-95 hover:scale-[1.02]',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
@@ -46,6 +50,28 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
+  if (variant === 'glass') {
+    return (
+      <GlassSurface
+        as={asChild ? Slot : 'button'}
+        radius={9999}
+        depth={10}
+        blur={1}
+        strength={100}
+        chromaticAberration={15}
+        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.1)"
+        elevation="low"
+        contrastObserver
+        className={cn(
+          buttonVariants({ variant, size }),
+          "border-0 shadow-none",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+
   const Comp = asChild ? Slot : 'button'
 
   return (

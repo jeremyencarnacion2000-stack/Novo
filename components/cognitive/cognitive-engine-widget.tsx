@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Brain, ArrowRight, AlertTriangle, Zap, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { springConfig } from '@/lib/design-tokens';
 
 interface WidgetData {
   focusScore: number;
@@ -72,8 +73,8 @@ export function CognitiveEngineWidget() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        whileHover={{ scale: 1.015, y: -2 }}
+        transition={{ ...springConfig.smooth, delay: 0.05 }}
+        whileHover={{ scale: 1.015, y: -2, transition: { ...springConfig.snappy } }}
         className={cn(
           'relative overflow-hidden rounded-3xl p-5 border transition-all duration-500 cursor-pointer',
           'border-white/[0.08] bg-white/[0.01] backdrop-blur-xl',

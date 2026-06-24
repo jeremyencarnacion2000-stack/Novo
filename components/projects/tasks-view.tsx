@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton"
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState"
 import { AnimatePresence, motion } from "framer-motion"
+import { eventBus } from "@/lib/events/event-bus"
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
   { status: "todo", title: "Not Started", color: "text-muted-foreground" },
@@ -91,6 +92,11 @@ export function TasksView() {
       }
       setTasks([...tasks, parsedTask as Task])
       toast.success("Task created")
+      eventBus.dispatch("TaskCreated", {
+        taskId: parsedTask.id,
+        taskTitle: parsedTask.title,
+        priority: parsedTask.priority,
+      })
     } catch (error) {
       console.error('Failed to create task:', error)
       toast.error("Failed to create task")
@@ -141,6 +147,13 @@ export function TasksView() {
         const updatedTask = await res.json()
         const updatedTasks = tasks.map((t) => (t.id === id ? updatedTask : t))
         setTasks(updatedTasks)
+        if (status === 'done') {
+          eventBus.dispatch("TaskCompleted", {
+            taskId: id,
+            taskTitle: updatedTask.title,
+            priority: updatedTask.priority,
+          })
+        }
       }
     } catch (error) {
       console.error('Failed to update task status:', error)

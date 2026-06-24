@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
+import { motion, AnimatePresence } from 'framer-motion'
 import { QuickCapture } from '@/components/quick-notes/quick-capture'
 import { NoteCard } from '@/components/quick-notes/note-card'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Search, Loader2, Archive, Pin } from 'lucide-react'
+import { Search, Loader2, Archive, Pin, FileText, Sparkles, ChevronRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface Note {
@@ -63,18 +62,18 @@ export default function NotesPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Notes</h1>
-                    <p className="text-muted-foreground mt-1">Capture ideas and thoughts instantly</p>
-                </div >
+                    <h1 className="text-2xl font-black tracking-tight text-white/90">Quick Notes</h1>
+                    <p className="text-xs text-white/30 font-medium mt-0.5">Capture ideas and thoughts instantly</p>
+                </div>
                 <QuickCapture />
-            </div >
+            </div>
 
             <div className="flex items-center gap-4">
                 <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
                     <Input
                         placeholder="Search notes..."
-                        className="pl-9"
+                        className="pl-9 bg-white/[0.03] border-white/[0.08] text-white/80 placeholder:text-white/25 rounded-2xl h-10 focus:border-white/20 focus:bg-white/[0.05] transition-all"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -90,9 +89,9 @@ export default function NotesPage() {
                 <TabsContent value="active" className="mt-6 space-y-8">
                     {pinnedNotes.length > 0 && (
                         <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                <Pin className="h-4 w-4" />
-                                Pinned
+                            <div className="flex items-center gap-2">
+                                <Pin className="h-3 w-3 text-amber-400/70" />
+                                <span className="text-[10px] font-black tracking-[0.25em] uppercase text-white/35">Pinned</span>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {pinnedNotes.map(note => (
@@ -104,7 +103,7 @@ export default function NotesPage() {
 
                     <div className="space-y-4">
                         {pinnedNotes.length > 0 && otherNotes.length > 0 && (
-                            <div className="text-sm font-medium text-muted-foreground">Others</div>
+                            <span className="text-[10px] font-black tracking-[0.25em] uppercase text-white/25">Others</span>
                         )}
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {otherNotes.map(note => (
@@ -112,11 +111,72 @@ export default function NotesPage() {
                             ))}
                         </div>
                         {activeNotes.length === 0 && (
-                            <div className="text-center py-12 text-muted-foreground">
-                                No notes found. Create one to get started!
-                            </div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4 }}
+                                className="flex flex-col items-center justify-center py-20 gap-5 text-center"
+                            >
+                                {/* Glow icon */}
+                                <div
+                                    className="w-16 h-16 rounded-3xl border border-indigo-500/20 flex items-center justify-center relative"
+                                    style={{ background: 'rgba(99,102,241,0.06)', boxShadow: '0 0 32px rgba(99,102,241,0.10)' }}
+                                >
+                                    <FileText className="w-7 h-7 text-indigo-400/70" />
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+                                        <Sparkles className="w-2.5 h-2.5 text-indigo-300" />
+                                    </span>
+                                </div>
+
+                                <div className="max-w-xs space-y-2">
+                                    <p className="text-base font-bold text-white/80">Your thought space is clear</p>
+                                    <p className="text-sm text-white/35 leading-relaxed">
+                                        Novo captures your ideas instantly and surfaces them at the right moment.
+                                        Start with a single thought — no structure required.
+                                    </p>
+                                </div>
+
+                                {/* CTA pill */}
+                                <div
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-white/40"
+                                    style={{ background: 'rgba(255,255,255,0.025)' }}
+                                >
+                                    <ChevronRight className="w-3.5 h-3.5 text-indigo-400/60" />
+                                    Use <span className="text-indigo-300/80 font-black">Quick Capture</span> above or press <kbd className="ml-1 text-[9px] bg-white/5 border border-white/10 rounded px-1 py-0.5 font-bold text-white/30">⌘ K</kbd>
+                                </div>
+                            </motion.div>
                         )}
                     </div>
+                </TabsContent>
+
+                <TabsContent value="archived" className="mt-6">
+                    {archivedNotes.length > 0 ? (
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {archivedNotes.map(note => (
+                                <NoteCard key={note.id} note={note} />
+                            ))}
+                        </div>
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
+                            className="flex flex-col items-center justify-center py-20 gap-5 text-center"
+                        >
+                            <div
+                                className="w-16 h-16 rounded-3xl border border-white/10 flex items-center justify-center"
+                                style={{ background: 'rgba(255,255,255,0.025)', boxShadow: '0 0 24px rgba(255,255,255,0.03)' }}
+                            >
+                                <Archive className="w-7 h-7 text-white/20" />
+                            </div>
+                            <div className="max-w-xs space-y-2">
+                                <p className="text-base font-bold text-white/50">No archived notes</p>
+                                <p className="text-sm text-white/25 leading-relaxed">
+                                    Notes you archive will appear here. Use archiving to declutter without losing your captures.
+                                </p>
+                            </div>
+                        </motion.div>
+                    )}
                 </TabsContent>
             </Tabs>
         </div>

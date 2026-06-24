@@ -121,7 +121,7 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
   }
 
   return (
-    <Card className="transition-all hover:shadow-md h-full">
+    <Card className="transition-all hover:shadow-s h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="subtitle-technical">Recent Activity</CardTitle>

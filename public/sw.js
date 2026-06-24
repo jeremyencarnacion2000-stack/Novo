@@ -53,8 +53,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Handle API requests
-  if (url.pathname.startsWith('/api/')) {
+  // Handle API requests (exclude next-auth to prevent auth loops or stale session caches)
+  if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/')) {
     event.respondWith(
       caches.open(API_CACHE_NAME).then((cache) => {
         return fetch(request).then((response) => {

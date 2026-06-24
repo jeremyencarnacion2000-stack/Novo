@@ -3,6 +3,7 @@ export interface CognitiveInsight {
   severity: 'info' | 'warning' | 'critical';
   headline: string;
   detail: string;
+  action?: string;
 }
 
 export interface ReorganizedTask {

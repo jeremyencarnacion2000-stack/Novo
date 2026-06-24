@@ -10,27 +10,28 @@ export interface CognitiveTwin {
   updatedAt: string
   version: number
   isInitialized: boolean
-  confidenceScore: number // Starts at 42, grows non-linearly with real signals
-  trustLevel: TrustLevel  // Derived from confidenceScore
+  onboardingCompletedAt: string | null   // First-class persisted event — never null after onboarding
+  confidenceScore: number
+  trustLevel: TrustLevel
 
   identity: {
     role: 'student' | 'founder' | 'developer' | 'creator' | 'professional' | ''
     industry: string
     focusStyle: 'deep_builder' | 'reactive_communicator' | 'frantic_juggler' | 'consistent_planner' | ''
-    deepWorkCapacity: number // hours, default: 3.5
+    deepWorkCapacity: number
   }
 
   energyCurve: {
     chronotype: 'morning_lark' | 'night_owl' | 'afternoon_peak' | ''
-    peakFocusStart: string // e.g. '09:00' — inferred by Evolution Engine
-    peakFocusEnd: string   // e.g. '12:00'
+    peakFocusStart: string
+    peakFocusEnd: string
     typicalSlumpHour: number
   }
 
   metrics: {
-    currentCognitiveLoad: number // 0-100
+    currentCognitiveLoad: number
     decisionFatigueRisk: 'low' | 'moderate' | 'high' | 'critical'
-    burnoutIndex: number // 0-100
+    burnoutIndex: number
   }
 
   bottlenecks: {
@@ -52,6 +53,7 @@ const defaultTwin: CognitiveTwin = {
   updatedAt: new Date().toISOString(),
   version: 1,
   isInitialized: false,
+  onboardingCompletedAt: null,
   confidenceScore: 42,
   trustLevel: 'initial',
   identity: { role: '', industry: '', focusStyle: '', deepWorkCapacity: 3.5 },
@@ -75,31 +77,41 @@ interface CognitiveTwinContextType {
 
 const CognitiveTwinContext = createContext<CognitiveTwinContextType | undefined>(undefined)
 
-// ── Merge strategy: server wins for inference fields, localStorage wins for workspace preferences ──
-function mergeTwins(local: CognitiveTwin, server: Record<string, unknown>): CognitiveTwin {
+// ── Merge strategy: SERVER WINS on all core fields.
+// workspaceLayout is merged additively (server as base, any extra client-only keys preserved).
+// localStorage is never authoritative — it is only used as an offline fallback when the
+// server returns null (network failure, first boot before record is created).
+function serverToTwin(serverRecord: Record<string, unknown>, fallback: CognitiveTwin): CognitiveTwin {
   return {
-    ...local,
-    // Server-authoritative fields (Evolution Engine owns these)
-    confidenceScore: (server.confidenceScore as number) ?? local.confidenceScore,
-    trustLevel: (server.trustLevel as TrustLevel) ?? local.trustLevel,
-    isInitialized: (server.isInitialized as boolean) ?? local.isInitialized,
+    ...fallback,
+    userId: (serverRecord.userId as string) ?? fallback.userId,
+    updatedAt: (serverRecord.updatedAt as string) ?? fallback.updatedAt,
+    version: (serverRecord.version as number) ?? fallback.version,
+    isInitialized: (serverRecord.isInitialized as boolean) ?? fallback.isInitialized,
+    onboardingCompletedAt: (serverRecord.onboardingCompletedAt as string | null) ?? fallback.onboardingCompletedAt,
+    confidenceScore: (serverRecord.confidenceScore as number) ?? fallback.confidenceScore,
+    trustLevel: (serverRecord.trustLevel as TrustLevel) ?? fallback.trustLevel,
+    identity: {
+      ...fallback.identity,
+      ...((serverRecord.identity as object) ?? {}),
+    },
     energyCurve: {
-      ...local.energyCurve,
-      ...((server.energyCurve as object) ?? {}),
+      ...fallback.energyCurve,
+      ...((serverRecord.energyCurve as object) ?? {}),
     },
     metrics: {
-      ...local.metrics,
-      ...((server.metrics as object) ?? {}),
+      ...fallback.metrics,
+      ...((serverRecord.metrics as object) ?? {}),
     },
     bottlenecks: {
-      ...local.bottlenecks,
-      ...((server.bottlenecks as object) ?? {}),
+      ...fallback.bottlenecks,
+      ...((serverRecord.bottlenecks as object) ?? {}),
     },
-    // Identity from server if local is empty
-    identity: (local.identity?.role ? local.identity : ((server.identity as CognitiveTwin['identity']) ?? local.identity)),
-    // localStorage wins for workspace layout (user preferences)
-    workspaceLayout: local.workspaceLayout,
-    updatedAt: new Date().toISOString(),
+    // workspaceLayout: server base + any client-only keys (future extensibility)
+    workspaceLayout: {
+      ...fallback.workspaceLayout,
+      ...((serverRecord.workspaceLayout as object) ?? {}),
+    },
   }
 }
 
@@ -108,57 +120,76 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
   const [twin, setTwin] = useState<CognitiveTwin>(defaultTwin)
   const [isLoading, setIsLoading] = useState(true)
 
-  // ── Phase 1: Load from localStorage immediately (no flash) ──────────────
+  // ── Single boot sequence: Server → Provider State → Cache (write-only) ──────
+  //
+  // Phase 1 (localStorage immediate load) has been intentionally REMOVED.
+  // localStorage must never overwrite server state. It is written FROM the server
+  // response so subsequent offline reads get a recent snapshot, but it is never
+  // read back into state on authenticated sessions.
+  //
+  // Boot order:
+  //   1. Render with defaultTwin (isLoading: true → guards don't fire yet)
+  //   2. Wait for session status
+  //   3. Fetch server record → server wins unconditionally
+  //   4. If server returns null (no record yet) → fall back to localStorage cache
+  //   5. isLoading: false → routing guards activate
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem('novo_cognitive_twin')
-      if (cached) setTwin(JSON.parse(cached))
-    } catch {
-      // silently ignore
-    }
-  }, [])
+    if (status === 'loading') return
 
-  // ── Phase 2: Sync with server when authenticated ─────────────────────────
-  useEffect(() => {
-    if (status !== 'authenticated') {
-      if (status === 'unauthenticated') setIsLoading(false)
+    if (status === 'unauthenticated') {
+      setIsLoading(false)
       return
     }
 
-    async function syncWithServer() {
+    // status === 'authenticated'
+    async function bootFromServer() {
       try {
         const res = await fetch('/api/cognitive-twin/sync')
-        if (!res.ok) return
-        const { twin: serverTwin } = await res.json()
-        if (!serverTwin) return
-
-        setTwin(prev => {
-          const merged = mergeTwins(prev, serverTwin)
-          try { localStorage.setItem('novo_cognitive_twin', JSON.stringify(merged)) } catch {}
-          return merged
-        })
+        if (res.ok) {
+          const { twin: serverTwin } = await res.json()
+          if (serverTwin) {
+            // ✅ Server record exists — it is the single source of truth
+            const hydrated = serverToTwin(serverTwin, defaultTwin)
+            setTwin(hydrated)
+            // Write back to localStorage as a non-authoritative offline cache
+            try { localStorage.setItem('novo_cognitive_twin', JSON.stringify(hydrated)) } catch {}
+            return
+          }
+        }
+        // Server returned null OR request failed — fall back to localStorage cache
+        // This is a degraded offline mode only; never treated as authoritative.
+        try {
+          const cached = localStorage.getItem('novo_cognitive_twin')
+          if (cached) setTwin(JSON.parse(cached))
+        } catch {}
       } catch {
-        // Server sync failed — keep local state, non-critical
+        // Network error — try localStorage cache as last resort
+        try {
+          const cached = localStorage.getItem('novo_cognitive_twin')
+          if (cached) setTwin(JSON.parse(cached))
+        } catch {}
       } finally {
         setIsLoading(false)
       }
     }
 
-    syncWithServer()
+    bootFromServer()
   }, [status, session?.user?.id])
 
   const initializeTwin = (data: Partial<CognitiveTwin>) => {
+    const now = new Date().toISOString()
     const newTwin: CognitiveTwin = {
       ...defaultTwin,
       ...data,
       isInitialized: true,
+      onboardingCompletedAt: now,
       trustLevel: 'initial',
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     }
     setTwin(newTwin)
     try { localStorage.setItem('novo_cognitive_twin', JSON.stringify(newTwin)) } catch {}
 
-    // Persist to DB asynchronously (non-blocking)
+    // Persist to DB — blocking POST to ensure multi-device consistency
     fetch('/api/cognitive-twin/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

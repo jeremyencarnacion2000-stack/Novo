@@ -17,7 +17,7 @@ const variants = {
     opacity: dir === 'forward' ? 1 : 0,
   }),
   center: {
-    x: '0vw',
+    x: 0,
     scale: 1,
     opacity: 1,
   },
@@ -95,7 +95,6 @@ export function PageWrapper({ children, className, isFullScreen = false }: PageW
           className
         )}
         style={{
-          willChange: 'transform, opacity',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
         }}

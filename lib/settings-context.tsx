@@ -18,6 +18,9 @@ export interface AppSettings {
   glassOpacity: number
   glassBlur: number
   accentColor: string
+  // Dashboard Card — Liquid Glass layer (independent from sidebar frosted glass)
+  cardOpacity: number
+  cardLiquidIntensity: number
 
   // Notifications
   dailyReminder: boolean
@@ -66,6 +69,8 @@ const defaultSettings: AppSettings = {
   glassOpacity: 12,
   glassBlur: 20,
   accentColor: 'indigo',
+  cardOpacity: 15,
+  cardLiquidIntensity: 16,
   dailyReminder: true,
   routineNotifications: true,
   projectDeadlines: true,
@@ -176,18 +181,36 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const rgbBase = isDark ? '0, 0, 0' : '255, 255, 255'
     const borderAlpha = isDark ? '0.08' : '0.12'
 
-    console.log(`[SettingsProvider] Apply: Opacity=${effectiveOpacity}, GlassBlur=${gBlurPx}`);
+    console.log(`[SettingsProvider] Apply: Opacity=${effectiveOpacity}, SidebarBlur=${gBlurPx}`);
 
+    // ── Sidebar Glass Layer (Frosted — brand-protected namespace) ──────────────
+    root.style.setProperty('--sidebar-blur-px', gBlurPx)
+    root.style.setProperty('--sidebar-opacity', `${effectiveOpacity}`)
+    document.body.style.setProperty('--sidebar-blur-px', gBlurPx)
+    document.body.style.setProperty('--sidebar-opacity', `${effectiveOpacity}`)
+
+    // ── Legacy alias — keep --glass-blur-px pointing to sidebar values ─────────
+    // (some components still reference the legacy var; sidebar and these stay in sync)
     root.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
     root.style.setProperty('--glass-blur', `${gBlur}`)
     root.style.setProperty('--glass-blur-px', gBlurPx)
-    root.style.setProperty('--card-rgb', rgbBase)
-    root.style.setProperty('--card-border-alpha', borderAlpha)
-
-    // Also apply to body to ensure inheritance
     document.body.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
     document.body.style.setProperty('--glass-blur', `${gBlur}`)
     document.body.style.setProperty('--glass-blur-px', gBlurPx)
+
+    // ── Liquid Glass Layer (Dashboard Cards — independent) ────────────────────
+    const cardOpacityVal = Math.max(0.03, settings.cardOpacity / 100)
+    const cardBlurPx = `${Math.max(4, settings.cardLiquidIntensity)}px`
+    const cardRefraction = Math.min(0.25, cardOpacityVal * 1.5)
+    root.style.setProperty('--card-liquid-opacity', `${cardOpacityVal}`)
+    root.style.setProperty('--card-blur-px', cardBlurPx)
+    root.style.setProperty('--card-refraction', `${cardRefraction}`)
+    document.body.style.setProperty('--card-liquid-opacity', `${cardOpacityVal}`)
+    document.body.style.setProperty('--card-blur-px', cardBlurPx)
+    document.body.style.setProperty('--card-refraction', `${cardRefraction}`)
+
+    root.style.setProperty('--card-rgb', rgbBase)
+    root.style.setProperty('--card-border-alpha', borderAlpha)
     document.body.style.setProperty('--card-rgb', rgbBase)
     document.body.style.setProperty('--card-border-alpha', borderAlpha)
 
@@ -287,7 +310,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.glassOpacity, settings.glassBlur, settings.accentColor, settings.backgroundImage, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return

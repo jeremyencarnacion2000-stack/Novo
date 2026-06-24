@@ -39,6 +39,16 @@ import {
   type CognitivePhase,
 } from '@/lib/cognitive-engine'
 import { usePlayerStore } from '@/lib/player-store'
+import { eventBus } from '@/lib/events/event-bus'
+
+// ─── Event Bus → Engine energy cost table ────────────────────────────────────
+// These calibrated weights translate behavioral signals into attentional depletion.
+const EVENT_ENERGY_COSTS = {
+  FocusEnded:       0.55,  // A completed deep-work session is cognitively expensive
+  FocusInterrupted: 0.25,  // Interruption is costly but less than full session
+  HabitCompleted:   0.15,  // Daily habits are moderate-load
+  TaskCompleted:    0.10,  // Task completion is low-cost
+} as const
 
 // ─── Routes considered "cognitively expensive" ───────────────────────────────
 const HEAVY_ROUTES = ['/projects', '/analytics', '/business', '/library']
@@ -125,9 +135,14 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id)
   }, [fetchBiometrics])
 
+  // ── Event Bus → Engine bridge — ref handles (declared early so refresh/logHabit can populate them) ──
+  const logHabitRef = useRef<(cost: number) => void>(() => {})
+  const refreshRef  = useRef<() => void>(() => {})
+
   // ── Bio-state computation (every 60s or on dependency change) ─────────────
   const refresh = useCallback(() => {
     let next = computeBioState({
+
       now: new Date(),
       chronotype,
       completedHabits: habits,
@@ -282,6 +297,35 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       { completedAt: new Date(), energyCost: Math.min(1, Math.max(0, energyCost)) }
     ])
   }, [])
+
+  // ── Event Bus → Engine bridge — wire refs to latest callbacks ───────────────
+  useEffect(() => {
+    logHabitRef.current = logHabit
+    refreshRef.current  = refresh
+  })
+
+  useEffect(() => {
+    const unsubFocusEnded = eventBus.subscribe('FocusEnded', () => {
+      logHabitRef.current(EVENT_ENERGY_COSTS.FocusEnded)
+      refreshRef.current()
+    })
+    const unsubFocusInterrupted = eventBus.subscribe('FocusInterrupted', () => {
+      logHabitRef.current(EVENT_ENERGY_COSTS.FocusInterrupted)
+      refreshRef.current()
+    })
+    const unsubHabit = eventBus.subscribe('HabitCompleted', () => {
+      logHabitRef.current(EVENT_ENERGY_COSTS.HabitCompleted)
+    })
+    const unsubTask = eventBus.subscribe('TaskCompleted', () => {
+      logHabitRef.current(EVENT_ENERGY_COSTS.TaskCompleted)
+    })
+    return () => {
+      unsubFocusEnded()
+      unsubFocusInterrupted()
+      unsubHabit()
+      unsubTask()
+    }
+  }, []) // mount-only — refs are always current
 
   const clearNavigationWarning = useCallback(() => setNavigationWarning(null), [])
 

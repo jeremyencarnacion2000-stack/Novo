@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Search, UserPlus, MessageSquare, Check, X } from 'lucide-react'
+import { Search, UserPlus, MessageSquare, Check, X, ArrowLeft } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -137,14 +137,14 @@ export default function SocialPage() {
     }, [selectedFriend])
 
     return (
-        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 h-[calc(100vh-4rem)] flex flex-col">
+        <div className="flex-1 space-y-4 p-3 md:p-8 pt-6 h-[calc(100vh-4rem)] flex flex-col">
             <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">Social Hub</h2>
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Social Hub</h2>
             </div>
 
-            <div className="grid grid-cols-12 gap-6 flex-1 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 flex-1 overflow-hidden">
                 {/* Left Sidebar: Friends & Search */}
-                <div className="col-span-4 flex flex-col gap-4 overflow-hidden">
+                <div className={`md:col-span-4 flex flex-col gap-4 overflow-hidden ${selectedFriend ? 'hidden md:flex' : 'flex'}`}>
                     <Card className="flex-1 flex flex-col overflow-hidden">
                         <CardHeader className="pb-2">
                             <div className="flex gap-2">
@@ -259,12 +259,18 @@ export default function SocialPage() {
                 </div>
 
                 {/* Right Area: Chat */}
-                <div className="col-span-8 flex flex-col overflow-hidden">
+                <div className={`md:col-span-8 flex flex-col overflow-hidden ${selectedFriend ? 'flex' : 'hidden md:flex'}`}>
                     <Card className="flex-1 flex flex-col overflow-hidden">
                         {selectedFriend ? (
                             <>
                                 <CardHeader className="border-b py-3">
                                     <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setSelectedFriend(null)}
+                                            className="md:hidden p-1 rounded-lg hover:bg-accent transition-colors"
+                                        >
+                                            <ArrowLeft className="h-5 w-5" />
+                                        </button>
                                         <Avatar>
                                             <AvatarImage src={selectedFriend.image} />
                                             <AvatarFallback>{selectedFriend.name?.[0]}</AvatarFallback>

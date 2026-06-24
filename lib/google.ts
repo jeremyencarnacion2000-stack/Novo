@@ -266,3 +266,79 @@ export const booksService = {
         })) || [];
     }
 };
+
+/**
+ * Drive Service
+ */
+export const driveService = {
+    /**
+     * Lists files from Google Drive
+     */
+    listFiles: async (pageSize = 10) => {
+        const auth = await getGoogleAuthClient();
+        const drive = google.drive({ version: 'v3', auth });
+
+        const res = await drive.files.list({
+            pageSize,
+            fields: 'files(id, name, mimeType, modifiedTime, size)',
+            orderBy: 'modifiedTime desc',
+        });
+
+        return res.data.files || [];
+    },
+
+    /**
+     * Creates a folder in Google Drive if it doesn't exist and uploads/saves a workspace backup
+     */
+    exportWorkspaceBackup: async (backupData: any) => {
+        const auth = await getGoogleAuthClient();
+        const drive = google.drive({ version: 'v3', auth });
+
+        // 1. Find or create "Novo Backups" folder
+        let folderId = '';
+        const folderSearch = await drive.files.list({
+            q: "name = 'Novo Backups' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+            fields: 'files(id)',
+            spaces: 'drive',
+        });
+
+        if (folderSearch.data.files && folderSearch.data.files.length > 0) {
+            folderId = folderSearch.data.files[0].id!;
+        } else {
+            const folderMetadata = {
+                name: 'Novo Backups',
+                mimeType: 'application/vnd.google-apps.folder',
+            };
+            const folder = await drive.files.create({
+                requestBody: folderMetadata,
+                fields: 'id',
+            });
+            folderId = folder.data.id!;
+        }
+
+        // 2. Upload file
+        const fileName = `novo_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        const fileMetadata = {
+            name: fileName,
+            parents: [folderId],
+        };
+
+        const media = {
+            mimeType: 'application/json',
+            body: JSON.stringify(backupData, null, 2),
+        };
+
+        const file = await drive.files.create({
+            requestBody: fileMetadata,
+            media: media,
+            fields: 'id, name, webViewLink',
+        });
+
+        return {
+            id: file.data.id,
+            name: file.data.name,
+            webViewLink: file.data.webViewLink,
+        };
+    }
+};
+

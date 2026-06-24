@@ -9,23 +9,23 @@ import { cn } from '@/lib/utils'
  * Props para el componente FloatingMusicWidget
  */
 interface FloatingMusicWidgetProps {
-  /** URL de la imagen del álbum */
+  /** Album artwork URL */
   albumImage: string
-  /** Título de la canción */
+  /** Track title */
   title: string
-  /** Nombre del artista */
+  /** Artist name */
   artist: string
-  /** Estado de reproducción */
+  /** Whether the track is currently playing */
   isPlaying: boolean
-  /** Callback para reproducir */
+  /** Callback to play */
   onPlay: () => void
-  /** Callback para pausar */
+  /** Callback to pause */
   onPause: () => void
-  /** Callback para siguiente pista */
+  /** Callback for next track */
   onNext: () => void
-  /** Callback para pista anterior */
+  /** Callback for previous track */
   onPrev: () => void
-  /** Callback para alternar minimizado */
+  /** Callback to toggle minimize state */
   onToggleMinimize: () => void
 }
 
@@ -164,7 +164,7 @@ export function FloatingMusicWidget({
                 size="sm"
                 onClick={onPrev}
                 className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-                aria-label="Pista anterior"
+                aria-label="Previous track"
               >
                 <SkipBack className="h-4 w-4" />
               </Button>
@@ -172,7 +172,7 @@ export function FloatingMusicWidget({
                 size="sm"
                 onClick={handlePlayPause}
                 className="h-8 w-8 p-0 hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
@@ -181,7 +181,7 @@ export function FloatingMusicWidget({
                 size="sm"
                 onClick={onNext}
                 className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-                aria-label="Siguiente pista"
+                aria-label="Next track"
               >
                 <SkipForward className="h-4 w-4" />
               </Button>
@@ -193,7 +193,7 @@ export function FloatingMusicWidget({
             size="sm"
             onClick={handleToggleMinimize}
             className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-            aria-label="Expandir widget"
+            aria-label="Expand widget"
           >
             <ChevronUp className="h-4 w-4" />
           </Button>
@@ -223,7 +223,7 @@ export function FloatingMusicWidget({
               size="sm"
               onClick={onPrev}
               className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-              aria-label="Pista anterior"
+              aria-label="Previous track"
             >
               <SkipBack className="h-4 w-4" />
             </Button>
@@ -231,7 +231,7 @@ export function FloatingMusicWidget({
               size="sm"
               onClick={handlePlayPause}
               className="h-8 w-8 p-0 hover:bg-white/20 transition-all duration-200 hover:scale-105"
-              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
@@ -240,7 +240,7 @@ export function FloatingMusicWidget({
               size="sm"
               onClick={onNext}
               className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-              aria-label="Siguiente pista"
+              aria-label="Next track"
             >
               <SkipForward className="h-4 w-4" />
             </Button>
@@ -252,7 +252,7 @@ export function FloatingMusicWidget({
             size="sm"
             onClick={handleToggleMinimize}
             className="h-8 w-8 p-0 hover:bg-white/20 transition-colors"
-            aria-label="Minimizar widget"
+            aria-label="Minimize widget"
           >
             <ChevronDown className="h-4 w-4" />
           </Button>

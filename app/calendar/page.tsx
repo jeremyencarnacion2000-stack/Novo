@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCognitiveState } from '@/lib/cognitive-context';
+import { useSettings } from '@/lib/settings-context';
 
 // Sources that should dim during cognitive fatigue phases
 const FATIGUE_DIM_SOURCES = ['project', 'business', 'school'];
@@ -26,6 +27,7 @@ const FOCUS_BOOST_SOURCES = ['project', 'checklist'];
 
 export default function CalendarPage() {
   const { toast } = useToast();
+  const { setSettingsOpen } = useSettings();
   const { bioState } = useCognitiveState();
   const isFatigue = bioState.phase === 'SYNAPTIC_FATIGUE' || bioState.phase === 'REDUCED_CAPACITY_MODE';
   const isPeak    = bioState.phase === 'PEAK_FOCUS';
@@ -200,12 +202,16 @@ export default function CalendarPage() {
                 <span>Synaptic fatigue detected — complex tasks are dimmed. Consider a {bioState.minutesToNextPhase}-min recovery break.</span>
               </div>
             )}
-            {isPeak && (
-              <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-xs text-emerald-300">
-                <Brain className="h-3.5 w-3.5 flex-shrink-0 animate-pulse" />
-                <span>Peak Focus active — deep work tasks highlighted.</span>
-              </div>
-            )}
+            {isPeak && (() => {
+              const topTask = events.find(e => e.source === 'checklist' || e.source === 'project');
+              const topTaskTitle = topTask ? `"${topTask.title}"` : 'your deep focus blocks';
+              return (
+                <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-xs text-emerald-300">
+                  <Brain className="h-3.5 w-3.5 flex-shrink-0 animate-pulse" />
+                  <span>Peak Focus active — start {topTaskTitle} while your focus capacity is at max.</span>
+                </div>
+              );
+            })()}
 
             <CalendarToolbar
               label={handleViewLabel()}
@@ -215,7 +221,7 @@ export default function CalendarPage() {
               date={currentDate}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              onSettingsClick={() => toast({ title: 'Settings', description: 'Calendar settings coming soon!' })}
+              onSettingsClick={() => setSettingsOpen(true)}
             />
 
             {/* Search overlay */}

@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Trash2, Calendar, RefreshCw, Briefcase, GraduationCap, ListChecks, CheckSquare } from "lucide-react"
 import type { ChecklistItem } from "@/types/checklist"
 import { DataIntegrator, type IntegratedTask } from "@/lib/data-integrator"
-import { toast } from "sonner"
+import { novoToast } from "@/components/ui/novo-toast"
 import { TiltCard } from "@/components/ui/tilt-card"
 
 export default function ChecklistClient() {
@@ -88,7 +88,7 @@ export default function ChecklistClient() {
       const previousItems = items
       setItems(prev => [...prev, optimisticTask])
       setNewItemText("")
-      toast.success("Task added")
+      novoToast.success({ title: "Task Added", description: "Task successfully registered to your daily queue." })
 
       try {
         const createdTask = await DataIntegrator.createManualTask(session.user.id, {
@@ -105,7 +105,7 @@ export default function ChecklistClient() {
       } catch (error) {
         console.error('Error adding task:', error)
         setItems(previousItems)
-        toast.error("Failed to add task")
+        novoToast.warning({ title: "Error", description: "Failed to add task." })
       }
     }
   }
@@ -123,6 +123,12 @@ export default function ChecklistClient() {
       window.dispatchEvent(new CustomEvent('cognitive:task-completed', {
         detail: { taskId: task.id, text: task.text }
       }));
+      novoToast.cognitive({
+        title: "Execution Momentum Increased",
+        badge: "+12%",
+        description: "Three consecutive priority tasks completed. Recommendation: Maintain your current focus window for another 18 minutes.",
+        duration: 8000,
+      });
     }
 
     // Sync with source
@@ -142,17 +148,17 @@ export default function ChecklistClient() {
       const previousItems = items
       // Optimistic delete
       setItems(prev => prev.filter(item => item.id !== id))
-      toast.success("Task deleted")
+      novoToast.info({ title: "Task Deleted", description: "Task successfully deleted." })
 
       try {
         await DataIntegrator.deleteManualTask(session.user.id, id)
       } catch (error) {
         console.error('Error deleting task:', error)
         setItems(previousItems)
-        toast.error("Failed to delete task")
+        novoToast.warning({ title: "Error", description: "Failed to delete task." })
       }
     } else {
-      toast.error("Can't delete integrated tasks here. Manage them in their respective modules.")
+      novoToast.info({ title: "Note", description: "Can't delete integrated tasks here. Manage them in their respective modules." })
     }
   }
 

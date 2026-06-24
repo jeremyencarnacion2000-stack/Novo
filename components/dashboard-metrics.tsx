@@ -148,10 +148,10 @@ export const DashboardMetrics = React.memo(
             <Card
               className={cn(
                 "relative transition-[transform,box-shadow,border-color,opacity] duration-300",
-                "hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]",
+                "hover:scale-[1.02] active:scale-[0.98] hover:shadow-m",
                 "group overflow-hidden border-white/5",
                 cardClass,
-                isFocusCard && "animate-pulse-slow shadow-[0_0_20px_rgba(99,102,241,0.15)] border-indigo-500/30",
+                isFocusCard && "bloom-soft border-indigo-500/30",
                 borderColor
               )}
             >

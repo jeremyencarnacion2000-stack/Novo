@@ -5,6 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Material design systems background variable mapping */
+  --md-sys-color-neutral-background: 255, 255, 255;
   /* Novo Design DNA: Carbon Glass Palette (Light Mode) */
   --background: #ffffff;
   --foreground: #09090b;
@@ -76,9 +78,32 @@
   --glass-highlight: rgba(255, 255, 255, 0.8);
   --glass-text: #1e293b;
   --glass-text-muted: #64748b;
+
+  /* ── Sidebar Glass Layer (Frosted — brand-protected, do not alias to card vars) */
+  --sidebar-blur-px: 24px;       /* matches --glass-blur-px by default */
+  --sidebar-opacity: 0.30;
+  --sidebar-brightness: 1.05;
+
+  /* ── Liquid Glass Layer (Dashboard Cards — independent from sidebar) */
+  --card-blur-px: 16px;
+  --card-liquid-opacity: 0.15;
+  --card-refraction: 0.18;
+
+  /* NIX Adaptive Glass Tokens - Light Mode */
+  --glass-radius: 28px;
+  --glass-depth: 16px;
+  --glass-strength: 90px;
+  --glass-aberration: 1.5px;
+  --glass-reflection: 0.15;
+  --glass-specular: 0.8;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 24px 80px rgba(0,0,0,0.35);
+  --glass-background-sampling: saturate(180%);
 }
 
 .dark {
+  /* Material design systems background variable mapping */
+  --md-sys-color-neutral-background: 20, 20, 23;
   /* Novo Design DNA: Carbon Mode (Dark Premium) */
   --background: #050505;
   /* Deeper, richer dark */
@@ -145,6 +170,27 @@
   --glass-highlight: rgba(255, 255, 255, 0.04);
   --glass-text: #ffffff;
   --glass-text-muted: #a1a1aa;
+
+  /* ── Sidebar Glass Layer — dark mode values (frosted premium) */
+  --sidebar-blur-px: 24px;
+  --sidebar-opacity: 0.12;
+  --sidebar-brightness: 1.0;
+
+  /* ── Liquid Glass Layer — dark mode */
+  --card-blur-px: 16px;
+  --card-liquid-opacity: 0.10;
+  --card-refraction: 0.12;
+
+  /* NIX Adaptive Glass Tokens - Dark Mode */
+  --glass-radius: 28px;
+  --glass-depth: 16px;
+  --glass-strength: 90px;
+  --glass-aberration: 1.5px;
+  --glass-reflection: 0.08;
+  --glass-specular: 0.4;
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  --glass-background-sampling: saturate(160%);
 }
 
 @theme inline {
@@ -173,6 +219,29 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* NDL v1.0 Specific Custom Primitives */
+  --color-neural-purple: #7C3AED;
+  --color-execution-blue: #3B82F6;
+  --color-recovery-cyan: #06B6D4;
+  --color-signal-white: #F8FAFC;
+  --color-surface: #080808;
+  --color-dark-bg: #040404;
+
+  --color-morado: #7C3AED;
+  --color-azul: #3B82F6;
+  --color-cyan: #06B6D4;
+  --color-verde: #10B981;
+  --color-ambar: #F59E0B;
+  --color-rojo: #EF4444;
+
+  --radius-card: 20px;
+  --radius-panel: 28px;
+  --radius-dialog: 34px;
+  --radius-orb: 999px;
+
+  --ease-deceleration: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-cognitive: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* Sidebar aliases */
   --color-sidebar: var(--sidebar);
@@ -239,40 +308,93 @@
 
 /* Card Hierarchy System - Soft Frosted */
 
+/* Card Hierarchy System - Soft Frosted */
+
 /* 1. MAIN CONTAINER (Panel grande translúcido) */
-@utility glass-panel {
-  @apply relative overflow-hidden;
-  background: var(--glass-panel-bg);
-  backdrop-filter: blur(var(--glass-blur-px, 24px)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px, 24px)) saturate(160%);
-  border: 1px solid var(--glass-panel-border);
-  border-radius: 24px;
-  box-shadow:
-    var(--glass-panel-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.8));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  box-shadow: var(--glass-shadow);
+}
+
+/* NDL Glass Primitives */
+@utility glass-surface {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@utility glass-floating {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+@utility glass-active {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--cognitive-card-border, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Bloom Levels */
+@utility bloom-soft {
+  box-shadow: 0 0 12px var(--cognitive-accent-glow, rgba(124, 102, 241, 0.15));
+}
+
+@utility bloom-medium {
+  box-shadow: 0 0 24px var(--cognitive-accent-glow, rgba(124, 102, 241, 0.35));
+}
+
+@utility bloom-strong {
+  box-shadow: 0 0 50px var(--cognitive-accent-glow, rgba(124, 102, 241, 0.65));
+}
+
+/* Shadow Levels */
+@utility shadow-xs {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+@utility shadow-s {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+}
+
+@utility shadow-m {
+  box-shadow: 0 25px 70px rgba(0,0,0,0.45);
+}
+
+@utility shadow-l {
+  box-shadow: 0 35px 90px rgba(0,0,0,0.55);
+}
+
+@utility shadow-xl {
+  box-shadow: 0 50px 120px rgba(0,0,0,0.65);
 }
 
 .card-bg-primary {
-  background-color: rgba(var(--card-rgb, 255, 255, 255), var(--glass-opacity));
-  backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, var(--card-border-alpha, 0.12));
+  @apply glass-surface;
 }
 
 .card-bg-secondary {
-  background-color: rgba(var(--card-rgb, 255, 255, 255), calc(var(--glass-opacity) * 1.5));
-  backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, var(--card-border-alpha, 0.12));
+  @apply glass-surface;
 }
 
 .card-bg-tertiary {
-  background-color: rgba(var(--card-rgb, 255, 255, 255), calc(var(--glass-opacity) * 0.75));
-  backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, calc(var(--card-border-alpha, 0.12) * 0.6));
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
-
 
 @utility glass-blur-xl {
   backdrop-filter: blur(40px) saturate(180%);
@@ -280,29 +402,56 @@
 }
 
 /* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
-@utility glass-card {
-  @apply relative overflow-hidden;
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(var(--glass-blur-px, 16px)) saturate(120%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px, 16px)) saturate(120%);
-  border: 1px solid var(--glass-panel-border);
-  border-radius: 20px;
+.glass-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, var(--glass-opacity));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  box-shadow: var(--glass-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
+    border-color: rgba(255, 255, 255, 0.15);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
     transform: translateY(-2px);
+  }
+}
+
+.glass-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  box-shadow: var(--glass-shadow);
+  padding: 8px 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--foreground);
+
+  &:hover {
+    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 2));
+    transform: scale(1.02);
+  }
+
+  &:active {
+    transform: scale(0.98);
   }
 }
 
 /* 2.5 Column Headers */
 @utility glass-header {
   @apply rounded-xl border p-4 transition-all duration-300;
-  background: var(--glass-highlight);
-  backdrop-filter: blur(var(--glass-blur-px, 12px));
-  -webkit-backdrop-filter: blur(var(--glass-blur-px, 12px));
-  border-color: var(--glass-panel-border);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 @utility scrollbar-hide {
@@ -548,19 +697,46 @@
     animation: pulse-cognitive 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* Sidebar - Clean Anchor */
+  /* Sidebar - Frosted Glass (brand-protected — uses sidebar namespace exclusively) */
   .glass-sidebar {
     @apply transition-all duration-300 ease-out relative overflow-hidden;
-    background: rgba(255, 255, 255, var(--glass-opacity));
-    backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(120%);
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(120%);
+    background: rgba(255, 255, 255, var(--sidebar-opacity));
+    backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
+    -webkit-backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
     border-right: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 10px 0 50px rgba(0, 0, 0, 0.2);
   }
 
   .dark .glass-sidebar {
-    background: rgba(255, 255, 255, var(--glass-opacity));
+    background: rgba(255, 255, 255, var(--sidebar-opacity));
+    backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
+    -webkit-backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
     border-right: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── Liquid Glass — Dashboard Cards (independent from sidebar frosted glass) ──
+     Less blur, more refraction, higher readability. Applied only to primary
+     dashboard section cards during the limited validation rollout.
+     Settings controls: cardLiquidIntensity → --card-blur-px
+                        cardOpacity        → --card-liquid-opacity            */
+  .liquid-glass {
+    background: rgba(255, 255, 255, var(--card-liquid-opacity));
+    backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, var(--card-refraction));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.5)),
+      0 4px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .dark .liquid-glass {
+    background: rgba(255, 255, 255, var(--card-liquid-opacity));
+    backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, var(--card-refraction));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.2)),
+      0 4px 24px rgba(0, 0, 0, 0.35);
   }
 
 
@@ -1208,4 +1384,114 @@ html.cognitive-reduced-capacity .cognitive-secondary-element {
   filter: blur(0.5px) opacity(0.4) !important;
   pointer-events: none;
   transition: filter 0.8s ease, opacity 0.8s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COGNITIVE PHASE DESIGN TOKEN SYSTEM
+   Provides CSS custom properties that any component can consume reactively.
+   These are set per cognitive phase on the <html> element and control:
+     --cognitive-accent        — primary accent color for active elements
+     --cognitive-accent-glow   — glow color for rings and shadows
+     --cognitive-glow-intensity — 0–1 scale for glow strength
+     --cognitive-anim-speed    — animation duration multiplier (1 = normal)
+     --cognitive-bg-pulse      — subtle background gradient tint
+     --cognitive-card-border   — card border override color
+     --cognitive-ui-opacity    — base opacity for secondary UI elements
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Default (no class / uninitialized) — neutral Novo indigo */
+:root {
+  --cognitive-accent:         #6366f1;
+  --cognitive-accent-glow:    rgba(99, 102, 241, 0.35);
+  --cognitive-glow-intensity: 0.35;
+  --cognitive-anim-speed:     1;
+  --cognitive-bg-pulse:       rgba(99, 102, 241, 0.04);
+  --cognitive-card-border:    rgba(255, 255, 255, 0.08);
+  --cognitive-ui-opacity:     1;
+}
+
+/**
+ * PEAK_FOCUS — electric indigo/violet sharp clarity palette.
+ * Increases glow intensity, accelerates micro-animations (faster = more alive),
+ * and tints the background subtly with the focus-mode violet.
+ */
+html.cognitive-peak {
+  --cognitive-accent:         #818cf8;   /* indigo-400 — slightly brighter */
+  --cognitive-accent-glow:    rgba(129, 140, 248, 0.50);
+  --cognitive-glow-intensity: 0.65;
+  --cognitive-anim-speed:     0.85;      /* animations feel snappier in peak */
+  --cognitive-bg-pulse:       rgba(99, 102, 241, 0.07);
+  --cognitive-card-border:    rgba(129, 140, 248, 0.18);
+  --cognitive-ui-opacity:     1;
+}
+
+/**
+ * LINEAR_EXECUTION — calm teal-blue balanced palette.
+ * Slight de-emphasis of glow (less arousing than peak),
+ * normal animation speed — steady, productive.
+ */
+html.cognitive-linear {
+  --cognitive-accent:         #38bdf8;   /* sky-400 — calm blue */
+  --cognitive-accent-glow:    rgba(56, 189, 248, 0.30);
+  --cognitive-glow-intensity: 0.25;
+  --cognitive-anim-speed:     1;
+  --cognitive-bg-pulse:       rgba(56, 189, 248, 0.04);
+  --cognitive-card-border:    rgba(56, 189, 248, 0.10);
+  --cognitive-ui-opacity:     1;
+}
+
+/**
+ * SYNAPTIC_FATIGUE — warm amber/rose recovery palette.
+ * Soft glow, slower animations to reduce stimulation,
+ * secondary UI elements are dimmed.
+ */
+html.cognitive-fatigue {
+  --cognitive-accent:         #fb923c;   /* orange-400 — warm recovery */
+  --cognitive-accent-glow:    rgba(251, 146, 60, 0.28);
+  --cognitive-glow-intensity: 0.18;
+  --cognitive-anim-speed:     1.4;       /* slower = calming */
+  --cognitive-bg-pulse:       rgba(251, 146, 60, 0.04);
+  --cognitive-card-border:    rgba(251, 146, 60, 0.10);
+  --cognitive-ui-opacity:     0.75;
+}
+
+/**
+ * REDUCED_CAPACITY_MODE — muted rose/gray stress-relief palette.
+ * Minimal glow, very slow animations, heavy secondary UI dimming.
+ */
+html.cognitive-reduced-capacity {
+  --cognitive-accent:         #f472b6;   /* pink-400 — soft alert */
+  --cognitive-accent-glow:    rgba(244, 114, 182, 0.20);
+  --cognitive-glow-intensity: 0.12;
+  --cognitive-anim-speed:     1.8;       /* very slow — minimal stimulation */
+  --cognitive-bg-pulse:       rgba(244, 114, 182, 0.03);
+  --cognitive-card-border:    rgba(244, 114, 182, 0.08);
+  --cognitive-ui-opacity:     0.60;
+}
+
+/* ── Phase-driven active element glow (applies to cognitive accent ring targets) */
+.cognitive-accent-ring {
+  box-shadow: 0 0 0 1px var(--cognitive-card-border),
+              0 0 16px calc(var(--cognitive-glow-intensity) * 20px) var(--cognitive-accent-glow);
+  border-color: var(--cognitive-card-border);
+  transition: box-shadow 1.5s ease, border-color 1.5s ease;
+}
+
+/* ── Phase-driven text accent (for labels, badges, indicators) */
+.cognitive-accent-text {
+  color: var(--cognitive-accent);
+  transition: color 1.5s ease;
+}
+
+/* ── Phase-driven icon/dot fill */
+.cognitive-accent-fill {
+  background-color: var(--cognitive-accent);
+  transition: background-color 1.5s ease;
+}
+
+/* ── Attention score bar — driven by --cognitive-attention (set via JS hook) */
+.cognitive-attention-bar {
+  width: calc(var(--cognitive-attention, 70) * 1%);
+  background: linear-gradient(90deg, var(--cognitive-accent), color-mix(in srgb, var(--cognitive-accent) 60%, white));
+  transition: width 2s cubic-bezier(0.25, 0.8, 0.25, 1), background 1.5s ease;
 }

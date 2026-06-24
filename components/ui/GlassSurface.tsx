@@ -28,14 +28,14 @@ import { useLiquidGlass } from '@/lib/liquid-glass/useLiquidGlass'
 export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'> {
   /**
    * Border radius in pixels — fed into the displacement map to match geometry.
-   * @default 28
+   * @default 128
    */
   radius?: number
 
   /**
    * Material depth: controls how far the blurred inner rect is inset.
    * Larger values = more pronounced lensing at the edges.
-   * @default 16
+   * @default 10
    */
   depth?: number
 
@@ -47,14 +47,13 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
 
   /**
    * Base displacement scale for feDisplacementMap.
-   * @default 90
+   * @default 100
    */
   strength?: number
 
   /**
    * Chromatic aberration spread. 0 = disabled.
-   * Each RGB channel displaces at strength + ca*2, strength + ca, strength.
-   * @default 1.5
+   * @default 15
    */
   chromaticAberration?: number
 
@@ -72,7 +71,7 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
 
   /**
    * Glass background color. Supports any CSS color.
-   * @default 'rgba(255, 255, 255, 0.18)'
+   * @default 'rgba(var(--md-sys-color-neutral-background), 0.1)'
    */
   backgroundColor?: string
 
@@ -81,6 +80,29 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
    * @default 'medium'
    */
   elevation?: 'low' | 'medium' | 'high'
+
+  /**
+   * Custom element tag to render as (e.g. 'button', 'a', Link, etc.)
+   * @default 'div'
+   */
+  as?: React.ElementType
+
+  /**
+   * Dynamically tracks parent background luminance and adjusts text/borders contrast.
+   * @default false
+   */
+  contrastObserver?: boolean
+
+  /**
+   * Enables ResizeObserver to dynamically update filter maps to fit the element dimensions.
+   * @default true
+   */
+  autoSize?: boolean
+
+  /** Static/fixed width overrides */
+  width?: number
+  /** Static/fixed height overrides */
+  height?: number
 }
 
 // ─── Shadow / Highlight Tokens ────────────────────────────────────────────────
@@ -96,15 +118,20 @@ const elevationShadow: Record<NonNullable<GlassSurfaceProps['elevation']>, strin
 const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
   function GlassSurface(
     {
-      radius = 28,
-      depth = 16,
+      radius = 128,
+      depth = 10,
       blur = 20,
-      strength = 90,
-      chromaticAberration = 1.5,
+      strength = 100,
+      chromaticAberration = 15,
       adaptive = true,
       debug = false,
-      backgroundColor = 'rgba(255, 255, 255, 0.18)',
+      backgroundColor = 'rgba(var(--md-sys-color-neutral-background), 0.1)',
       elevation = 'medium',
+      as,
+      contrastObserver = false,
+      autoSize = true,
+      width: staticWidth,
+      height: staticHeight,
       className,
       style,
       children,
@@ -125,92 +152,197 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       strength,
       chromaticAberration,
       adaptive,
+      width: staticWidth,
+      height: staticHeight,
+      autoSize,
     })
+
+    const [resolvedContrast, setResolvedContrast] = React.useState<'light' | 'dark' | null>(null)
 
     // Merge forwarded ref with internal ResizeObserver ref
     const ref = React.useCallback(
-      (node: HTMLDivElement | null) => {
-        ;(internalRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+      (node: any) => {
+        ;(internalRef as React.MutableRefObject<any>).current = node
         if (typeof forwardedRef === 'function') {
           forwardedRef(node)
         } else if (forwardedRef) {
-          forwardedRef.current = node
+          ;(forwardedRef as React.MutableRefObject<any>).current = node
         }
       },
       [internalRef, forwardedRef],
     )
 
+    // ── Contrast Observer logic ──────────────────────────────────────────────
+
+    React.useEffect(() => {
+      if (!contrastObserver) return
+
+      const el = internalRef.current
+      if (!el) return
+
+      const getBackgroundLuminance = (element: HTMLElement): 'light' | 'dark' => {
+        let current: HTMLElement | null = element
+        while (current) {
+          const computed = window.getComputedStyle(current)
+          const bg = computed.backgroundColor
+          if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
+            const match = bg.match(/\d+/g)
+            if (match && match.length >= 3) {
+              const r = parseInt(match[0], 10)
+              const g = parseInt(match[1], 10)
+              const b = parseInt(match[2], 10)
+              const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+              return luminance < 140 ? 'dark' : 'light'
+            }
+          }
+          current = current.parentElement
+        }
+        // Fallback to checking document root theme
+        if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
+          return 'dark'
+        }
+        return 'light'
+      }
+
+      const updateContrast = () => {
+        const lum = getBackgroundLuminance(el)
+        setResolvedContrast(lum)
+      }
+
+      updateContrast()
+
+      const themeObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.attributeName === 'class' || mutation.attributeName === 'style') {
+            updateContrast()
+          }
+        }
+      })
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style'],
+      })
+
+      let parentObserver: MutationObserver | null = null
+      if (el.parentElement) {
+        parentObserver = new MutationObserver(updateContrast)
+        parentObserver.observe(el.parentElement, {
+          attributes: true,
+          attributeFilter: ['class', 'style'],
+        })
+      }
+
+      window.addEventListener('resize', updateContrast, { passive: true })
+
+      return () => {
+        themeObserver.disconnect()
+        if (parentObserver) parentObserver.disconnect()
+        window.removeEventListener('resize', updateContrast)
+      }
+    }, [contrastObserver, internalRef])
+
     // ── Build inline styles ──────────────────────────────────────────────────
 
     const computedStyle = React.useMemo<React.CSSProperties>(() => {
-      const base: React.CSSProperties = {
+      return {
         borderRadius: radius,
-        // GPU layers — only these properties are ever animated
-        willChange: 'transform, opacity, filter, backdrop-filter',
-        // These must NOT be animated — only the above GPU props are
         position: 'relative',
         isolation: 'isolate',
         overflow: 'hidden',
-        // Transition: only GPU-safe props
-        transition: 'backdrop-filter 200ms ease, filter 200ms ease, opacity 200ms ease, transform 200ms ease',
+        background: 'transparent',
+        border: 'none',
+        boxShadow: 'none',
+      }
+    }, [radius])
+
+    const bgStyles = React.useMemo<React.CSSProperties>(() => {
+      let activeBg = backgroundColor
+      let activeBorder = '1px solid rgba(255, 255, 255, 0.08)'
+      let activeShadow = elevationShadow[elevation]
+
+      if (contrastObserver && resolvedContrast) {
+        if (resolvedContrast === 'dark') {
+          activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
+            ? 'rgba(20, 20, 23, 0.15)'
+            : backgroundColor
+          activeBorder = '1px solid rgba(255, 255, 255, 0.08)'
+          activeShadow = '0 24px 80px rgba(0,0,0,0.50), inset 1px 1px 0 rgba(255,255,255,0.15)'
+        } else {
+          activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
+            ? 'rgba(255, 255, 255, 0.25)'
+            : backgroundColor
+          activeBorder = '1px solid rgba(0, 0, 0, 0.08)'
+          activeShadow = '0 12px 40px rgba(0,0,0,0.08), inset 1px 1px 0 rgba(255,255,255,0.6)'
+        }
+      }
+
+      const baseBg: React.CSSProperties = {
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 'inherit',
+        pointerEvents: 'none',
+        zIndex: 0,
+        background: activeBg,
+        border: activeBorder,
+        boxShadow: activeShadow,
+        transition: 'backdrop-filter 200ms ease, filter 200ms ease, opacity 200ms ease',
       }
 
       if (debug && mapUrl) {
-        // Show the raw displacement map
         return {
-          ...base,
+          ...baseBg,
           backgroundImage: `url("${mapUrl}")`,
           backgroundSize: '100% 100%',
           boxShadow: 'none',
-          backdropFilter: 'none',
         }
       }
 
+      // Standard CSS backdrop-blur is fully compatible in Chrome.
+      // Standard CSS filter: url(...) is also fully compatible in Chrome.
+      // This completely avoids nesting SVG filters inside backdrop-filter!
       if (!hasSVGFilterSupport || !filterUrl) {
-        // Fallback: simple backdrop blur (no SVG filter)
         return {
-          ...base,
-          backdropFilter: `blur(${blur * 2}px)`,
-          background: backgroundColor,
-          boxShadow: elevationShadow[elevation],
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          ...baseBg,
+          backdropFilter: `blur(${blur * 1.5}px)`,
         }
       }
 
-      // Full Liquid Glass pipeline
       return {
-        ...base,
-        backdropFilter: buildBackdropFilter(),
-        background: backgroundColor,
-        boxShadow: elevationShadow[elevation],
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        ...baseBg,
+        filter: `${filterUrl} brightness(1.08) saturate(1.4)`,
+        backdropFilter: `blur(${blur}px)`,
       }
     }, [
-      radius,
+      backgroundColor,
+      elevation,
+      contrastObserver,
+      resolvedContrast,
       debug,
       mapUrl,
       hasSVGFilterSupport,
       filterUrl,
       blur,
-      backgroundColor,
-      elevation,
-      buildBackdropFilter,
     ])
 
+    const Component = as || 'div'
+
     return (
-      <div
+      <Component
         ref={ref}
         data-novo-glass
         data-elevation={elevation}
+        data-contrast={resolvedContrast}
         className={cn(
-          // Layout — nothing in here animates
           'flex flex-col',
           className,
         )}
         style={{ ...computedStyle, ...style }}
         {...rest}
       >
-        {/* Inner edge highlight — rendered as a separate non-layout layer */}
+        {/* Liquid Glass Background Layer */}
+        <div aria-hidden style={bgStyles} />
+
+        {/* Inner edge highlight */}
         <div
           aria-hidden
           style={{
@@ -228,7 +360,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         <div style={{ position: 'relative', zIndex: 2, display: 'contents' }}>
           {children}
         </div>
-      </div>
+      </Component>
     )
   },
 )

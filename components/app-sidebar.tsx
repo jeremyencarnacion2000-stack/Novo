@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, CalendarRange, Sun, Bot, Music, LogOut, LogIn, User, BarChart3, Timer, PanelLeft, Brain } from 'lucide-react'
+import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, CalendarRange, Sun, Bot, Music, LogOut, LogIn, User, BarChart3, Timer, PanelLeft, Brain, Users } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { FocusMode } from '@/components/focus-mode'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { GlassSurface } from '@/components/ui/GlassSurface'
 
 import { useTranslation } from '@/lib/i18n'
 import { useSettings } from '@/lib/settings-context'
@@ -93,6 +94,7 @@ export function AppSidebar() {
         { title: t('sidebar.business'), href: '/business', icon: Briefcase },
         { title: t('sidebar.library'), href: '/library', icon: BookOpen },
         { title: t('sidebar.spiritual'), href: '/spiritual', icon: Sparkles },
+        { title: t('sidebar.social'), href: '/social', icon: Users },
         { title: t('sidebar.appearance'), href: '/appearance', icon: Heart },
         { title: t('sidebar.music'), href: '/music', icon: Music },
       ],
@@ -233,13 +235,32 @@ export function AppSidebar() {
                                     "rounded-full transition-[background-color,color,box-shadow,width,padding] duration-200 ease-out h-10",
                                     state === 'collapsed' ? "!justify-center !px-0 !w-10 !mx-auto" : "px-4",
                                     isActive
-                                      ? "sidebar-active-item"
+                                      ? ""
                                       : "text-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                                   )}
                                 >
-                                  <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center gap-3", state === 'collapsed' && "justify-center")}>
-                                    <item.icon className={cn("h-5 w-5 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-foreground/40")} />
-                                    {state === 'expanded' && <span className={cn("text-sm tracking-tight transition-all duration-200", isActive ? "font-semibold text-foreground" : "font-medium text-foreground/60")}>{item.title}</span>}
+                                  <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
+                                    {isActive && (
+                                      <GlassSurface
+                                        radius={9999}
+                                        depth={10}
+                                        blur={20}
+                                        strength={100}
+                                        chromaticAberration={15}
+                                        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
+                                        elevation="low"
+                                        contrastObserver
+                                        aria-hidden
+                                        className="pointer-events-none"
+                                        style={{ position: 'absolute', inset: '-2px -16px', zIndex: 0 }}
+                                      />
+                                    )}
+                                    <item.icon className={cn("h-5 w-5 shrink-0 relative z-10 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-foreground/40")} />
+                                    {state === 'expanded' && (
+                                      <span className={cn("text-sm tracking-tight relative z-10", isActive ? "font-semibold text-foreground" : "font-medium text-foreground/60")}>
+                                        {item.title}
+                                      </span>
+                                    )}
                                   </Link>
                                 </SidebarMenuButton>
                                 </motion.div>
@@ -268,20 +289,49 @@ export function AppSidebar() {
                     transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   >
                   <SidebarMenuButton asChild tooltip="Profile" className={cn("rounded-full h-10 transition-all duration-300 btn-press",
-                    state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "px-2",
-                    pathname === '/profile' ? "sidebar-active-item" : "hover:bg-foreground/10"
+                    state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "p-0 overflow-hidden",
+                    pathname === '/profile' ? "" : "hover:bg-foreground/10"
                   )}>
-                    <Link href="/profile" className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8 border border-foreground/10">
-                        <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
-                        <AvatarFallback className="bg-primary/20 text-primary text-xs">{session?.user?.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                      </Avatar>
-                      {state === 'expanded' && (
-                        <div className="flex flex-col items-start text-sm overflow-hidden min-w-0">
-                          <span className="font-semibold truncate w-full text-xs">{session?.user?.name || 'User'}</span>
-                        </div>
-                      )}
-                    </Link>
+                    {pathname === '/profile' ? (
+                      <GlassSurface
+                        as={Link}
+                        href="/profile"
+                        radius={9999}
+                        depth={10}
+                        blur={20}
+                        strength={100}
+                        chromaticAberration={15}
+                        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
+                        elevation="low"
+                        contrastObserver
+                        className={cn(
+                          "flex items-center gap-3 w-full h-full text-foreground",
+                          state === 'collapsed' ? "justify-center" : "px-2"
+                        )}
+                      >
+                        <Avatar className="h-8 w-8 border border-foreground/10 shrink-0">
+                          <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
+                          <AvatarFallback className="bg-primary/20 text-primary text-xs">{session?.user?.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                        </Avatar>
+                        {state === 'expanded' && (
+                          <div className="flex flex-col items-start text-sm overflow-hidden min-w-0">
+                            <span className="font-semibold truncate w-full text-xs text-foreground">{session?.user?.name || 'User'}</span>
+                          </div>
+                        )}
+                      </GlassSurface>
+                    ) : (
+                      <Link href="/profile" className={cn("flex items-center gap-3 w-full h-full px-2", state === 'collapsed' && "justify-center px-0")}>
+                        <Avatar className="h-8 w-8 border border-foreground/10 shrink-0">
+                          <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
+                          <AvatarFallback className="bg-primary/20 text-primary text-xs">{session?.user?.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                        </Avatar>
+                        {state === 'expanded' && (
+                          <div className="flex flex-col items-start text-sm overflow-hidden min-w-0">
+                            <span className="font-semibold truncate w-full text-xs">{session?.user?.name || 'User'}</span>
+                          </div>
+                        )}
+                      </Link>
+                    )}
                   </SidebarMenuButton>
                   </motion.div>
                 ) : (
@@ -302,37 +352,73 @@ export function AppSidebar() {
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
                 <SidebarMenuButton
-                  onClick={() => {
+                  asChild={isSettingsOpen}
+                  onClick={!isSettingsOpen ? () => {
                     safeViewTransition(() => {
                       setSettingsOpen(true)
                     })
-                  }}
+                  } : undefined}
                   style={!isSettingsOpen ? { viewTransitionName: 'settings-window' } as React.CSSProperties : undefined}
                   tooltip={t('sidebar.settings')}
                   className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative",
-                    state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "px-3 w-full",
-                    isSettingsOpen ? "sidebar-active-item" : "hover:bg-foreground/10"
+                    state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "w-full",
+                    isSettingsOpen ? "p-0 overflow-hidden" : "px-3 hover:bg-foreground/10"
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <Settings className="h-4 w-4 icon-hover-spin shrink-0" />
-                    {state === 'expanded' && <span className="text-xs">{t('sidebar.settings')}</span>}
-                  </div>
-                  {state === 'expanded' && (
-                    <div className={cn(
-                      "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold border backdrop-blur-md transition-all duration-300",
-                      isOnline 
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
-                        : "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
-                    )}>
-                      <span className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
-                      <span>{isOnline ? 'Online' : 'Sin conexión'}</span>
-                    </div>
-                  )}
-                  {state === 'collapsed' && (
-                    <div className="absolute top-1.5 right-1.5 flex items-center">
-                      <span className={cn("w-2 h-2 rounded-full border border-black/50 shadow-sm", isOnline ? "bg-emerald-400" : "bg-amber-400")} />
-                    </div>
+                  {isSettingsOpen ? (
+                    <GlassSurface
+                      radius={9999}
+                      depth={10}
+                      blur={20}
+                      strength={100}
+                      chromaticAberration={15}
+                      backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
+                      elevation="low"
+                      contrastObserver
+                      className={cn(
+                        "flex items-center justify-between w-full h-full text-foreground",
+                        state === 'collapsed' ? "justify-center px-0" : "px-3"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Settings className="h-4 w-4 icon-hover-spin shrink-0" />
+                        {state === 'expanded' && <span className="text-xs font-semibold">{t('sidebar.settings')}</span>}
+                      </div>
+                      {state === 'expanded' && (
+                        <div className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold border backdrop-blur-md transition-all duration-300",
+                          isOnline 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
+                        )}>
+                          <span className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
+                          <span>{isOnline ? 'Online' : 'Sin conexión'}</span>
+                        </div>
+                      )}
+                    </GlassSurface>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <Settings className="h-4 w-4 icon-hover-spin shrink-0" />
+                        {state === 'expanded' && <span className="text-xs">{t('sidebar.settings')}</span>}
+                      </div>
+                      {state === 'expanded' && (
+                        <div className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold border backdrop-blur-md transition-all duration-300",
+                          isOnline 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
+                        )}>
+                          <span className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
+                          <span>{isOnline ? 'Online' : 'Sin conexión'}</span>
+                        </div>
+                      )}
+                      {state === 'collapsed' && (
+                        <div className="absolute top-1.5 right-1.5 flex items-center">
+                          <span className={cn("w-2 h-2 rounded-full border border-black/50 shadow-sm", isOnline ? "bg-emerald-400" : "bg-amber-400")} />
+                        </div>
+                      )}
+                    </>
                   )}
                 </SidebarMenuButton>
                 </motion.div>

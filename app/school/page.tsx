@@ -204,7 +204,7 @@ export default function SchoolPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="courses" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsList className="grid w-full grid-cols-2 max-w-full sm:max-w-[400px]">
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>

@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Moon, AlertTriangle, Brain, Zap, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { springConfig } from '@/lib/design-tokens';
 import type { CognitiveInsight } from './types';
 
 const ICONS = {
@@ -20,21 +21,21 @@ const SEVERITY_STYLES = {
     bg: 'bg-indigo-950/10 backdrop-blur-md',
     icon: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.15)]',
     badge: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    glow: 'hover:shadow-[0_20px_50px_rgba(99,102,241,0.18)]',
+    glow: 'hover:bloom-soft',
   },
   warning: {
     border: 'border-amber-500/25 hover:border-amber-500/45',
     bg: 'bg-amber-950/10 backdrop-blur-md',
     icon: 'text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.15)]',
     badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    glow: 'hover:shadow-[0_20px_50px_rgba(245,158,11,0.18)]',
+    glow: 'hover:bloom-medium',
   },
   critical: {
     border: 'border-red-500/30 hover:border-red-500/50',
     bg: 'bg-red-950/10 backdrop-blur-md',
     icon: 'text-red-400 bg-red-500/10 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]',
     badge: 'bg-red-500/10 text-red-400 border-red-500/20',
-    glow: 'hover:shadow-[0_20px_50px_rgba(239,68,68,0.22)]',
+    glow: 'hover:bloom-strong',
   },
 };
 
@@ -65,9 +66,9 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
         return (
           <motion.div
             key={i}
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 + i * 0.1, duration: 0.5 }}
+            transition={{ ...springConfig.smooth, delay: 0.1 + i * 0.08 }}
             className={cn(
               'flex items-start gap-4 p-4 rounded-2xl border transition-all duration-500 cursor-default relative overflow-hidden',
               'glass-card group hover:scale-[1.02]',
@@ -107,6 +108,17 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
                 </span>
               </div>
               <p className="text-[11px] text-white/45 leading-relaxed font-normal">{insight.detail}</p>
+              {insight.action && (
+                <div className="mt-3 flex">
+                  <span className={cn(
+                    'text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full border transition-all duration-300',
+                    styles.badge,
+                    'bg-white/[0.02] hover:bg-white/[0.08] cursor-pointer'
+                  )}>
+                    → {insight.action}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Pulse dot for critical */}

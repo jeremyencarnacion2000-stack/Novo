@@ -3,6 +3,7 @@ import { Routine, RoutineTask } from "@/types/routine"
 import { Project, Task, Subtask } from "@/types/project"
 import { isSameDay, parseISO } from "date-fns"
 import { trackActivity } from "@/lib/activity-tracker"
+import { eventBus } from "@/lib/events/event-bus"
 
 // IndexedDB utilities for offline storage
 class OfflineStorage {
@@ -878,6 +879,11 @@ export const DataIntegrator = {
       trackActivity('task', true, { id: task.id, name: task.text, module: task.source }).catch(err =>
         console.error('Failed to track task completion:', err)
       )
+      eventBus.dispatch('TaskCompleted', {
+        taskId: task.id,
+        taskTitle: task.text,
+        source: task.source
+      })
     }
 
     try {
@@ -980,6 +986,11 @@ export const DataIntegrator = {
         await setCachedData('checklist', userId, [...checklist.data, newTask])
       }
       await syncToCloud('/api/checklist', taskData, 'POST')
+      eventBus.dispatch('TaskCreated', {
+        taskId: tempId,
+        taskTitle: taskData.text || taskData.title,
+        source: 'manual'
+      })
     } catch (error) {
       console.error('Failed to create manual task:', error)
     }
@@ -1016,6 +1027,19 @@ export const DataIntegrator = {
         await setCachedData('tasks', userId, [...tasks.data, newTask])
       }
       await syncToCloud('/api/tasks', taskData, 'POST')
+      eventBus.dispatch('TaskCreated', {
+        taskId: tempId,
+        taskTitle: taskData.title,
+        source: 'standalone'
+      })
+      if (taskData.dueDate) {
+        eventBus.dispatch('CalendarModified', {
+          action: 'create',
+          eventId: tempId,
+          eventTitle: taskData.title,
+          date: taskData.dueDate
+        })
+      }
     } catch (error) {
       console.error('Failed to create task:', error)
     }

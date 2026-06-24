@@ -13,25 +13,16 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
       data-slot="card"
       data-variant={variant}
       className={cn(
-        'text-card-foreground flex flex-col gap-8 rounded-[32px] p-6 lg:p-10 relative isolate shadow-none bg-transparent overflow-hidden',
-        variant !== 'ghost' && 'glass-card',
+        'text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative isolate shadow-none bg-transparent overflow-hidden border transition-all duration-300',
+        variant === 'primary' && 'glass-surface',
+        variant === 'secondary' && 'glass-surface bg-white/[0.04]',
+        variant === 'tertiary' && 'glass-surface bg-black/40 border-white/5',
+        variant === 'ghost' && 'border-transparent',
         className,
       )}
       {...props}
       style={style}
     >
-      {/* Glass Background & Blur */}
-      {variant !== 'ghost' && (
-        <div
-          className={cn(
-            "absolute inset-0 z-[-2] rounded-[32px] pointer-events-none",
-            variant === 'primary' && "card-bg-primary",
-            variant === 'secondary' && "card-bg-secondary",
-            variant === 'tertiary' && "card-bg-tertiary",
-          )}
-        />
-      )}
-      {/* Children flow normally over the absolute background layers */}
       {children}
     </div>
   )

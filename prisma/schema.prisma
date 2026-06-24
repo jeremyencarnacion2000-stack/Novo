@@ -97,6 +97,9 @@ model User {
   musicPlaylists  MusicPlaylist[]
   musicHistory    MusicHistory[]
   followedArtists MusicArtist[]
+
+  // External Integrations (Notion, Drive, etc.)
+  integrationAccounts IntegrationAccount[]
 }
 
 model VerificationToken {
@@ -885,6 +888,7 @@ model CognitiveTwinRecord {
   confidenceScore  Float    @default(42)
   trustLevel       String   @default("initial") // 'initial' | 'learning' | 'adapted' | 'validated'
   isInitialized    Boolean  @default(false)
+  onboardingCompletedAt DateTime?              // Set once when onboarding finishes; never mutated by Evolution Engine
 
   // Serialized JSON blobs — mirrors CognitiveTwin TypeScript interface
   identity         Json     @default("{}")
@@ -970,4 +974,27 @@ model TwinSnapshot {
   @@unique([twinId, snapshotDate]) // one snapshot per day
   @@index([userId, snapshotDate])
   @@map("twin_snapshots")
+}
+
+// ── External Service Integration Tokens ─────────────────────────────────────
+// Stores OAuth credentials for third-party services (Notion, Google Drive, etc.)
+// Kept separate from NextAuth Account model to avoid schema coupling.
+model IntegrationAccount {
+  id            String    @id @default(cuid())
+  userId        String
+  provider      String    // "notion" | "drive"
+  accessToken   String
+  refreshToken  String?
+  tokenType     String?
+  scope         String?
+  expiresAt     DateTime?
+  // Provider-specific metadata (workspaceId, botId, selectedDatabaseIds, etc.)
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("integration_accounts")
 }
