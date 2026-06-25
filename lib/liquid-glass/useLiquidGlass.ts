@@ -264,17 +264,8 @@ export function useLiquidGlass({
   const mapUrl = ''
 
   const buildBackdropFilter = useCallback((): string => {
-    if (!hasSVGFilterSupport || !filterUrl) {
-      return `blur(${blur * 1.5}px) brightness(1.08) saturate(1.4)`
-    }
-    return [
-      `blur(${Math.max(1, blur * 0.4)}px)`,
-      filterUrl,
-      `blur(${Math.max(0.5, blur * 0.3)}px)`,
-      'brightness(1.08)',
-      'saturate(1.4)',
-    ].join(' ')
-  }, [hasSVGFilterSupport, filterUrl, blur])
+    return `blur(${blur}px) brightness(1.08) saturate(1.4)`
+  }, [blur])
 
   return {
     ref,
