@@ -119,7 +119,7 @@ export default function LibraryPage() {
 
   return (
     <div className="flex-1 h-full p-4 md:p-8 pt-6 overflow-hidden">
-      <div className="h-full flex flex-col space-y-4 bg-background/80 backdrop-blur-xl rounded-3xl border border-border/50 shadow-2xl p-4 md:p-6 overflow-hidden">
+      <div className="liquid-glass h-full flex flex-col space-y-4 bg-background/80 backdrop-blur-xl rounded-3xl border border-border/50 shadow-2xl p-4 md:p-6 overflow-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Library</h2>

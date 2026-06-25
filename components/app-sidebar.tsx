@@ -204,7 +204,7 @@ export function AppSidebar() {
                 <SidebarGroup className={cn(state === 'collapsed' && "!p-0")}>
                   {state === 'expanded' && (
                     <CollapsibleTrigger asChild>
-                      <SidebarGroupLabel className="px-4 text-[10px] font-black tracking-[0.3em] uppercase opacity-60 mb-2 cursor-pointer hover:opacity-100 transition-opacity flex items-center justify-between w-full group-data-[state=open]/collapsible:opacity-100 group-data-[state=open]/collapsible:mb-4">
+                      <SidebarGroupLabel className="liquid-glass-subtle px-4 text-[10px] font-black tracking-[0.3em] uppercase opacity-60 mb-2 cursor-pointer hover:opacity-100 transition-opacity flex items-center justify-between w-full group-data-[state=open]/collapsible:opacity-100 group-data-[state=open]/collapsible:mb-4">
                         {section.title}
                         <ChevronDown className="h-3.5 w-3.5 transition-transform duration-500 group-data-[state=closed]/collapsible:-rotate-90 opacity-40 group-hover:opacity-100" />
                       </SidebarGroupLabel>

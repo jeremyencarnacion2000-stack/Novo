@@ -98,13 +98,13 @@ export default function DashboardClient() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-6 md:grid-cols-2">
             <motion.div variants={itemVariants} className="space-y-6">
-              <Card variant="secondary" className="p-0 border-none shadow-none">
+              <Card variant="secondary" className="liquid-glass-elevated p-0 border-none shadow-none">
                 <QuickActions />
               </Card>
               <DashboardHabits />
             </motion.div>
             <motion.div variants={itemVariants}>
-              <Card variant="tertiary" className="p-0 border-none shadow-none h-full">
+              <Card variant="tertiary" className="liquid-glass-elevated p-0 border-none shadow-none h-full">
                 <RecentActivity onActivityClick={handleActivityClick} />
               </Card>
             </motion.div>

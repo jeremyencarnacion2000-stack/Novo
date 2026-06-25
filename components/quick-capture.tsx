@@ -197,7 +197,7 @@ export function QuickCapture() {
 
                     {/* Modal (Floating like Raycast/Spotlight) */}
                     <motion.div
-                        className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-[5001] bg-[#0A0A0B]/90 border border-white/10 rounded-[32px] glass-blur shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden"
+                        className="liquid-glass-elevated fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-[5001] bg-[#0A0A0B]/90 border border-white/10 rounded-[32px] glass-blur shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden"
                         initial={{ opacity: 0, y: -20, scale: 0.94, filter: 'blur(4px)' }}
                         animate={{
                             opacity: 1,

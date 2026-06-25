@@ -26,7 +26,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
 
     return (
         <Card
-            className="hover:shadow-md transition-shadow cursor-pointer"
+            className="liquid-glass hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => onClick?.(course)}
         >
             <CardHeader className="pb-3">

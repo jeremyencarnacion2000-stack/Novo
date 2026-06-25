@@ -265,18 +265,12 @@ export function useLiquidGlass({
 
   const buildBackdropFilter = useCallback((): string => {
     if (!hasSVGFilterSupport || !filterUrl) {
-      // Fallback: proper backdrop glass blur for browsers without SVG filter support
-      return `blur(12px)`
+      return `blur(${blur * 1.5}px) brightness(1.08) saturate(1.4)`
     }
-    // Full Liquid Glass pipeline:
-    // - A small pre-blur feeds into the displacement map for smooth sampling
-    // - The displacement map creates the liquid lens distortion
-    // - A post-blur softens the chromatic fringing
-    // - brightness/saturate give the glass its luminous quality
     return [
-      `blur(${Math.max(0.5, blur * 0.5)}px)`,
-      `url('${filterUrl}')`,
-      `blur(${Math.max(1, blur)}px)`,
+      `blur(${Math.max(1, blur * 0.4)}px)`,
+      filterUrl,
+      `blur(${Math.max(0.5, blur * 0.3)}px)`,
       'brightness(1.08)',
       'saturate(1.4)',
     ].join(' ')

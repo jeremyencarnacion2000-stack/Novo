@@ -195,7 +195,7 @@ export default function BusinessPage() {
       <DealsPipeline />
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="liquid-glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -233,7 +233,7 @@ export default function BusinessPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="liquid-glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />

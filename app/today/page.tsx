@@ -396,7 +396,7 @@ export default function TodayPage() {
                     ].map(stat => (
                         <div
                             key={stat.label}
-                            className="flex flex-col gap-1 px-4 py-3 rounded-2xl border border-white/[0.06]"
+                            className="liquid-glass flex flex-col gap-1 px-4 py-3 rounded-2xl border border-white/[0.06]"
                             style={{ background: 'rgba(255,255,255,0.015)' }}
                         >
                             <span className="text-white/30 flex items-center gap-1">{stat.icon}

@@ -111,7 +111,7 @@ export default function ProfilePage() {
         {/* User Info & Stats */}
         <div className="lg:col-span-3 space-y-6">
           {/* Profile Card */}
-          <Card>
+          <Card className="liquid-glass">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
@@ -177,7 +177,7 @@ export default function ProfilePage() {
 
           {/* Stats Card */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+            <Card className="liquid-glass bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -187,7 +187,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
+            <Card className="liquid-glass bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Flame className="h-5 w-5 text-orange-500" />
@@ -197,7 +197,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+            <Card className="liquid-glass bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Target className="h-5 w-5 text-purple-500" />
@@ -207,7 +207,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+            <Card className="liquid-glass bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-yellow-500" />
@@ -219,7 +219,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Vision Board Placeholder */}
-          <Card>
+          <Card className="liquid-glass">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-yellow-500" />

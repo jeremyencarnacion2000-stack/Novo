@@ -297,20 +297,19 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         }
       }
 
-      // Standard CSS backdrop-blur is fully compatible in Chrome.
-      // Standard CSS filter: url(...) is also fully compatible in Chrome.
-      // This completely avoids nesting SVG filters inside backdrop-filter!
       if (!hasSVGFilterSupport || !filterUrl) {
         return {
           ...baseBg,
-          backdropFilter: `blur(${blur * 1.5}px)`,
+          backdropFilter: `blur(${blur * 1.5}px) brightness(1.08) saturate(1.4)`,
+          WebkitBackdropFilter: `blur(${blur * 1.5}px) brightness(1.08) saturate(1.4)`,
         }
       }
 
+      const bdFilter = `blur(${Math.max(1, blur * 0.4)}px) ${filterUrl} blur(${Math.max(0.5, blur * 0.3)}px) brightness(1.08) saturate(1.4)`
       return {
         ...baseBg,
-        filter: `${filterUrl} brightness(1.08) saturate(1.4)`,
-        backdropFilter: `blur(${blur}px)`,
+        backdropFilter: bdFilter,
+        WebkitBackdropFilter: bdFilter,
       }
     }, [
       backgroundColor,

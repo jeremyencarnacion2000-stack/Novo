@@ -21,7 +21,7 @@ export function GPADisplay({ gpa, label, description, size = 'large', showScale 
     };
 
     return (
-        <Card>
+        <Card className="liquid-glass">
             <CardHeader className={size === 'small' ? 'pb-2' : ''}>
                 <CardTitle className={size === 'small' ? 'text-base' : ''}>{label}</CardTitle>
                 {description && <CardDescription>{description}</CardDescription>}

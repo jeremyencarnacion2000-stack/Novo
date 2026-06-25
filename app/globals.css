@@ -770,29 +770,67 @@
     border-right: 1px solid rgba(255, 255, 255, 0.04);
   }
 
-  /* ── Liquid Glass — Dashboard Cards (independent from sidebar frosted glass) ──
-     Less blur, more refraction, higher readability. Applied only to primary
-     dashboard section cards during the limited validation rollout.
+  /* ── Novo Liquid Glass Tier System ────────────────────────────────────────
+     Tier 1 (Subtle)  → dashboard cards, list items, inputs
+     Tier 2 (Medium)  → dialogs, floating panels, sidebar sections
+     Tier 3 (Premium) → hero cards, overlays, featured elements
+
      Settings controls: cardLiquidIntensity → --card-blur-px
                         cardOpacity        → --card-liquid-opacity            */
-  .liquid-glass {
-    background: rgba(255, 255, 255, var(--card-liquid-opacity));
-    backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
-    -webkit-backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, var(--card-refraction));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.5)),
-      0 4px 24px rgba(0, 0, 0, 0.18);
-  }
 
-  .dark .liquid-glass {
-    background: rgba(255, 255, 255, var(--card-liquid-opacity));
-    backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
-    -webkit-backdrop-filter: blur(var(--card-blur-px)) saturate(160%);
+  /* Tier 1: Subtle — light blur, readable, everyday surfaces */
+  .liquid-glass,
+  .liquid-glass-subtle {
+    background: rgba(var(--card-rgb, 255, 255, 255), var(--card-liquid-opacity));
+    backdrop-filter: blur(var(--card-blur-px)) saturate(140%) brightness(1.02);
+    -webkit-backdrop-filter: blur(var(--card-blur-px)) saturate(140%) brightness(1.02);
     border: 1px solid rgba(255, 255, 255, var(--card-refraction));
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.2)),
-      0 4px 24px rgba(0, 0, 0, 0.35);
+      0 2px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Tier 2: Medium — more blur + glow, for elevated surfaces */
+  .liquid-glass-elevated {
+    background: rgba(var(--card-rgb, 255, 255, 255), calc(var(--card-liquid-opacity) * 1.4));
+    backdrop-filter: blur(calc(var(--card-blur-px) + 8px)) saturate(160%) brightness(1.05);
+    -webkit-backdrop-filter: blur(calc(var(--card-blur-px) + 8px)) saturate(160%) brightness(1.05);
+    border: 1px solid rgba(255, 255, 255, calc(var(--card-refraction) * 1.5));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 2)),
+      inset 0 -1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 0.5)),
+      0 8px 32px rgba(0, 0, 0, 0.22);
+  }
+
+  /* Tier 3: Premium — max blur + luminance, hero elements */
+  .liquid-glass-premium {
+    background: rgba(var(--card-rgb, 255, 255, 255), calc(var(--card-liquid-opacity) * 2));
+    backdrop-filter: blur(calc(var(--card-blur-px) + 16px)) saturate(180%) brightness(1.08);
+    -webkit-backdrop-filter: blur(calc(var(--card-blur-px) + 16px)) saturate(180%) brightness(1.08);
+    border: 1px solid rgba(255, 255, 255, calc(var(--card-refraction) * 2));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 2.5)),
+      inset 0 -1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 0.8)),
+      0 16px 48px rgba(0, 0, 0, 0.30);
+  }
+
+  .dark .liquid-glass,
+  .dark .liquid-glass-subtle {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 0.8)),
+      0 2px 12px rgba(0, 0, 0, 0.25);
+  }
+  .dark .liquid-glass-elevated {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.2)),
+      inset 0 -1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 0.3)),
+      0 8px 32px rgba(0, 0, 0, 0.40);
+  }
+  .dark .liquid-glass-premium {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 1.5)),
+      inset 0 -1px 0 rgba(255, 255, 255, calc(var(--card-refraction) * 0.5)),
+      0 16px 48px rgba(0, 0, 0, 0.55);
   }
 
 
