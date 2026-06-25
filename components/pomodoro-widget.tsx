@@ -82,6 +82,7 @@ export function PomodoroWidget() {
                         variant="ghost"
                         size="sm"
                         onClick={toggleTimer}
+                        aria-label={isActive ? "Pause timer" : "Play timer"}
                         className={cn(
                             "rounded-full hover:bg-white/10 text-white transition-all",
                             isFocusPage ? "h-10 w-10 p-0" : "h-8 w-8 p-0"
@@ -98,6 +99,7 @@ export function PomodoroWidget() {
                             variant="ghost"
                             size="sm"
                             onClick={resetTimer}
+                            aria-label="Reset timer"
                             className="h-10 w-10 p-0 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors"
                         >
                             <RotateCcw className="h-4 w-4" />

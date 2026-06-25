@@ -251,6 +251,7 @@ function NotificationRow({
           {/* Delete btn */}
           <motion.button
             onClick={(e) => { e.stopPropagation(); onDelete(notification.id) }}
+            aria-label="Delete notification"
             className="shrink-0 p-1 rounded-md text-white/0 group-hover:text-white/25 hover:!text-red-400 hover:bg-red-500/15 transition-colors"
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.9 }}
@@ -394,6 +395,7 @@ export function NotificationCenter() {
           setIsOpen(o => !o)
           if (!isOpen) loadNotifications()
         }}
+        aria-label="Notifications"
         className="fixed top-4 right-4 z-[100] w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
@@ -492,6 +494,7 @@ export function NotificationCenter() {
                         >
                           <motion.button
                             onClick={markAllRead}
+                            aria-label="Mark all as read"
                             className="p-1.5 rounded-lg hover:bg-white/10 text-white/35 hover:text-white/75 transition-colors"
                             whileHover={{ scale: 1.12 }}
                             whileTap={{ scale: 0.9 }}
@@ -501,6 +504,7 @@ export function NotificationCenter() {
                           </motion.button>
                           <motion.button
                             onClick={clearAll}
+                            aria-label="Clear all notifications"
                             className="p-1.5 rounded-lg hover:bg-red-500/15 text-white/35 hover:text-red-400 transition-colors"
                             whileHover={{ scale: 1.12 }}
                             whileTap={{ scale: 0.9 }}
@@ -513,6 +517,7 @@ export function NotificationCenter() {
                     </AnimatePresence>
                     <motion.button
                       onClick={() => setIsOpen(false)}
+                      aria-label="Close notifications"
                       className="p-1.5 rounded-lg hover:bg-white/10 text-white/35 hover:text-white/75 transition-colors"
                       whileHover={{ scale: 1.12, rotate: 90 }}
                       whileTap={{ scale: 0.9 }}

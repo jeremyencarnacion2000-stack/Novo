@@ -177,12 +177,13 @@ export function AppSidebar() {
       )}>
         <SidebarHeader className={cn("py-8 flex justify-center transition-[padding] duration-300", state === 'collapsed' ? "!px-0" : "px-6")}>
           <div className={cn("flex items-center justify-center transition-[width] duration-300", state === 'collapsed' ? 'w-full' : 'w-full')}>
-            <div
+            <button
               onClick={() => {
                 if (isMobile) setOpenMobile(false)
                 else { toggleSidebar() }
               }}
-              className="group relative flex items-center justify-center cursor-pointer"
+              aria-label="Toggle sidebar"
+              className="group relative flex items-center justify-center cursor-pointer bg-transparent border-0 p-0"
             >
               <div className="transition-all duration-300 group-hover:opacity-0 group-hover:scale-90">
                 <Image src="/icon.svg" alt="Novo" width={state === 'expanded' ? 32 : 24} height={state === 'expanded' ? 32 : 24} className="object-contain" priority />
@@ -193,7 +194,7 @@ export function AppSidebar() {
               {state === 'expanded' && (
                 <span className="ml-3 text-lg font-bold tracking-tight transition-opacity duration-300 group-hover:opacity-50">Novo</span>
               )}
-            </div>
+            </button>
           </div>
         </SidebarHeader>
 
@@ -360,6 +361,7 @@ export function AppSidebar() {
                   } : undefined}
                   style={!isSettingsOpen ? { viewTransitionName: 'settings-window' } as React.CSSProperties : undefined}
                   tooltip={t('sidebar.settings')}
+                  aria-label="Settings"
                   className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative",
                     state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "w-full",
                     isSettingsOpen ? "p-0 overflow-hidden" : "px-3 hover:bg-foreground/10"

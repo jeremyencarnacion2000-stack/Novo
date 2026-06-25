@@ -29,7 +29,7 @@ export default async function MobileAuthBridge() {
     redirect(`novoapp://auth?token=${token}`);
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-[#050505] text-white p-6">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-white p-6">
             <div className="max-w-md w-full text-center space-y-6">
                 <div className="animate-pulse text-4xl mb-8">✨</div>
                 <h1 className="text-2xl font-bold">Authenticating...</h1>

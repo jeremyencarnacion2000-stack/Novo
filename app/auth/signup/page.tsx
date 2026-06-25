@@ -63,7 +63,7 @@ export default function SignUpPage() {
 
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#050505] text-white p-4 relative overflow-hidden">
+            <div className="min-h-screen flex items-center justify-center bg-background text-white p-4 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-transparent to-transparent opacity-50" />
                 <div className="absolute inset-0 backdrop-blur-[40px]" />
                 <div className="flex flex-col items-center justify-center space-y-4 text-center relative z-10">
@@ -117,7 +117,7 @@ export default function SignUpPage() {
             </div>
 
             {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-[#050505] relative">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-background relative">
                 <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/5 to-transparent pointer-events-none" />
                 <div className="w-full max-w-md space-y-8 relative z-10">
                     <div className="space-y-2">

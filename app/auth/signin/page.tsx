@@ -57,7 +57,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] text-white flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-background text-white flex flex-col overflow-hidden">
       {/* Dynamic Background Image (if present) - but for auth usually we want a clean look, 
           however we can use a subtle blur overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 animate-pulse-slow" />

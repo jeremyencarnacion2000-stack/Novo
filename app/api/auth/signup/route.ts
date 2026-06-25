@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        if (password.length < 6) {
+        if (password.length < 12) {
             console.warn('⚠️ [API-SignUp] Password too short')
             return NextResponse.json(
-                { error: 'La contraseña debe tener al menos 6 caracteres' },
+                { error: 'La contraseña debe tener al menos 12 caracteres' },
                 { status: 400 }
             )
         }

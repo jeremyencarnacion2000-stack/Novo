@@ -51,6 +51,7 @@ export function MobileNav() {
                                 <button
                                     key="fab"
                                     onClick={onOpen}
+                                    aria-label="Add"
                                     className="h-12 w-12 -my-4 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-[0_4px_24px_rgba(99,102,241,0.4)] active:scale-90 transition-all duration-200 ring-[3px] ring-black/40"
                                 >
                                     <Plus className="h-5 w-5 text-white" strokeWidth={2.2} />
@@ -65,6 +66,7 @@ export function MobileNav() {
                         return (
                             <button
                                 key={item.path}
+                                aria-label={item.label}
                                 onClick={() => {
                                     if (isMenu) {
                                         setDrawerOpen(true)
