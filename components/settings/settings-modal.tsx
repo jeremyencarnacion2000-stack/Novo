@@ -24,7 +24,7 @@ export function SettingsModal() {
                 className={cn(
                 "max-w-4xl md:max-w-5xl w-[94vw] md:w-full h-[85vh] p-0 shadow-2xl outline-none",
                 "!flex flex-col overflow-hidden rounded-[32px]",
-                "liquid-glass-premium"
+                "!bg-black/80 dark:!bg-black/80 backdrop-blur-2xl border border-white/10 liquid-glass-premium"
             )}>
                 {/* Content Layer (Sharp) */}
                 <div className="flex-1 w-full flex flex-col p-0 overflow-hidden relative bg-transparent h-full">

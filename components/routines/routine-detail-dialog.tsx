@@ -57,7 +57,7 @@ export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }
       <Dialog open={open} onOpenChange={(o) => safeViewTransition(() => !o && onClose())}>
         <DialogContent
           style={{ viewTransitionName: 'routine-detail-modal' } as React.CSSProperties}
-          className="max-w-7xl w-[95vw] h-[90vh] p-0 border-none shadow-none [&>button]:text-foreground [&>button]:z-20 z-[5001] rounded-[24px] md:rounded-[32px] overflow-hidden liquid-glass-premium"
+          className="max-w-7xl w-[95vw] h-[90vh] p-0 shadow-none [&>button]:text-white [&>button]:z-20 z-[5001] rounded-[24px] md:rounded-[32px] overflow-hidden !bg-black/80 dark:!bg-black/80 backdrop-blur-2xl border border-white/10 liquid-glass-premium"
         >
           {/* Content Viewport — overflow-y-auto directly on this div */}
           <div className="relative z-10 overflow-y-auto h-full w-full custom-scrollbar">
