@@ -1604,3 +1604,63 @@ html.cognitive-reduced-capacity {
   background: linear-gradient(90deg, var(--cognitive-accent), color-mix(in srgb, var(--cognitive-accent) 60%, white));
   transition: width 2s cubic-bezier(0.25, 0.8, 0.25, 1), background 1.5s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COGNITIVE ADAPTIVE DENSITY
+   The app breathes with the user's cognitive state.
+   These rules affect EVERY page, EVERY component — not just /cognitive.
+   The user never notices these changes consciously. They just feel right.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Peak Focus: tighter spacing, higher density, snappier transitions */
+html.cognitive-peak .container { gap: 1rem; }
+html.cognitive-peak * { transition-duration: var(--cognitive-transition-speed, 150ms); }
+html.cognitive-peak .liquid-glass,
+html.cognitive-peak .liquid-glass-elevated,
+html.cognitive-peak .liquid-glass-premium {
+  transition: all 200ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Fatigue: more whitespace, calmer, slower — the app exhales */
+html.cognitive-fatigue .container { gap: 1.5rem; }
+html.cognitive-fatigue * {
+  transition-duration: var(--cognitive-transition-speed, 500ms) !important;
+}
+html.cognitive-fatigue .liquid-glass,
+html.cognitive-fatigue .liquid-glass-elevated,
+html.cognitive-fatigue .liquid-glass-premium {
+  transition: all 600ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  backdrop-filter: blur(24px) saturate(130%) brightness(0.98) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(130%) brightness(0.98) !important;
+}
+html.cognitive-fatigue h1,
+html.cognitive-fatigue h2 { letter-spacing: 0.01em; }
+html.cognitive-fatigue .text-xs,
+html.cognitive-fatigue .text-\[9px\],
+html.cognitive-fatigue .text-\[10px\],
+html.cognitive-fatigue .text-\[11px\] { opacity: 0.7; }
+
+/* Reduced Capacity: minimal stimulation, maximum calm */
+html.cognitive-reduced-capacity .container { gap: 2rem; }
+html.cognitive-reduced-capacity * {
+  transition-duration: var(--cognitive-transition-speed, 700ms) !important;
+}
+html.cognitive-reduced-capacity .liquid-glass,
+html.cognitive-reduced-capacity .liquid-glass-elevated,
+html.cognitive-reduced-capacity .liquid-glass-premium {
+  transition: all 800ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  backdrop-filter: blur(20px) saturate(110%) brightness(0.95) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(110%) brightness(0.95) !important;
+}
+html.cognitive-reduced-capacity .text-xs,
+html.cognitive-reduced-capacity .text-\[9px\],
+html.cognitive-reduced-capacity .text-\[10px\],
+html.cognitive-reduced-capacity .text-\[11px\] { opacity: 0.55; }
+html.cognitive-reduced-capacity [data-notification-center],
+html.cognitive-reduced-capacity .animate-pulse,
+html.cognitive-reduced-capacity .animate-bounce,
+html.cognitive-reduced-capacity .animate-ping {
+  animation: none !important;
+}
+
+/* Linear: balanced baseline — no overrides needed, CSS defaults apply */

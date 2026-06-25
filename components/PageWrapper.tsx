@@ -1,13 +1,18 @@
 'use client'
 
-import React, { useRef, useState, useEffect, useCallback } from 'react'
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useScrollContainer } from '@/lib/scroll-container-context'
+import { useCognitivePhase } from '@/lib/cognitive-context'
 
-// ─── Spring Physics ─────────────────────────────────────────────────────────
-const SPRING = { type: 'spring', stiffness: 280, damping: 30, mass: 1 } as const
+const PHASE_SPRINGS: Record<string, { stiffness: number; damping: number; mass: number }> = {
+  PEAK_FOCUS:            { stiffness: 380, damping: 28, mass: 0.8 },
+  LINEAR_EXECUTION:      { stiffness: 280, damping: 30, mass: 1 },
+  SYNAPTIC_FATIGUE:      { stiffness: 180, damping: 35, mass: 1.3 },
+  REDUCED_CAPACITY_MODE: { stiffness: 140, damping: 40, mass: 1.5 },
+}
 
 // ─── Variants ───────────────────────────────────────────────────────────────
 const variants = {
@@ -37,6 +42,12 @@ interface PageWrapperProps {
 export function PageWrapper({ children, className, isFullScreen = false }: PageWrapperProps) {
   const pathname = usePathname()
   const { setScrollContainer } = useScrollContainer()
+  let phase = 'LINEAR_EXECUTION'
+  try { phase = useCognitivePhase() } catch {}
+  const SPRING = useMemo(() => ({
+    type: 'spring' as const,
+    ...(PHASE_SPRINGS[phase] || PHASE_SPRINGS.LINEAR_EXECUTION),
+  }), [phase])
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const [prevPath, setPrevPath] = useState(pathname)
