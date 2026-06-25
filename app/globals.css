@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 @import 'tailwindcss';
-/* @import 'tw-animate-css'; */
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -796,28 +796,74 @@
       0 4px 24px rgba(0, 0, 0, 0.06);
   }
 
-  /* Tier 2: Elevated — SVG chromatic aberration + heavier blur */
+  /* Tier 2: Elevated — chromatic edge glow + heavier blur */
   .liquid-glass-elevated {
+    position: relative;
     background: rgba(255, 255, 255, 0.60);
     backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
     -webkit-backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
-    /* SVG displacement via GlassSurface component only */
     border: 1px solid rgba(0, 0, 0, 0.10);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.70),
       0 8px 40px rgba(0, 0, 0, 0.08);
   }
+  .liquid-glass-elevated::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 100, 100, 0.12) 0%,
+      rgba(100, 255, 100, 0.08) 35%,
+      transparent 50%,
+      rgba(100, 100, 255, 0.08) 65%,
+      rgba(255, 100, 255, 0.10) 100%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    padding: 2px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.7;
+  }
 
-  /* Tier 3: Premium — strong SVG aberration + max blur + luminance */
+  /* Tier 3: Premium — stronger chromatic edge + max blur */
   .liquid-glass-premium {
+    position: relative;
     background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
     -webkit-backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
-    /* SVG displacement via GlassSurface component only */
     border: 1px solid rgba(0, 0, 0, 0.12);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.80),
       0 16px 60px rgba(0, 0, 0, 0.10);
+  }
+  .liquid-glass-premium::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 80, 80, 0.18) 0%,
+      rgba(255, 200, 50, 0.10) 20%,
+      rgba(80, 255, 80, 0.12) 40%,
+      transparent 50%,
+      rgba(80, 80, 255, 0.12) 60%,
+      rgba(200, 50, 255, 0.10) 80%,
+      rgba(255, 80, 120, 0.15) 100%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    padding: 3px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.8;
   }
 
   /* Dark mode overrides */
@@ -837,6 +883,8 @@
       inset 0 -1px 0 rgba(255, 255, 255, 0.04),
       0 8px 40px rgba(0, 0, 0, 0.45);
   }
+  .dark .liquid-glass-elevated::before { opacity: 0.5; }
+  .dark .liquid-glass-premium::before { opacity: 0.6; }
   .dark .liquid-glass-premium {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.12);
