@@ -225,7 +225,7 @@ export default function ClientLayout({
                 <OfflineIndicator />
                 <SyncQueueInit />
                 <NetworkStatus />
-                <SileoToaster position="top-right" theme="dark" />
+                <SileoToaster position="top-right" theme="system" offset={{ top: 60 }} />
               </ChatbotProvider>
             </FocusProvider>
           </PomodoroProvider>

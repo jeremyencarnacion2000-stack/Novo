@@ -1,8 +1,9 @@
 'use client'
 
 import { sileo } from 'sileo'
+import type { SileoState } from 'sileo'
 
-type ToastVariant = 'default' | 'destructive'
+type ToastVariant = 'default' | 'destructive' | 'success' | 'warning' | 'info'
 
 interface ToastOptions {
   title?: string
@@ -11,14 +12,25 @@ interface ToastOptions {
   duration?: number
 }
 
-function toast({ title, description, variant, duration }: ToastOptions) {
-  const type = variant === 'destructive' ? 'error' : 'success'
+const variantMap: Record<ToastVariant, SileoState> = {
+  default: 'success',
+  destructive: 'error',
+  success: 'success',
+  warning: 'warning',
+  info: 'info',
+}
+
+function toast({ title, description, variant = 'default', duration }: ToastOptions) {
+  const type = variantMap[variant] || 'success'
+
+  const isError = variant === 'destructive'
+  const isWarning = variant === 'warning'
 
   const id = sileo.show({
     title: title || '',
-    description: description || '',
+    description: description || undefined,
     type,
-    duration: duration ?? 4000,
+    duration: duration ?? (isError ? 6000 : isWarning ? 5000 : 4000),
   })
 
   return {
