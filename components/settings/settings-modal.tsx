@@ -19,12 +19,12 @@ export function SettingsModal() {
                 });
             }}
         >
-            <DialogContent 
+            <DialogContent
                 style={{ viewTransitionName: 'settings-window' } as React.CSSProperties}
                 className={cn(
                 "max-w-4xl md:max-w-5xl w-[94vw] md:w-full h-[85vh] p-0 shadow-2xl outline-none",
-                "!flex flex-col overflow-hidden rounded-[32px] border border-white/10",
-                "bg-black/40 backdrop-blur-2xl"
+                "!flex flex-col overflow-hidden rounded-[32px]",
+                "liquid-glass-premium"
             )}>
                 {/* Content Layer (Sharp) */}
                 <div className="flex-1 w-full flex flex-col p-0 overflow-hidden relative bg-transparent h-full">
