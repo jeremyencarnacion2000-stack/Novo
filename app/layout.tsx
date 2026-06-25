@@ -68,22 +68,59 @@ export default function RootLayout({
         />
         <ClientLayout>{children}</ClientLayout>
 
-        {/* Global SVG Liquid Gooey Filter */}
+        {/* Global SVG Filters */}
         <svg
-          style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}
+          aria-hidden="true"
+          style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none', overflow: 'visible' }}
           xmlns="http://www.w3.org/2000/svg"
-          version="1.1"
         >
           <defs>
+            {/* Liquid Gooey */}
             <filter id="liquid-gooey">
               <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
-              <feColorMatrix
-                in="blur"
-                mode="matrix"
-                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9"
-                result="goo"
-              />
+              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
               <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+            </filter>
+
+            {/* ── Novo Liquid Glass — Chromatic Aberration Displacement ── */}
+            <filter id="novo-glass" colorInterpolationFilters="sRGB" x="-5%" y="-5%" width="110%" height="110%">
+              {/* Displacement map: radial gradient gray→edge colors */}
+              <feFlood floodColor="#808080" result="gray" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="preblur" />
+
+              {/* Red channel — strongest displacement */}
+              <feDisplacementMap in="preblur" in2="gray" scale="8" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="dR" />
+
+              {/* Green channel — medium displacement */}
+              <feDisplacementMap in="preblur" in2="gray" scale="5" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="dG" />
+
+              {/* Blue channel — least displacement */}
+              <feDisplacementMap in="preblur" in2="gray" scale="3" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="dB" />
+
+              {/* Merge channels back */}
+              <feBlend in="dR" in2="dG" mode="screen" result="rg" />
+              <feBlend in="rg" in2="dB" mode="screen" />
+            </filter>
+
+            {/* Stronger variant for premium tier */}
+            <filter id="novo-glass-strong" colorInterpolationFilters="sRGB" x="-5%" y="-5%" width="110%" height="110%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="preblur" />
+              <feFlood floodColor="#808080" result="gray" />
+
+              <feDisplacementMap in="preblur" in2="gray" scale="14" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="dR" />
+
+              <feDisplacementMap in="preblur" in2="gray" scale="9" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="dG" />
+
+              <feDisplacementMap in="preblur" in2="gray" scale="5" xChannelSelector="R" yChannelSelector="G" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="dB" />
+
+              <feBlend in="dR" in2="dG" mode="screen" result="rg" />
+              <feBlend in="rg" in2="dB" mode="screen" />
             </filter>
           </defs>
         </svg>
