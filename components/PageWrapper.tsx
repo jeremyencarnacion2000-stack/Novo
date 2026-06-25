@@ -105,9 +105,9 @@ export function PageWrapper({ children, className, isFullScreen = false }: PageW
             : 'overflow-y-auto overflow-x-hidden scrollbar-hide',
           className
         )}
-        style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
+        onAnimationComplete={() => {
+          const el = scrollRef.current
+          if (el) el.style.transform = 'none'
         }}
       >
         {isFullScreen ? (
