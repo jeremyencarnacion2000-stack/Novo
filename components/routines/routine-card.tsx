@@ -20,7 +20,7 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
 
     return (
         <Card
-            className="transition-all hover:shadow-md cursor-pointer flex flex-col h-full"
+            className="liquid-glass-elevated transition-all hover:shadow-md cursor-pointer flex flex-col h-full"
             onClick={() => onView(routine)}
             onMouseEnter={() => setIsCardHovered(true)}
             onMouseLeave={() => setIsCardHovered(false)}
