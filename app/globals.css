@@ -61,6 +61,12 @@
 }
 
 :root {
+  /* ── Cognitive Phase Transitions (felt, not seen) ── */
+  --cognitive-accent: #818cf8;
+  --cognitive-transition-speed: 300ms;
+  --cognitive-secondary-opacity: 1;
+  --cognitive-bg-overlay-opacity: 0.05;
+
   /* Material design systems background variable mapping */
   --md-sys-color-neutral-background: 255, 255, 255;
   /* Novo Design DNA: Carbon Glass Palette (Light Mode) */
@@ -1380,7 +1386,7 @@ html:not(.blue-light-filter)::before {
  */
 html.cognitive-fatigue {
   filter: saturate(0.75) brightness(0.92) sepia(0.10);
-  transition: filter 2s ease;
+  transition: filter 3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 html.cognitive-fatigue .card,
@@ -1394,7 +1400,7 @@ html.cognitive-fatigue [class*="rounded-"] {
  */
 html.cognitive-peak {
   filter: saturate(1.05) brightness(1.02) contrast(1.02);
-  transition: filter 2s ease;
+  transition: filter 3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /**
@@ -1402,7 +1408,7 @@ html.cognitive-peak {
  */
 html.cognitive-linear {
   filter: none;
-  transition: filter 2s ease;
+  transition: filter 3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Notification collapse during fatigue (Focus Lock) */

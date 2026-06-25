@@ -379,15 +379,16 @@ function FatigueNavigationWarning({
 }) {
   return (
     <div
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-md w-full mx-4 animate-in slide-in-from-top-2 fade-in duration-300"
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-md w-full mx-4"
       role="alert"
+      style={{ animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both' }}
     >
       <div
-        className="rounded-2xl px-5 py-4 backdrop-blur-2xl border shadow-2xl"
+        className="liquid-glass-elevated rounded-2xl px-5 py-4 border"
         style={{
-          background: 'rgba(20, 8, 8, 0.92)',
-          borderColor: 'rgba(239, 68, 68, 0.25)',
-          boxShadow: '0 8px 40px rgba(239,68,68,0.15)',
+          background: 'rgba(20, 8, 8, 0.88)',
+          borderColor: 'rgba(251, 146, 60, 0.20)',
+          boxShadow: '0 12px 48px rgba(251,146,60,0.12), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}
       >
         <div className="flex items-start gap-3">

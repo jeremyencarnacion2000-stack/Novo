@@ -38,20 +38,23 @@ export function useCognitiveTheme(): void {
 
     const html = document.documentElement
 
-    // ── Dynamic numeric vars (change within a phase) ──────────────────────
     html.style.setProperty('--cognitive-attention',        String(bioState.attentionScore))
     html.style.setProperty('--cognitive-fatigue',          String(bioState.fatigueScore))
     html.style.setProperty('--cognitive-stress',           String(userStressScore))
     html.style.setProperty('--cognitive-minutes-to-next',  String(bioState.minutesToNextPhase))
     html.style.setProperty('--cognitive-ultradian-cycle',  String(bioState.ultradianCycle))
 
-    // ── Derived opacity for secondary elements (attention-gated) ──────────
-    // High attention → full opacity; low attention → progressively dimmed
     const secondaryOpacity = Math.max(0.4, bioState.attentionScore / 100).toFixed(2)
     html.style.setProperty('--cognitive-secondary-opacity', secondaryOpacity)
 
-    // ── Background overlay intensity — drives the bg-gradient-overlay div ──
-    // Peak: subtle violet; Fatigue: warm amber; Reduced: muted rose
+    const PHASE_ACCENTS: Record<string, string> = {
+      PEAK_FOCUS:            '#818cf8',
+      LINEAR_EXECUTION:      '#38bdf8',
+      SYNAPTIC_FATIGUE:      '#fb923c',
+      REDUCED_CAPACITY_MODE: '#f472b6',
+    }
+    html.style.setProperty('--cognitive-accent', PHASE_ACCENTS[bioState.phase] || '#6366f1')
+
     const overlayOpacity = (bioState.phase === 'PEAK_FOCUS'
       ? 0.08
       : bioState.phase === 'SYNAPTIC_FATIGUE' || bioState.phase === 'REDUCED_CAPACITY_MODE'
@@ -60,14 +63,21 @@ export function useCognitiveTheme(): void {
     ).toFixed(2)
     html.style.setProperty('--cognitive-bg-overlay-opacity', overlayOpacity)
 
-    // ── Sidebar frosted glass brightness adjusts to fatigue ───────────────
-    // Fatigued: slightly dimmer sidebar; Peak: no change
     const sidebarBrightness = bioState.phase === 'SYNAPTIC_FATIGUE'
       ? '0.92'
       : bioState.phase === 'REDUCED_CAPACITY_MODE'
         ? '0.85'
         : '1.0'
     html.style.setProperty('--sidebar-brightness', sidebarBrightness)
+
+    const animSpeed = bioState.phase === 'PEAK_FOCUS'
+      ? '150ms'
+      : bioState.phase === 'SYNAPTIC_FATIGUE'
+        ? '500ms'
+        : bioState.phase === 'REDUCED_CAPACITY_MODE'
+          ? '700ms'
+          : '300ms'
+    html.style.setProperty('--cognitive-transition-speed', animSpeed)
 
   }, [bioState, userStressScore])
 }

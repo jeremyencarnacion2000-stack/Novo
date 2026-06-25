@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, RefreshCw, Clock, AlertCircle, CheckCircle2, Mic, ChevronDown, ChevronUp } from 'lucide-react';
 import { FocusScoreRing } from '@/components/cognitive/focus-score-ring';
@@ -32,13 +33,16 @@ function CognitiveLoader() {
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-[#060608]/80 backdrop-blur-sm z-20">
-      <motion.div
-        className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
-        animate={{ rotate: [0, 360] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-      >
-        <Brain className="w-7 h-7 text-primary" />
-      </motion.div>
+      <div className="relative">
+        <div className="absolute inset-0 rounded-2xl border-2 border-primary/30 animate-ping" />
+        <motion.div
+          className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+        >
+          <Brain className="w-7 h-7 text-primary" />
+        </motion.div>
+      </div>
       <div className="flex flex-col items-center gap-2">
         <span className="text-xs font-black tracking-[0.3em] uppercase text-white/50">
           Cognitive Engine
@@ -71,6 +75,7 @@ function CognitiveLoader() {
 
 // ── Signal Stream Component ───────────────────────────────────────────────────
 function SignalStream({ insights }: { insights: any[] }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const visibleInsights = expanded ? insights : insights.slice(0, 2);
 
@@ -83,11 +88,9 @@ function SignalStream({ insights }: { insights: any[] }) {
             insight={insight}
             onActionClick={(action) => {
               if (action.toLowerCase().includes('break') || action.toLowerCase().includes('ambient') || action.toLowerCase().includes('music')) {
-                const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/music"]');
-                if (btn) (btn as HTMLButtonElement).click();
+                router.push('/music');
               } else {
-                const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/focus"]');
-                if (btn) (btn as HTMLButtonElement).click();
+                router.push('/focus');
               }
             }}
           />
@@ -117,6 +120,7 @@ function SignalStream({ insights }: { insights: any[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CognitivePage() {
+  const router = useRouter();
   const { bioState, chronotype, phaseOverride, setChronotype, setPhaseOverride } = useCognitiveEngine();
   const [data, setData] = useState<CognitiveEngineResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,18 +158,15 @@ export default function CognitivePage() {
   return (
     <div className="absolute inset-0 p-4 lg:p-6 flex flex-col bg-transparent">
       <div
-        className="w-full h-full rounded-[2rem] flex flex-col overflow-hidden relative"
+        className="w-full h-full rounded-[2rem] flex flex-col overflow-hidden relative liquid-glass-premium"
         style={{
-          background: 'rgba(6,6,8,0.92)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(48px) saturate(160%)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 40px 120px rgba(0,0,0,0.6)',
+          borderRadius: '2rem',
         }}
       >
-        {/* Ambient glow orbs — layered for depth */}
+        {/* Ambient glow orbs — layered for depth, phase-reactive */}
         <div className="absolute top-[-15%] left-[-5%] w-[50%] h-[50%] rounded-full opacity-60 blur-[140px] pointer-events-none z-0" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)' }} />
-        <div className="absolute bottom-[-15%] right-[-5%] w-[45%] h-[45%] rounded-full opacity-50 blur-[120px] pointer-events-none z-0" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)' }} />
-        <div className="absolute top-[40%] right-[20%] w-[20%] h-[20%] rounded-full opacity-30 blur-[80px] pointer-events-none z-0" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-[-15%] right-[-5%] w-[45%] h-[45%] rounded-full opacity-60 blur-[120px] pointer-events-none z-0" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 70%)' }} />
+        <div className="absolute top-[40%] right-[20%] w-[20%] h-[20%] rounded-full opacity-30 blur-[80px] pointer-events-none z-0" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--primary) 8%, transparent) 0%, transparent 70%)' }} />
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div
@@ -276,7 +277,7 @@ export default function CognitivePage() {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0 }}
               >
                 <CognitiveStateHero
                   phase={bioState.phase}
@@ -293,7 +294,7 @@ export default function CognitivePage() {
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.08 }}
                   className="space-y-4"
                 >
                   
@@ -307,24 +308,28 @@ export default function CognitivePage() {
                     actionLabel={bioState.phase === 'PEAK_FOCUS' ? 'Start Focus Block →' : bioState.phase === 'SYNAPTIC_FATIGUE' ? 'Launch Ambient Player →' : 'Review Routines →'}
                     onActionClick={() => {
                       if (bioState.phase === 'PEAK_FOCUS') {
-                        const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/focus"]');
-                        if (btn) (btn as HTMLButtonElement).click();
+                        router.push('/focus');
                       } else if (bioState.phase === 'SYNAPTIC_FATIGUE') {
-                        const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/music"]');
-                        if (btn) (btn as HTMLButtonElement).click();
+                        router.push('/music');
                       } else {
-                        const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/routines"]');
-                        if (btn) (btn as HTMLButtonElement).click();
+                        router.push('/routines');
                       }
                     }}
                     impact={bioState.phase === 'PEAK_FOCUS' || bioState.phase === 'SYNAPTIC_FATIGUE' ? 'high' : 'medium'}
                     estGain={bioState.phase === 'PEAK_FOCUS' ? '+35% Efficiency' : bioState.phase === 'SYNAPTIC_FATIGUE' ? '+25% Recovery' : undefined}
                   />
 
-                  {/* Signal Stream — max 2 visible */}
-                  {report.insights && report.insights.length > 0 && (
-                    <SignalStream insights={report.insights} />
-                  )}
+                </motion.div>
+              )}
+
+              {/* Signal Stream — max 2 visible */}
+              {report.recommendation && report.insights && report.insights.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.16 }}
+                >
+                  <SignalStream insights={report.insights} />
                 </motion.div>
               )}
 
@@ -332,10 +337,15 @@ export default function CognitivePage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
                 {/* Twin Vitals — left column */}
-                <div className="lg:col-span-5 space-y-6">
+                <motion.div
+                  className="lg:col-span-5 space-y-6"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.24 }}
+                >
                   <div>
                     <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30 mb-3">Twin Vitals</p>
-                    <div className="card--secondary rounded-3xl p-6 space-y-6 flex flex-col items-center [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="card--secondary liquid-glass rounded-3xl p-6 space-y-6 flex flex-col items-center [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <FocusScoreRing
                         score={report.focusScore}
                         energyLevel={report.energyLevel}
@@ -358,13 +368,18 @@ export default function CognitivePage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Time Intelligence — right column */}
-                <div className="lg:col-span-7 space-y-6">
+                <motion.div
+                  className="lg:col-span-7 space-y-6"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.32 }}
+                >
                   <div>
                     <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30 mb-3">Time Intelligence</p>
-                    <div className="card--secondary rounded-3xl p-5 relative overflow-hidden [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="card--secondary liquid-glass rounded-3xl p-5 relative overflow-hidden [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <EnergyTimelineChart
                         timeline={signals.energyTimeline}
                         currentHour={signals.currentHour}
@@ -383,11 +398,11 @@ export default function CognitivePage() {
                     </div>
                   </div>
                   {report.reorganizedDay?.length > 0 && (
-                    <div className="card--secondary rounded-3xl p-5 [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="card--secondary liquid-glass rounded-3xl p-5 [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <ReorganizedDay tasks={report.reorganizedDay} />
                     </div>
                   )}
-                </div>
+                </motion.div>
 
               </div>
 
