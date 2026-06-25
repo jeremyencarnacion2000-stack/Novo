@@ -63,20 +63,20 @@ export default function SignUpPage() {
 
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background text-white p-4 relative overflow-hidden">
+            <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-transparent to-transparent opacity-50" />
                 <div className="absolute inset-0 backdrop-blur-[40px]" />
                 <div className="flex flex-col items-center justify-center space-y-4 text-center relative z-10">
                     <CheckCircle2 className="h-16 w-16 text-green-500 animate-bounce-slow" />
                     <h2 className="text-2xl font-bold tracking-tight">Account Created!</h2>
-                    <p className="text-white/40">Redirecting to login...</p>
+                    <p className="text-foreground/40">Redirecting to login...</p>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen w-full flex bg-black text-white overflow-hidden">
+        <div className="min-h-screen w-full flex bg-background text-foreground overflow-hidden">
             {/* Left Side - Gradient & Info */}
             <div className="hidden lg:flex w-1/2 relative p-12 flex-col justify-between overflow-hidden">
                 {/* Gradient Background */}
@@ -126,7 +126,7 @@ export default function SignUpPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" className="bg-black border-gray-800 hover:bg-gray-900 hover:text-white h-12">
+                        <Button variant="outline" className="bg-background border-gray-800 hover:bg-gray-900 hover:text-foreground h-12">
                             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -135,7 +135,7 @@ export default function SignUpPage() {
                             </svg>
                             Google
                         </Button>
-                        <Button variant="outline" className="bg-black border-gray-800 hover:bg-gray-900 hover:text-white h-12">
+                        <Button variant="outline" className="bg-background border-gray-800 hover:bg-gray-900 hover:text-foreground h-12">
                             <Github className="mr-2 h-4 w-4" />
                             Github
                         </Button>
@@ -146,7 +146,7 @@ export default function SignUpPage() {
                             <span className="w-full border-t border-gray-800" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-black px-2 text-gray-500">Or</span>
+                            <span className="bg-background px-2 text-gray-500">Or</span>
                         </div>
                     </div>
 
@@ -159,7 +159,7 @@ export default function SignUpPage() {
                                     placeholder="eg. John"
                                     value={firstName}
                                     onChange={(e) => setFirstName(e.target.value)}
-                                    className="bg-gray-900/50 border-gray-800 h-12 focus:border-violet-500 transition-colors"
+                                    className="bg-white/5 border-white/10 h-12 focus:border-violet-500 transition-colors"
                                     required
                                 />
                             </div>
@@ -229,7 +229,7 @@ export default function SignUpPage() {
 
                     <div className="text-center text-sm text-gray-500">
                         Already have an account?{' '}
-                        <Link href="/auth/signin" className="text-white hover:underline font-medium">
+                        <Link href="/auth/signin" className="text-foreground hover:underline font-medium">
                             Log in
                         </Link>
                     </div>

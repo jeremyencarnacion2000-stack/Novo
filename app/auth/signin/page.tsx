@@ -57,7 +57,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background text-white flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-background text-foreground flex flex-col overflow-hidden">
       {/* Dynamic Background Image (if present) - but for auth usually we want a clean look, 
           however we can use a subtle blur overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 animate-pulse-slow" />
@@ -69,7 +69,7 @@ export default function SignInPage() {
           onClick={() => window.location.href = '/welcome'}
           className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors active:scale-95"
         >
-          <ArrowLeft className="h-4 w-4 text-white/60" />
+          <ArrowLeft className="h-4 w-4 text-foreground/60" />
         </button>
       </div>
 
@@ -81,10 +81,10 @@ export default function SignInPage() {
             <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center">
               <div className="h-3.5 w-3.5 bg-black rounded-full" />
             </div>
-            <span className="text-sm font-bold tracking-tight text-white/40">NOVO</span>
+            <span className="text-sm font-bold tracking-tight text-foreground/40">NOVO</span>
           </div>
           <h1 className="text-3xl font-black tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-white/40 leading-relaxed">
+          <p className="text-sm text-foreground/40 leading-relaxed">
             Sign in to continue to your workspace. 
             <span className="block mt-1 text-indigo-400/60 font-medium italic">Login with Google to sync your YouTube Music history and likes.</span>
           </p>
@@ -112,21 +112,21 @@ export default function SignInPage() {
         {/* Divider */}
         <div className="flex items-center gap-4 mb-6">
           <div className="flex-1 h-px bg-white/10" />
-          <span className="text-[11px] font-medium tracking-widest uppercase text-white/20">or</span>
+          <span className="text-[11px] font-medium tracking-widest uppercase text-foreground/20">or</span>
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
         {/* Credentials Form */}
         <form onSubmit={handleCredentialsLogin} className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-xs font-medium text-white/40 tracking-wide uppercase">Email</label>
+            <label htmlFor="email" className="text-xs font-medium text-foreground/40 tracking-wide uppercase">Email</label>
             <input
               id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-13 px-4 py-3.5 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 focus:bg-white/[0.07] transition-all"
+              className="w-full h-13 px-4 py-3.5 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-white/30 focus:bg-white/[0.07] transition-all"
               required
               disabled={loading || googleLoading}
             />
@@ -134,8 +134,8 @@ export default function SignInPage() {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor="password" className="text-xs font-medium text-white/40 tracking-wide uppercase">Password</label>
-              <button type="button" className="text-[11px] text-white/30 hover:text-white/50 transition-colors">
+              <label htmlFor="password" className="text-xs font-medium text-foreground/40 tracking-wide uppercase">Password</label>
+              <button type="button" className="text-[11px] text-foreground/30 hover:text-foreground/50 transition-colors">
                 Forgot?
               </button>
             </div>
@@ -146,14 +146,14 @@ export default function SignInPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-13 px-4 py-3.5 pr-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 focus:bg-white/[0.07] transition-all"
+                className="w-full h-13 px-4 py-3.5 pr-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-white/30 focus:bg-white/[0.07] transition-all"
                 required
                 disabled={loading || googleLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/40 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground/40 transition-colors"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -175,9 +175,9 @@ export default function SignInPage() {
         </form>
 
         {/* Sign Up Link */}
-        <p className="text-center text-xs text-white/25 mt-8">
+        <p className="text-center text-xs text-foreground/25 mt-8">
           Don&apos;t have an account?{' '}
-          <button onClick={() => window.location.href = '/auth/signup'} className="text-white/60 font-medium hover:text-white transition-colors">
+          <button onClick={() => window.location.href = '/auth/signup'} className="text-foreground/60 font-medium hover:text-foreground transition-colors">
             Create one
           </button>
         </p>
@@ -242,7 +242,7 @@ function SlideToSignIn({ isLoading, enabled, onSwipeComplete }: SlideToSignInPro
         style={{ opacity }}
         className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
       >
-        <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-white/30 select-none">
+        <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-foreground/30 select-none">
           {isLoading ? "AUTHENTICATING SYSTEM..." : "SLIDE TO SIGN IN"}
         </span>
       </motion.div>

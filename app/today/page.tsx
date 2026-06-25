@@ -79,8 +79,8 @@ function ProgressRing({ progress, completed, total }: { progress: number; comple
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-sm font-black text-white leading-none">{completed}</span>
-                <span className="text-[9px] text-white/30 font-medium">/{total}</span>
+                <span className="text-sm font-black text-foreground leading-none">{completed}</span>
+                <span className="text-[9px] text-muted-foreground font-medium">/{total}</span>
             </div>
         </div>
     );
@@ -109,7 +109,7 @@ function SourceIcon({ source }: { source: string }) {
         manual:  <Pencil className="w-3 h-3" />,
         notion:  <Link2 className="w-3 h-3" />,
     };
-    return <span className="text-white/30">{map[source] ?? map.manual}</span>;
+    return <span className="text-foreground/30">{map[source] ?? map.manual}</span>;
 }
 
 // ─── Task Row ────────────────────────────────────────────────────────────────
@@ -150,12 +150,12 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
             <div className="flex-1 min-w-0">
                 <p className={cn(
                     'text-sm font-medium truncate transition-all duration-200',
-                    task.completed ? 'line-through text-white/20' : 'text-white/80'
+                    task.completed ? 'line-through text-foreground/20' : 'text-foreground/80'
                 )}>
                     {task.text}
                 </p>
                 {task.metadata && (
-                    <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1">
+                    <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
                         <SourceIcon source={task.source} />
                         {task.metadata.routineName || task.metadata.projectTitle || task.metadata.courseCode}
                     </p>
@@ -173,10 +173,10 @@ const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent
     morning:   { label: 'Mañana',    icon: <Sun className="w-4 h-4" />,           accent: 'text-amber-400' },
     afternoon: { label: 'Tarde',     icon: <Zap className="w-4 h-4" />,           accent: 'text-orange-400' },
     evening:   { label: 'Noche',     icon: <Circle className="w-4 h-4" />,        accent: 'text-indigo-400' },
-    anytime:   { label: 'Cuando sea',icon: <Clock className="w-4 h-4" />,         accent: 'text-white/40' },
+    anytime:   { label: 'Cuando sea',icon: <Clock className="w-4 h-4" />,         accent: 'text-foreground/40' },
     project:   { label: 'Proyectos', icon: <FolderKanban className="w-4 h-4" />, accent: 'text-blue-400' },
     school:    { label: 'Escuela',   icon: <GraduationCap className="w-4 h-4" />,accent: 'text-violet-400' },
-    manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-white/50' },
+    manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-foreground/50' },
     notion:    { label: 'Notion',    icon: <Link2 className="w-4 h-4" />,        accent: 'text-teal-400' },
 };
 
@@ -188,7 +188,7 @@ function SectionCard({
     onToggle: (t: IntegratedTask) => void;
 }) {
     const [open, setOpen] = useState(true);
-    const meta = sectionMeta[sectionKey] ?? { label: sectionKey, icon: <ListChecks className="w-4 h-4" />, accent: 'text-white/50' };
+    const meta = sectionMeta[sectionKey] ?? { label: sectionKey, icon: <ListChecks className="w-4 h-4" />, accent: 'text-foreground/50' };
     const done = tasks.filter(t => t.completed).length;
 
     return (
@@ -205,10 +205,10 @@ function SectionCard({
             >
                 <div className="flex items-center gap-2.5">
                     <span className={meta.accent}>{meta.icon}</span>
-                    <span className="text-xs font-black tracking-widest uppercase text-white/60">{meta.label}</span>
-                    <span className="text-[10px] text-white/20 font-medium">{done}/{tasks.length}</span>
+                    <span className="text-xs font-black tracking-widest uppercase text-foreground/60">{meta.label}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">{done}/{tasks.length}</span>
                 </div>
-                <ChevronRight className={cn('w-4 h-4 text-white/20 transition-transform duration-300', open && 'rotate-90')} />
+                <ChevronRight className={cn('w-4 h-4 text-muted-foreground transition-transform duration-300', open && 'rotate-90')} />
             </button>
 
             {/* Tasks */}
@@ -256,10 +256,10 @@ function UrgentBanner({ items }: { items: UrgentItem[] }) {
                 {items.map(item => (
                     <div key={item.id} className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-white/75 truncate">
+                            <p className="text-sm font-semibold text-foreground/75 truncate">
                                 {item.courseCode}: {item.title}
                             </p>
-                            <p className="text-[10px] text-white/30 mt-0.5">
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
                                 Vence: {new Date(item.dueDate).toLocaleDateString('es', { weekday: 'short', month: 'short', day: 'numeric' })}
                             </p>
                         </div>
@@ -351,8 +351,8 @@ export default function TodayPage() {
                 className="flex items-start justify-between gap-4"
             >
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight text-white/90">Hoy</h1>
-                    <p className="text-xs text-white/30 font-medium mt-0.5 capitalize">{dayLabel}</p>
+                    <h1 className="text-2xl font-black tracking-tight text-foreground/90">Hoy</h1>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5 capitalize">{dayLabel}</p>
                 </div>
 
                 {loading ? (
@@ -392,17 +392,17 @@ export default function TodayPage() {
                     {[
                         { label: 'Total', value: total, icon: <Target className="w-3.5 h-3.5" /> },
                         { label: 'Completadas', value: completed, icon: <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> },
-                        { label: 'Restantes', value: total - completed, icon: <Circle className="w-3.5 h-3.5 text-white/30" /> },
+                        { label: 'Restantes', value: total - completed, icon: <Circle className="w-3.5 h-3.5 text-muted-foreground" /> },
                     ].map(stat => (
                         <div
                             key={stat.label}
                             className="liquid-glass flex flex-col gap-1 px-4 py-3 rounded-2xl border border-white/[0.06]"
                             style={{ background: 'rgba(255,255,255,0.015)' }}
                         >
-                            <span className="text-white/30 flex items-center gap-1">{stat.icon}
+                            <span className="text-muted-foreground flex items-center gap-1">{stat.icon}
                                 <span className="text-[9px] font-black tracking-widest uppercase">{stat.label}</span>
                             </span>
-                            <span className="text-xl font-black text-white/80 tabular-nums">{stat.value}</span>
+                            <span className="text-xl font-black text-foreground/80 tabular-nums">{stat.value}</span>
                         </div>
                     ))}
                 </motion.div>
@@ -440,15 +440,15 @@ export default function TodayPage() {
                         <CheckCircle2 className="w-7 h-7 text-primary" />
                     </div>
                     <div className="max-w-sm space-y-2">
-                        <p className="text-base font-bold text-white/80">You have a clear day</p>
-                        <p className="text-sm text-white/35 leading-relaxed">
+                        <p className="text-base font-bold text-foreground/80">You have a clear day</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                             No tasks are scheduled. This is a good moment to build structure —
                             Novo will automatically surface tomorrow's priorities once you set up routines.
                         </p>
                     </div>
                     {/* Forward action */}
                     <div
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-white/40 cursor-default"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-foreground/40 cursor-default"
                         style={{ background: 'rgba(255,255,255,0.025)' }}
                     >
                         <ChevronRight className="w-3.5 h-3.5 text-primary/60" />

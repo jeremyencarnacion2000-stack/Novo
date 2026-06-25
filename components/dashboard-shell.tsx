@@ -110,17 +110,17 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     transition={{ type: 'spring', stiffness: 420, damping: 30 }}
                     className="
                       max-w-xs w-full rounded-2xl border border-white/10 px-4 py-3
-                      backdrop-blur-2xl bg-[rgba(10,10,15,0.88)]
+                      backdrop-blur-2xl bg-background/90
                       shadow-[0_8px_40px_rgba(0,0,0,0.5)]
                       flex items-start gap-3
                     "
                   >
-                    <p className="flex-1 text-xs text-white/75 leading-relaxed">
+                    <p className="flex-1 text-xs text-foreground/75 leading-relaxed">
                       {insightMessage}
                     </p>
                     <button
                       onClick={dismissInsight}
-                      className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-white/30 hover:text-white/60"
+                      className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-foreground/30 hover:text-foreground/60"
                       aria-label="Dismiss insight"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -139,15 +139,15 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     className="
                       fixed bottom-24 right-6 z-[160] w-80 rounded-3xl border border-white/10 p-5
-                      backdrop-blur-2xl bg-[rgba(8,8,12,0.92)]
+                      backdrop-blur-2xl bg-background/95
                       shadow-[0_20px_80px_rgba(0,0,0,0.6)]
                     "
                   >
                     <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/5">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Hub de Comandos</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</span>
                       <button
                         onClick={() => setVoiceOpen(false)}
-                        className="p-1 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors"
+                        className="p-1 rounded-lg hover:bg-white/5 text-foreground/40 hover:text-foreground transition-colors"
                         title="Cerrar panel"
                       >
                         <X className="h-3.5 w-3.5" />

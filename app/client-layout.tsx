@@ -27,6 +27,27 @@ import { ScrollContainerProvider } from '@/lib/scroll-container-context'
 import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 
+function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
+  return function ComposedProviders({ children }: { children: React.ReactNode }) {
+    return providers.reduceRight(
+      (acc, Provider) => <Provider>{acc}</Provider>,
+      children as React.ReactElement,
+    )
+  }
+}
+
+const AppProviders = composeProviders(
+  SessionProvider as any,
+  SettingsProvider,
+  NotificationProvider,
+  PomodoroProvider,
+  FocusProvider,
+  ChatbotProvider,
+  QuickCaptureProvider,
+  ScrollContainerProvider,
+  CognitiveProvider,
+)
+
 /**
  * CognitiveThemeSyncer — mounts once inside CognitiveProvider.
  * Bridges live BioState → CSS custom properties on <html>.
@@ -198,39 +219,23 @@ export default function ClientLayout({
   if (!mounted) return null
 
   return (
-    <SessionProvider>
-      <SettingsProvider>
-        <NotificationProvider>
-          <PomodoroProvider>
-            <FocusProvider>
-              <ChatbotProvider>
-                <QuickCaptureProvider>
-                  <ScrollContainerProvider>
-                    <CognitiveProvider>
-                      <CognitiveThemeSyncer />
-                      <CognitiveTwinProvider>
-                        <GlobalPlayer>
-                          <AuthWrapper>
-                            <>
-                              {children}
-                              <QuickCapture />
-                            </>
-                          </AuthWrapper>
-                        </GlobalPlayer>
-                        <AuthenticatedWidgets />
-                      </CognitiveTwinProvider>
-                    </CognitiveProvider>
-                  </ScrollContainerProvider>
-                </QuickCaptureProvider>
-                <OfflineIndicator />
-                <SyncQueueInit />
-                <NetworkStatus />
-                <SileoToaster position="top-right" theme="system" offset={{ top: 60 }} />
-              </ChatbotProvider>
-            </FocusProvider>
-          </PomodoroProvider>
-        </NotificationProvider>
-      </SettingsProvider>
-    </SessionProvider>
+    <AppProviders>
+      <CognitiveThemeSyncer />
+      <CognitiveTwinProvider>
+        <GlobalPlayer>
+          <AuthWrapper>
+            <>
+              {children}
+              <QuickCapture />
+            </>
+          </AuthWrapper>
+        </GlobalPlayer>
+        <AuthenticatedWidgets />
+      </CognitiveTwinProvider>
+      <OfflineIndicator />
+      <SyncQueueInit />
+      <NetworkStatus />
+      <SileoToaster position="top-right" theme="system" offset={{ top: 60 }} />
+    </AppProviders>
   )
 }

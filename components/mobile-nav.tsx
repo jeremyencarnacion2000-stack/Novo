@@ -39,7 +39,7 @@ export function MobileNav() {
                         compact ? "px-6 py-1.5 rounded-[32px] max-w-[280px]" : "px-3 py-2.5"
                     )}
                     style={{
-                        background: 'rgba(8, 8, 10, 0.85)',
+                        background: 'color-mix(in srgb, var(--background) 88%, transparent)',
                     }}
                 >
                     {navItems.map((item) => {

@@ -78,7 +78,7 @@ export function MobileSectionDrawer({ open, onClose }: MobileSectionDrawerProps)
                 <div
                     className="liquid-glass-elevated mx-2 mb-2 rounded-[32px] border border-white/[0.06] shadow-[0_-16px_60px_rgba(0,0,0,0.6)] overflow-hidden glass-blur-xl"
                     style={{
-                        background: 'rgba(10, 10, 12, 0.88)',
+                        background: 'color-mix(in srgb, var(--background) 92%, transparent)',
                     }}
                 >
                     {/* Handle */}

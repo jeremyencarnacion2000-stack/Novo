@@ -762,11 +762,11 @@
   /* Sidebar - Frosted Glass (brand-protected — uses sidebar namespace exclusively) */
   .glass-sidebar {
     @apply transition-all duration-300 ease-out relative overflow-hidden;
-    background: rgba(255, 255, 255, var(--sidebar-opacity));
+    background: rgba(255, 255, 255, 0.70);
     backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
     -webkit-backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 10px 0 50px rgba(0, 0, 0, 0.2);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
   }
 
   .dark .glass-sidebar {
@@ -787,42 +787,40 @@
   /* Tier 1: Subtle — frosted glass, readable, everyday surfaces */
   .liquid-glass,
   .liquid-glass-subtle {
-    background: rgba(var(--card-rgb, 255, 255, 255), 0.06);
+    background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
     -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      0 4px 24px rgba(0, 0, 0, 0.15);
+      inset 0 1px 0 rgba(255, 255, 255, 0.60),
+      0 4px 24px rgba(0, 0, 0, 0.06);
   }
 
   /* Tier 2: Elevated — SVG chromatic aberration + heavier blur */
   .liquid-glass-elevated {
-    background: rgba(var(--card-rgb, 255, 255, 255), 0.08);
+    background: rgba(255, 255, 255, 0.60);
     backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
     -webkit-backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
     filter: url(#novo-glass);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(0, 0, 0, 0.10);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-      0 8px 40px rgba(0, 0, 0, 0.25);
+      inset 0 1px 0 rgba(255, 255, 255, 0.70),
+      0 8px 40px rgba(0, 0, 0, 0.08);
   }
 
   /* Tier 3: Premium — strong SVG aberration + max blur + luminance */
   .liquid-glass-premium {
-    background: rgba(var(--card-rgb, 255, 255, 255), 0.10);
+    background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
     -webkit-backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
     filter: url(#novo-glass-strong);
-    border: 1px solid rgba(255, 255, 255, 0.20);
+    border: 1px solid rgba(0, 0, 0, 0.12);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.30),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-      0 16px 60px rgba(0, 0, 0, 0.35);
+      inset 0 1px 0 rgba(255, 255, 255, 0.80),
+      0 16px 60px rgba(0, 0, 0, 0.10);
   }
 
+  /* Dark mode overrides */
   .dark .liquid-glass,
   .dark .liquid-glass-subtle {
     background: rgba(255, 255, 255, 0.04);
