@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+
+const createGradeSchema = z.object({
+    courseId: z.string().min(1).max(200),
+    name: z.string().min(1).max(500),
+    score: z.number().min(0),
+    maxScore: z.number().min(1),
+    weight: z.number().min(0).max(100),
+    category: z.string().min(1).max(100),
+    date: z.string().min(1).max(100),
+});
 
 // POST /api/school/grades - Create new grade
 export async function POST(request: NextRequest) {
@@ -21,14 +32,15 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { courseId, name, score, maxScore, weight, category, date } = body;
-
-        if (!courseId || !name || score === undefined || !maxScore || !weight || !category || !date) {
+        const parsed = createGradeSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Missing required fields' },
+                { error: 'Invalid input', details: parsed.error.flatten() },
                 { status: 400 }
             );
         }
+
+        const { courseId, name, score, maxScore, weight, category, date } = parsed.data;
 
         // Verify course belongs to user
         const course = await prisma.course.findFirst({

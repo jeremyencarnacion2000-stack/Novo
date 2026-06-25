@@ -12,13 +12,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const trackers = await prisma.tracker.findMany({
-      where: { userId: session.user.id },
-      include: { entries: true },
-      orderBy: { updatedAt: 'desc' }
-    })
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const skip = (page - 1) * limit
 
-    return NextResponse.json(trackers)
+    const where = { userId: session.user.id }
+
+    const [trackers, total] = await Promise.all([
+      prisma.tracker.findMany({
+        where,
+        include: { entries: { take: 30, orderBy: { date: 'desc' } } },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.tracker.count({ where }),
+    ])
+
+    const response = NextResponse.json(trackers)
+    response.headers.set('X-Total-Count', String(total))
+    response.headers.set('X-Total-Pages', String(Math.ceil(total / limit)))
+    response.headers.set('X-Page', String(page))
+    return response
   } catch (error) {
     console.error('Error fetching trackers:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const createGoalSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  status: z.enum(['active', 'completed', 'paused', 'cancelled']).optional(),
+  timeframe: z.string().max(50).optional(),
+  deadline: z.string().max(100).optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,12 +19,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const goals = await prisma.goal.findMany({
-      where: { userId: session.user.id },
-      orderBy: { updatedAt: 'desc' }
-    })
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const skip = (page - 1) * limit
 
-    return NextResponse.json(goals)
+    const where = { userId: session.user.id }
+
+    const [goals, total] = await Promise.all([
+      prisma.goal.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.goal.count({ where }),
+    ])
+
+    const response = NextResponse.json(goals)
+    response.headers.set('X-Total-Count', String(total))
+    response.headers.set('X-Total-Pages', String(Math.ceil(total / limit)))
+    response.headers.set('X-Page', String(page))
+    return response
   } catch (error) {
     console.error('Error fetching goals:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -30,11 +55,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, description, status, timeframe, deadline } = body
-
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const parsed = createGoalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
     }
+
+    const { title, description, status, timeframe, deadline } = parsed.data
 
     const goal = await prisma.goal.create({
       data: {

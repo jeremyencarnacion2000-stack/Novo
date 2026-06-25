@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const updateSettingsSchema = z.object({
+    settings: z.record(z.unknown()),
+})
 
 export async function GET(request: NextRequest) {
     try {
@@ -36,11 +41,12 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { settings } = body
-
-        if (!settings) {
-            return NextResponse.json({ error: 'Settings are required' }, { status: 400 })
+        const parsed = updateSettingsSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
         }
+
+        const { settings } = parsed.data
 
         // Upsert user settings
         const userSettings = await prisma.userSettings.upsert({

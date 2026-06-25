@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const createDealSchema = z.object({
+    title: z.string().min(1).max(500),
+    value: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)]),
+    stage: z.string().min(1).max(100),
+    probability: z.number().min(0).max(100).optional(),
+    expectedClose: z.string().max(100).optional().nullable(),
+    notes: z.string().max(5000).optional().nullable(),
+    clientId: z.string().min(1).max(200),
+});
 
 // GET /api/business/deals - Get all deals
 export async function GET(request: NextRequest) {
@@ -69,19 +80,20 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { title, value, stage, probability, expectedClose, notes, clientId } = body;
-
-        if (!title || value === undefined || !stage || !clientId) {
+        const parsed = createDealSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Missing required fields: title, value, stage, clientId' },
+                { error: 'Invalid input', details: parsed.error.flatten() },
                 { status: 400 }
             );
         }
 
+        const { title, value, stage, probability, expectedClose, notes, clientId } = parsed.data;
+
         const deal = await prisma.deal.create({
             data: {
                 title,
-                value: parseFloat(value),
+                value: typeof value === 'number' ? value : parseFloat(value),
                 stage,
                 probability: probability ?? 50,
                 expectedClose: expectedClose ? new Date(expectedClose) : null,

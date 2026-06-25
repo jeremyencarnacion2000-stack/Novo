@@ -17,12 +17,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const activityHistory = await prisma.activityHistory.findMany({
-      where: { userId: session.user.id },
-      orderBy: { date: 'desc' }
-    })
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const skip = (page - 1) * limit
 
-    return NextResponse.json(activityHistory)
+    const where = { userId: session.user.id }
+
+    const [activityHistory, total] = await Promise.all([
+      prisma.activityHistory.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.activityHistory.count({ where }),
+    ])
+
+    const response = NextResponse.json(activityHistory)
+    response.headers.set('X-Total-Count', String(total))
+    response.headers.set('X-Total-Pages', String(Math.ceil(total / limit)))
+    response.headers.set('X-Page', String(page))
+    return response
   } catch (error) {
     console.error('Error fetching activity history:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
     try {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown'
+        const rl = rateLimit(`auth:signup:${ip}`, 5, 300_000)
+        if (!rl.allowed) return rateLimitResponse(rl);
+
         const body = await request.json()
         const { name, email, password } = body
 

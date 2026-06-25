@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const createMessageSchema = z.object({
+    receiverId: z.string().min(1).max(200),
+    content: z.string().min(1).max(5000),
+})
 
 export async function GET(request: NextRequest) {
     try {
@@ -43,7 +49,12 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { receiverId, content } = body
+        const parsed = createMessageSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+        }
+
+        const { receiverId, content } = parsed.data
 
         const message = await prisma.directMessage.create({
             data: {
