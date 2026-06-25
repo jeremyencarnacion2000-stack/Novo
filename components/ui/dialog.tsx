@@ -39,14 +39,10 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         'fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm',
-        'data-[state=open]:animate-[novo-fade-in] data-[state=closed]:animate-[novo-fade-out]',
+        'data-[state=open]:animate-[novo-fade-in_350ms_var(--novo-spring)_both]',
+        'data-[state=closed]:animate-[novo-fade-out_200ms_ease-out_both]',
         className,
       )}
-      style={{
-        animationDuration: 'var(--novo-duration-fast)',
-        animationTimingFunction: 'var(--novo-spring)',
-        animationFillMode: 'both',
-      }}
       {...props}
     />
   )
@@ -68,14 +64,10 @@ function DialogContent({
         aria-describedby={undefined}
         className={cn(
           'bg-background fixed top-[50%] left-[50%] z-[5001] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
-          'data-[state=open]:animate-[novo-panel-in] data-[state=closed]:animate-[novo-panel-out]',
+          'data-[state=open]:animate-[novo-panel-in_500ms_var(--novo-spring)_both]',
+          'data-[state=closed]:animate-[novo-panel-out_250ms_ease-out_both]',
           className,
         )}
-        style={{
-          animationDuration: 'var(--novo-duration)',
-          animationTimingFunction: 'var(--novo-spring)',
-          animationFillMode: 'both',
-        }}
         {...props}
       >
         {children}

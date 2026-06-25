@@ -37,14 +37,10 @@ function SheetOverlay({
       data-slot="sheet-overlay"
       className={cn(
         'fixed inset-0 z-50 bg-black/50',
-        'data-[state=open]:animate-[novo-fade-in] data-[state=closed]:animate-[novo-fade-out]',
+        'data-[state=open]:animate-[novo-fade-in_350ms_var(--novo-spring)_both]',
+        'data-[state=closed]:animate-[novo-fade-out_200ms_ease-out_both]',
         className,
       )}
-      style={{
-        animationDuration: 'var(--novo-duration-fast)',
-        animationTimingFunction: 'var(--novo-spring)',
-        animationFillMode: 'both',
-      }}
       {...props}
     />
   )
@@ -66,20 +62,15 @@ function SheetContent({
         className={cn(
           'bg-background fixed z-50 flex flex-col gap-4 shadow-lg',
           side === 'right' &&
-            'inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-[state=open]:animate-[novo-slide-right-in] data-[state=closed]:animate-[novo-slide-right-out]',
+            'inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-[state=open]:animate-[novo-slide-right-in_500ms_var(--novo-spring)_both] data-[state=closed]:animate-[novo-slide-right-out_250ms_ease-out_both]',
           side === 'left' &&
-            'inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-[state=open]:animate-[novo-slide-left-in] data-[state=closed]:animate-[novo-slide-left-out]',
+            'inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-[state=open]:animate-[novo-slide-left-in_500ms_var(--novo-spring)_both] data-[state=closed]:animate-[novo-slide-left-out_250ms_ease-out_both]',
           side === 'top' &&
-            'inset-x-0 top-0 h-auto border-b data-[state=open]:animate-[novo-panel-in] data-[state=closed]:animate-[novo-panel-out]',
+            'inset-x-0 top-0 h-auto border-b data-[state=open]:animate-[novo-panel-in_500ms_var(--novo-spring)_both] data-[state=closed]:animate-[novo-panel-out_250ms_ease-out_both]',
           side === 'bottom' &&
-            'inset-x-0 bottom-0 h-auto border-t data-[state=open]:animate-[novo-drawer-in] data-[state=closed]:animate-[novo-drawer-out]',
+            'inset-x-0 bottom-0 h-auto border-t data-[state=open]:animate-[novo-drawer-in_500ms_var(--novo-spring)_both] data-[state=closed]:animate-[novo-drawer-out_250ms_ease-out_both]',
           className,
         )}
-        style={{
-          animationDuration: 'var(--novo-duration)',
-          animationTimingFunction: 'var(--novo-spring)',
-          animationFillMode: 'both',
-        }}
         {...props}
       >
         {children}
