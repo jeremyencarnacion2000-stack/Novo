@@ -41,7 +41,7 @@ function mapKey(w: number, h: number, r: number, d: number): string {
 function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): string {
   if (typeof document === 'undefined') return ''
   const k = cacheKey(params)
-  if (domFilterIds.has(k)) return `url('#${domFilterIds.get(k)}')`
+  if (domFilterIds.has(k)) return `url(#${domFilterIds.get(k)})`
 
   let svgContainer = document.getElementById('_ng_svg') as SVGSVGElement | null
   if (!svgContainer) {
@@ -117,7 +117,7 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
     domFilterIds.delete(domFilterIds.keys().next().value!)
   }
   domFilterIds.set(k, id)
-  return `url('#${id}')`
+  return `url(#${id})`
 }
 
 // ─── Browser Support Detection ────────────────────────────────────────────────

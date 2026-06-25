@@ -297,20 +297,20 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         }
       }
 
-      const blurVal = `blur(${blur}px) brightness(1.08) saturate(1.4)`
       if (!hasSVGFilterSupport || !filterUrl) {
+        const fallback = `blur(${blur}px) brightness(1.08) saturate(1.4)`
         return {
           ...baseBg,
-          backdropFilter: blurVal,
-          WebkitBackdropFilter: blurVal,
+          backdropFilter: fallback,
+          WebkitBackdropFilter: fallback,
         }
       }
 
+      const bdChain = `blur(${Math.max(0.5, blur * 0.3)}px) ${filterUrl} blur(${Math.max(1, blur * 0.5)}px) brightness(1.08) saturate(1.4)`
       return {
         ...baseBg,
-        backdropFilter: blurVal,
-        WebkitBackdropFilter: blurVal,
-        filter: `${filterUrl}`,
+        backdropFilter: bdChain,
+        WebkitBackdropFilter: bdChain,
       }
     }, [
       backgroundColor,
