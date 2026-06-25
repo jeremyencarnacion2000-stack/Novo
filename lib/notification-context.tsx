@@ -111,23 +111,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   //   registerSW()
   // }, [isSupported])
 
-  // Listen for permission changes
+  // Sync permission state on visibility change (no polling)
   useEffect(() => {
     if (!isSupported) return
 
-    const handlePermissionChange = () => {
-      setPermission(Notification.permission)
+    const syncPermission = () => {
+      const current = Notification.permission
+      setPermission(prev => prev !== current ? current : prev)
     }
 
-    // Check permission periodically (since there's no direct event)
-    const interval = setInterval(() => {
-      if (Notification.permission !== permission) {
-        setPermission(Notification.permission)
-      }
-    }, 1000)
+    document.addEventListener('visibilitychange', syncPermission)
+    window.addEventListener('focus', syncPermission)
 
-    return () => clearInterval(interval)
-  }, [isSupported, permission])
+    return () => {
+      document.removeEventListener('visibilitychange', syncPermission)
+      window.removeEventListener('focus', syncPermission)
+    }
+  }, [isSupported])
 
   const requestPermission = async (): Promise<NotificationPermission> => {
     if (!isSupported) {

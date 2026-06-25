@@ -28,6 +28,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -36,6 +37,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model User {
@@ -145,6 +148,7 @@ model ChecklistItem {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("checklist_items")
 }
 
@@ -180,6 +184,7 @@ model Routine {
   updatedAt     DateTime @updatedAt
   version       Int      @default(1)
 
+  @@index([userId])
   @@map("routines")
 }
 
@@ -280,6 +285,7 @@ model Project {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("projects")
 }
 
@@ -313,6 +319,7 @@ model Task {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("tasks")
 }
 
@@ -328,6 +335,7 @@ model Tracker {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("trackers")
 }
 
@@ -353,6 +361,7 @@ model AnalyticsEvent {
   timestamp DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("analytics_events")
 }
 
@@ -365,6 +374,7 @@ model UserSession {
   duration    Int?     // in seconds
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("user_sessions")
 }
 
@@ -379,6 +389,7 @@ model DailyAnalytics {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
+  @@index([userId])
   @@map("daily_analytics")
 }
 
@@ -392,6 +403,8 @@ model Conversation {
 
   messages    Message[]
   attachments Attachment[]
+
+  @@index([userId])
 }
 
 model Message {
@@ -413,6 +426,8 @@ model AIConversation {
   messages  Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Attachment {
@@ -484,6 +499,7 @@ model BusinessContentIdea {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("business_content_ideas")
 }
 
@@ -511,6 +527,7 @@ model Book {
   updatedAt   DateTime @updatedAt
   version     Int      @default(1)
 
+  @@index([userId])
   @@map("books")
 }
 
@@ -523,6 +540,7 @@ model Gratitude {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("gratitudes")
 }
 
@@ -539,6 +557,7 @@ model Goal {
   updatedAt   DateTime @updatedAt
   version     Int      @default(1)
 
+  @@index([userId])
   @@map("goals")
 }
 
@@ -553,6 +572,7 @@ model Client {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("clients")
 }
 
@@ -565,6 +585,7 @@ model Subject {
   updatedAt   DateTime @updatedAt
   version     Int      @default(1)
 
+  @@index([userId])
   @@map("subjects")
 }
 
@@ -578,6 +599,7 @@ model ActivityHistory {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([userId])
   @@map("activity_history")
 }
 
@@ -736,6 +758,8 @@ model Friendship {
   addressee   User     @relation("ReceivedFriendships", fields: [addresseeId], references: [id], onDelete: Cascade)
 
   @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
   @@map("friendships")
 }
 
@@ -749,6 +773,7 @@ model ChatSession {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("chat_sessions")
 }
 
@@ -763,6 +788,8 @@ model DirectMessage {
   sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
+  @@index([senderId])
+  @@index([receiverId])
   @@map("direct_messages")
 }
 
@@ -808,6 +835,7 @@ model LikedTrack {
   createdAt DateTime @default(now())
 
   @@unique([userId, trackId])
+  @@index([userId])
   @@map("music_liked_tracks")
 }
 
@@ -837,6 +865,7 @@ model MusicPlaylist {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([userId])
   @@map("music_playlists")
 }
 
@@ -850,6 +879,7 @@ model MusicArtist {
   followedAt DateTime @default(now())
 
   @@unique([userId, artistId])
+  @@index([userId])
   @@map("music_followed_artists")
 }
 

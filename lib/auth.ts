@@ -458,7 +458,6 @@ export const authOptions: NextAuthOptions = {
 
       // Send properties to the client, like an access_token and user id from a JWT.
       session.accessToken = token.accessToken as string;
-      session.refreshToken = token.refreshToken as string; // Not recommended to expose to client directly, but user requested
       session.provider = token.provider as string; // Provider (google, spotify, etc.)
       session.error = token.error; // For refresh token errors
       if (token.id) {

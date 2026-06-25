@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { SessionProvider, useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
-import { NovoToaster } from '@/components/ui/novo-toast'
+import { Toaster as SileoToaster } from 'sileo'
+import 'sileo/dist/styles.css'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
@@ -224,7 +225,7 @@ export default function ClientLayout({
                 <OfflineIndicator />
                 <SyncQueueInit />
                 <NetworkStatus />
-                <NovoToaster />
+                <SileoToaster position="top-right" theme="dark" />
               </ChatbotProvider>
             </FocusProvider>
           </PomodoroProvider>
