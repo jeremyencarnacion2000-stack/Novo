@@ -20,7 +20,7 @@ export function SettingsTwin() {
   const role = twin.identity?.role || ''
 
   // Chronotype / focus labels
-  const chronoLabel: Record<string, string> = { morning_lark: 'Morning Lark', night_owl: 'Night Owl', afternoon_peak: 'Afternoon Peak', '': 'Not detected' }
+  const chronoLabel: Record<string, string> = { morning_lark: 'Morning Lark', night_owl: 'Night Owl', intermediate: 'Intermediate Peak', '': 'Not detected' }
   const focusLabel: Record<string, string> = { deep_builder: 'Deep Builder', reactive_communicator: 'Reactive Communicator', frantic_juggler: 'Frantic Juggler', consistent_planner: 'Consistent Planner', '': 'Not detected' }
   const frictionLabel: Record<string, string> = { context_switching: 'Context Switching', procrastination: 'Procrastination', overcommitment: 'Overcommitment', lack_of_structure: 'Lack of Structure', '': 'Not detected' }
 

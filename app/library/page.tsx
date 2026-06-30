@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Library as LibraryIcon, Search, ArrowUpDown, Sparkles, X } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { ScrollReveal } from '@/components/ui/scroll-reveal'
 
 export default function LibraryPage() {
   const [books, setBooks] = useState<any[]>([])
@@ -121,7 +122,8 @@ export default function LibraryPage() {
     <div className="flex-1 h-full p-4 md:p-8 pt-6 overflow-hidden">
       <div className="liquid-glass h-full flex flex-col space-y-4 bg-background/80 backdrop-blur-xl rounded-3xl border border-border/50 shadow-2xl p-4 md:p-6 overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
+        <ScrollReveal className="flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Library</h2>
           <div className="flex items-center space-x-1 bg-secondary/50 p-1 rounded-xl backdrop-blur-md">
             <Button
@@ -153,6 +155,7 @@ export default function LibraryPage() {
             </Button>
           </div>
         </div>
+        </ScrollReveal>
 
         {/* Filter bar for My Books */}
         {view === 'library' && (

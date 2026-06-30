@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import {
     PenLine, X, Lightbulb, CheckSquare, Bell, FileText,
     Send, Archive, Trash2, ChevronRight, Calendar, Layers, Plus, Check,
@@ -197,7 +198,7 @@ export function QuickCapture() {
 
                     {/* Modal (Floating like Raycast/Spotlight) */}
                     <motion.div
-                        className="liquid-glass-elevated fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-[5001] bg-[#0A0A0B]/90 border border-white/10 rounded-[32px] glass-blur shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden"
+                        className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-[5001] bg-[#0A0A0B]/70 border border-white/10 rounded-[32px] shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)]"
                         initial={{ opacity: 0, y: -20, scale: 0.94, filter: 'blur(4px)' }}
                         animate={{
                             opacity: 1,
@@ -221,8 +222,20 @@ export function QuickCapture() {
                             }
                         }}
                     >
+                        <GlassSurface
+                            radius={32}
+                            depth={12}
+                            blur={1}
+                            strength={50}
+                            chromaticAberration={8}
+                            backgroundColor="transparent"
+                            elevation="medium"
+                            aria-hidden
+                            className="pointer-events-none"
+                            style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
+                        />
                         {/* Header Tabs */}
-                        <div className="flex items-center justify-between p-6 pb-2">
+                        <div className="flex items-center justify-between p-6 pb-2 relative z-10">
                             <div className="flex gap-4">
                                 <button
                                     onClick={() => setActiveTab('capture')}
@@ -243,7 +256,7 @@ export function QuickCapture() {
                         </div>
 
                         {activeTab === 'capture' && (
-                            <div className="p-8 space-y-6">
+                            <div className="p-8 space-y-6 relative z-10">
                                 {/* Content Area */}
                                 <div className="space-y-4">
                                     <Textarea
@@ -302,7 +315,7 @@ export function QuickCapture() {
                         )}
 
                         {activeTab === 'attributes' && (
-                            <motion.div
+                            <motion.div className="relative z-10"
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 className="p-8 space-y-8"
@@ -367,7 +380,7 @@ export function QuickCapture() {
                         )}
 
                         {activeTab === 'saved' && (
-                            <div className="p-8 max-h-[400px] overflow-y-auto space-y-4 pb-12">
+                            <div className="p-8 max-h-[400px] overflow-y-auto space-y-4 pb-12 relative z-10">
                                 {savedNotes.map(note => (
                                     <div key={note.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-start gap-4 group">
                                         <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center mt-1", typeConfig[note.type]?.color + "/20")}>

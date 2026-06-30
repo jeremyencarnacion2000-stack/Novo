@@ -19,7 +19,7 @@ export type CognitivePhase =
   | 'SYNAPTIC_FATIGUE' // Accumulated fatigue — mandatory recovery block
   | 'REDUCED_CAPACITY_MODE' // Underpowered/strained peak window due to poor biometrics
 
-export type Chronotype = 'early_bird' | 'intermediate' | 'night_owl'
+export type Chronotype = 'morning_lark' | 'intermediate' | 'night_owl'
 
 export interface HabitEntry {
   completedAt: Date   // UTC timestamp when habit was logged
@@ -51,20 +51,20 @@ const ULTRADIAN_MINUTES = 90
 
 /** Peak PEAK_FOCUS windows by chronotype (hour ranges, inclusive) */
 const PEAK_WINDOWS: Record<Chronotype, Array<[number, number]>> = {
-  early_bird:    [[5, 9],   [10, 12]],
+  morning_lark:  [[5, 9],   [10, 12]],
   intermediate:  [[7, 11],  [14, 16]],
   night_owl:     [[10, 14], [20, 23]],
 }
 
 /** LINEAR_EXECUTION windows (non-peak, non-fatigue) by chronotype */
 const LINEAR_WINDOWS: Record<Chronotype, Array<[number, number]>> = {
-  early_bird:    [[12, 15], [16, 18]],
+  morning_lark:  [[12, 15], [16, 18]],
   intermediate:  [[11, 14], [16, 19]],
   night_owl:     [[14, 20], [9, 10]],
 }
 
 /** Absolute late-night hours that force SYNAPTIC_FATIGUE regardless of anything else */
-const LATE_NIGHT_HOURS: [number, number] = [23, 5] // 23:00 → 05:00
+const LATE_NIGHT_HOURS: [number, number] = [0, 4] // 00:00 → 04:59
 
 /** Accumulated energy cost threshold that triggers SYNAPTIC_FATIGUE */
 const FATIGUE_THRESHOLD = 0.65
@@ -104,7 +104,7 @@ function computeDailyFatigueLoad(habits: HabitEntry[], now: Date): number {
  */
 function circadianScore(hour: number, chronotype: Chronotype): number {
   const offset: Record<Chronotype, number> = {
-    early_bird: -2,
+    morning_lark: -2,
     intermediate: 0,
     night_owl: +3,
   }
@@ -162,7 +162,7 @@ export function computeBioState({
   const minute = now.getMinutes()
 
   const defaultWakeHour: Record<Chronotype, number> = {
-    early_bird: 5,
+    morning_lark: 5,
     intermediate: 7,
     night_owl: 9,
   }
@@ -214,9 +214,30 @@ export function computeBioState({
 
   // ── 7. Minutes to next phase boundary ────────────────────────────────────
   const minutesRemaining = ULTRADIAN_MINUTES - minutesIntoCycle
-  const minutesToNextPhase = (phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE')
-    ? Math.max(0, minutesRemaining) // recover at end of current cycle
-    : minutesRemaining
+  let minutesToNextPhase: number
+  if (phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE') {
+    if (isLateNight) {
+      // Count minutes until 5:00 AM (end of forced late-night fatigue)
+      const targetHour = 5
+      const minsUntilTarget = ((targetHour - hour + 24) % 24) * 60 - minute
+      minutesToNextPhase = Math.max(1, minsUntilTarget)
+    } else if (inUltradianDip) {
+      minutesToNextPhase = Math.max(1, minutesRemaining)
+    } else {
+      // Fatigue from load or low attention — find next hour where circadian > 0.35
+      let minsAhead = 30
+      for (let m = 30; m <= 480; m += 15) {
+        const futureHour = (hour + Math.floor((minute + m) / 60)) % 24
+        if (circadianScore(futureHour, chronotype) >= 0.35) {
+          minsAhead = m
+          break
+        }
+      }
+      minutesToNextPhase = minsAhead
+    }
+  } else {
+    minutesToNextPhase = minutesRemaining
+  }
 
   // ── 8. Blue light + audio recommendation ─────────────────────────────────
   const blueLight = phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE' || hour >= 20 || hour < 6

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Task } from "@/types/project"
 import { useNotifications } from "@/lib/notification-context"
+import { blendy } from "@/lib/blendy"
 
 interface TaskDialogProps {
   open: boolean
@@ -24,6 +25,21 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
   const [status, setStatus] = useState<Task["status"]>("todo")
   const [priority, setPriority] = useState<Task["priority"]>("medium")
   const [dueDate, setDueDate] = useState("")
+
+  const blendyKey = task ? `task-${task.id}` : 'btn-new-task'
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        blendy.update()
+        blendy.toggle(blendyKey)
+      }, 30)
+    }
+  }, [open, blendyKey])
+
+  const handleClose = () => {
+    blendy.untoggle(blendyKey, onClose)
+  }
 
   useEffect(() => {
     if (task) {
@@ -65,8 +81,8 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent data-blendy-to={blendyKey} className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "New Task"}</DialogTitle>
           <DialogDescription>
@@ -117,7 +133,7 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
             <Input type="date" id="dueDate" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button type="submit">Save Task</Button>

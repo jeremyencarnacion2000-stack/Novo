@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { TrendingUp } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { springConfig } from '@/lib/design-tokens'
 
 interface DashboardMetricsProps {
   refreshKey: number
@@ -141,15 +142,16 @@ export const DashboardMetrics = React.memo(
         return (
           <motion.div
             key={metric.title}
-            layoutId={isFocusCard ? "focus-time-metric-card" : undefined}
             className="flex flex-col h-full"
-            style={{ originX: 0.5, originY: 0.5 }}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            transition={springConfig.snappy}
           >
             <Card
               className={cn(
-                "relative transition-[transform,box-shadow,border-color,opacity] duration-300",
-                "hover:scale-[1.02] active:scale-[0.98] hover:shadow-m",
-                "group overflow-hidden border-white/5",
+                "relative transition-[box-shadow,border-color,opacity] duration-300",
+                "hover:shadow-m",
+                "group border-white/5",
                 cardClass,
                 isFocusCard && "bloom-soft border-indigo-500/30",
                 borderColor
@@ -170,9 +172,9 @@ export const DashboardMetrics = React.memo(
                 </div>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-baseline gap-1.5">
                   <div className={cn(
-                    "text-3xl font-black tracking-tighter transition-transform duration-300 group-hover:scale-105 origin-left",
+                    "text-4xl md:text-5xl font-extralight tracking-tight transition-transform duration-300 group-hover:scale-105 origin-left tabular-nums",
                     isHero ? "text-primary" : "text-foreground"
                   )}>
                     {typeof metric.value === 'number' || typeof metric.value === 'string' ? metric.value : '-'}

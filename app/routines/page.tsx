@@ -13,6 +13,7 @@ import { useSWRConfig } from 'swr'
 import { useToast } from '@/hooks/use-toast'
 import { RoutineStatsCard } from '@/components/routines/routine-stats'
 import { safeViewTransition } from '@/hooks/use-view-transition'
+import { ScrollReveal } from '@/components/ui/scroll-reveal'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
@@ -272,6 +273,7 @@ export default function RoutinesPage() {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
+      <ScrollReveal>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
@@ -283,8 +285,8 @@ export default function RoutinesPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
-            onClick={() => safeViewTransition(() => setImportDialogOpen(true))}
-            style={!importDialogOpen ? { viewTransitionName: 'routine-modal' } as React.CSSProperties : undefined}
+            onClick={() => setImportDialogOpen(true)}
+            data-blendy-from="btn-import-routine"
             variant="outline"
             className="w-full sm:w-auto"
           >
@@ -292,8 +294,8 @@ export default function RoutinesPage() {
             Import
           </Button>
           <Button
-            onClick={() => safeViewTransition(() => setDialogOpen(true))}
-            style={!dialogOpen ? { viewTransitionName: 'routine-modal' } as React.CSSProperties : undefined}
+            onClick={() => setDialogOpen(true)}
+            data-blendy-from="btn-new-routine"
             className="w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -301,9 +303,12 @@ export default function RoutinesPage() {
           </Button>
         </div>
       </div>
+      </ScrollReveal>
 
       {/* Stats Section */}
-      <RoutineStatsCard />
+      <ScrollReveal delay={0.05}>
+        <RoutineStatsCard />
+      </ScrollReveal>
 
       <RoutinesList
         routines={routines || []}
@@ -324,13 +329,13 @@ export default function RoutinesPage() {
 
       <ImportRoutineDialog
         open={importDialogOpen}
-        onClose={() => safeViewTransition(() => setImportDialogOpen(false))}
+        onClose={() => setImportDialogOpen(false)}
         onImport={handleImport}
       />
 
       <RoutineDetailDialog
         open={detailDialogOpen}
-        onClose={() => safeViewTransition(() => setDetailDialogOpen(false))}
+        onClose={() => setDetailDialogOpen(false)}
         routine={viewingRoutine}
         onUpdateProgress={handleUpdateProgress}
       />

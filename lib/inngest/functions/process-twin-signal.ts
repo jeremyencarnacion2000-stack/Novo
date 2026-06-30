@@ -13,7 +13,7 @@ type SignalType =
   | 'routine_skipped'
 
 type TrustLevel = 'initial' | 'learning' | 'adapted' | 'validated'
-type Chronotype = '' | 'morning_lark' | 'night_owl' | 'afternoon_peak'
+type Chronotype = '' | 'morning_lark' | 'night_owl' | 'intermediate'
 type FrictionPoint = '' | 'procrastination' | 'context_switching' | 'overcommitment' | 'lack_of_structure'
 type DecisionFatigueRisk = 'low' | 'moderate' | 'high' | 'critical'
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { blendy } from '@/lib/blendy'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -182,12 +183,22 @@ export default function TrackersPage() {
 
   const handleEdit = (tracker: Tracker) => {
     setEditingTracker(tracker)
+    blendy.toggle(`tracker-${tracker.id}`)
+    setDialogOpen(true)
+  }
+
+  const handleOpenNewTracker = () => {
+    setEditingTracker(undefined)
+    blendy.toggle('btn-new-tracker')
     setDialogOpen(true)
   }
 
   const handleDialogClose = () => {
-    setDialogOpen(false)
-    setEditingTracker(undefined)
+    const key = editingTracker ? `tracker-${editingTracker.id}` : 'btn-new-tracker'
+    blendy.untoggle(key, () => {
+      setDialogOpen(false)
+      setEditingTracker(undefined)
+    })
   }
 
   const handleLogEntry = async (id: string, value: number) => {
@@ -292,7 +303,7 @@ export default function TrackersPage() {
             Track your habits and metrics over time
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+        <Button onClick={handleOpenNewTracker} data-blendy-from="btn-new-tracker" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           New Tracker
         </Button>

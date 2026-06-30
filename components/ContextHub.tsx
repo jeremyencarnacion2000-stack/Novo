@@ -11,10 +11,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { startTransition, useEffect, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { usePlayerStore } from '@/lib/player-store';
 import { useSettings } from '@/lib/settings-context';
+import { useFocus } from '@/lib/focus-context';
 import { useScrollContainer } from '@/lib/scroll-container-context';
 import { useCognitiveState, useCognitiveDispatch } from '@/lib/cognitive-context';
 import type { CognitivePhase } from '@/lib/cognitive-engine';
@@ -27,6 +28,7 @@ import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
 import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { springConfig } from '@/lib/design-tokens';
 
 // ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
 const PHASE_COLOR: Record<CognitivePhase, string> = {
@@ -63,6 +65,13 @@ function getWeatherIcon(type: WeatherIcon) {
   }
 }
 
+/**
+ * Returns a contextual icon based on the hour of the day.
+ *
+ * ⚠️  This is NOT real weather data — it's a time-of-day simulation.
+ * To show real weather, replace this with a call to a weather API
+ * (e.g. Open-Meteo, OpenWeatherMap) and store the result in state.
+ */
 function getContextualWeather(hour: number): WeatherIcon {
   if (hour >= 6 && hour < 12) return 'cloud-sun';
   if (hour >= 12 && hour < 17) return 'sun';
@@ -233,7 +242,7 @@ function PlaylistPanel() {
       </div>
 
       {/* Scrollable Content list */}
-      <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pr-0.5 min-h-[160px] relative">
+      <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pr-0.5 min-h-[160px] relative" data-lenis-prevent>
         <AnimatePresence mode="wait">
           {loading ? (
             <motion.div
@@ -315,11 +324,68 @@ function PlaylistPanel() {
   );
 }
 
+// ─── Clock and Weather Section Sub-component (Self-updating for render isolation) ───
+function ClockSection({
+  attentionScore,
+  showDetails = false,
+  children
+}: {
+  attentionScore: number;
+  showDetails?: boolean;
+  children?: React.ReactNode;
+}) {
+  const [time, setTime] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setTime(new Date());
+    const t = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (!time) {
+    return (
+      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white/5 rounded-full" />
+    );
+  }
+
+  const formattedTime = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const weatherIcon = getContextualWeather(time.getHours());
+
+  if (showDetails) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <div className="scale-[0.72] origin-center opacity-80">
+          <AnalogClock time={time} attentionScore={attentionScore} />
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-white/95 leading-none">{formattedTime}</p>
+          <p className="text-[9px] text-zinc-500 font-mono tracking-tighter mt-1 flex items-center gap-1.5">
+            {getWeatherIcon(weatherIcon)}
+            <span>{time.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+          </p>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex-shrink-0 flex items-center justify-center scale-[0.72] origin-center opacity-90">
+        <AnalogClock time={time} attentionScore={attentionScore} />
+      </div>
+
+      <p className="text-[10px] font-mono font-medium text-zinc-500 tracking-tighter leading-none">{formattedTime}</p>
+      
+      <div className="w-6 h-px bg-white/10 my-0.5" />
+      
+      {getWeatherIcon(weatherIcon)}
+    </>
+  );
+}
+
 // ─── Capsule Content Sub-component ──────────────────────────────────────────
 function CapsuleContent({
-  time,
-  formattedTime,
-  weatherIcon,
   cognitiveAlert,
   dopaminePulse,
   springY,
@@ -328,9 +394,6 @@ function CapsuleContent({
   handlePointerUp,
   handleClick,
 }: {
-  time: Date | null;
-  formattedTime: string;
-  weatherIcon: WeatherIcon;
   cognitiveAlert: boolean;
   dopaminePulse: boolean;
   springY: any;
@@ -357,26 +420,17 @@ function CapsuleContent({
         marginRight: '0px',
         y: springY,
         touchAction: 'none',
-        willChange: 'width, height, transform'
       }}
-      initial={{ opacity: 0, scale: 0.85 }}
+      initial={false}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.85 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+      transition={springConfig.smooth}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onClick={handleClick}
     >
-      <div className="flex-shrink-0 flex items-center justify-center scale-[0.72] origin-center opacity-90">
-        <AnalogClock time={time} attentionScore={bioState.attentionScore} />
-      </div>
-
-      <p className="text-[10px] font-mono font-medium text-zinc-500 tracking-tighter leading-none">{formattedTime}</p>
-      
-      <div className="w-6 h-px bg-white/10 my-0.5" />
-      
-      {getWeatherIcon(weatherIcon)}
+      <ClockSection attentionScore={bioState.attentionScore} showDetails={false} />
 
       <div
         className="px-2 py-1 rounded-full text-[8px] font-bold tracking-widest uppercase bg-white/5 backdrop-blur-md text-white/60 border border-white/5 flex-shrink-0 text-center leading-none"
@@ -398,32 +452,22 @@ function CapsuleContent({
 
 // ─── Expanded Content Sub-component ─────────────────────────────────────────
 function ExpandedContent({
-  time,
-  formattedTime,
-  weatherIcon,
   dopaminePulse,
   springY,
   setHubState,
   activeTab,
   setActiveTab,
-  brightness,
-  setBrightness,
-  focusMode,
-  setFocusMode,
 }: {
-  time: Date | null;
-  formattedTime: string;
-  weatherIcon: WeatherIcon;
   dopaminePulse: boolean;
   springY: any;
   setHubState: React.Dispatch<React.SetStateAction<HubState>>;
   activeTab: 'music' | 'controls';
   setActiveTab: React.Dispatch<React.SetStateAction<'music' | 'controls'>>;
-  brightness: number;
-  setBrightness: React.Dispatch<React.SetStateAction<number>>;
-  focusMode: boolean;
-  setFocusMode: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
+  // ── Real settings connections ──────────────────────────────────────────────
+  const { settings, updateSettings } = useSettings();
+  const { isActive: focusTimerActive, toggleTimer } = useFocus();
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const { bioState } = useCognitiveState();
   return (
     <motion.div
@@ -438,43 +482,32 @@ function ExpandedContent({
         height: '310px',
         y: springY,
         boxShadow: '0 32px 64px rgba(0,0,0,0.8), inset 0 0 24px rgba(255, 255, 255, 0.02), inset 0 1px 0 rgba(255,255,255,0.08)',
-        willChange: 'width, height, transform'
       }}
-      initial={{ opacity: 0, scale: 0.9, x: 20 }}
+      initial={false}
       animate={{ opacity: 1, scale: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.92, x: 15 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 25, mass: 0.7 }}
+      exit={{ opacity: 0, scale: 0.95, x: 10, transition: { duration: 0.18 } }}
+      transition={springConfig.smooth}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-2 pt-1 pb-2.5 border-b border-white/[0.06] mb-2.5 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="scale-[0.72] origin-center opacity-80">
-            <AnalogClock time={time} attentionScore={bioState.attentionScore} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-white/95 leading-none">{formattedTime}</p>
-            <p className="text-[9px] text-zinc-500 font-mono tracking-tighter mt-1 flex items-center gap-1.5">
-              {getWeatherIcon(weatherIcon)}
-              <span>{time?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-            </p>
-            {/* Cognitive telemetry progress */}
-            <div className="flex items-center gap-1.5 mt-2">
-              <Brain className="w-2.5 h-2.5" style={{ color: PHASE_COLOR[bioState.phase] }} />
-              <div className="flex-1 h-0.5 bg-white/5 rounded-full overflow-hidden w-16">
-                <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${bioState.attentionScore}%`,
-                    background: `linear-gradient(90deg, ${PHASE_COLOR[bioState.phase]}, ${PHASE_COLOR[bioState.phase]}88)`,
-                  }}
-                />
-              </div>
-              <span className="text-[8px] font-mono tracking-tighter text-zinc-400 tabular-nums">
-                {bioState.attentionScore}%
-              </span>
+        <ClockSection attentionScore={bioState.attentionScore} showDetails={true}>
+          {/* Cognitive telemetry progress */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <Brain className="w-2.5 h-2.5" style={{ color: PHASE_COLOR[bioState.phase] }} />
+            <div className="flex-1 h-0.5 bg-white/5 rounded-full overflow-hidden w-16">
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{
+                  width: `${bioState.attentionScore}%`,
+                  background: `linear-gradient(90deg, ${PHASE_COLOR[bioState.phase]}, ${PHASE_COLOR[bioState.phase]}88)`,
+                }}
+              />
             </div>
+            <span className="text-[8px] font-mono tracking-tighter text-zinc-400 tabular-nums">
+              {bioState.attentionScore}%
+            </span>
           </div>
-        </div>
+        </ClockSection>
         <button
           aria-label="Collapse hub"
           onClick={() => startTransition(() => setHubState('capsule'))}
@@ -546,59 +579,71 @@ function ExpandedContent({
               exit={{ opacity: 0, x: -8 }}
               transition={{ duration: 0.16 }}
             >
-              {/* Focus mode switch card */}
+              {/* Focus mode switch — starts/pauses the Pomodoro focus timer */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
                 <div>
-                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Focus Mode</p>
-                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">Block distractions</p>
+                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Focus Timer</p>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">{focusTimerActive ? 'Sesión activa — toca para pausar' : 'Iniciar sesión Pomodoro'}</p>
                 </div>
                 <button
-                  onClick={() => setFocusMode(f => !f)}
+                  onClick={toggleTimer}
+                  aria-label={focusTimerActive ? 'Pause focus timer' : 'Start focus timer'}
                   className={cn(
                     'relative w-9 h-5 rounded-full transition-all duration-300',
-                    focusMode ? 'bg-indigo-500/80' : 'bg-white/10'
+                    focusTimerActive ? 'bg-indigo-500/80' : 'bg-white/10'
                   )}
                 >
                   <div className={cn(
                     'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all shadow-md',
-                    focusMode ? 'left-[18px]' : 'left-0.5'
+                    focusTimerActive ? 'left-[18px]' : 'left-0.5'
                   )} />
                 </button>
               </div>
 
-              {/* Brightness glassmorphic slider */}
+              {/* Dimness slider — controls backgroundDimness in settings */}
               <div className="p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-bold text-white/90 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Sun className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.2} /> Brightness
+                    <Sun className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.2} /> Dimness
                   </p>
-                  <span className="text-[9px] font-mono text-zinc-500">{brightness}%</span>
+                  <span className="text-[9px] font-mono text-zinc-500">{settings.backgroundDimness}%</span>
                 </div>
                 <div className="relative h-1 bg-white/10 rounded-full">
                   <div
                     className="absolute left-0 top-0 h-full bg-white/80 rounded-full transition-all"
-                    style={{ width: `${brightness}%` }}
+                    style={{ width: `${settings.backgroundDimness}%` }}
                   />
                   <input
-                    type="range" min={10} max={100} value={brightness}
-                    onChange={e => setBrightness(Number(e.target.value))}
+                    type="range" min={0} max={80} value={settings.backgroundDimness}
+                    onChange={e => updateSettings({ backgroundDimness: Number(e.target.value) })}
+                    aria-label="Background dimness"
                     className="absolute inset-0 opacity-0 cursor-pointer w-full"
                   />
                 </div>
               </div>
 
-              {/* Theme selector glassmorphic bar */}
+              {/* Theme selector — toggles light/dark via settings context */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
                 <div>
                   <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Appearance</p>
-                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">Select aesthetic mode</p>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">{settings.theme === 'dark' ? 'Dark mode' : 'Light mode'}</p>
                 </div>
                 <div className="flex gap-1.5 bg-black/30 p-1 rounded-xl border border-white/5">
-                  <button className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
-                    <Sun className="w-3.5 h-3.5 text-zinc-400 hover:text-white" strokeWidth={1.2} />
+                  <button
+                    aria-label="Light mode"
+                    aria-pressed={settings.theme === 'light'}
+                    onClick={() => updateSettings({ theme: 'light' })}
+                    className={cn('p-1.5 rounded-lg transition-colors', settings.theme === 'light' ? 'bg-white/15 text-white' : 'hover:bg-white/5 text-zinc-400')}
+                  >
+                    <Sun className="w-3.5 h-3.5" strokeWidth={1.2} />
                   </button>
-                  <button className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
-                    <Moon className="w-3.5 h-3.5 text-zinc-400 hover:text-white" strokeWidth={1.2} />
+                  <button
+                    aria-label="Dark mode"
+                    aria-pressed={settings.theme === 'dark'}
+                    onClick={() => updateSettings({ theme: 'dark' })}
+                    className={cn('p-1.5 rounded-lg transition-colors', settings.theme === 'dark' ? 'bg-white/15 text-white' : 'hover:bg-white/5 text-zinc-400')}
+                  >
+                    <Moon className="w-3.5 h-3.5" strokeWidth={1.2} />
                   </button>
                 </div>
               </div>
@@ -620,10 +665,6 @@ const ContextHubComponent = () => {
   const [hubState, setHubState] = useState<HubState>('idle');
   const [activeTab, setActiveTab] = useState<'music' | 'controls'>('music');
   const [isHovered, setIsHovered] = useState(false);
-  const [brightness, setBrightness] = useState(85);
-  const [focusMode, setFocusMode] = useState(false);
-  const [time, setTime] = useState<Date | null>(null);
-  const [weatherIcon, setWeatherIcon] = useState<WeatherIcon>('cloud-sun');
   const [cognitiveAlert, setCognitiveAlert] = useState(false);
   const [dopaminePulse, setDopaminePulse] = useState(false);
 
@@ -632,21 +673,8 @@ const ContextHubComponent = () => {
   // Motion values for vertical positioning
   const scrollYProgress = useMotionValue(0);
   const y = useMotionValue(120);
-  const springY = useSpring(y, { stiffness: 420, damping: 38, mass: 0.4 });
+  const springY = useSpring(y, { stiffness: 300, damping: 35, mass: 0.6 });
   const [windowHeight, setWindowHeight] = useState(800);
-
-  // Clock updating - Suspended in idle state to prevent unnecessary ticks
-  useEffect(() => {
-    if (hubState === 'idle') return;
-    const update = () => {
-      const now = new Date();
-      setTime(now);
-      setWeatherIcon(getContextualWeather(now.getHours()));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [hubState]);
 
   // Resize boundaries
   useEffect(() => {
@@ -657,13 +685,13 @@ const ContextHubComponent = () => {
     return () => window.removeEventListener('resize', handle);
   }, []);
 
-  // Sync scroll dynamics
+  // Sync scroll dynamics — constant travelRange prevents position jumps
+  const SCROLL_BAR_HEIGHT = 80;
   useEffect(() => {
     const updateY = (progress: number) => {
       const topPadding = 24;
       const bottomPadding = 24;
-      const capsuleHeight = hubState === 'idle' ? 80 : hubState === 'capsule' ? 190 : 310;
-      const travelRange = Math.max(0, windowHeight - topPadding - bottomPadding - capsuleHeight);
+      const travelRange = Math.max(0, windowHeight - topPadding - bottomPadding - SCROLL_BAR_HEIGHT);
 
       if (hubState === 'expanded') {
         y.set((windowHeight - 310) / 2);
@@ -678,7 +706,13 @@ const ContextHubComponent = () => {
     return unsubscribe;
   }, [hubState, windowHeight, scrollYProgress, y]);
 
-  // Scroll physics observer
+  // Refs to avoid scroll handler re-creation on state changes
+  const hubStateRef = useRef(hubState);
+  hubStateRef.current = hubState;
+  const isHoveredRef = useRef(isHovered);
+  isHoveredRef.current = isHovered;
+
+  // Scroll physics observer — stable deps, no re-creation on state change
   useEffect(() => {
     if (!scrollContainer) return;
 
@@ -686,34 +720,25 @@ const ContextHubComponent = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
       const maxScroll = Math.max(1, scrollHeight - clientHeight);
       const progress = maxScroll > 0 ? (scrollTop / maxScroll) : 0;
-
       scrollYProgress.set(progress);
 
-      // Expand to capsule dynamically during scrolls
-      setHubState(cur => cur === 'idle' ? 'capsule' : cur);
+      if (hubStateRef.current === 'idle') setHubState('capsule');
 
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
       scrollTimeoutRef.current = setTimeout(() => {
-        setHubState(cur => (cur === 'capsule' && !isHovered) ? 'idle' : cur);
-      }, 1500);
+        if (!isHoveredRef.current) {
+          setHubState(cur => cur === 'capsule' ? 'idle' : cur);
+        }
+      }, 100);
     };
 
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
 
     return () => {
       scrollContainer.removeEventListener('scroll', handleScroll);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [scrollContainer, isHovered]);
-
-  // Auto-collapse capsule → idle
-  useEffect(() => {
-    if (hubState === 'capsule' && !isHovered) {
-      const t = setTimeout(() => setHubState('idle'), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [hubState, isHovered]);
+  }, [scrollContainer]);
 
   // Auto-expand capsule → expanded on hover after 400ms
   useEffect(() => {
@@ -723,10 +748,10 @@ const ContextHubComponent = () => {
     }
   }, [hubState, isHovered]);
 
-  // Auto-collapse expanded → capsule when not hovered
+  // Auto-collapse expanded → capsule when not hovered (0.5s)
   useEffect(() => {
     if (hubState === 'expanded' && !isHovered) {
-      const t = setTimeout(() => setHubState('capsule'), 3000);
+      const t = setTimeout(() => setHubState('capsule'), 500);
       return () => clearTimeout(t);
     }
   }, [hubState, isHovered]);
@@ -750,14 +775,11 @@ const ContextHubComponent = () => {
     if (!isDragging.current || !scrollContainer) return;
     const delta = e.clientY - dragStartY.current;
     if (Math.abs(delta) > 3) hasDragged.current = true;
-    
-    const topPadding = 24;
-    const bottomPadding = 24;
-    const capsuleHeight = hubState === 'idle' ? 80 : hubState === 'capsule' ? 190 : 310;
-    const travelRange = Math.max(1, windowHeight - topPadding - bottomPadding - capsuleHeight);
-    
+
+    const travelRange = Math.max(1, windowHeight - 48 - SCROLL_BAR_HEIGHT);
     const scrollRange = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    scrollContainer.scrollTop = dragStartScrollTop.current + delta * (scrollRange / travelRange);
+    const ratio = Math.min(scrollRange / travelRange, 3);
+    scrollContainer.scrollTop = dragStartScrollTop.current + delta * ratio;
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -771,70 +793,55 @@ const ContextHubComponent = () => {
   };
 
   // Event handlers
+  // Event handlers — pulse hub on actions, let sileo handle the notification toast
   useEffect(() => {
-    const handler = (e: Event) => {
-      setHubState('capsule');
+    const onHabit = (e: Event) => {
       const cost = (e as CustomEvent).detail?.energyCost ?? 0.5;
       logHabit(cost);
-
-      // Trigger dopaminergic pulse animation
-      setDopaminePulse(true);
-      setTimeout(() => setDopaminePulse(false), 1200);
-    };
-    window.addEventListener('habit-completed', handler);
-    return () => window.removeEventListener('habit-completed', handler);
-  }, [logHabit]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
       setHubState('capsule');
-
-      // Trigger dopaminergic pulse animation
       setDopaminePulse(true);
       setTimeout(() => setDopaminePulse(false), 1200);
     };
-    window.addEventListener('cognitive:task-completed', handler);
-    return () => window.removeEventListener('cognitive:task-completed', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
+    const onTask = () => {
+      setHubState('capsule');
+      setDopaminePulse(true);
+      setTimeout(() => setDopaminePulse(false), 1200);
+    };
+    const onRoutine = () => {
       setHubState('capsule');
       setTimeout(() => setHubState('idle'), 1500);
     };
-    window.addEventListener('routine-opened', handler);
-    return () => window.removeEventListener('routine-opened', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
+    const onFatigue = () => {
       setCognitiveAlert(true);
       setHubState('capsule');
       setTimeout(() => setCognitiveAlert(false), 4000);
     };
-    window.addEventListener('cognitive:fatigue-onset', handler);
-    return () => window.removeEventListener('cognitive:fatigue-onset', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
+    const onNavWarn = () => {
       setCognitiveAlert(true);
       setHubState('capsule');
       setTimeout(() => setCognitiveAlert(false), 3000);
     };
-    window.addEventListener('cognitive:navigation-warning', handler);
-    return () => window.removeEventListener('cognitive:navigation-warning', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
+    const onReduced = () => {
       setCognitiveAlert(true);
       setHubState('expanded');
       setTimeout(() => setCognitiveAlert(false), 5000);
     };
-    window.addEventListener('cognitive:reduced-capacity-onset', handler);
-    return () => window.removeEventListener('cognitive:reduced-capacity-onset', handler);
-  }, []);
+
+    window.addEventListener('habit-completed', onHabit);
+    window.addEventListener('cognitive:task-completed', onTask);
+    window.addEventListener('routine-opened', onRoutine);
+    window.addEventListener('cognitive:fatigue-onset', onFatigue);
+    window.addEventListener('cognitive:navigation-warning', onNavWarn);
+    window.addEventListener('cognitive:reduced-capacity-onset', onReduced);
+    return () => {
+      window.removeEventListener('habit-completed', onHabit);
+      window.removeEventListener('cognitive:task-completed', onTask);
+      window.removeEventListener('routine-opened', onRoutine);
+      window.removeEventListener('cognitive:fatigue-onset', onFatigue);
+      window.removeEventListener('cognitive:navigation-warning', onNavWarn);
+      window.removeEventListener('cognitive:reduced-capacity-onset', onReduced);
+    };
+  }, [logHabit]);
 
   // Agent Event Triggers
   useEffect(() => {
@@ -857,8 +864,6 @@ const ContextHubComponent = () => {
     return null;
   }
 
-  const formattedTime = time?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) ?? '';
-
   // ─── Idle state: sleek vertical hardware slider line ───────────────────────
   const idleContent = (
     <motion.div
@@ -871,11 +876,10 @@ const ContextHubComponent = () => {
         marginRight: '0px',
         y: springY,
         touchAction: 'none',
-        willChange: 'width, height, transform'
       }}
-      initial={{ opacity: 0 }}
+      initial={false}
       animate={{ opacity: 0.35 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.12 } }}
       whileHover={{ opacity: 0.7 }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -909,9 +913,6 @@ const ContextHubComponent = () => {
           {hubState === 'idle' && idleContent}
           {hubState === 'capsule' && (
             <CapsuleContent
-              time={time}
-              formattedTime={formattedTime}
-              weatherIcon={weatherIcon}
               cognitiveAlert={cognitiveAlert}
               dopaminePulse={dopaminePulse}
               springY={springY}
@@ -923,18 +924,11 @@ const ContextHubComponent = () => {
           )}
           {hubState === 'expanded' && (
             <ExpandedContent
-              time={time}
-              formattedTime={formattedTime}
-              weatherIcon={weatherIcon}
               dopaminePulse={dopaminePulse}
               springY={springY}
               setHubState={setHubState}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
-              brightness={brightness}
-              setBrightness={setBrightness}
-              focusMode={focusMode}
-              setFocusMode={setFocusMode}
             />
           )}
         </AnimatePresence>

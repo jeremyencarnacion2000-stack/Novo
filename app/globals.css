@@ -256,7 +256,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Inter', 'Inter Fallback';
+  --font-sans: 'Inter', 'Inter Fallback', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -936,15 +936,6 @@
   }
 
   /* Legacy & Utilities */
-  .glass-card {
-    @apply relative overflow-hidden transition-all duration-300;
-    background: var(--glass-panel-bg);
-    backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(120%);
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(120%);
-    border: 1px solid var(--glass-panel-border);
-    border-radius: 24px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-  }
 
   .glass-overlay {
     @apply bg-black/60 backdrop-blur-md;
@@ -1395,6 +1386,22 @@ html, body, * {
   height: 0 !important;
 }
 
+/* ─── Reduced Motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass,
+  .liquid-glass-subtle,
+  .liquid-glass-elevated,
+  .liquid-glass-premium,
+  .glass-card,
+  .glass-panel,
+  [data-novo-glass] {
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 /* ─── Cognitive Circadian Theming ──────────────────────────────────────────── */
 
 /**
@@ -1710,3 +1717,57 @@ html.cognitive-reduced-capacity .animate-ping {
 }
 
 /* Linear: balanced baseline — no overrides needed, CSS defaults apply */
+
+/* ─── Blendy Morph Transition Layer ─────────────────────────────────────── */
+
+/* The clone element Blendy creates during morphing */
+.blendy-clone {
+  border-radius: 16px;
+  backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  /* Ensure the morph clone is always above content but below modals */
+  z-index: 9998 !important;
+  /* Smooth spring-like scale easing during morph */
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Source element during active morph — fade it slightly */
+[data-blendy-from].blendy-active {
+  opacity: 0.6;
+  transition: opacity 180ms ease;
+}
+
+/* Target element snap-in — fade from invisible so the clone hand-off is seamless */
+[data-blendy-to] {
+  animation: blendyFadeIn 120ms ease forwards;
+}
+
+@keyframes blendyFadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Swapy drag handle cursor feedback */
+[data-swapy-handle] {
+  cursor: grab;
+}
+[data-swapy-handle]:active {
+  cursor: grabbing;
+}
+
+/* Swapy dragging item — lift effect */
+[data-swapy-item].swapy-dragging {
+  opacity: 0.35;
+  transform: scale(0.97);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/* Swapy drop slot highlight */
+[data-swapy-slot].swapy-over {
+  background: rgba(129, 140, 248, 0.06);
+  border-radius: 16px;
+  outline: 1.5px dashed rgba(129, 140, 248, 0.35);
+  transition: background 180ms ease, outline 180ms ease;
+}

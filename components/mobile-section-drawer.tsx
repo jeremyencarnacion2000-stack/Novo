@@ -3,6 +3,8 @@
 import React from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
+import { springConfig } from '@/lib/design-tokens'
 import {
     LayoutDashboard, Calendar, BarChart3, Bot, Timer,
     ListChecks, CheckSquare, KanbanSquare, TrendingUp,
@@ -59,21 +61,31 @@ export function MobileSectionDrawer({ open, onClose }: MobileSectionDrawerProps)
         onClose()
     }
 
-    if (!open) return null
-
     return (
+        <AnimatePresence>
+        {open && (
         <>
             {/* Backdrop */}
-            <div
+            <motion.div
                 className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm md:hidden"
-                style={{ animation: 'novo-fade-in var(--novo-duration-fast) var(--novo-spring) both' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 onClick={onClose}
             />
 
-            {/* Drawer — ultra-clean, premium glass feel */}
-            <div
+            {/* Drawer — drag to dismiss */}
+            <motion.div
                 className="fixed inset-x-0 bottom-0 z-[5001] md:hidden"
-                style={{ animation: 'novo-drawer-in var(--novo-duration) var(--novo-spring) both' }}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={springConfig.smooth}
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0, bottom: 0.4 }}
+                onDragEnd={(_, info) => { if (info.offset.y > 100) onClose() }}
             >
                 <div
                     className="liquid-glass-elevated mx-2 mb-2 rounded-[32px] border border-white/[0.06] shadow-[0_-16px_60px_rgba(0,0,0,0.6)] overflow-hidden glass-blur-xl"
@@ -148,7 +160,9 @@ export function MobileSectionDrawer({ open, onClose }: MobileSectionDrawerProps)
                         </div>
                     </div>
                 </div>
-            </div>
+            </motion.div>
         </>
+        )}
+        </AnimatePresence>
     )
 }

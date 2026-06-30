@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import * as pdfjsLib from 'pdfjs-dist'
 import mammoth from 'mammoth'
+import { blendy } from '@/lib/blendy'
 
 // Initialize PDF.js worker
 if (typeof window !== 'undefined') {
@@ -161,21 +162,32 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
     handleClose();
   }
 
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        blendy.update()
+        blendy.toggle('btn-import-routine')
+      }, 30)
+    }
+  }, [open])
+
   const handleClose = () => {
-    setFile(null)
-    setParsedText('')
-    setError('')
-    setIsProcessing(false)
-    setStep('upload')
-    setParsedData(null)
-    setSelectedBlocks({})
-    onClose()
+    blendy.untoggle('btn-import-routine', () => {
+      setFile(null)
+      setParsedText('')
+      setError('')
+      setIsProcessing(false)
+      setStep('upload')
+      setParsedData(null)
+      setSelectedBlocks({})
+      onClose()
+    })
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => safeViewTransition(() => !o && handleClose())}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        style={{ viewTransitionName: 'import-routine-modal' } as React.CSSProperties}
+        data-blendy-to="btn-import-routine"
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         <DialogHeader>

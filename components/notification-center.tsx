@@ -181,10 +181,10 @@ function NotificationRow({
       <GlassSurface
         radius={16}
         depth={6}
-        blur={10}
-        strength={45}
-        chromaticAberration={0.4}
-        backgroundColor="rgba(255, 255, 255, 0.015)"
+        blur={1}
+        strength={30}
+        chromaticAberration={4}
+        backgroundColor="transparent"
         className="w-full border border-white/[0.04]"
       >
         <motion.div
@@ -299,12 +299,25 @@ export function NotificationCenter() {
     setPrevUnread(unreadCount)
   }, [unreadCount])
 
-  const loadNotifications = useCallback(async () => {
+  const lastFetchTimeRef = useRef<number>(0)
+  const cachedNotificationsRef = useRef<AppNotification[]>([])
+
+  const loadNotifications = useCallback(async (force = false) => {
     setLoading(true)
     try {
       const readIds: string[]    = JSON.parse(localStorage.getItem('novo-read-notifications')    || '[]')
       const deletedIds: string[] = JSON.parse(localStorage.getItem('novo-deleted-notifications') || '[]')
-      const generated = await generateSmartNotifications()
+      
+      let generated: AppNotification[] = []
+      const now = Date.now()
+      if (!force && now - lastFetchTimeRef.current < 30000 && cachedNotificationsRef.current.length > 0) {
+        generated = cachedNotificationsRef.current
+      } else {
+        generated = await generateSmartNotifications()
+        cachedNotificationsRef.current = generated
+        lastFetchTimeRef.current = now
+      }
+
       const filtered  = generated
         .filter(n => !deletedIds.includes(n.id))
         .map(n => ({ ...n, read: readIds.includes(n.id) }))
@@ -389,31 +402,17 @@ export function NotificationCenter() {
   return (
     <>
       {/* ── Bell Button ──────────────────────────────────────────────── */}
-      <motion.button
-        ref={buttonRef}
+      <button
+        ref={buttonRef as any}
         onClick={() => {
-          setIsOpen(o => !o)
+          setIsOpen(prev => !prev)
           if (!isOpen) loadNotifications()
         }}
         aria-label="Notifications"
-        className="fixed top-4 right-4 z-[100] w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all"
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        style={{ background: 'transparent' }}
+        className="fixed top-4 right-4 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all border border-white/15 glass-blur hover:scale-110 active:scale-95"
+        style={{ background: 'rgba(255,255,255,0.05)', isolation: 'isolate' }}
       >
-        <GlassSurface
-          radius={999}
-          depth={6}
-          blur={12}
-          strength={50}
-          chromaticAberration={0.3}
-          backgroundColor="rgba(255, 255, 255, 0.08)"
-          className="w-full h-full flex items-center justify-center border border-white/15"
-        >
-          <motion.div animate={bellControls}>
-            <AnimatedSVGIcon state="notification" size={18} color="rgba(255, 255, 255, 0.85)" />
-          </motion.div>
-        </GlassSurface>
+        <AnimatedSVGIcon state="notification" size={18} color="rgba(255, 255, 255, 0.85)" />
 
         {/* Badge */}
         <AnimatePresence>
@@ -430,7 +429,7 @@ export function NotificationCenter() {
             </motion.span>
           )}
         </AnimatePresence>
-      </motion.button>
+      </button>
 
       {/* ── Panel Portal ──────────────────────────────────────────────── */}
       {typeof document !== 'undefined' && createPortal(
@@ -443,7 +442,7 @@ export function NotificationCenter() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.18 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className="liquid-glass-premium fixed top-16 right-4 z-[101] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-5rem))] flex flex-col rounded-3xl overflow-hidden"
+              className="liquid-glass-premium fixed top-16 right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-5rem))] flex flex-col rounded-3xl overflow-hidden"
               style={{
                 boxShadow: '0 30px 80px rgba(0,0,0,0.65)',
               }}
@@ -451,10 +450,10 @@ export function NotificationCenter() {
               <GlassSurface
                 radius={24}
                 depth={16}
-                blur={28}
-                strength={95}
-                chromaticAberration={1.5}
-                backgroundColor="rgba(10, 10, 15, 0.88)"
+                blur={1}
+                strength={60}
+                chromaticAberration={12}
+                backgroundColor="rgba(10, 10, 15, 0.5)"
                 className="w-full flex-1 flex flex-col max-h-[min(620px,calc(100vh-5rem))]"
               >
                 {/* Header */}
@@ -529,7 +528,7 @@ export function NotificationCenter() {
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-2">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-2" data-lenis-prevent>
                   <AnimatePresence mode="wait">
                     {loading && notifications.length === 0 ? (
                       <motion.div

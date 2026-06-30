@@ -62,6 +62,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.danger.label': 'Danger Zone',
         'settings.delete_all': 'Delete All Data',
 
+        // Dashboard Greetings
+        'greeting.morning': 'Good morning',
+        'greeting.afternoon': 'Good afternoon',
+        'greeting.evening': 'Good evening',
+
         // Sidebar - Section Titles
         'sidebar.overview': 'Overview',
         'sidebar.productivity': 'Productivity',
@@ -89,6 +94,8 @@ const translations: Record<Language, Record<string, string>> = {
         'sidebar.pinned': 'Pinned',
         'sidebar.settings': 'Settings',
         'sidebar.logout': 'Log out',
+        'sidebar.life_context': 'Life Context',
+        'sidebar.cognitive_engine': 'Cognitive Engine',
     },
     es: {
         // Settings - Appearance
@@ -147,6 +154,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.danger.label': 'Zona de Peligro',
         'settings.delete_all': 'Eliminar Todos los Datos',
 
+        // Dashboard Greetings
+        'greeting.morning': 'Buenos días',
+        'greeting.afternoon': 'Buenas tardes',
+        'greeting.evening': 'Buenas noches',
+
         // Sidebar - Section Titles
         'sidebar.overview': 'General',
         'sidebar.productivity': 'Productividad',
@@ -174,6 +186,8 @@ const translations: Record<Language, Record<string, string>> = {
         'sidebar.pinned': 'Favoritos',
         'sidebar.settings': 'Configuración',
         'sidebar.logout': 'Cerrar sesión',
+        'sidebar.life_context': 'Contexto Vital',
+        'sidebar.cognitive_engine': 'Motor Cognitivo',
     },
     fr: {
         // Settings - Appearance
@@ -182,8 +196,15 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.language.label': 'Langue',
         'settings.language.desc': 'Langue de l\'interface',
 
+        'sidebar.life_context': 'Contexte de vie',
+        'sidebar.cognitive_engine': 'Moteur Cognitif',
+
+        // Dashboard Greetings
+        'greeting.morning': 'Bonjour',
+        'greeting.afternoon': 'Bon après-midi',
+        'greeting.evening': 'Bonsoir',
+
         // Settings - General
-        'settings.general.title': 'Général',
         'settings.general.desc': 'Préférences régionales et de format',
 
         // Sidebar
@@ -201,8 +222,12 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.language.label': 'Sprache',
         'settings.language.desc': 'Oberflächensprache',
 
+        // Dashboard Greetings
+        'greeting.morning': 'Guten Morgen',
+        'greeting.afternoon': 'Guten Tag',
+        'greeting.evening': 'Guten Abend',
+
         // Settings - General
-        'settings.general.title': 'Allgemein',
         'settings.general.desc': 'Regionale und Formateinstellungen',
 
         // Sidebar

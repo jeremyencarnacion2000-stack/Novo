@@ -1,14 +1,18 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import Lenis from 'lenis'
 
+const LenisContext = createContext<Lenis | null>(null)
+
+export function useLenis(): Lenis | null {
+  return useContext(LenisContext)
+}
+
 interface SmoothScrollProviderProps {
     children: React.ReactNode
-    /** The scrollable element ref — if null, applies to window */
     scrollRef?: React.RefObject<HTMLElement | null>
-    /** Direct HTMLElement — preferred over scrollRef when available */
     scrollElement?: HTMLElement | null
 }
 
@@ -41,6 +45,7 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
         const lenis = new Lenis({
             wrapper,
             content: wrapper.firstElementChild as HTMLElement,
+            lerp: 0.08,
             duration: 1.0,
             easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
             touchMultiplier: 1.5,
@@ -74,5 +79,5 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
         }
     }, [scrollRef, scrollElement])
 
-    return <>{children}</>
+    return <LenisContext.Provider value={lenisRef.current}>{children}</LenisContext.Provider>
 }

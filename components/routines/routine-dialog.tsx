@@ -26,6 +26,7 @@ import { Plus, X, Sparkles } from 'lucide-react'
 import { Routine, RoutineTask } from '@/types/routine'
 import { Checkbox } from '@/components/ui/checkbox'
 import routineTemplates from '@/data/routine-templates.json'
+import { blendy } from '@/lib/blendy'
 
 interface RoutineDialogProps {
   open: boolean
@@ -55,6 +56,21 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   const [scheduledTime, setScheduledTime] = useState('')
   const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
+
+  const blendyKey = routine ? `routine-${routine.id}` : 'btn-new-routine'
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        blendy.update()
+        blendy.toggle(blendyKey)
+      }, 30)
+    }
+  }, [open, blendyKey])
+
+  const handleClose = () => {
+    blendy.untoggle(blendyKey, onClose)
+  }
 
   useEffect(() => {
     if (routine) {
@@ -143,9 +159,9 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => safeViewTransition(() => !o && onClose())}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        style={{ viewTransitionName: 'routine-form-modal' } as React.CSSProperties}
+        data-blendy-to={blendyKey}
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         <form onSubmit={handleSubmit}>
@@ -331,7 +347,7 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button type="submit">{routine ? 'Update' : 'Create'} Routine</Button>

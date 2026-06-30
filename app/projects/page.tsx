@@ -12,6 +12,7 @@ import type { Project, ProjectStatus } from "@/types/project"
 import { useToast } from "@/hooks/use-toast"
 import { useProjects } from "@/hooks/use-swr"
 import { useCognitiveEngine } from "@/lib/cognitive-context"
+import { ScrollReveal } from "@/components/ui/scroll-reveal"
 
 export default function ProjectsPage() {
   const { data: projects, error, isLoading, mutate } = useProjects()
@@ -252,15 +253,18 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex flex-col gap-10 md:gap-16">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-4xl md:text-6xl font-light tracking-tight italic opacity-90">Projects & Tasks</h1>
-          <p className="subtitle-technical">
-            Active directives · system initiatives
-          </p>
+      <ScrollReveal>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-6xl font-light tracking-tight italic opacity-90">Projects & Tasks</h1>
+            <p className="subtitle-technical">
+              Active directives · system initiatives
+            </p>
+          </div>
         </div>
-      </div>
+      </ScrollReveal>
 
+      <ScrollReveal delay={0.05}>
       <Tabs defaultValue="projects" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
           <TabsTrigger value="projects">Projects</TabsTrigger>
@@ -269,7 +273,7 @@ export default function ProjectsPage() {
 
         <TabsContent value="projects" className="space-y-6">
           <div className="flex justify-end">
-            <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+            <Button onClick={() => setDialogOpen(true)} data-blendy-from="btn-new-project" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Project
             </Button>
@@ -286,6 +290,7 @@ export default function ProjectsPage() {
           <TasksView />
         </TabsContent>
       </Tabs>
+      </ScrollReveal>
 
       <ProjectDialog
         open={dialogOpen}

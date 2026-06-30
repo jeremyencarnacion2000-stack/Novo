@@ -11,7 +11,7 @@
  *  • Wires `will-change: transform, filter` for GPU acceleration
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   getDisplacementMap,
   type DisplacementFilterParams,
@@ -21,7 +21,6 @@ import {
 
 /** Module-level cache: cacheKey → DOM filter id */
 const domFilterIds = new Map<string, string>()
-const mapCache = new Map<string, string>()
 
 const MAX_CACHE_SIZE = 64
 
@@ -29,14 +28,18 @@ function cacheKey(p: Required<DisplacementFilterParams>): string {
   return `${p.width}x${p.height}x${p.radius}x${p.depth}x${p.strength}x${p.chromaticAberration}`
 }
 
-function mapKey(w: number, h: number, r: number, d: number): string {
-  return `${w}x${h}x${r}x${d}`
-}
-
 /**
- * Injects the displacement SVG filter as a real DOM element so that
- * `backdrop-filter: url('#id')` resolves correctly in Chrome.
- * Data-URI fragment references (#displace) are NOT reliable for backdrop-filter.
+ * Injects the displacement SVG <filter> as a real DOM element so that
+ * `backdrop-filter: url(#id)` resolves correctly in Chromium.
+ *
+ * Two hard constraints, both learned the hard way:
+ *   1. The <filter> MUST live in the document. Referencing a filter inside a
+ *      `data:` URI fragment (`url("data:…#displace")`) is NOT reliable for
+ *      backdrop-filter in current Chromium — only same-document filter ids work.
+ *   2. The displacement map fed to <feImage> MUST be a data-URI image. Chromium's
+ *      feImage CANNOT render a referenced in-document element (`href="#localId"`)
+ *      — that path silently produces an empty map and therefore zero distortion.
+ *      So we embed the map via getDisplacementMap() as a data URI here.
  */
 function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): string {
   if (typeof document === 'undefined') return ''
@@ -52,43 +55,23 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
     document.body.appendChild(svgContainer)
   }
 
-  let defsEl = svgContainer.querySelector('defs')
-  if (!defsEl) {
-    defsEl = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
-    svgContainer.appendChild(defsEl)
-  }
-
   const id = `ngf${k.replace(/[^a-zA-Z0-9]/g, '')}`.slice(0, 64)
-  const mapId = `map_${id}`
-  const gradY = `Y_${id}`
-  const gradX = `X_${id}`
 
   const { width, height, radius, depth, strength, chromaticAberration } = params
   const scR = strength + chromaticAberration * 2
   const scG = strength + chromaticAberration
   const scB = strength
 
-  // Inject displacement gradients and map directly into defs
-  const mapGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-  mapGroup.id = mapId
-  mapGroup.innerHTML = `
-    <linearGradient id="${gradY}" x1="0" x2="0" y1="${Math.ceil((radius / height) * 15)}%" y2="${Math.floor(100 - (radius / height) * 15)}%">
-      <stop offset="0%" stop-color="#0F0" />
-      <stop offset="100%" stop-color="#000" />
-    </linearGradient>
-    <linearGradient id="${gradX}" x1="${Math.ceil((radius / width) * 15)}%" x2="${Math.floor(100 - (radius / width) * 15)}%" y1="0" y2="0">
-      <stop offset="0%" stop-color="#F00" />
-      <stop offset="100%" stop-color="#000" />
-    </linearGradient>
-    <rect x="0" y="0" width="${width}" height="${height}" fill="#808080" />
-    <g filter="blur(2px)">
-      <rect x="0" y="0" width="${width}" height="${height}" fill="#000080" />
-      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#${gradY})" style="mix-blend-mode: screen;" />
-      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#${gradX})" style="mix-blend-mode: screen;" />
-      <rect x="${depth}" y="${depth}" width="${width - 2 * depth}" height="${height - 2 * depth}" fill="#808080" rx="${radius}" ry="${radius}" filter="blur(${depth}px)" />
-    </g>
-  `
-  defsEl.appendChild(mapGroup)
+  // A pill/circle is passed radius:9999. Left uncapped, the gradient stops in
+  // the displacement map land far off-canvas and the edge lensing collapses, so
+  // clamp the radius (and depth) to the geometry the element can actually hold.
+  const half = Math.floor(Math.min(width, height) / 2)
+  const safeRadius = Math.min(radius, half)
+  const safeDepth = Math.max(1, Math.min(depth, half - 1))
+
+  // Displacement texture as a data-URI image — the only feImage source Chromium
+  // honours inside a backdrop-filter pipeline.
+  const mapUrl = getDisplacementMap({ width, height, radius: safeRadius, depth: safeDepth })
 
   const filterEl = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
   filterEl.id = id
@@ -99,9 +82,11 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
   filterEl.setAttribute('height', String(height))
   filterEl.setAttribute('filterUnits', 'userSpaceOnUse')
 
-  // Reference the mapGroup element inside defs by #id
+  // feImage loads the displacement map; three feDisplacementMap passes (one per
+  // RGB channel at slightly different scales) recombine via screen blend to
+  // produce chromatic aberration — exactly the srdavo/ekino pipeline.
   filterEl.innerHTML = [
-    `<feImage href="#${mapId}" result="dm" preserveAspectRatio="none"/>`,
+    `<feImage x="0" y="0" width="${width}" height="${height}" href="${mapUrl}" result="dm" preserveAspectRatio="none"/>`,
     `<feDisplacementMap in="SourceGraphic" in2="dm" scale="${scR}" xChannelSelector="R" yChannelSelector="G"/>`,
     `<feColorMatrix type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="dR"/>`,
     `<feDisplacementMap in="SourceGraphic" in2="dm" scale="${scG}" xChannelSelector="R" yChannelSelector="G"/>`,
@@ -114,7 +99,12 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
   svgContainer.appendChild(filterEl)
 
   if (domFilterIds.size >= MAX_CACHE_SIZE) {
-    domFilterIds.delete(domFilterIds.keys().next().value!)
+    const oldestKey = domFilterIds.keys().next().value!
+    const oldestId = domFilterIds.get(oldestKey)
+    domFilterIds.delete(oldestKey)
+    // Evict the stale DOM node too, otherwise the cache map shrinks but the
+    // document keeps accumulating orphaned <filter> elements.
+    if (oldestId) document.getElementById(oldestId)?.remove()
   }
   domFilterIds.set(k, id)
   return `url(#${id})`
@@ -157,6 +147,25 @@ function detectSVGFilterSupport(): boolean {
   return _svgFilterSupport
 }
 
+// ─── Reactive Liquid Glass Registry ───────────────────────────────────────────
+const listeners = new Set<() => void>()
+let activeSVGFiltersCount = 0
+const MAX_SIMULTANEOUS_SVG_FILTERS = 5
+
+function registerSVGFilter(): boolean {
+  if (activeSVGFiltersCount < MAX_SIMULTANEOUS_SVG_FILTERS) {
+    activeSVGFiltersCount++
+    listeners.forEach(l => l())
+    return true
+  }
+  return false
+}
+
+function unregisterSVGFilter() {
+  activeSVGFiltersCount = Math.max(0, activeSVGFiltersCount - 1)
+  listeners.forEach(l => l())
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export interface UseLiquidGlassOptions {
@@ -184,6 +193,8 @@ export interface UseLiquidGlassResult {
   height: number
   /** Whether the browser supports SVG filters in backdrop-filter */
   hasSVGFilterSupport: boolean
+  /** Whether this specific element is currently rendered with the high-fidelity SVG filter */
+  useSVGFilter: boolean
   /**
    * Call this to generate the complete backdrop-filter string,
    * including blur passes, brightness, and saturate.
@@ -207,6 +218,7 @@ export function useLiquidGlass({
     height: staticHeight || 0,
   })
   const hasSVGFilterSupport = detectSVGFilterSupport()
+  const [useSVGFilter, setUseSVGFilter] = useState(false)
 
   // Sync static dimensions if they change when autoSize is disabled
   useEffect(() => {
@@ -222,50 +234,92 @@ export function useLiquidGlass({
     const el = ref.current
     if (!el) return
 
-    // Enable GPU acceleration immediately
-    el.style.willChange = 'transform, filter, backdrop-filter, opacity'
-
-    function measure() {
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const w = Math.ceil(rect.width)
-      const h = Math.ceil(rect.height)
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const { width: w, height: h } = entry.contentRect
       if (w > 0 && h > 0) {
-        // Round to nearest 16px to prevent layout thrashing and maximize filter cache hit rate
         const roundedW = Math.ceil(w / 16) * 16
         const roundedH = Math.ceil(h / 16) * 16
         setDimensions(prev => (prev.width === roundedW && prev.height === roundedH ? prev : { width: roundedW, height: roundedH }))
       }
-    }
-
-    // Initial measure
-    requestAnimationFrame(() => requestAnimationFrame(measure))
-
-    const ro = new ResizeObserver(measure)
+    })
     ro.observe(el)
 
-    // Window resize — adaptive material
-    const onResize = () => measure()
-    window.addEventListener('resize', onResize, { passive: true })
-
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', onResize)
-    }
+    return () => ro.disconnect()
   }, [autoSize])
 
   const { width, height } = dimensions
 
-  // DOM-injected filter ref: url('#id') — reliable in Chrome
-  const filterUrl = width > 0 && height > 0
-    ? getOrCreateDOMFilter({ width, height, radius, depth, strength, chromaticAberration })
-    : ''
+  // Evaluate eligibility based on browser support, element dimensions, and performance settings
+  const isEligible = useMemo(() => {
+    if (!hasSVGFilterSupport) return false
+    // Don't apply heavy SVG displacement filters to small components (like buttons, small badges, tabs)
+    if (width < 120 || height < 120) return false
+
+    // Respect showAnimations / performance settings via DOM attribute
+    const reduceEffects = typeof document !== 'undefined' &&
+      (document.documentElement.getAttribute('data-animations') === 'false' ||
+       document.documentElement.classList.contains('low-perf'))
+    if (reduceEffects) return false
+
+    return true
+  }, [hasSVGFilterSupport, width, height])
+
+  // Orchestrate active SVG filters to keep browser rasterization lightweight
+  useEffect(() => {
+    let registered = false
+
+    const checkRegistration = () => {
+      if (!isEligible) {
+        if (registered) {
+          unregisterSVGFilter()
+          registered = false
+          setUseSVGFilter(false)
+        }
+        return
+      }
+
+      if (registered) return
+
+      // Try to register as an active SVG filter
+      const success = registerSVGFilter()
+      if (success) {
+        registered = true
+        setUseSVGFilter(true)
+      } else {
+        setUseSVGFilter(false)
+      }
+    }
+
+    checkRegistration()
+    listeners.add(checkRegistration)
+
+    return () => {
+      listeners.delete(checkRegistration)
+      if (registered) {
+        unregisterSVGFilter()
+      }
+    }
+  }, [isEligible])
+
+  const filterUrl = useMemo(() =>
+    width > 0 && height > 0 && useSVGFilter
+      ? getOrCreateDOMFilter({ width, height, radius, depth, strength, chromaticAberration })
+      : '',
+    [width, height, radius, depth, strength, chromaticAberration, useSVGFilter]
+  )
 
   const mapUrl = ''
 
   const buildBackdropFilter = useCallback((): string => {
-    return `blur(${blur}px) brightness(1.08) saturate(1.4)`
-  }, [blur])
+    if (hasSVGFilterSupport && useSVGFilter && filterUrl) {
+      return `blur(${blur / 2}px) ${filterUrl} blur(${blur}px) brightness(1.1) saturate(1.5)`
+    }
+    // High-quality frosted glass blur fallback when SVG filter is not used
+    const fallbackBlur = Math.max(20, blur * 10)
+    return `blur(${fallbackBlur}px) saturate(150%) brightness(1.05)`
+  }, [blur, hasSVGFilterSupport, useSVGFilter, filterUrl])
 
   return {
     ref,
@@ -274,6 +328,7 @@ export function useLiquidGlass({
     width,
     height,
     hasSVGFilterSupport,
+    useSVGFilter,
     buildBackdropFilter,
   }
 }

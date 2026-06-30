@@ -51,15 +51,37 @@ function Button({
     asChild?: boolean
   }) {
   if (variant === 'glass') {
+    // GlassSurface can't be used with Slot (asChild) because it renders
+    // internal layers — Slot requires a single child. When asChild, render
+    // the child directly with a glass overlay sibling instead.
+    if (asChild) {
+      return (
+        <span className={cn("relative inline-flex", buttonVariants({ variant, size }), className)} style={{ borderRadius: 9999 }}>
+          <GlassSurface
+            radius={9999}
+            depth={4}
+            blur={1}
+            strength={25}
+            chromaticAberration={3}
+            backgroundColor="transparent"
+            elevation="low"
+            aria-hidden
+            className="pointer-events-none"
+            style={{ position: 'absolute', inset: '-2px', zIndex: 0, borderRadius: 'inherit' }}
+          />
+          <Slot className="relative z-10" {...props} />
+        </span>
+      )
+    }
     return (
       <GlassSurface
-        as={asChild ? Slot : 'button'}
+        as="button"
         radius={9999}
-        depth={10}
+        depth={4}
         blur={1}
-        strength={100}
-        chromaticAberration={15}
-        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.1)"
+        strength={25}
+        chromaticAberration={3}
+        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.05)"
         elevation="low"
         contrastObserver
         className={cn(

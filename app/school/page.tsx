@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { blendy } from '@/lib/blendy';
 
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -14,6 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { calculateGPA } from '@/lib/gpa-calculator';
 
 import { Course, Grade } from '@/types/school';
+import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import { motion } from 'framer-motion';
+import { springConfig } from '@/lib/design-tokens';
 
 export default function SchoolPage() {
   const { toast } = useToast();
@@ -149,12 +153,39 @@ export default function SchoolPage() {
 
   const handleEditCourse = (course: Course) => {
     setEditingCourse(course);
+    blendy.toggle(`course-${course.id}`);
+    setCourseDialogOpen(true);
+  };
+
+  const handleOpenNewCourse = () => {
+    setEditingCourse(undefined);
+    blendy.toggle('btn-add-course');
     setCourseDialogOpen(true);
   };
 
   const handleAddGradeClick = (course: Course) => {
     setSelectedCourse(course);
+    blendy.toggle(`grade-${course.id}`);
     setGradeDialogOpen(true);
+  };
+
+  const handleCloseCourseDialog = () => {
+    const key = editingCourse ? `course-${editingCourse.id}` : 'btn-add-course';
+    blendy.untoggle(key, () => {
+      setCourseDialogOpen(false);
+      setEditingCourse(undefined);
+    });
+  };
+
+  const handleCloseGradeDialog = () => {
+    if (selectedCourse) {
+      blendy.untoggle(`grade-${selectedCourse.id}`, () => {
+        setGradeDialogOpen(false);
+        setSelectedCourse(undefined);
+      });
+    } else {
+      setGradeDialogOpen(false);
+    }
   };
 
   // Calculate GPAs
@@ -188,19 +219,23 @@ export default function SchoolPage() {
   return (
     <div className="flex flex-col gap-6 md:gap-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">School</h1>
-        <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Track your courses, grades, and GPA
-        </p>
-      </div>
+      <ScrollReveal>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">School</h1>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+            Track your courses, grades, and GPA
+          </p>
+        </div>
+      </ScrollReveal>
 
       {/* GPA Overview */}
+      <ScrollReveal delay={0.05}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GPADisplay gpa={overallGPA} label="Overall GPA" />
         <GPADisplay gpa={universityGPA} label="University GPA" />
         <GPADisplay gpa={highSchoolGPA} label="High School GPA" />
       </div>
+      </ScrollReveal>
 
       {/* Tabs */}
       <Tabs defaultValue="courses" className="w-full">
@@ -220,10 +255,8 @@ export default function SchoolPage() {
               </TabsList>
             </Tabs>
             <Button
-              onClick={() => {
-                setEditingCourse(undefined);
-                setCourseDialogOpen(true);
-              }}
+              data-blendy-from="btn-add-course"
+              onClick={handleOpenNewCourse}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Course
@@ -237,14 +270,20 @@ export default function SchoolPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCourses.map((course) => (
-                <CourseCard
+              {filteredCourses.map((course, i) => (
+                <motion.div
                   key={course.id}
-                  course={course}
-                  onEdit={handleEditCourse}
-                  onDelete={handleDeleteCourse}
-                  onAddGrade={handleAddGradeClick}
-                />
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springConfig.gentle, delay: Math.min(i, 12) * 0.06 }}
+                >
+                  <CourseCard
+                    course={course}
+                    onEdit={handleEditCourse}
+                    onDelete={handleDeleteCourse}
+                    onAddGrade={handleAddGradeClick}
+                  />
+                </motion.div>
               ))}
             </div>
           )}
@@ -259,10 +298,7 @@ export default function SchoolPage() {
       {/* Dialogs */}
       <CourseDialog
         open={courseDialogOpen}
-        onClose={() => {
-          setCourseDialogOpen(false);
-          setEditingCourse(undefined);
-        }}
+        onClose={handleCloseCourseDialog}
         onSave={handleSaveCourse}
         course={editingCourse}
       />
@@ -270,10 +306,7 @@ export default function SchoolPage() {
       {selectedCourse && selectedCourse.id && (
         <GradeDialog
           open={gradeDialogOpen}
-          onClose={() => {
-            setGradeDialogOpen(false);
-            setSelectedCourse(undefined);
-          }}
+          onClose={handleCloseGradeDialog}
           onSave={handleAddGrade}
           courseId={selectedCourse.id}
         />

@@ -40,6 +40,8 @@ import {
 } from '@/lib/cognitive-engine'
 import { usePlayerStore } from '@/lib/player-store'
 import { eventBus } from '@/lib/events/event-bus'
+import { startMorphTransition } from '@/lib/morphing-engine'
+import { novoToast } from '@/components/ui/novo-toast'
 
 // ─── Event Bus → Engine energy cost table ────────────────────────────────────
 // These calibrated weights translate behavioral signals into attentional depletion.
@@ -172,7 +174,9 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    setBioState(next)
+    startMorphTransition(() => {
+      setBioState(next)
+    })
   }, [chronotype, habits, userStressScore, phaseOverride])
 
   useEffect(() => {
@@ -203,16 +207,42 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new CustomEvent('cognitive:fatigue-onset', {
         detail: { fatigueScore: bioState.fatigueScore, label: bioState.label }
       }))
+      novoToast.warning({
+        title: 'Rest Cycle Recommended',
+        description: 'Synaptic Fatigue onset detected. Warm blue-light filter activated, ambient player initialized. High-load pages restricted.',
+        badge: 'Rest & Recover',
+        duration: 6000
+      })
     }
     if (bioState.phase === 'REDUCED_CAPACITY_MODE' && prev !== 'REDUCED_CAPACITY_MODE') {
       window.dispatchEvent(new CustomEvent('cognitive:reduced-capacity-onset', {
         detail: { attentionScore: bioState.attentionScore, userStressScore, label: bioState.label }
       }))
+      novoToast.show('cognitive', {
+        title: 'Adaptive Protection Enabled',
+        description: 'High fatigue detected. Dashboard layout simplified, secondary components dimmed, high-load items rescheduled.',
+        badge: 'Reduced Load',
+        duration: 6000
+      })
     }
     if (bioState.phase === 'PEAK_FOCUS' && prev !== 'PEAK_FOCUS') {
       window.dispatchEvent(new CustomEvent('cognitive:peak-onset', {
         detail: { attentionScore: bioState.attentionScore }
       }))
+      novoToast.success({
+        title: 'Peak Focus Cycle',
+        description: 'Circadian attention peak reached. Focus frequencies loaded, notification badges silenced, deep work state secured.',
+        badge: 'Peak Performance',
+        duration: 6000
+      })
+    }
+    if (bioState.phase === 'LINEAR_EXECUTION' && prev && prev !== 'LINEAR_EXECUTION') {
+      novoToast.info({
+        title: 'Balanced State Active',
+        description: 'Focus reserves are optimal. Standard UI layouts and normal notification settings restored.',
+        badge: 'Linear Execution',
+        duration: 5000
+      })
     }
 
     // Always dispatch global event for any bio-state metrics change (e.g. Outfit sync)
@@ -281,7 +311,9 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setPhaseOverrideWithSave = useCallback((p: CognitivePhase | null) => {
-    setPhaseOverride(p)
+    startMorphTransition(() => {
+      setPhaseOverride(p)
+    })
     if (typeof window !== 'undefined') {
       if (p) {
         localStorage.setItem('cognitive:phase-override', p)
@@ -379,7 +411,7 @@ function FatigueNavigationWarning({
 }) {
   return (
     <div
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-md w-full mx-4"
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-md w-[calc(100%-2rem)]"
       role="alert"
       style={{ animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both' }}
     >

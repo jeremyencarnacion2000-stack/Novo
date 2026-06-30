@@ -119,8 +119,8 @@ export default function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
                   <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
                   <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-2xl font-bold text-white">
                     {session?.user?.name?.charAt(0) || 'U'}
@@ -176,7 +176,7 @@ export default function ProfilePage() {
           </Card>
 
           {/* Stats Card */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Card className="liquid-glass bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">

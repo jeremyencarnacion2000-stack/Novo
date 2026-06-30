@@ -6,6 +6,7 @@ import { Brain, ArrowRight, AlertTriangle, Zap, TrendingDown } from 'lucide-reac
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { springConfig } from '@/lib/design-tokens';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 
 interface WidgetData {
   focusScore: number;
@@ -76,13 +77,25 @@ export function CognitiveEngineWidget() {
         transition={{ ...springConfig.smooth, delay: 0.05 }}
         whileHover={{ scale: 1.015, y: -2, transition: { ...springConfig.snappy } }}
         className={cn(
-          'relative overflow-hidden rounded-3xl p-5 border transition-all duration-500 cursor-pointer',
-          'border-white/[0.08] bg-white/[0.01] backdrop-blur-xl',
+          'relative rounded-3xl p-5 border transition-all duration-500 cursor-pointer',
+          'border-white/[0.08] bg-white/[0.01]',
           'hover:border-primary/30 hover:bg-primary/[0.02]',
           'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_50px_rgba(0,0,0,0.3)]',
           'hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(99,102,241,0.2)]',
         )}
       >
+        <GlassSurface
+          radius={24}
+          depth={10}
+          blur={1}
+          strength={40}
+          chromaticAberration={6}
+          backgroundColor="transparent"
+          elevation="low"
+          aria-hidden
+          className="pointer-events-none"
+          style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
+        />
         {/* Ambient gradient orb — shifts on hover via CSS */}
         <div
           className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10 blur-3xl transition-all duration-700 group-hover:opacity-25 group-hover:scale-125 pointer-events-none"

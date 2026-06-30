@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Repeat2, ArrowRight } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { RoutineCard } from './routine-card'
+import { springConfig } from '@/lib/design-tokens'
 
 interface RoutinesListProps {
   routines: Routine[]
@@ -53,15 +54,21 @@ export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransit
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {routines.map((routine) => (
-        <RoutineCard
+      {routines.map((routine, i) => (
+        <motion.div
           key={routine.id}
-          routine={routine}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onView={onView}
-          isActiveTransition={activeTransitionId === routine.id}
-        />
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springConfig.gentle, delay: Math.min(i, 12) * 0.06 }}
+        >
+          <RoutineCard
+            routine={routine}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onView={onView}
+            isActiveTransition={activeTransitionId === routine.id}
+          />
+        </motion.div>
       ))}
     </div>
   )

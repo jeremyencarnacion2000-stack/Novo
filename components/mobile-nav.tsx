@@ -1,115 +1,118 @@
 'use client'
 
 import React, { useState } from 'react'
-import { LayoutDashboard, BarChart3, Plus, Bot, Grid2x2 } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Bell, Bot, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useQuickCapture } from '@/lib/quick-capture-context'
 import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
+import { useScrollDirection } from '@/hooks/use-scroll-direction'
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
+import { springConfig } from '@/lib/design-tokens'
 
 export function MobileNav() {
     const router = useRouter()
     const pathname = usePathname()
     const { onOpen } = useQuickCapture()
     const [drawerOpen, setDrawerOpen] = useState(false)
+    const scrollDir = useScrollDirection(40)
 
-    const isActive = (path: string) => pathname === path
+    const isActive = (path: string) => pathname === path || pathname === path + '/'
 
     const navItems = [
         { icon: LayoutDashboard, path: '/', label: 'Home' },
         { icon: BarChart3, path: '/analytics', label: 'Stats' },
-        { icon: null, path: '', label: 'Add' },
+        { icon: Bell, path: '/notifications', label: 'Alerts', action: 'notifications' },
         { icon: Bot, path: '/ai', label: 'AI' },
-        { icon: Grid2x2, path: '__menu__', label: 'Menu' },
     ]
 
     const isCompactPath = pathname === '/ai' || pathname === '/music' || pathname.startsWith('/music/') || pathname === '/cognitive'
-    const compact = isCompactPath
 
     return (
         <>
-            {/* Ultra-minimal floating capsule nav */}
             <div className={cn(
-                "fixed bottom-5 left-5 right-5 z-[100] md:hidden flex justify-center pointer-events-none transition-transform duration-500 ease-out",
-                compact && "translate-y-2"
+                "fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none transition-transform duration-500 ease-out gap-3",
+                scrollDir === 'down' && "translate-y-[120%]"
             )}>
-                <div
+                {/* Nav bar — left side, pill-shaped */}
+                <motion.div
                     className={cn(
-                        "w-full max-w-md flex items-center justify-evenly transition-all duration-500 ease-out rounded-[28px] border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.55)] pointer-events-auto glass-blur-xl",
-                        compact ? "px-6 py-1.5 rounded-[32px] max-w-[280px]" : "px-3 py-2.5"
+                        "flex items-center gap-1 rounded-full border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.55)] pointer-events-auto",
+                        isCompactPath ? "px-3 py-1.5" : "px-2 py-2"
                     )}
-                    style={{
-                        background: 'color-mix(in srgb, var(--background) 88%, transparent)',
-                    }}
+                    style={{ background: 'color-mix(in srgb, var(--background) 90%, transparent)' }}
+                    layout
                 >
-                    {navItems.map((item) => {
-                        // FAB — centered, elevated
-                        if (item.icon === null) {
-                            if (compact) return null // Hide FAB in compact mode for maximum space
+                    <LayoutGroup>
+                        {navItems.map((item) => {
+                            const Icon = item.icon
+                            const active = isActive(item.path)
 
                             return (
-                                <button
-                                    key="fab"
-                                    onClick={onOpen}
-                                    aria-label="Add"
-                                    className="h-12 w-12 -my-4 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-[0_4px_24px_rgba(99,102,241,0.4)] active:scale-90 transition-all duration-200 ring-[3px] ring-black/40"
-                                >
-                                    <Plus className="h-5 w-5 text-white" strokeWidth={2.2} />
-                                </button>
-                            )
-                        }
-
-                        const Icon = item.icon
-                        const isMenu = item.path === '__menu__'
-                        const active = !isMenu && isActive(item.path)
-
-                        return (
-                            <button
-                                key={item.path}
-                                aria-label={item.label}
-                                onClick={() => {
-                                    if (isMenu) {
-                                        setDrawerOpen(true)
-                                    } else {
-                                        router.push(item.path)
-                                    }
-                                }}
-                                className={cn(
-                                    "flex flex-col items-center gap-1 transition-all duration-300 active:scale-90 relative",
-                                    compact ? "py-2 px-4" : "py-1.5 px-3 rounded-2xl",
-                                    active
-                                        ? "text-white"
-                                        : isMenu && drawerOpen
-                                            ? "text-white/50"
-                                            : "text-white/25 hover:text-white/40"
-                                )}
-                            >
-                                <Icon 
+                                <motion.button
+                                    key={item.path}
+                                    aria-label={item.label}
+                                    aria-current={active ? 'page' : undefined}
+                                    onClick={() => {
+                                        navigator.vibrate?.(10)
+                                        if (item.action === 'notifications') {
+                                            window.dispatchEvent(new CustomEvent('open-notifications'))
+                                        } else {
+                                            router.push(item.path)
+                                        }
+                                    }}
                                     className={cn(
-                                        "transition-all duration-300",
-                                        compact ? "h-[20px] w-[20px]" : "h-[22px] w-[22px]"
-                                    )} 
-                                    strokeWidth={active ? 2 : 1.6} 
-                                />
-                                {!compact && (
-                                    <span className={cn(
-                                        "text-[9px] font-medium tracking-wide transition-all duration-300",
-                                        active ? "opacity-100" : "opacity-50"
-                                    )}>
-                                        {item.label}
-                                    </span>
-                                )}
-                                {/* Active indicator dot */}
-                                {active && (
-                                    <div className={cn(
-                                        "absolute w-1 h-1 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(99,102,241,0.6)] transition-all duration-300",
-                                        compact ? "-bottom-1" : "-bottom-0.5"
-                                    )} />
-                                )}
-                            </button>
-                        )
-                    })}
-                </div>
+                                        "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] h-[44px]",
+                                        active ? "text-white" : "text-white/30",
+                                        active && "px-4"
+                                    )}
+                                    whileTap={{ scale: 0.82 }}
+                                    transition={springConfig.snappy}
+                                    layout
+                                >
+                                    {active && (
+                                        <motion.div
+                                            layoutId="mobile-nav-pill"
+                                            className="absolute inset-0 rounded-full bg-white/[0.1]"
+                                            transition={springConfig.smooth}
+                                        />
+                                    )}
+                                    <Icon
+                                        className={cn("relative z-10", isCompactPath ? "h-[18px] w-[18px]" : "h-[20px] w-[20px]")}
+                                        strokeWidth={active ? 2.2 : 1.5}
+                                    />
+                                    {active && !isCompactPath && (
+                                        <motion.span
+                                            initial={{ opacity: 0, width: 0 }}
+                                            animate={{ opacity: 1, width: 'auto' }}
+                                            className="text-[10px] font-semibold tracking-wide relative z-10 ml-1.5 whitespace-nowrap"
+                                        >
+                                            {item.label}
+                                        </motion.span>
+                                    )}
+                                </motion.button>
+                            )
+                        })}
+                    </LayoutGroup>
+                </motion.div>
+
+                {/* FAB — right side, opens/closes drawer */}
+                <motion.button
+                    layoutId="fab-morph"
+                    onClick={() => { navigator.vibrate?.(10); setDrawerOpen(o => !o) }}
+                    aria-label={drawerOpen ? "Close menu" : "Open menu"}
+                    className="pointer-events-auto h-[52px] w-[52px] rounded-full border border-white/10 flex items-center justify-center shadow-[0_8px_40px_rgba(0,0,0,0.5)] glass-blur"
+                    style={{ background: 'color-mix(in srgb, var(--background) 85%, transparent)' }}
+                    whileTap={{ scale: 0.85 }}
+                    transition={springConfig.snappy}
+                >
+                    <motion.div
+                        animate={{ rotate: drawerOpen ? 45 : 0 }}
+                        transition={springConfig.snappy}
+                    >
+                        <Plus className="h-5 w-5 text-white/60" strokeWidth={2} />
+                    </motion.div>
+                </motion.button>
             </div>
 
             {/* Section Drawer */}

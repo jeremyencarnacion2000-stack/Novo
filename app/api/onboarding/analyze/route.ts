@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Chronotype / Energy Curve
-    let chronotype: 'morning_lark' | 'night_owl' | 'afternoon_peak' = 'afternoon_peak'
+    let chronotype: 'morning_lark' | 'night_owl' | 'intermediate' = 'intermediate'
     let peakFocusStart = '14:00'
     let peakFocusEnd = '18:00'
     let typicalSlumpHour = 13

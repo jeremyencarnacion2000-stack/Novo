@@ -4,6 +4,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Star, Clock, CheckCircle, BookMarked, Smartphone, Headphones } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { springConfig } from '@/lib/design-tokens'
 
 interface LibraryGridProps {
     books: any[]
@@ -62,12 +64,17 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-            {books.map((book) => {
+            {books.map((book, i) => {
                 const progress = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0
 
                 return (
-                    <Card
+                    <motion.div
                         key={book.id}
+                        initial={{ opacity: 0, y: 18 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ ...springConfig.gentle, delay: Math.min(i, 20) * 0.04 }}
+                    >
+                    <Card
                         className="group cursor-pointer hover:shadow-lg transition-all duration-300 border-0 bg-card/50 hover:bg-card rounded-xl overflow-hidden"
                         onClick={() => onBookClick(book)}
                     >
@@ -138,6 +145,7 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
                             )}
                         </CardContent>
                     </Card>
+                    </motion.div>
                 )
             })}
         </div>

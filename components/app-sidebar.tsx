@@ -21,6 +21,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import { springConfig } from '@/lib/design-tokens'
 import { FocusMode } from '@/components/focus-mode'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -42,11 +43,50 @@ import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 export function AppSidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const { isMobile, setOpenMobile, state, toggleSidebar } = useSidebar()
+  const { isMobile, setOpenMobile, state, open, setOpen, toggleSidebar } = useSidebar()
   const { t } = useTranslation()
   const { isSettingsOpen, setSettingsOpen } = useSettings()
   const sidebarContentRef = useRef<HTMLDivElement>(null)
   const { twin } = useCognitiveTwin()
+
+  // Hover state refs
+  const isHoverExpandedRef = React.useRef(false)
+  const isManualCollapsedRef = React.useRef(false)
+
+  const handleMouseEnter = () => {
+    if (isMobile) return
+    if (!open && !isManualCollapsedRef.current) {
+      isHoverExpandedRef.current = true
+      setOpen(true)
+    }
+  }
+
+  const handleMouseLeave = () => {
+    if (isMobile) return
+    isManualCollapsedRef.current = false // Reset manual collapse protection when mouse leaves
+    if (isHoverExpandedRef.current) {
+      isHoverExpandedRef.current = false
+      setOpen(false)
+    }
+  }
+
+  const handleToggle = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    } else {
+      if (isHoverExpandedRef.current) {
+        // Click locks it permanently open
+        isHoverExpandedRef.current = false
+      } else if (open) {
+        // Manually collapsed, flag it to prevent immediate hover expansion
+        isManualCollapsedRef.current = true
+        setOpen(false)
+      } else {
+        // Manually open permanently
+        setOpen(true)
+      }
+    }
+  }
 
   const [isOnline, setIsOnline] = React.useState(true)
 
@@ -74,7 +114,7 @@ export function AppSidebar() {
         { title: t('sidebar.analytics'), href: '/analytics', icon: BarChart3 },
         { title: t('sidebar.calendar'), href: '/calendar', icon: CalendarRange },
         { title: t('sidebar.ai'), href: '/ai', icon: Bot },
-        { title: 'Cognitive Engine', href: '/cognitive', icon: Brain },
+        { title: t('sidebar.cognitive_engine'), href: '/cognitive', icon: Brain },
         { title: t('sidebar.focus'), href: '/focus', icon: Timer },
       ],
     },
@@ -88,7 +128,7 @@ export function AppSidebar() {
       ],
     },
     {
-      title: 'Contexto Vital',
+      title: t('sidebar.life_context'),
       items: [
         { title: t('sidebar.school'), href: '/school', icon: GraduationCap },
         { title: t('sidebar.business'), href: '/business', icon: Briefcase },
@@ -103,7 +143,7 @@ export function AppSidebar() {
 
   // Filter, sort, and group items dynamically based on Cognitive Twin initialized state
   const navigation = React.useMemo(() => {
-    const enabledModules = twin.workspaceLayout?.enabledModules || ['today', 'ai', 'cognitive', 'focus']
+    const enabledModules = twin.workspaceLayout?.enabledModules || ['today', 'ai', 'cognitive', 'focus', 'routines', 'checklist', 'projects', 'trackers', 'school', 'business', 'library', 'spiritual', 'social', 'appearance', 'music']
     const pinnedModules = twin.workspaceLayout?.pinnedModules || []
 
     const filteredGroups = rawNavigation.map((group) => {
@@ -170,6 +210,8 @@ export function AppSidebar() {
         "[&>[data-sidebar=sidebar]]:!bg-transparent [&>[data-sidebar=sidebar]]:!border-0 [&>[data-sidebar=sidebar]]:!shadow-none",
         isMobile ? "w-[280px]" : ""
       )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className={cn(
         "h-full w-full flex flex-col overflow-hidden transition-[border-radius] duration-300",
@@ -178,10 +220,7 @@ export function AppSidebar() {
         <SidebarHeader className={cn("py-8 flex justify-center transition-[padding] duration-300", state === 'collapsed' ? "!px-0" : "px-6")}>
           <div className={cn("flex items-center justify-center transition-[width] duration-300", state === 'collapsed' ? 'w-full' : 'w-full')}>
             <button
-              onClick={() => {
-                if (isMobile) setOpenMobile(false)
-                else { toggleSidebar() }
-              }}
+              onClick={handleToggle}
               aria-label="Toggle sidebar"
               className="group relative flex items-center justify-center cursor-pointer bg-transparent border-0 p-0"
             >
@@ -220,13 +259,32 @@ export function AppSidebar() {
                       <SidebarGroupContent>
                         <SidebarMenu className="gap-2">
                           {section.items.map((item) => {
-                            const isActive = pathname === item.href
+                            const isActive = pathname === item.href || pathname === item.href + '/'
                             return (
-                              <SidebarMenuItem key={item.title}>
+                              <SidebarMenuItem key={item.title} className="relative">
+                                {isActive && (
+                                  <GlassSurface
+                                    radius={9999}
+                                    depth={4}
+                                    blur={1}
+                                    strength={20}
+                                    chromaticAberration={3}
+                                    backgroundColor="transparent"
+                                    elevation="low"
+                                    aria-hidden
+                                    className="pointer-events-none"
+                                    style={{
+                                      position: 'absolute',
+                                      inset: '-3px -4px',
+                                      zIndex: 1,
+                                      borderRadius: '9999px',
+                                    }}
+                                  />
+                                )}
                                 <motion.div
                                   whileHover={{ scale: 1.015 }}
                                   whileTap={{ scale: 0.97 }}
-                                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                  transition={springConfig.snappy}
                                 >
                                 <SidebarMenuButton
                                   asChild
@@ -236,26 +294,11 @@ export function AppSidebar() {
                                     "rounded-full transition-[background-color,color,box-shadow,width,padding] duration-200 ease-out h-10",
                                     state === 'collapsed' ? "!justify-center !px-0 !w-10 !mx-auto" : "px-4",
                                     isActive
-                                      ? ""
+                                      ? "!bg-transparent"
                                       : "text-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                                   )}
                                 >
                                   <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
-                                    {isActive && (
-                                      <GlassSurface
-                                        radius={9999}
-                                        depth={10}
-                                        blur={20}
-                                        strength={100}
-                                        chromaticAberration={15}
-                                        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
-                                        elevation="low"
-                                        contrastObserver
-                                        aria-hidden
-                                        className="pointer-events-none"
-                                        style={{ position: 'absolute', inset: '-2px -16px', zIndex: 0 }}
-                                      />
-                                    )}
                                     <item.icon className={cn("h-5 w-5 shrink-0 relative z-10 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-foreground/40")} />
                                     {state === 'expanded' && (
                                       <span className={cn("text-sm tracking-tight relative z-10", isActive ? "font-semibold text-foreground" : "font-medium text-foreground/60")}>
@@ -287,22 +330,22 @@ export function AppSidebar() {
                   <motion.div
                     whileHover={{ scale: 1.03, x: 2 }}
                     whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    transition={springConfig.snappy}
                   >
                   <SidebarMenuButton asChild tooltip="Profile" className={cn("rounded-full h-10 transition-all duration-300 btn-press",
                     state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "p-0 overflow-hidden",
-                    pathname === '/profile' ? "" : "hover:bg-foreground/10"
+                    (pathname === '/profile' || pathname === '/profile/') ? "" : "hover:bg-foreground/10"
                   )}>
-                    {pathname === '/profile' ? (
+                    {(pathname === '/profile' || pathname === '/profile/') ? (
                       <GlassSurface
                         as={Link}
                         href="/profile"
                         radius={9999}
-                        depth={10}
-                        blur={20}
-                        strength={100}
-                        chromaticAberration={15}
-                        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
+                        depth={4}
+                        blur={1}
+                        strength={20}
+                        chromaticAberration={3}
+                        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.06)"
                         elevation="low"
                         contrastObserver
                         className={cn(
@@ -350,7 +393,7 @@ export function AppSidebar() {
                 <motion.div
                   whileHover={{ scale: 1.03, x: 2 }}
                   whileTap={{ scale: 0.96 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  transition={springConfig.snappy}
                 >
                 <SidebarMenuButton
                   asChild={isSettingsOpen}
@@ -370,11 +413,11 @@ export function AppSidebar() {
                   {isSettingsOpen ? (
                     <GlassSurface
                       radius={9999}
-                      depth={10}
-                      blur={20}
-                      strength={100}
-                      chromaticAberration={15}
-                      backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.12)"
+                      depth={4}
+                      blur={1}
+                      strength={20}
+                      chromaticAberration={3}
+                      backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.06)"
                       elevation="low"
                       contrastObserver
                       className={cn(
@@ -427,19 +470,33 @@ export function AppSidebar() {
               </SidebarMenuItem>
             </SidebarMenu>
 
-            {/* ⌘K hint */}
-            {state === 'expanded' && (
-              <button
-                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))}
-                className="mt-2 w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-white/[0.025] hover:bg-white/[0.05] border border-white/[0.06] transition-all group"
-              >
-                <span className="text-[10px] text-white/30 font-medium group-hover:text-white/50 transition-colors">Búsqueda rápida</span>
-                <span className="flex items-center gap-0.5">
-                  <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">⌘</kbd>
-                  <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">K</kbd>
-                </span>
-              </button>
-            )}
+            {/* Search shortcut hint — platform-aware (⌘K on Mac, Ctrl+K on Windows/Linux) */}
+            {state === 'expanded' && (() => {
+              const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform)
+              return (
+                <button
+                  onClick={() => {
+                    if (isMac) {
+                      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
+                    } else {
+                      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+                    }
+                  }}
+                  aria-label={isMac ? 'Búsqueda rápida ⌘K' : 'Búsqueda rápida Ctrl+K'}
+                  className="mt-2 w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-white/[0.025] hover:bg-white/[0.05] border border-white/[0.06] transition-all group"
+                >
+                  <span className="text-[10px] text-white/30 font-medium group-hover:text-white/50 transition-colors">Búsqueda rápida</span>
+                  <span className="flex items-center gap-0.5">
+                    {isMac ? (
+                      <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">⌘</kbd>
+                    ) : (
+                      <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">Ctrl</kbd>
+                    )}
+                    <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">K</kbd>
+                  </span>
+                </button>
+              )
+            })()}
           </div>
         </SidebarFooter>
         <SidebarRail />

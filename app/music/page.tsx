@@ -819,7 +819,7 @@ export default function MusicPage() {
             onClick={(e) => handleToggleLike(track, e)}
             className={cn(
               "h-4 w-4 transition-all hover:scale-115 cursor-pointer",
-              isLiked ? "text-[#1db954] fill-[#1db954] opacity-100" : "opacity-0 group-hover:opacity-100 hover:text-[#1db954]"
+              isLiked ? "text-[#1db954] fill-[#1db954] opacity-100" : "sm:opacity-0 sm:group-hover:opacity-100 hover:text-[#1db954]"
             )} 
           />
           <span className="text-sm tabular-nums opacity-85">
@@ -833,7 +833,7 @@ export default function MusicPage() {
                 e.stopPropagation()
                 setActiveTrackMenuId(activeTrackMenuId === songId ? null : songId)
               }} 
-              className="h-4 w-4 opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white" 
+              className="h-4 w-4 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer hover:text-white"
             />
             {activeTrackMenuId === songId && (
               <div 
@@ -888,9 +888,9 @@ export default function MusicPage() {
   }
 
   return (
-    <div className="absolute inset-0 p-4 lg:p-6 flex flex-col justify-between bg-transparent">
+    <div className="absolute inset-0 p-0 sm:p-4 lg:p-6 flex flex-col justify-between bg-transparent">
       {/* ─── FLOATING MAIN CONTAINER ─── */}
-      <div className="w-full h-full bg-[#151713]/85 backdrop-blur-2xl border border-white/10 rounded-[2rem] flex overflow-hidden shadow-2xl relative">
+      <div className="w-full h-full bg-[#151713]/85 backdrop-blur-2xl border-0 sm:border sm:border-white/10 rounded-none sm:rounded-[2rem] flex overflow-hidden shadow-2xl relative">
         
         {/* ─── LEFT SIDEBAR ─── */}
         <div className="w-[240px] bg-black/35 border-r border-white/5 flex flex-col hidden lg:flex shrink-0 p-5">
@@ -1266,7 +1266,7 @@ export default function MusicPage() {
                         <div 
                           key={track.id}
                           onClick={() => handlePlay(track)}
-                          className="w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
+                          className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                         >
                           <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
                             <img src={track.image} className="w-full h-full object-cover" alt={track.name} />
@@ -1311,7 +1311,7 @@ export default function MusicPage() {
                         <div 
                           key={album.id}
                           onClick={() => handlePlay(album)}
-                          className="w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
+                          className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                         >
                           <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
                             <img src={album.image} className="w-full h-full object-cover" alt={album.name} />
@@ -1359,7 +1359,7 @@ export default function MusicPage() {
                             <div 
                               key={songId + '-' + i}
                               onClick={() => handlePlay(track)}
-                              className="w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
+                              className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                             >
                               <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
                                 <img src={track.thumbnail || track.image || DEFAULT_IMG} className="w-full h-full object-cover" alt={track.title || track.name} />
@@ -1406,7 +1406,7 @@ export default function MusicPage() {
                         <div 
                           key={pl.id}
                           onClick={() => navigateTo('artists')}
-                          className="w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
+                          className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                         >
                           <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
                             {pl.isCollage ? (

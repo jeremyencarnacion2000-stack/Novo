@@ -2,12 +2,40 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { GlassSurface } from '@/components/ui/GlassSurface'
 
 interface CardProps extends React.ComponentProps<'div'> {
-  variant?: 'primary' | 'secondary' | 'tertiary' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'liquid'
 }
 
 function Card({ className, style, variant = 'primary', children, ...props }: CardProps) {
+  // `liquid` opts a hero/primary card into the real Liquid Glass renderer
+  // (SVG displacement in backdrop-filter) instead of the CSS glassmorphism
+  // surfaces. Use sparingly — it's GPU-heavier than .glass-surface.
+  if (variant === 'liquid') {
+    return (
+      <GlassSurface
+        data-slot="card"
+        data-variant="liquid"
+        radius={20}
+        depth={8}
+        blur={1}
+        strength={50}
+        chromaticAberration={8}
+        elevation="medium"
+        contrastObserver
+        className={cn(
+          'text-card-foreground gap-8 p-6 lg:p-10 transition-all duration-300',
+          className,
+        )}
+        style={style}
+        {...props}
+      >
+        {children}
+      </GlassSurface>
+    )
+  }
+
   return (
     <div
       data-slot="card"

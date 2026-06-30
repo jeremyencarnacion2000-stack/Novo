@@ -993,7 +993,7 @@ model TwinSnapshot {
   trustLevel       String
   cognitiveLoad    Float
   burnoutIndex     Float
-  chronotype       String   // '' | 'morning_lark' | 'night_owl' | 'afternoon_peak'
+  chronotype       String   // '' | 'morning_lark' | 'night_owl' | 'intermediate'
   mainFrictionPoint String  // '' | 'procrastination' | 'context_switching' | etc.
   peakFocusStart   String   // e.g. '09:00'
   peakFocusEnd     String   // e.g. '12:00'

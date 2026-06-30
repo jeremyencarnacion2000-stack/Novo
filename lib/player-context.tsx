@@ -1,45 +1,13 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+/**
+ * player-context.tsx
+ *
+ * NOTE: This file is retained for backward compatibility but is effectively
+ * a thin re-export of the Zustand player-store.
+ * The actual player state is managed by usePlayerStore (lib/player-store.ts).
+ *
+ * DO NOT add useContext/conditional hook logic here — use usePlayerStore directly.
+ */
 
-interface PlayerContextType {
-  player: any
-  currentTrack: any
-  play: (uri: string) => Promise<void>
-}
-
-const PlayerContext = createContext<PlayerContextType | undefined>(undefined)
-
-export function PlayerProvider({ children }: { children: ReactNode }) {
-  return (
-    <PlayerContext.Provider value={{
-      player: null,
-      currentTrack: null,
-      play: () => Promise.resolve()
-    }}>
-      {children}
-    </PlayerContext.Provider>
-  )
-}
-
-export function usePlayer() {
-  const context = useContext(PlayerContext)
-
-  // Return mock object for server-side rendering to avoid prerendering errors
-  if (typeof window === 'undefined') {
-    return {
-      player: null,
-      currentTrack: null,
-      play: () => Promise.resolve()
-    }
-  }
-
-  if (!context) {
-    return {
-      player: null,
-      currentTrack: null,
-      play: () => Promise.resolve()
-    }
-  }
-  return context
-}
+export { usePlayerStore as usePlayer } from '@/lib/player-store'

@@ -272,10 +272,10 @@ function NovoToastItem({ toast, onDismiss }: NovoToastItemProps) {
     >
       <GlassSurface
         radius={24}
-        depth={materialFormed ? 14 : 4} // morphing depth
-        blur={materialFormed ? 20 : 5}  // blur morphing
-        strength={85}
-        chromaticAberration={hovered ? 1.2 : 0.6} // chromatic aberration dynamics
+        depth={materialFormed ? 6 : 3}
+        blur={1}
+        strength={25}
+        chromaticAberration={hovered ? 4 : 2}
         backgroundColor="rgba(10, 10, 15, 0.85)"
         style={{
           boxShadow: shadowIntensity,

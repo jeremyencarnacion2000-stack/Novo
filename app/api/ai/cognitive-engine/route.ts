@@ -8,15 +8,23 @@ import { groqAPI } from '@/lib/groq';
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // ─── Circadian energy model (science-backed curve) ────────────────────────────
-// Peak: 9-11am | Dip: 1-3pm | Recovery: 4-6pm | Decline: 7pm+
-function getCircadianEnergyAt(hour: number): number {
+// Peak: 9-11am | Dip: 1-3pm | Recovery: 4-6pm | Decline: 7pm+ (adjusted by chronotype)
+function getCircadianEnergyAt(hour: number, chronotype: string = 'intermediate'): number {
+  const offsetMap: Record<string, number> = {
+    morning_lark: -2,
+    intermediate: 0,
+    night_owl: 3,
+  };
+  const offset = offsetMap[chronotype] ?? 0;
+  const shifted = (hour - offset + 24) % 24;
+
   const curve: Record<number, number> = {
     0: 15, 1: 10, 2: 8, 3: 8, 4: 12, 5: 20, 6: 35,
     7: 55, 8: 72, 9: 88, 10: 95, 11: 90, 12: 75,
     13: 60, 14: 45, 15: 50, 16: 65, 17: 70, 18: 62,
     19: 52, 20: 40, 21: 30, 22: 22, 23: 18,
   };
-  return curve[hour] ?? 50;
+  return curve[shifted] ?? 50;
 }
 
 // ─── Cognitive load weight by priority ────────────────────────────────────────
@@ -43,7 +51,7 @@ export async function GET(req: NextRequest) {
     const todayStr = now.toISOString().split('T')[0];
 
     // ── Collect all signals in parallel ─────────────────────────────────────
-    const [tasks, focusSessions, dailyAnalytics, recentSessions] = await Promise.all([
+    const [tasks, focusSessions, dailyAnalytics, recentSessions, twinRecord] = await Promise.all([
       prisma.task.findMany({
         where: { userId },
         orderBy: { createdAt: 'asc' },
@@ -63,6 +71,9 @@ export async function GET(req: NextRequest) {
         where: { userId, startTime: { gte: sevenDaysAgo } },
         orderBy: { startTime: 'desc' },
         take: 20,
+      }),
+      prisma.cognitiveTwinRecord.findUnique({
+        where: { userId },
       }),
     ]);
 
@@ -123,11 +134,33 @@ export async function GET(req: NextRequest) {
     );
     let cognitiveLoad = Math.min(100, Math.round(cognitiveLoadRaw * 8));
 
-    // Circadian energy at current hour
+    // Resolve user's chronotype from override or DB record
+    const userChronotype = chronotypeOverride || (twinRecord?.energyCurve as any)?.chronotype || 'intermediate';
+
+    // Circadian energy at current hour (adjusted for chronotype)
     const currentHour = now.getHours();
-    let currentEnergy = getCircadianEnergyAt(currentHour);
-    const peakHour = 10;
-    const dipHour = 14;
+    let currentEnergy = getCircadianEnergyAt(currentHour, userChronotype);
+
+    // Calculate peaks dynamically based on chronotype
+    let peakHour = 10;
+    let dipHour = 14;
+    let peakLabel = '10am';
+    let dipLabel = '2pm';
+    let peakInstructions = '9-11am';
+
+    if (userChronotype === 'morning_lark') {
+      peakHour = 8;
+      dipHour = 12;
+      peakLabel = '8am';
+      dipLabel = '12pm';
+      peakInstructions = '7-9am';
+    } else if (userChronotype === 'night_owl') {
+      peakHour = 13;
+      dipHour = 17;
+      peakLabel = '1pm';
+      dipLabel = '5pm';
+      peakInstructions = '12-2pm';
+    }
 
     // Historical patterns from daily analytics
     const avgProductivity = dailyAnalytics.length > 0
@@ -195,7 +228,7 @@ export async function GET(req: NextRequest) {
     const energyTimeline = Array.from({ length: 24 }, (_, h) => ({
       hour: h,
       label: `${h.toString().padStart(2, '0')}:00`,
-      energy: getCircadianEnergyAt(h),
+      energy: getCircadianEnergyAt(h, userChronotype),
       isCurrent: h === currentHour,
       isPeak: h === peakHour,
       isDip: h === dipHour,
@@ -224,14 +257,32 @@ export async function GET(req: NextRequest) {
       cognitiveWeight: getCognitiveWeight(t.priority),
     }));
 
+    let twinProfileContext = '';
+    if (twinRecord) {
+      const identity = (twinRecord.identity as any) || {};
+      const bottlenecks = (twinRecord.bottlenecks as any) || {};
+      const metrics = (twinRecord.metrics as any) || {};
+      twinProfileContext = `
+## Learned Cognitive Twin Profile (Database Record)
+- User Role/Identity: ${identity.role || 'not_specified'} (industry: ${identity.industry || 'not_specified'})
+- User Focus Style: ${identity.focusStyle || 'not_specified'}
+- Chronotype (learned): ${userChronotype}
+- Main Friction Point: ${bottlenecks.mainFrictionPoint || 'not_detected'}
+- Current Cognitive Load (learned): ${metrics.currentCognitiveLoad ?? 30}%
+- Burnout Index (learned): ${metrics.burnoutIndex ?? 10}%
+- Trust Level: ${twinRecord.trustLevel} (confidence: ${twinRecord.confidenceScore}%)
+`;
+    }
+
     // ── Build Gemini prompt ──────────────────────────────────────────────────
     const prompt = `You are NOVO's Adaptive Cognitive Engine — an elite performance intelligence system.
 
 Analyze this user's real-time cognitive state and return a precise JSON report.
+${twinProfileContext}
 
 ## Current State
 - Local time: ${now.toLocaleTimeString()} (Hour: ${currentHour})
-- Circadian energy right now: ${currentEnergy}% (peak at 10am, dip at 2pm)
+- Circadian energy right now: ${currentEnergy}% (peak at ${peakLabel}, dip at ${dipLabel})
 - Estimated Recovery State: ${recoveryState}
 - Focus Score computed: ${focusScore}/100
 
@@ -291,10 +342,10 @@ Return ONLY valid JSON (no markdown, no explanation outside JSON):
 
 Rules:
 - Reorganize tasks based on cognitive weight matching energy level (heavy tasks at peak, light tasks at dip)
-- Schedule max 3 high-priority tasks in peak window (9-11am)
+- Schedule max 3 high-priority tasks in peak window (${peakInstructions})
 - Keep reorganizedDay to top 8 tasks max
 - Make insights feel like they came from a real cognitive scientist, not generic advice
-- The "reason" for each task must reference specific data (e.g., "Scheduled at 10am because your circadian peak is 95% capacity")
+- The "reason" for each task must reference specific data (e.g., "Scheduled at ${peakLabel} because your circadian peak is 95% capacity")
 - Be specific with numbers in detail fields`;
 
     let text = '';
@@ -371,16 +422,28 @@ Rules:
           type: 'focus_window',
           severity: 'info',
           headline: 'Circadian Peak Window Active',
-          detail: `Your circadian energy curve indicates peak cognitive endurance between 9:00 AM and 11:30 AM (currently at ${currentEnergy}% capacity).`
+          detail: `Your circadian energy curve indicates peak cognitive endurance between ${
+            userChronotype === 'morning_lark' ? '7:00 AM and 9:30 AM' :
+            userChronotype === 'night_owl' ? '12:00 PM and 2:30 PM' :
+            '9:00 AM and 11:30 AM'
+          } (currently at ${currentEnergy}% capacity).`
         }
       ];
 
-      // Smart scientific task scheduling
-      const scheduleHours = [9, 10, 11, 13, 14, 15, 16, 17];
+      // Smart scientific task scheduling (shifted based on chronotype)
+      const offsetMap: Record<string, number> = {
+        morning_lark: -2,
+        intermediate: 0,
+        night_owl: 3,
+      };
+      const offset = offsetMap[userChronotype] ?? 0;
+      const baseScheduleHours = [9, 10, 11, 13, 14, 15, 16, 17];
+      const scheduleHours = baseScheduleHours.map(h => (h + offset + 24) % 24);
+
       const scheduledTasks = displayTasks.slice(0, 8).map((t, index) => {
-        const hour = scheduleHours[index] || (9 + index);
+        const hour = scheduleHours[index] || ((9 + index + offset + 24) % 24);
         const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour > 12 ? hour - 12 : hour;
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
         const timeLabel = `${displayHour.toString().padStart(2, '0')}:00 ${ampm}`;
         
         let reason = '';
@@ -402,6 +465,9 @@ Rules:
         };
       });
 
+      const localPeakStart = userChronotype === 'morning_lark' ? 7 : userChronotype === 'night_owl' ? 12 : 9;
+      const localPeakEnd = userChronotype === 'morning_lark' ? 9 : userChronotype === 'night_owl' ? 14 : 11;
+
       cognitiveReport = {
         focusScore,
         energyLevel: currentEnergy > 70 ? 'high' : currentEnergy > 40 ? 'medium' : 'low',
@@ -410,8 +476,8 @@ Rules:
         cognitiveLoad,
         burnoutRisk,
         focusFragmentation,
-        peakWindowStart: 9,
-        peakWindowEnd: 11,
+        peakWindowStart: localPeakStart,
+        peakWindowEnd: localPeakEnd,
         reorganizedDay: scheduledTasks,
         insights,
         recommendation: burnoutRisk > 60

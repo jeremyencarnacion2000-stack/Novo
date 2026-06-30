@@ -22,7 +22,7 @@ export interface CognitiveTwin {
   }
 
   energyCurve: {
-    chronotype: 'morning_lark' | 'night_owl' | 'afternoon_peak' | ''
+    chronotype: 'morning_lark' | 'night_owl' | 'intermediate' | ''
     peakFocusStart: string
     peakFocusEnd: string
     typicalSlumpHour: number

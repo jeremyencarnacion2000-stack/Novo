@@ -14,7 +14,7 @@
  *  • Graceful fallback for browsers without SVG-filter backdrop-filter support.
  *
  * Usage:
- *   <GlassSurface radius={28} depth={16} blur={20} strength={90} chromaticAberration={1.5} adaptive>
+ *   <GlassSurface radius={28} depth={16} blur={2} strength={90} chromaticAberration={1.5} adaptive>
  *     <p>Content</p>
  *   </GlassSurface>
  */
@@ -40,8 +40,10 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
   depth?: number
 
   /**
-   * Pre/post blur in pixels applied to the backdrop-filter chain.
-   * @default 20
+   * Pre/post blur in pixels applied to the backdrop-filter chain. Keep this
+   * LOW (≈0–3) — blur is the expensive filter and high values frost over the
+   * displacement, killing the transparent/refractive "liquid glass" look.
+   * @default 2
    */
   blur?: number
 
@@ -70,8 +72,9 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
   debug?: boolean
 
   /**
-   * Glass background color. Supports any CSS color.
-   * @default 'rgba(var(--md-sys-color-neutral-background), 0.1)'
+   * Glass background color. Supports any CSS color. Keep the alpha very low
+   * (≈0.03–0.08) for the transparent crystal look.
+   * @default 'rgba(var(--md-sys-color-neutral-background), 0.05)'
    */
   backgroundColor?: string
 
@@ -103,6 +106,8 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
   width?: number
   /** Static/fixed height overrides */
   height?: number
+  /** Allow dynamic attributes for polymorphic rendering (e.g. href, type, disabled) */
+  [x: string]: any
 }
 
 // ─── Shadow / Highlight Tokens ────────────────────────────────────────────────
@@ -119,13 +124,13 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
   function GlassSurface(
     {
       radius = 128,
-      depth = 10,
-      blur = 20,
-      strength = 100,
-      chromaticAberration = 15,
+      depth = 6,
+      blur = 1,
+      strength = 40,
+      chromaticAberration = 6,
       adaptive = true,
       debug = false,
-      backgroundColor = 'rgba(var(--md-sys-color-neutral-background), 0.1)',
+      backgroundColor = 'rgba(var(--md-sys-color-neutral-background), 0.05)',
       elevation = 'medium',
       as,
       contrastObserver = false,
@@ -144,6 +149,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       filterUrl,
       mapUrl,
       hasSVGFilterSupport,
+      useSVGFilter,
       buildBackdropFilter,
     } = useLiquidGlass({
       radius,
@@ -248,7 +254,6 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         borderRadius: radius,
         position: 'relative',
         isolation: 'isolate',
-        overflow: 'hidden',
         background: 'transparent',
         border: 'none',
         boxShadow: 'none',
@@ -258,20 +263,22 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     const bgStyles = React.useMemo<React.CSSProperties>(() => {
       let activeBg = backgroundColor
       let activeBorder = '1px solid rgba(255, 255, 255, 0.08)'
-      let activeShadow = elevationShadow[elevation]
+      let activeShadow = elevationShadow[elevation as 'low' | 'medium' | 'high']
 
       if (contrastObserver && resolvedContrast) {
+        // Keep the tint near-transparent so the displacement/refraction stays
+        // visible (crystal-clear look). Just enough tint to anchor the panel.
         if (resolvedContrast === 'dark') {
           activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
-            ? 'rgba(20, 20, 23, 0.15)'
+            ? 'rgba(20, 20, 23, 0.06)'
             : backgroundColor
-          activeBorder = '1px solid rgba(255, 255, 255, 0.08)'
-          activeShadow = '0 24px 80px rgba(0,0,0,0.50), inset 1px 1px 0 rgba(255,255,255,0.15)'
+          activeBorder = '1px solid rgba(255, 255, 255, 0.10)'
+          activeShadow = '0 24px 80px rgba(0,0,0,0.45), inset 1px 1px 0 rgba(255,255,255,0.18)'
         } else {
           activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
-            ? 'rgba(255, 255, 255, 0.25)'
+            ? 'rgba(255, 255, 255, 0.10)'
             : backgroundColor
-          activeBorder = '1px solid rgba(0, 0, 0, 0.08)'
+          activeBorder = '1px solid rgba(255, 255, 255, 0.30)'
           activeShadow = '0 12px 40px rgba(0,0,0,0.08), inset 1px 1px 0 rgba(255,255,255,0.6)'
         }
       }
@@ -297,12 +304,19 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         }
       }
 
-      const bd = `blur(${blur}px) brightness(1.08) saturate(1.4)`
+      // Exact srdavo/ekino backdrop-filter chain. The displacement filter must
+      // sit *inside* backdrop-filter (not the `filter` property) so it bends the
+      // content behind the panel. A half pre-blur softens the backdrop so the
+      // lens samples smooth pixels, then the SVG filter displaces + chromatically
+      // splits it, then the full blur + tone pass finishes the material.
+      const displace = hasSVGFilterSupport && useSVGFilter && filterUrl ? `${filterUrl} ` : ''
+      const bd = displace 
+        ? `blur(${blur / 2}px) ${displace}blur(${blur}px) brightness(1.1) saturate(1.5)`
+        : `blur(${Math.max(20, blur * 10)}px) saturate(150%) brightness(1.05)`
       return {
         ...baseBg,
         backdropFilter: bd,
         WebkitBackdropFilter: bd,
-        filter: hasSVGFilterSupport && filterUrl ? filterUrl : undefined,
       }
     }, [
       backgroundColor,
@@ -312,6 +326,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       debug,
       mapUrl,
       hasSVGFilterSupport,
+      useSVGFilter,
       filterUrl,
       blur,
     ])
@@ -348,8 +363,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
           }}
         />
 
-        {/* Content */}
-        <div style={{ position: 'relative', zIndex: 2, display: 'contents' }}>
+        {/* Content — z-2 lifts above bg (z-0) and highlight (z-1) layers */}
+        <div className="relative z-[2] flex flex-col flex-1 min-h-0 min-w-0">
           {children}
         </div>
       </Component>

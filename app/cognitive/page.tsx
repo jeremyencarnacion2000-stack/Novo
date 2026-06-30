@@ -13,6 +13,8 @@ import { VoiceCommandHub } from '@/components/ai/VoiceCommandHub';
 import type { CognitiveEngineResponse } from '@/components/cognitive/types';
 import { cn } from '@/lib/utils';
 import { useCognitiveEngine } from '@/lib/cognitive-context';
+import { springConfig } from '@/lib/design-tokens';
+import { ScrollReveal } from '@/components/ui/scroll-reveal';
 
 
 // ── Loading state ────────────────────────────────────────────────────────────
@@ -220,9 +222,9 @@ export default function CognitivePage() {
               }}
               className="text-[9px] font-black tracking-widest uppercase bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.14] rounded-xl px-3 py-2 text-white/70 hover:text-white outline-none transition-all cursor-pointer"
             >
-              <option value="morning" className="bg-[#060608] text-white/60">MORNING LARK</option>
+              <option value="morning_lark" className="bg-[#060608] text-white/60">MORNING LARK</option>
               <option value="intermediate" className="bg-[#060608] text-white/60">INTERMEDIATE</option>
-              <option value="evening" className="bg-[#060608] text-white/60">NIGHT OWL</option>
+              <option value="night_owl" className="bg-[#060608] text-white/60">NIGHT OWL</option>
             </select>
 
             {lastRefresh && (
@@ -269,16 +271,12 @@ export default function CognitivePage() {
             </div>
           )}
 
-          {/* Main content */}
+          {/* Main content — Control Panel Layout */}
           {report && signals && !loading && (
             <div className="p-4 lg:p-6 space-y-6">
 
-              {/* Twin Identity Core */}
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0 }}
-              >
+              {/* ── Row 1: Hero State (full width) ─────────────────────────── */}
+              <ScrollReveal>
                 <CognitiveStateHero
                   phase={bioState.phase}
                   label={bioState.label}
@@ -287,96 +285,70 @@ export default function CognitivePage() {
                   minutesToNextPhase={bioState.minutesToNextPhase}
                   chronotype={chronotype}
                 />
-              </motion.div>
+              </ScrollReveal>
 
-              {/* Primary Directive */}
-              {report.recommendation && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.08 }}
-                  className="space-y-4"
-                >
-                  
-                  <RecommendationHero
-                    headline={
-                      bioState.phase === 'PEAK_FOCUS' ? 'Initiate Peak Work Focus Block' :
-                      bioState.phase === 'SYNAPTIC_FATIGUE' ? 'Activate Cognitive Recovery Routine' :
-                      'Execute Standard High-Value Routine'
-                    }
-                    detail={report.recommendation}
-                    actionLabel={bioState.phase === 'PEAK_FOCUS' ? 'Start Focus Block →' : bioState.phase === 'SYNAPTIC_FATIGUE' ? 'Launch Ambient Player →' : 'Review Routines →'}
-                    onActionClick={() => {
-                      if (bioState.phase === 'PEAK_FOCUS') {
-                        router.push('/focus');
-                      } else if (bioState.phase === 'SYNAPTIC_FATIGUE') {
-                        router.push('/music');
-                      } else {
-                        router.push('/routines');
-                      }
-                    }}
-                    impact={bioState.phase === 'PEAK_FOCUS' || bioState.phase === 'SYNAPTIC_FATIGUE' ? 'high' : 'medium'}
-                    estGain={bioState.phase === 'PEAK_FOCUS' ? '+35% Efficiency' : bioState.phase === 'SYNAPTIC_FATIGUE' ? '+25% Recovery' : undefined}
-                  />
+              {/* ── Row 2: Command Grid (asymmetric 3-column) ──────────────── */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-                </motion.div>
-              )}
-
-              {/* Signal Stream — max 2 visible */}
-              {report.recommendation && report.insights && report.insights.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.16 }}
-                >
-                  <SignalStream insights={report.insights} />
-                </motion.div>
-              )}
-
-              {/* Grid for Layer 3 (Why) & Layer 4 (Prediction) */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                
-                {/* Twin Vitals — left column */}
-                <motion.div
-                  className="lg:col-span-5 space-y-6"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.24 }}
-                >
-                  <div>
-                    <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30 mb-3">Twin Vitals</p>
-                    <div className="card--secondary liquid-glass rounded-3xl p-6 space-y-6 flex flex-col items-center [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <FocusScoreRing
-                        score={report.focusScore}
-                        energyLevel={report.energyLevel}
-                      />
-                      {report.cognitiveMemory && (
-                        <div className="w-full px-4 py-3 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                          <p className="text-[10px] text-indigo-400/80 leading-relaxed text-center">
-                            <span className="font-black uppercase tracking-widest text-[9px] block mb-1 text-indigo-300">Adaptation Confidence</span>
-                            {report.cognitiveMemory}
-                          </p>
-                        </div>
-                      )}
-                      <div className="w-full border-t border-white/[0.05] pt-4">
-                        <BurnoutRiskMeter
-                          risk={report.burnoutRisk}
-                          workloadDensity={signals.workloadDensity}
-                          focusFragmentation={report.focusFragmentation}
-                          overduePressure={Math.min(100, signals.overdueTasks * 15)}
-                        />
+                {/* Left: Twin Vitals (compact) */}
+                <ScrollReveal delay={0.05} className="lg:col-span-4 space-y-5">
+                  <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30">Twin Vitals</p>
+                  <div className="card--secondary liquid-glass rounded-3xl p-5 space-y-5 flex flex-col items-center [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <FocusScoreRing
+                      score={report.focusScore}
+                      energyLevel={report.energyLevel}
+                    />
+                    {report.cognitiveMemory && (
+                      <div className="w-full px-3 py-2.5 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
+                        <p className="text-[9px] text-indigo-400/80 leading-relaxed text-center">
+                          <span className="font-black uppercase tracking-widest text-[8px] block mb-1 text-indigo-300">Adaptation</span>
+                          {report.cognitiveMemory}
+                        </p>
                       </div>
+                    )}
+                    <div className="w-full border-t border-white/[0.05] pt-4">
+                      <BurnoutRiskMeter
+                        risk={report.burnoutRisk}
+                        workloadDensity={signals.workloadDensity}
+                        focusFragmentation={report.focusFragmentation}
+                        overduePressure={Math.min(100, signals.overdueTasks * 15)}
+                      />
                     </div>
                   </div>
-                </motion.div>
 
-                {/* Time Intelligence — right column */}
-                <motion.div
-                  className="lg:col-span-7 space-y-6"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.32 }}
-                >
+                  {/* Signal Stream (moved here — compact sidebar) */}
+                  {report.insights && report.insights.length > 0 && (
+                    <SignalStream insights={report.insights} />
+                  )}
+                </ScrollReveal>
+
+                {/* Center + Right: Directive + Timeline (wider) */}
+                <ScrollReveal delay={0.1} className="lg:col-span-8 space-y-5">
+                  {/* Primary Directive */}
+                  {report.recommendation && (
+                    <RecommendationHero
+                      headline={
+                        bioState.phase === 'PEAK_FOCUS' ? 'Initiate Peak Work Focus Block' :
+                        bioState.phase === 'SYNAPTIC_FATIGUE' ? 'Activate Cognitive Recovery Routine' :
+                        'Execute Standard High-Value Routine'
+                      }
+                      detail={report.recommendation}
+                      actionLabel={bioState.phase === 'PEAK_FOCUS' ? 'Start Focus Block →' : bioState.phase === 'SYNAPTIC_FATIGUE' ? 'Launch Ambient Player →' : 'Review Routines →'}
+                      onActionClick={() => {
+                        if (bioState.phase === 'PEAK_FOCUS') {
+                          router.push('/focus');
+                        } else if (bioState.phase === 'SYNAPTIC_FATIGUE') {
+                          router.push('/music');
+                        } else {
+                          router.push('/routines');
+                        }
+                      }}
+                      impact={bioState.phase === 'PEAK_FOCUS' || bioState.phase === 'SYNAPTIC_FATIGUE' ? 'high' : 'medium'}
+                      estGain={bioState.phase === 'PEAK_FOCUS' ? '+35% Efficiency' : bioState.phase === 'SYNAPTIC_FATIGUE' ? '+25% Recovery' : undefined}
+                    />
+                  )}
+
+                  {/* Time Intelligence */}
                   <div>
                     <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30 mb-3">Time Intelligence</p>
                     <div className="card--secondary liquid-glass rounded-3xl p-5 relative overflow-hidden [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -397,12 +369,14 @@ export default function CognitivePage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Reorganized Day */}
                   {report.reorganizedDay?.length > 0 && (
                     <div className="card--secondary liquid-glass rounded-3xl p-5 [box-shadow:inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <ReorganizedDay tasks={report.reorganizedDay} />
                     </div>
                   )}
-                </motion.div>
+                </ScrollReveal>
 
               </div>
 

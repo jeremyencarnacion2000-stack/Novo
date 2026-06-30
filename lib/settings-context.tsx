@@ -168,6 +168,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark')
     }
 
+    // Sincronizar preferencia de animaciones/efectos en el DOM root
+    root.setAttribute('data-animations', settings.showAnimations ? 'true' : 'false')
+
     // Apply background settings
     root.style.setProperty('--bg-dimness', `${settings.backgroundDimness / 100}`)
     root.style.setProperty('--bg-blur-px', `${settings.backgroundBlur}px`)

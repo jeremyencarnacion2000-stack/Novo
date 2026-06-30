@@ -382,55 +382,72 @@ export function CognitiveStateHero({
         ? { borderColor: 'rgba(239,68,68,0.22)', background: 'linear-gradient(135deg, rgba(239,68,68,0.03) 0%, rgba(6,6,8,0.015) 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 0 60px rgba(239,68,68,0.06)' }
         : { borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.015)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }
 
+  const phaseColor = isPeak ? '#818cf8' : isFatigue ? '#fb923c' : isReduced ? '#ef4444' : '#34d399'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springConfig.smooth }}
-      whileHover={{ scale: 1.008, transition: { ...springConfig.snappy } }}
-      className="relative overflow-hidden rounded-3xl border p-6 md:p-8 backdrop-blur-xl"
+      className="relative overflow-hidden rounded-3xl border p-6 md:p-10 backdrop-blur-xl"
       style={phaseAccentStyle}
     >
-      <div 
+      {/* Noise texture */}
+      <div
         className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
         }}
       />
-      
-      <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-        {/* Animated Cognitive Orb */}
-        <div className="flex-shrink-0 flex items-center justify-center p-2 bg-white/[0.02] rounded-full border border-white/[0.03]">
-          <OrbPrimitive size="lg" variant={orbVariant} pulse={true} glow={true} />
+
+      {/* Ambient phase glow */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[120px] opacity-[0.08] pointer-events-none"
+        style={{ background: phaseColor }}
+      />
+
+      <div className="relative z-10">
+        {/* Top bar: phase label + chronotype */}
+        <div className="flex items-center justify-between mb-8">
+          <span className="text-[10px] font-black tracking-[0.3em] uppercase" style={{ color: phaseColor }}>
+            {phaseLabel}
+          </span>
+          <span className="text-[10px] text-white/30 font-medium capitalize tracking-wider">
+            {chronotype} · {minutesToNextPhase}m to next phase
+          </span>
         </div>
 
-        {/* Narrative & Info */}
-        <div className="flex-1 text-center md:text-left min-w-0">
-          <div className="flex flex-col md:flex-row md:items-center gap-3 justify-center md:justify-start">
-            <span className="text-[10px] font-black tracking-[0.3em] uppercase text-indigo-400">
-              {phaseLabel}
-            </span>
-            <span className="hidden md:inline text-white/20">|</span>
-            <span className="text-xs text-white/55 font-medium capitalize">
-              Chronotype: {chronotype}
-            </span>
+        {/* Center: Orb + Score + Title — the hero moment */}
+        <div className="flex flex-col items-center text-center gap-6 mb-10">
+          <div className="relative">
+            <OrbPrimitive size="xl" variant={orbVariant} pulse={true} glow={true} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-5xl md:text-7xl font-extralight tabular-nums"
+                style={{ color: phaseColor, textShadow: `0 0 40px ${phaseColor}40` }}
+              >
+                {attentionScore}
+              </span>
+            </div>
           </div>
-          
-          <h2 className="text-2xl md:text-3xl font-black text-white mt-2 tracking-tight uppercase italic">
-            {phaseTitle}
-          </h2>
-          
-          <p className="text-sm text-white/60 mt-3 leading-relaxed max-w-2xl">
-            {phaseDesc}
-          </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6">
-            <TelemetryPill label="Cognitive Clarity" value={attentionScore} unit="%" status={attentionScore >= 70 ? 'good' : attentionScore >= 50 ? 'warning' : 'critical'} icon={Brain} />
-            <TelemetryPill label="Exec Momentum" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
-            <TelemetryPill label="Recovery Reserve" value={100 - fatigueScore} unit="%" status={100 - fatigueScore >= 60 ? 'good' : 'warning'} icon={Battery} />
-            <TelemetryPill label="Synaptic Load" value={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4))} unit="%" status={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 40 ? 'good' : Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 70 ? 'warning' : 'critical'} icon={Zap} />
-            <TelemetryPill label="Biological Clock" value={minutesToNextPhase} unit=" min" status="normal" icon={Clock} />
+          <div>
+            <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight uppercase italic leading-none">
+              {phaseTitle}
+            </h2>
+            <p className="text-sm text-white/40 mt-3 leading-relaxed max-w-xl mx-auto">
+              {phaseDesc}
+            </p>
           </div>
+        </div>
+
+        {/* Telemetry bar — full width, prominent */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <TelemetryPill label="Cognitive Clarity" value={attentionScore} unit="%" status={attentionScore >= 70 ? 'good' : attentionScore >= 50 ? 'warning' : 'critical'} icon={Brain} />
+          <TelemetryPill label="Exec Momentum" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
+          <TelemetryPill label="Recovery Reserve" value={100 - fatigueScore} unit="%" status={100 - fatigueScore >= 60 ? 'good' : 'warning'} icon={Battery} />
+          <TelemetryPill label="Synaptic Load" value={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4))} unit="%" status={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 40 ? 'good' : Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 70 ? 'warning' : 'critical'} icon={Zap} />
+          <TelemetryPill label="Biological Clock" value={minutesToNextPhase} unit=" min" status="normal" icon={Clock} />
         </div>
       </div>
     </motion.div>

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useScrollContainer } from '@/lib/scroll-container-context'
 import { useCognitivePhase } from '@/lib/cognitive-context'
+import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 
 const PHASE_SPRINGS: Record<string, { stiffness: number; damping: number; mass: number }> = {
   PEAK_FOCUS:            { stiffness: 380, damping: 28, mass: 0.8 },
@@ -115,9 +116,11 @@ export function PageWrapper({ children, className, isFullScreen = false }: PageW
             {children}
           </div>
         ) : (
-          <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-24 md:pb-8 flex-1 w-full">
-            {children}
-          </div>
+          <SmoothScrollProvider scrollElement={scrollRef.current}>
+            <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-24 md:pb-8 flex-1 w-full">
+              {children}
+            </div>
+          </SmoothScrollProvider>
         )}
       </motion.div>
     </AnimatePresence>

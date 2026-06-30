@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { blendy } from '@/lib/blendy';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { CalendarSidebar } from '@/components/calendar/calendar-sidebar';
 import { MonthGrid, CalendarEvent } from '@/components/calendar/month-grid';
 import { WeekGrid } from '@/components/calendar/week-grid';
 import { DayGrid } from '@/components/calendar/day-grid';
+import { safeViewTransition } from '@/hooks/use-view-transition';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -129,7 +131,22 @@ export default function CalendarPage() {
 
   const handleCreateEvent = () => {
     setNewEvent({ title: '', date: currentDate, startTime: '09:00', endTime: '10:00', source: 'google' });
+    setTimeout(() => { blendy.update(); blendy.toggle('btn-create-event'); }, 10);
     setIsCreateDialogOpen(true);
+  };
+
+  const handleSelectEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setTimeout(() => { blendy.update(); blendy.toggle(`event-${event.id}`); }, 10);
+  };
+
+  const handleCloseCreateDialog = () => {
+    blendy.untoggle('btn-create-event', () => setIsCreateDialogOpen(false));
+  };
+
+  const handleCloseSelectedEvent = () => {
+    if (selectedEvent) blendy.untoggle(`event-${selectedEvent.id}`, () => setSelectedEvent(null));
+    else setSelectedEvent(null);
   };
 
   const submitCreateEvent = async () => {
@@ -152,7 +169,7 @@ export default function CalendarPage() {
     };
     setEvents(prev => [...prev, created]);
     setIsCreating(false);
-    setIsCreateDialogOpen(false);
+    handleCloseCreateDialog();
     toast({ title: 'Success', description: 'Event created successfully' });
   };
 
@@ -262,7 +279,7 @@ export default function CalendarPage() {
             )}
 
             {/* Calendar grid area */}
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0 min-w-0 w-full relative overflow-hidden">
               {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -273,8 +290,8 @@ export default function CalendarPage() {
                     <MonthGrid
                       currentDate={currentDate}
                       events={filteredEvents}
-                      onSelectEvent={setSelectedEvent}
-                      onSelectDay={(d) => { setCurrentDate(d); setView('day'); }}
+                      onSelectEvent={handleSelectEvent}
+                      onSelectDay={(d) => { safeViewTransition(() => { setCurrentDate(d); setView('day'); }); }}
                       fatigueDimSources={fatigueDimSources}
                     />
                   )}
@@ -282,7 +299,7 @@ export default function CalendarPage() {
                     <WeekGrid
                       currentDate={currentDate}
                       events={filteredEvents}
-                      onSelectEvent={setSelectedEvent}
+                      onSelectEvent={handleSelectEvent}
                       fatigueDimSources={fatigueDimSources}
                     />
                   )}
@@ -290,7 +307,7 @@ export default function CalendarPage() {
                     <DayGrid
                       currentDate={currentDate}
                       events={filteredEvents}
-                      onSelectEvent={setSelectedEvent}
+                      onSelectEvent={handleSelectEvent}
                       fatigueDimSources={fatigueDimSources}
                     />
                   )}
@@ -302,8 +319,8 @@ export default function CalendarPage() {
       </div>
 
       {/* Create Event Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] glass-panel border-white/10">
+      <Dialog open={isCreateDialogOpen} onOpenChange={(o) => !o && handleCloseCreateDialog()}>
+        <DialogContent data-blendy-to="btn-create-event" className="sm:max-w-[425px] glass-panel border-white/10">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight">Create New Event</DialogTitle>
           </DialogHeader>
@@ -342,11 +359,11 @@ export default function CalendarPage() {
       {/* Event detail modal */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="glass-panel rounded-3xl shadow-2xl border border-white/10 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+        <div data-blendy-to={selectedEvent ? `event-${selectedEvent.id}` : ''} className="glass-panel rounded-3xl shadow-2xl border border-white/10 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 space-y-5">
               <div className="flex items-start justify-between">
                 <h3 className="text-xl font-bold leading-none tracking-tight">{selectedEvent.title}</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-white/10" onClick={() => setSelectedEvent(null)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-white/10" onClick={handleCloseSelectedEvent}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -367,7 +384,7 @@ export default function CalendarPage() {
               )}
             </div>
             <div className="bg-white/5 p-4 flex justify-end border-t border-white/10">
-              <Button onClick={() => setSelectedEvent(null)} className="rounded-xl px-6">Close</Button>
+              <Button onClick={handleCloseSelectedEvent} className="rounded-xl px-6">Close</Button>
             </div>
           </div>
         </div>

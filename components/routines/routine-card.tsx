@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Edit, Trash2, Clock, CalendarDays, Dumbbell, Activity, Play } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { cn } from '@/lib/utils'
+import { blendy } from '@/lib/blendy'
 
 interface RoutineCardProps {
     routine: Routine
@@ -18,13 +19,18 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
     const [isCardHovered, setIsCardHovered] = useState(false)
     const isStructured = routine.days && routine.days.length > 0
 
+    const handleViewClick = () => {
+        blendy.toggle(`routine-${routine.id}`)
+        onView(routine)
+    }
+
     return (
         <Card
             className="liquid-glass-elevated transition-all hover:shadow-md cursor-pointer flex flex-col h-full"
-            onClick={() => onView(routine)}
+            onClick={handleViewClick}
             onMouseEnter={() => setIsCardHovered(true)}
             onMouseLeave={() => setIsCardHovered(false)}
-            style={(isCardHovered || isActiveTransition) ? { viewTransitionName: 'routine-modal' } as React.CSSProperties : undefined}
+            data-blendy-from={`routine-${routine.id}`}
         >
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
@@ -156,7 +162,7 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
                     variant="default"
                     onClick={(e) => {
                         e.stopPropagation()
-                        onView(routine)
+                        handleViewClick()
                     }}
                 >
                     <Play className="h-3 w-3 mr-2" />

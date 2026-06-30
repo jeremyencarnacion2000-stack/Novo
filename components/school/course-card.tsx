@@ -57,6 +57,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                     </div>
                     <div className="flex items-center gap-1">
                         <Button
+                            data-blendy-from={`grade-${course.id}`}
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {
@@ -67,6 +68,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                             <Plus className="h-4 w-4" />
                         </Button>
                         <Button
+                            data-blendy-from={`course-${course.id}`}
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {

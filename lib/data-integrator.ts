@@ -329,21 +329,28 @@ export interface BackupData {
 }
 
 export const DataIntegrator = {
-  // Initialize sync listeners and run initial sync
-  initialize: () => {
-    if (typeof window !== 'undefined') {
-      if (navigator.onLine) {
-        syncPendingOperations()
-      }
+  // Initialize sync listeners and run initial sync (idempotent — safe to call multiple times)
+  _initialized: false,
+  _handleOnline: () => { isOnline = true; syncPendingOperations() },
+  _handleOffline: () => { isOnline = false },
 
-      window.addEventListener('online', () => {
-        isOnline = true
-        syncPendingOperations()
-      })
-      window.addEventListener('offline', () => {
-        isOnline = false
-      })
+  initialize: function() {
+    if (this._initialized || typeof window === 'undefined') return
+    this._initialized = true
+
+    if (navigator.onLine) {
+      syncPendingOperations()
     }
+
+    window.addEventListener('online', this._handleOnline)
+    window.addEventListener('offline', this._handleOffline)
+  },
+
+  destroy: function() {
+    if (!this._initialized || typeof window === 'undefined') return
+    window.removeEventListener('online', this._handleOnline)
+    window.removeEventListener('offline', this._handleOffline)
+    this._initialized = false
   },
 
   // Get network status

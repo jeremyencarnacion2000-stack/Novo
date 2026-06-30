@@ -31,7 +31,7 @@ export function CalendarToolbar({
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 w-full">
             {/* Left: Navigation & Title */}
             <div className="flex items-center gap-4 w-full md:w-auto">
-                <h2 className="text-2xl font-bold tracking-tight min-w-[200px] text-foreground">{label}</h2>
+                <h2 className="text-lg sm:text-2xl font-bold tracking-tight min-w-0 sm:min-w-[200px] text-foreground">{label}</h2>
 
                 <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => onNavigate('PREV')} className="h-8 w-8 rounded-full hover:bg-muted">
@@ -49,7 +49,7 @@ export function CalendarToolbar({
 
             {/* Right: Search, Settings, View Switcher */}
             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                <div className="relative hidden md:block w-64">
+                <div className="relative hidden md:block w-48 lg:w-64 shrink">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Find Events & Contacts"

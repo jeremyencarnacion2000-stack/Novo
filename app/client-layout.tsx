@@ -6,6 +6,7 @@ import { SessionProvider, useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import { Toaster as SileoToaster } from 'sileo'
 import 'sileo/styles.css'
+import { NovoToaster } from '@/components/ui/novo-toast'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
@@ -24,6 +25,7 @@ import { registerServiceWorker } from '@/lib/register-sw'
 import { OfflineIndicator } from '@/components/offline-indicator'
 import { useSyncQueue } from '@/hooks/use-sync-queue'
 import { ScrollContainerProvider } from '@/lib/scroll-container-context'
+import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 
@@ -164,7 +166,6 @@ function SyncQueueInit() {
   return null
 }
 
-import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-context'
 
 // ─── Root client layout ──────────────────────────────────────────────────────
 export default function ClientLayout({
@@ -216,7 +217,11 @@ export default function ClientLayout({
     }
   }, [])
 
-  if (!mounted) return null
+  if (!mounted) {
+    // Render a stable non-null placeholder during SSR/hydration to avoid white flash.
+    // The body background is already set by globals.css, so this is essentially invisible.
+    return <div className="h-screen w-full bg-background" aria-hidden />
+  }
 
   return (
     <AppProviders>
@@ -236,6 +241,7 @@ export default function ClientLayout({
       <SyncQueueInit />
       <NetworkStatus />
       <SileoToaster position="top-right" theme="system" offset={{ top: 60 }} />
+      <NovoToaster />
     </AppProviders>
   )
 }

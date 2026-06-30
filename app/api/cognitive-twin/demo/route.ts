@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
       else if (currentConfidence >= 56) trustLevel = 'learning'
 
       // Log trust level upgrades
-      const prevTrust = day === 30 ? 'initial' : (snapshotsToCreate[snapshotsToCreate.length - 1]?.trustLevel ?? 'initial')
+      const prevTrust: string = day === 30 ? 'initial' : (snapshotsToCreate[snapshotsToCreate.length - 1]?.trustLevel ?? 'initial')
       if (trustLevel !== prevTrust) {
         logsToCreate.push({
           twinId: twin.id,

@@ -152,7 +152,7 @@ export const NotificationMorph: React.FC<NotificationMorphProps> = ({
       }}
       onAnimationComplete={onComplete}
     >
-      <GlassSurface radius={16} depth={8} blur={12} strength={50}>
+      <GlassSurface radius={16} depth={4} blur={1} strength={20} chromaticAberration={3}>
         <div className="p-3 text-xs flex items-center justify-between">
           <span className="capitalize font-semibold text-white/90">{semantic.replace(/-/g, ' ')}</span>
           {children}

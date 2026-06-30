@@ -5,12 +5,14 @@ import type React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, Calendar, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Edit, Trash2, Calendar, ChevronRight, AlertCircle, CheckCircle2, GripVertical } from "lucide-react"
 import type { Project, ProjectStatus } from "@/types/project"
 import { Progress } from "@/components/ui/progress"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { TiltCard } from "@/components/ui/tilt-card"
 import { cn } from "@/lib/utils"
+import { createSwapy } from "swapy"
+import { blendy } from "@/lib/blendy"
 
 interface KanbanBoardProps {
   projects: Project[]
@@ -26,7 +28,33 @@ const columns: { status: ProjectStatus; title: string; color: string }[] = [
 ]
 
 export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: KanbanBoardProps) {
-  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const swapyRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    swapyRef.current = createSwapy(containerRef.current, {
+      manualSwap: true,
+      animation: "dynamic"
+    })
+
+    swapyRef.current.onSwapEnd(({ data }: any) => {
+      Object.entries(data.object).forEach(([slotId, itemId]) => {
+        if (itemId) {
+          const status = slotId.split("-").slice(0, -1).join("-") as ProjectStatus
+          const proj = projects.find(p => p.id === itemId)
+          if (proj && proj.status !== status) {
+            onStatusChange(itemId as string, status)
+          }
+        }
+      })
+    })
+
+    return () => {
+      swapyRef.current?.destroy()
+    }
+  }, [projects, onStatusChange])
 
   const getNextStatus = (currentStatus: ProjectStatus): ProjectStatus | null => {
     if (currentStatus === "not-started") return "in-progress"
@@ -42,32 +70,13 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
     return diffDays
   }
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData("text/plain", id)
-    setDraggedId(id)
-    // Set drag image or effect if needed
-    e.dataTransfer.effectAllowed = "move"
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }
-
-  const handleDrop = (e: React.DragEvent, status: ProjectStatus) => {
-    e.preventDefault()
-    const id = e.dataTransfer.getData("text/plain")
-    if (id && id !== draggedId) {
-      // Prevent dropping on itself if logic allows, but here we just check id
-    }
-    if (id) {
-      onStatusChange(id, status)
-    }
-    setDraggedId(null)
+  const handleEditClick = (project: Project) => {
+    blendy.toggle(`project-${project.id}`)
+    onEdit(project)
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-3" ref={containerRef}>
       {columns.map((column) => {
         const columnProjects = projects.filter((p) => p.status === column.status)
 
@@ -75,8 +84,6 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
           <div
             key={column.status}
             className="flex flex-col gap-4"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, column.status)}
           >
             <div className={cn("glass-header border-none bg-white/[0.03] rounded-2xl mb-2", column.color)}>
               <div className="flex items-center justify-between px-3">
@@ -86,22 +93,24 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
             </div>
 
             <div
-              className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""}`}
+              className="space-y-3 min-h-[200px] rounded-lg transition-colors"
             >
-              {columnProjects.map((project) => {
+              {columnProjects.map((project, index) => {
                 const nextStatus = getNextStatus(project.status)
                 const daysRemaining = getDaysRemaining(project.dueDate)
                 const isOverdue = daysRemaining < 0 && project.status !== "completed"
                 const completedSubtasks = project.subtasks.filter((st) => st.completed).length
 
                 return (
-                  <TiltCard
-                    key={project.id}
-                    className={`transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-grab active:cursor-grabbing hover-glow-border ${draggedId === project.id ? "opacity-30" : ""}`}
-                    draggable
-                    onDragStart={(e: any) => handleDragStart(e, project.id)}
-                  >
-                    <Card className="h-full border-white/5 transition-all duration-500 hover:border-white/10">
+                  <div key={project.id} data-swapy-slot={`${column.status}-${index}`} className="w-full">
+                    <div data-swapy-item={project.id} className="w-full">
+                      <TiltCard
+                        className="transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover-glow-border"
+                      >
+                        <Card 
+                          data-blendy-from={`project-${project.id}`}
+                          className="h-full border-white/5 transition-all duration-500 hover:border-white/10"
+                        >
                       <CardHeader className="pb-4">
                         <div className="flex items-start justify-between gap-3">
                           <CardTitle className="text-[15px] font-semibold leading-snug tracking-tight line-clamp-2 opacity-90">{project.title}</CardTitle>
@@ -187,26 +196,27 @@ export function KanbanBoard({ projects, onEdit, onDelete, onStatusChange }: Kanb
                               <ChevronRight className="h-3 w-3 ml-1" />
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => onEdit(project)}>
+                          <Button variant="outline" size="sm" onClick={() => handleEditClick(project)}>
                             <Edit className="h-3 w-3" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => onDelete(project.id)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
+                          <Button variant="outline" size="sm" data-swapy-handle className="cursor-grab active:cursor-grabbing">
+                            <GripVertical className="h-3 w-3 opacity-60" />
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
                   </TiltCard>
-                )
+                </div>
+              </div>
+            )
               })}
 
-              {columnProjects.length === 0 && (
-                <Card className="border-dashed">
-                  <CardContent className="py-12">
-                    <p className="text-center text-sm text-muted-foreground">No projects yet</p>
-                  </CardContent>
-                </Card>
-              )}
+              <div data-swapy-slot={`${column.status}-empty`} className="h-10 w-full flex items-center justify-center border border-dashed border-white/[0.04] rounded-2xl text-[10px] text-white/20 hover:text-white/40 hover:border-white/10 hover:bg-white/[0.01] transition-all duration-300">
+                Drop here
+              </div>
             </div>
           </div>
         )

@@ -20,6 +20,7 @@ import type { Project, ProjectStatus, Subtask } from "@/types/project"
 import { Badge } from "@/components/ui/badge"
 import { X, Plus, Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { blendy } from "@/lib/blendy"
 
 interface ProjectDialogProps {
   open: boolean
@@ -33,6 +34,21 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<ProjectStatus>("not-started")
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
+
+  const blendyKey = project ? `project-${project.id}` : 'btn-new-project'
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        blendy.update()
+        blendy.toggle(blendyKey)
+      }, 30)
+    }
+  }, [open, blendyKey])
+
+  const handleClose = () => {
+    blendy.untoggle(blendyKey, onClose)
+  }
   const [startDate, setStartDate] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [progress, setProgress] = useState(0)
@@ -117,8 +133,8 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent data-blendy-to={blendyKey} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{project ? "Edit Project" : "Create New Project"}</DialogTitle>
@@ -296,7 +312,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button type="submit">{project ? "Update" : "Create"} Project</Button>

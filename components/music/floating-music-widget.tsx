@@ -26,7 +26,6 @@ interface Particle {
 
 const FloatingMusicWidgetComponent = () => {
   const pathname = usePathname();
-  const isMusicPage = pathname.startsWith('/music');
 
   const {
     currentTrack,
@@ -41,6 +40,7 @@ const FloatingMusicWidgetComponent = () => {
     isReady
   } = usePlayerStore();
 
+  // ── All hooks must be declared before any conditional return ──────────────
   // Reward triggers
   const [isRewarding, setIsRewarding] = useState(false);
   const [rewardParticles, setRewardParticles] = useState<Particle[]>([]);
@@ -72,6 +72,9 @@ const FloatingMusicWidgetComponent = () => {
     window.addEventListener('habit-completed', handleHabitCompleted);
     return () => window.removeEventListener('habit-completed', handleHabitCompleted);
   }, []);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const isMusicPage = pathname.startsWith('/music');
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -159,7 +162,13 @@ const FloatingMusicWidgetComponent = () => {
     );
   }
 
-  // Render only reward particles when not on `/music` (or minimized) to avoid overlapping ContextHub
+  // Render only reward particles when not on `/music` (or minimized)
+  // Particles originate from center of the viewport right-edge (where the widget lives)
+  const particleOrigin = {
+    left: `clamp(60px, calc(100vw - 80px), 100vw)`,
+    top: `clamp(80px, calc(50vh - 40px), calc(100vh - 80px))`
+  }
+
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
       <AnimatePresence>
@@ -176,10 +185,7 @@ const FloatingMusicWidgetComponent = () => {
               mass: 0.45
             }}
             className="absolute w-3.5 h-3.5 rounded-[4px] bg-gradient-to-tr from-yellow-300 via-pink-400 to-indigo-500 border border-white/60 backdrop-blur-md shadow-[0_0_12px_rgba(236,72,153,0.5)]"
-            style={{
-              left: `calc(100vw - 120px)`,
-              top: `50vh`
-            }}
+            style={particleOrigin}
           />
         ))}
       </AnimatePresence>

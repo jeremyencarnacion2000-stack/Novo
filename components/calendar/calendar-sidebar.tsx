@@ -1,6 +1,6 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { MiniCalendar } from "@/components/calendar/mini-calendar"
 import { Plus } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -32,14 +32,10 @@ export function CalendarSidebar({
             </Button>
 
             {/* Mini Calendar */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 p-4 shadow-sm">
-                <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={onDateChange}
-                    className="p-3"
-                />
-            </div>
+            <MiniCalendar
+                selected={date}
+                onSelect={(d) => onDateChange(d)}
+            />
 
             {/* My Calendars Filters */}
             <div className="space-y-4 px-2">

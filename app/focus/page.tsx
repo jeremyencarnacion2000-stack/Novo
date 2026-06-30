@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import { Play, Pause, Square, SkipForward, Plus, CheckCircle2, Circle } from 'lucide-react';
 import { useFocus } from '@/lib/focus-context';
 import { FocusSettings } from '@/components/focus/focus-settings';
@@ -71,13 +72,24 @@ export default function FocusPage() {
                 {/* Main Timer Column */}
                 <div className="lg:col-span-2 space-y-6">
                     <div
-                        className="relative overflow-hidden rounded-3xl border border-white/[0.07] p-8"
+                        className="relative rounded-3xl border border-white/[0.07] p-8"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
-                            backdropFilter: 'blur(12px)',
                             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}
                     >
+                        <GlassSurface
+                            radius={24}
+                            depth={12}
+                            blur={1}
+                            strength={50}
+                            chromaticAberration={8}
+                            backgroundColor="transparent"
+                            elevation="low"
+                            aria-hidden
+                            className="pointer-events-none"
+                            style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
+                        />
                         {/* Grain noise overlay */}
                         <div 
                             className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"

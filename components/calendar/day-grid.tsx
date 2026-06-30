@@ -25,7 +25,9 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
   }, []);
 
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
-  const dayEvents = events.filter((e) => isSameDay(e.start, currentDate) && !e.allDay);
+  const allEvents = events.filter((e) => isSameDay(e.start, currentDate));
+  const allDayEvents = allEvents.filter((e) => e.allDay);
+  const dayEvents = allEvents.filter((e) => !e.allDay);
 
   const getEventStyle = (ev: CalendarEvent) => {
     const startH = ev.start.getHours() + ev.start.getMinutes() / 60;
@@ -36,14 +38,37 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div
+      className="flex flex-col h-full overflow-hidden"
+      style={{ viewTransitionName: `cal-day-${format(currentDate, 'yyyy-MM-dd')}` } as React.CSSProperties}
+    >
       {/* Day header */}
       <div className="shrink-0 pb-3 border-b border-white/5 mb-1">
         <h3 className="text-lg font-bold text-foreground">
           {format(currentDate, 'EEEE, MMMM d')}
         </h3>
-        <p className="text-xs text-muted-foreground">{dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''} today</p>
+        <p className="text-xs text-muted-foreground">{allEvents.length} event{allEvents.length !== 1 ? 's' : ''} today</p>
       </div>
+
+      {/* All-day events banner */}
+      {allDayEvents.length > 0 && (
+        <div className="shrink-0 flex flex-wrap gap-2 pb-3 mb-1 border-b border-white/5">
+          {allDayEvents.map((ev) => (
+            <button
+              key={ev.id}
+              onClick={() => onSelectEvent(ev)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold truncate max-w-[200px] transition-opacity hover:opacity-80"
+              style={{
+                backgroundColor: `${ev.color}22`,
+                borderLeft: `3px solid ${ev.color}`,
+                color: ev.color,
+              }}
+            >
+              {ev.title}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Scrollable grid */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">

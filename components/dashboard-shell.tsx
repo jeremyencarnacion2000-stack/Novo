@@ -36,6 +36,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
 
   useEffect(() => {
     DataIntegrator.initialize()
+    return () => DataIntegrator.destroy()
   }, [])
 
   // Close voice panel when navigating to full-screen routes
@@ -80,7 +81,6 @@ function DashboardShellInner({ children }: DashboardShellProps) {
               ) : (
                 <div
                   className={cn(
-                    'container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-24 md:pb-8 flex-1 w-full',
                     settings.compactMode && 'dashboard-shell'
                   )}
                 >

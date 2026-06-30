@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { Task } from "@/types/project"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +18,8 @@ import { NovoSkeleton } from "@/components/ui/NovoSkeleton"
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState"
 import { AnimatePresence, motion } from "framer-motion"
 import { eventBus } from "@/lib/events/event-bus"
+import { createSwapy } from "swapy"
+import { blendy } from "@/lib/blendy"
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
   { status: "todo", title: "Not Started", color: "text-muted-foreground" },
@@ -33,8 +33,41 @@ export function TasksView() {
   const [search, setSearch] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>()
-  const [draggedId, setDraggedId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const swapyRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    swapyRef.current = createSwapy(containerRef.current, {
+      manualSwap: true,
+      animation: "dynamic"
+    })
+
+    swapyRef.current.onSwapEnd(({ data }: any) => {
+      Object.entries(data.object).forEach(([slotId, itemId]) => {
+        if (itemId) {
+          const status = slotId.split("-").slice(0, -1).join("-") as Task["status"]
+          const t = tasks.find(taskItem => taskItem.id === itemId)
+          if (t && t.status !== status) {
+            handleStatusChange(itemId, status)
+          }
+        }
+      })
+    })
+
+    return () => {
+      swapyRef.current?.destroy()
+    }
+  }, [tasks])
+
+  const handleEditClick = (task: Task) => {
+    blendy.toggle(`task-${task.id}`)
+    setEditingTask(task)
+    setDialogOpen(true)
+  }
 
   const loadTasks = async () => {
     if (!session?.user?.id) return
@@ -166,25 +199,7 @@ export function TasksView() {
     return null
   }
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData("text/plain", id)
-    setDraggedId(id)
-    e.dataTransfer.effectAllowed = "move"
-  }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }
-
-  const handleDrop = (e: React.DragEvent, status: Task["status"]) => {
-    e.preventDefault()
-    const id = e.dataTransfer.getData("text/plain")
-    if (id) {
-      handleStatusChange(id, status)
-    }
-    setDraggedId(null)
-  }
 
   const filteredTasks = tasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
 
@@ -220,13 +235,13 @@ export function TasksView() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+        <Button onClick={() => setDialogOpen(true)} data-blendy-from="btn-new-task" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           New Task
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3" ref={containerRef}>
         {columns.map((column) => {
           const columnTasks = filteredTasks.filter((t) => t.status === column.status)
 
@@ -234,8 +249,6 @@ export function TasksView() {
             <div
               key={column.status}
               className="flex flex-col gap-4"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.status)}
             >
               <div className={cn("glass-header border-none bg-white/[0.03] rounded-2xl mb-2", column.color)}>
                 <div className="flex items-center justify-between px-3">
@@ -245,8 +258,7 @@ export function TasksView() {
               </div>
 
               <div
-                className={`space-y-3 min-h-[260px] relative rounded-lg transition-colors ${draggedId ? "bg-secondary/10 border-2 border-dashed border-secondary/20" : ""
-                  }`}
+                className="space-y-3 min-h-[260px] relative rounded-lg transition-colors"
               >
                 <AnimatePresence mode="wait">
                   {isLoading ? (
@@ -268,7 +280,7 @@ export function TasksView() {
                       exit={{ opacity: 0 }}
                       className="space-y-3"
                     >
-                      {columnTasks.map((task) => {
+                      {columnTasks.map((task, index) => {
                         const nextStatus = getNextStatus(task.status)
                         const isOverdue =
                           task.dueDate &&
@@ -277,14 +289,12 @@ export function TasksView() {
                           !isToday(parseISO(task.dueDate))
 
                         return (
-                          <TiltCard
-                            key={task.id}
-                            className={`transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-grab active:cursor-grabbing ${draggedId === task.id ? "opacity-30" : ""
-                              }`}
-                            draggable
-                            onDragStart={(e: any) => handleDragStart(e, task.id)}
-                          >
-                            <Card className="h-full border-white/5 transition-all duration-500 hover:border-white/10">
+                          <div key={task.id} data-swapy-slot={`${column.status}-${index}`} className="w-full">
+                            <div data-swapy-item={task.id} className="w-full">
+                              <TiltCard
+                                className="transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover-glow-border"
+                              >
+                                <Card data-blendy-from={`task-${task.id}`} className="h-full border-white/5 transition-all duration-500 hover:border-white/10">
                               <CardContent className="p-5 space-y-4">
                                 <div className="flex items-start justify-between gap-3">
                                   <span
@@ -350,10 +360,7 @@ export function TasksView() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
-                                    onClick={() => {
-                                      setEditingTask(task)
-                                      setDialogOpen(true)
-                                    }}
+                                    onClick={() => handleEditClick(task)}
                                   >
                                     <Edit2 className="h-3 w-3" />
                                   </Button>
@@ -361,9 +368,11 @@ export function TasksView() {
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          </TiltCard>
+                                </CardContent>
+                              </Card>
+                            </TiltCard>
+                          </div>
+                        </div>
                         )
                       })}
                     </motion.div>
@@ -392,6 +401,7 @@ export function TasksView() {
         onSave={editingTask ? handleUpdate : handleCreate}
         task={editingTask}
       />
+
     </div>
   )
 }
