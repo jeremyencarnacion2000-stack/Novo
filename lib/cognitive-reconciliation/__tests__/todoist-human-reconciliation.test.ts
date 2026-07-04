@@ -363,6 +363,20 @@ describe('Todoist human external-completion vertical slice', () => {
     expect(store.inFlightRunId).toBeNull()
   })
 
+  it('keeps the cursor when the provider rejects a malformed Todoist response', async () => {
+    const store = seededStore()
+    const originalCursor = store.connection!.cursor
+    const pullSelectedProjects = jest.fn(async () => {
+      throw new Error('todoist_response_invalid')
+    })
+    const sync = createTodoistHumanReconciliationService({ store, pullSelectedProjects })
+
+    await expect(sync({ userId: 'user-1' })).rejects.toThrow('todoist_response_invalid')
+
+    expect(store.connection!.cursor).toBe(originalCursor)
+    expect(store.inFlightRunId).toBeNull()
+  })
+
   it('never infers completion from absence in an active-task snapshot', async () => {
     const store = seededStore()
     const sync = service(store, [pull({ activeTasks: [], completions: [] })])

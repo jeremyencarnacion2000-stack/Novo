@@ -57,18 +57,18 @@ export async function pullTodoistSelectedProjects({
     if (!response.ok) throw new Error('todoist_active_pull_failed')
     const rows = jsonArray(await response.json())
     if (rows.length >= PAGE_LIMIT) throw new Error('todoist_active_window_truncated')
-    return rows.flatMap((row): TodoistImportedTask[] => {
-      if (typeof row !== 'object' || row === null) return []
+    return rows.map((row): TodoistImportedTask => {
+      if (typeof row !== 'object' || row === null) throw new Error('todoist_response_invalid')
       const value = row as Record<string, unknown>
       const id = providerId(value.id)
-      if (!id || typeof value.content !== 'string') return []
-      return [{
+      if (!id || typeof value.content !== 'string') throw new Error('todoist_response_invalid')
+      return {
         id,
         projectId,
         text: value.content,
         priority: priority(value.priority),
         dueDate: dueDate(value.due),
-      }]
+      }
     })
   }))
 
@@ -89,11 +89,13 @@ export async function pullTodoistSelectedProjects({
     return events.flatMap((event) => {
       if (typeof event !== 'object' || event === null) return []
       const value = event as Record<string, unknown>
+      if (value.object_type !== 'item' || value.event_type !== 'completed') return []
       const eventId = providerId(value.id)
       const taskId = providerId(value.object_id)
       const occurredAt = typeof value.event_date === 'string' ? new Date(value.event_date) : new Date(Number.NaN)
-      if (value.object_type !== 'item' || value.event_type !== 'completed' || !eventId || !taskId
-        || !Number.isFinite(occurredAt.getTime())) return []
+      if (!eventId || !taskId || !Number.isFinite(occurredAt.getTime())) {
+        throw new Error('todoist_response_invalid')
+      }
       return [{ eventId, taskId, projectId, occurredAt }]
     })
   }))).flat() : []

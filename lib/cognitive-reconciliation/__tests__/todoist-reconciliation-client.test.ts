@@ -62,6 +62,36 @@ describe('Todoist selected-project reconciliation client', () => {
     })).rejects.toThrow('todoist_completion_window_truncated')
   })
 
+  it('rejects a malformed selected-project task row instead of advancing past it', async () => {
+    const fetchImpl = jest.fn(async () => response([{ id: 'task-1' }]))
+
+    await expect(pullTodoistSelectedProjects({
+      accessToken: 'token', projectIds: ['project-1'], cursor: null,
+      fetchImpl: fetchImpl as typeof fetch,
+    })).rejects.toThrow('todoist_response_invalid')
+  })
+
+  it.each([
+    {
+      events: [{ object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: '2026-08-11T12:00:00.000Z' }],
+    },
+    {
+      events: [{ id: 'event-1', object_type: 'item', event_type: 'completed', event_date: '2026-08-11T12:00:00.000Z' }],
+    },
+    {
+      events: [{ id: 'event-1', object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: 'not-a-date' }],
+    },
+  ])('rejects a malformed completion-capable event row', async ({ events }) => {
+    const fetchImpl = jest.fn(async (input: string | URL | Request) => (
+      String(input).includes('/rest/v2/tasks') ? response([]) : response({ events })
+    ))
+
+    await expect(pullTodoistSelectedProjects({
+      accessToken: 'token', projectIds: ['project-1'], cursor: '2026-08-11T11:00:00.000Z',
+      fetchImpl: fetchImpl as typeof fetch,
+    })).rejects.toThrow('todoist_response_invalid')
+  })
+
   it('rejects an unbounded or malformed selected scope before fetch', async () => {
     const fetchImpl = jest.fn()
     await expect(pullTodoistSelectedProjects({
