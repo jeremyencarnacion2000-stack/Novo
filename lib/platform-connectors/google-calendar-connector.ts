@@ -12,6 +12,13 @@ const DEFAULT_PEAK_START = '09:00';
 const DEFAULT_PEAK_END = '11:00';
 
 export const googleCalendarConnector: PlatformConnector = {
+  // ponytail: calendarService.listEvents() resolves its Google token from the
+  // ambient server session (getGoogleAuthClient -> getServerSession), not
+  // from the `userId` param below — only `userId`'s twin/peak-window lookup
+  // actually honors it. Safe today (every real caller runs inside that
+  // user's own request), but wrong for any future non-request caller (a
+  // cron job, a caller acting on another user). Fix when that caller shows
+  // up: thread a real per-user token through calendarService instead.
   async fetchSignals(userId: string): Promise<PlatformSignal[]> {
     try {
       const now = new Date();
