@@ -15,6 +15,13 @@ interface TaskLite {
   dueDate: string | null
 }
 
+interface DecisionEntry {
+  id: string
+  changeType: string
+  description: string
+  createdAt: string
+}
+
 const PHASE_COPY: Record<string, string> = {
   PEAK_FOCUS: 'Tu ventana de máximo enfoque está abierta.',
   LINEAR_EXECUTION: 'Buen momento para ejecutar con constancia.',
@@ -29,22 +36,32 @@ const FRICTION_TIP: Record<string, string> = {
   lack_of_structure: 'Bloquea 25 minutos ahora mismo, sin más planeación.',
 }
 
+function isToday(iso: string): boolean {
+  const d = new Date(iso)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
 // The single decision that replaces the old cold-start card, which fabricated
 // clinical-sounding claims ("Impaired Sleep Debt Detected") for brand-new
-// accounts with zero real signal. This pulls only things that are actually
-// true: a real pending task if one exists, or — if not — the user's own
-// onboarding answers (chronotype, peak window, stated friction point),
-// framed honestly as "según lo que nos dijiste", never as a "detected" pattern.
+// accounts with zero real signal. Priority order: an overdue or high-priority
+// task wins (most concrete and actionable); otherwise a real calendar signal
+// logged today (e.g. meeting overload) takes over; otherwise the user's own
+// onboarding answers, framed honestly as "según nos dijiste" — never a
+// "detected" pattern.
 export function NowHero() {
   const { twin } = useCognitiveTwin()
   const phase = useCognitivePhase()
   const [task, setTask] = useState<TaskLite | null>(null)
+  const [calendarSignal, setCalendarSignal] = useState<DecisionEntry | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/tasks?status=todo')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((tasks: TaskLite[]) => {
+    Promise.all([
+      fetch('/api/tasks?status=todo').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/cognitive/decisions').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([tasks, decisions]: [TaskLite[], DecisionEntry[]]) => {
         const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
         const now = Date.now()
         const sorted = [...tasks].sort((a, b) => {
@@ -53,7 +70,16 @@ export function NowHero() {
           if (overdueA !== overdueB) return overdueA - overdueB
           return (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)
         })
-        setTask(sorted[0] ?? null)
+        const topTask = sorted[0] ?? null
+        setTask(topTask)
+
+        const isUrgentTask = !!topTask && (
+          (!!topTask.dueDate && new Date(topTask.dueDate).getTime() < now) || topTask.priority === 'high'
+        )
+        if (!isUrgentTask) {
+          const todaysCalendarSignal = decisions.find((d) => d.changeType.startsWith('calendar_') && isToday(d.createdAt))
+          setCalendarSignal(todaysCalendarSignal ?? null)
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -69,9 +95,12 @@ export function NowHero() {
     return <div className="h-48 rounded-[28px] bg-foreground/[0.03] animate-pulse" />
   }
 
+  const showCalendarSignal = !task && !!calendarSignal
+  const linkHref = task ? '/checklist' : showCalendarSignal ? '/calendar' : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
-      <Link href={task ? '/checklist' : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'} className="block group">
+      <Link href={linkHref} className="block group">
         <div className="relative rounded-[28px] p-8 md:p-10 border border-primary/25 bg-gradient-to-br from-primary/[0.10] via-primary/[0.03] to-transparent overflow-hidden transition-all duration-300 hover:border-primary/40">
           <div
             className="absolute -top-10 -right-10 w-56 h-56 rounded-full opacity-20 blur-3xl pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
@@ -86,6 +115,13 @@ export function NowHero() {
                 {phaseCopy}
                 {isOverdue && <span className="text-red-400 font-medium"> · vencida</span>}
               </p>
+            </>
+          ) : showCalendarSignal ? (
+            <>
+              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
+                {calendarSignal!.description}
+              </h2>
+              <p className="relative text-sm md:text-base text-foreground/60">{phaseCopy}</p>
             </>
           ) : twin.energyCurve.chronotype ? (
             <>
@@ -109,7 +145,7 @@ export function NowHero() {
           )}
 
           <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-            {task ? 'Ir a la tarea' : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+            {task ? 'Ir a la tarea' : showCalendarSignal ? 'Ver calendario' : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </div>
       </Link>
