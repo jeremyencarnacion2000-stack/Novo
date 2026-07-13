@@ -2,6 +2,7 @@
 
 import { prisma } from './prisma';
 import { startOfDay, endOfDay, addDays, setHours, setMinutes } from 'date-fns';
+import { calendarService } from './google';
 
 export interface CalendarEvent {
     id: string;
@@ -160,10 +161,29 @@ export class CalendarAggregator {
         start: Date,
         end: Date
     ): Promise<CalendarEvent[]> {
-        // TODO: Implement Google Calendar API integration
-        // For now, return empty array
-        // This will be populated when Google Calendar is properly integrated
-        return [];
+        try {
+            const events = await calendarService.listEvents(start.toISOString(), 50, end.toISOString());
+            return events
+                .filter((e: any) => e.start?.dateTime || e.start?.date)
+                .map((e: any) => {
+                    const isAllDay = !e.start?.dateTime;
+                    return {
+                        id: `google:event:${e.id}`,
+                        title: e.summary || '(Sin título)',
+                        start: new Date(e.start.dateTime || e.start.date),
+                        end: new Date(e.end.dateTime || e.end.date),
+                        allDay: isAllDay,
+                        source: 'google' as const,
+                        color: SOURCE_COLORS.google,
+                        metadata: {
+                            description: e.description || undefined,
+                        },
+                    };
+                });
+        } catch {
+            // Not connected via Google, or the token/API call failed — no Google events this run.
+            return [];
+        }
     }
 
     /**
