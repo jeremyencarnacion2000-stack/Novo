@@ -43,8 +43,9 @@ describe('googleCalendarConnector', () => {
   });
 
   it('falls back to default peak window when the twin has none set', async () => {
+    const today = new Date().toISOString().slice(0, 10);
     (calendarService.listEvents as jest.Mock).mockResolvedValue([
-      { start: { dateTime: '2026-07-13T09:00:00' }, end: { dateTime: '2026-07-13T09:30:00' } },
+      { start: { dateTime: `${today}T09:00:00` }, end: { dateTime: `${today}T09:30:00` } },
     ]);
     (prisma.cognitiveTwinRecord.findUnique as jest.Mock).mockResolvedValue({ id: 'twin-1', energyCurve: {} });
 
