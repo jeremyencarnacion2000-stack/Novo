@@ -17,10 +17,17 @@ describe('googleCalendarConnector', () => {
   });
 
   it('returns signals derived from real calendar events and the twin peak window', async () => {
+    const event1Start = new Date(); event1Start.setHours(9, 0, 0, 0);
+    const event1End = new Date(); event1End.setHours(9, 30, 0, 0);
+    const event2Start = new Date(); event2Start.setHours(9, 35, 0, 0);
+    const event2End = new Date(); event2End.setHours(10, 0, 0, 0);
+    const event3Start = new Date(); event3Start.setHours(10, 5, 0, 0);
+    const event3End = new Date(); event3End.setHours(10, 30, 0, 0);
+
     (calendarService.listEvents as jest.Mock).mockResolvedValue([
-      { start: { dateTime: '2026-07-13T09:00:00' }, end: { dateTime: '2026-07-13T09:30:00' } },
-      { start: { dateTime: '2026-07-13T09:35:00' }, end: { dateTime: '2026-07-13T10:00:00' } },
-      { start: { dateTime: '2026-07-13T10:05:00' }, end: { dateTime: '2026-07-13T10:30:00' } },
+      { start: { dateTime: event1Start.toISOString() }, end: { dateTime: event1End.toISOString() } },
+      { start: { dateTime: event2Start.toISOString() }, end: { dateTime: event2End.toISOString() } },
+      { start: { dateTime: event3Start.toISOString() }, end: { dateTime: event3End.toISOString() } },
     ]);
     (prisma.cognitiveTwinRecord.findUnique as jest.Mock).mockResolvedValue({
       id: 'twin-1',
@@ -43,9 +50,10 @@ describe('googleCalendarConnector', () => {
   });
 
   it('falls back to default peak window when the twin has none set', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const peakMoment = new Date(); peakMoment.setHours(9, 0, 0, 0);
+    const peakMomentEnd = new Date(); peakMomentEnd.setHours(9, 30, 0, 0);
     (calendarService.listEvents as jest.Mock).mockResolvedValue([
-      { start: { dateTime: `${today}T09:00:00` }, end: { dateTime: `${today}T09:30:00` } },
+      { start: { dateTime: peakMoment.toISOString() }, end: { dateTime: peakMomentEnd.toISOString() } },
     ]);
     (prisma.cognitiveTwinRecord.findUnique as jest.Mock).mockResolvedValue({ id: 'twin-1', energyCurve: {} });
 
