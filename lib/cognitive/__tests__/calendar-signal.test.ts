@@ -38,3 +38,68 @@ describe('computeCalendarSignal', () => {
     expect(result.largestFreeGapMinutes).toBe(750);
   });
 });
+
+import { evaluateCalendarThresholds } from '../calendar-signal';
+
+describe('evaluateCalendarThresholds', () => {
+  const now = new Date('2026-07-13T12:00:00');
+
+  it('returns no signals when not connected', () => {
+    const signal = { connected: false, meetingCount: 0, meetingMinutesToday: 0, largestFreeGapMinutes: null };
+    const result = evaluateCalendarThresholds([], signal, '09:00', '11:00', now);
+    expect(result).toEqual([]);
+  });
+
+  it('flags meeting overload for 3+ consecutive events with <10 min gaps', () => {
+    const events = [
+      { start: { dateTime: '2026-07-13T09:00:00' }, end: { dateTime: '2026-07-13T09:30:00' } },
+      { start: { dateTime: '2026-07-13T09:35:00' }, end: { dateTime: '2026-07-13T10:00:00' } },
+      { start: { dateTime: '2026-07-13T10:05:00' }, end: { dateTime: '2026-07-13T10:30:00' } },
+    ];
+    const signal = { connected: true, meetingCount: 3, meetingMinutesToday: 85, largestFreeGapMinutes: 600 };
+    const result = evaluateCalendarThresholds(events, signal, '14:00', '16:00', now);
+    expect(result.find(s => s.type === 'calendar_meeting_overload')).toBeDefined();
+    expect(result.find(s => s.type === 'calendar_meeting_overload')?.headline).toContain('3');
+  });
+
+  it('does not flag meeting overload when gaps are >= 10 min', () => {
+    const events = [
+      { start: { dateTime: '2026-07-13T09:00:00' }, end: { dateTime: '2026-07-13T09:30:00' } },
+      { start: { dateTime: '2026-07-13T09:45:00' }, end: { dateTime: '2026-07-13T10:15:00' } },
+      { start: { dateTime: '2026-07-13T10:30:00' }, end: { dateTime: '2026-07-13T11:00:00' } },
+    ];
+    const signal = { connected: true, meetingCount: 3, meetingMinutesToday: 90, largestFreeGapMinutes: 600 };
+    const result = evaluateCalendarThresholds(events, signal, '14:00', '16:00', now);
+    expect(result.find(s => s.type === 'calendar_meeting_overload')).toBeUndefined();
+  });
+
+  it('flags no real focus window when largest free gap is under 30 minutes', () => {
+    const signal = { connected: true, meetingCount: 1, meetingMinutesToday: 800, largestFreeGapMinutes: 25 };
+    const result = evaluateCalendarThresholds([], signal, '09:00', '11:00', now);
+    expect(result.find(s => s.type === 'calendar_no_focus_window')).toBeDefined();
+  });
+
+  it('does not flag no-focus-window when the largest gap is 30 minutes or more', () => {
+    const signal = { connected: true, meetingCount: 1, meetingMinutesToday: 60, largestFreeGapMinutes: 30 };
+    const result = evaluateCalendarThresholds([], signal, '09:00', '11:00', now);
+    expect(result.find(s => s.type === 'calendar_no_focus_window')).toBeUndefined();
+  });
+
+  it('flags a peak-window conflict when an event overlaps the declared peak window', () => {
+    const events = [
+      { start: { dateTime: '2026-07-13T09:30:00' }, end: { dateTime: '2026-07-13T10:00:00' } },
+    ];
+    const signal = { connected: true, meetingCount: 1, meetingMinutesToday: 30, largestFreeGapMinutes: 600 };
+    const result = evaluateCalendarThresholds(events, signal, '09:00', '11:00', now);
+    expect(result.find(s => s.type === 'calendar_peak_conflict')).toBeDefined();
+  });
+
+  it('does not flag a peak-window conflict when no event overlaps it', () => {
+    const events = [
+      { start: { dateTime: '2026-07-13T13:00:00' }, end: { dateTime: '2026-07-13T13:30:00' } },
+    ];
+    const signal = { connected: true, meetingCount: 1, meetingMinutesToday: 30, largestFreeGapMinutes: 600 };
+    const result = evaluateCalendarThresholds(events, signal, '09:00', '11:00', now);
+    expect(result.find(s => s.type === 'calendar_peak_conflict')).toBeUndefined();
+  });
+});

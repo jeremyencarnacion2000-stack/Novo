@@ -3,6 +3,8 @@
 // engine's report generation and the PlatformConnector layer (see
 // lib/platform-connectors/) can share one implementation instead of two.
 
+import type { PlatformSignal } from '@/lib/platform-connectors/types';
+
 export interface CalendarSignal {
   connected: boolean;
   meetingCount: number;
@@ -48,4 +50,68 @@ export function computeCalendarSignal(
     meetingMinutesToday,
     largestFreeGapMinutes: Math.round(largestGapMs / 60000),
   };
+}
+
+export function evaluateCalendarThresholds(
+  events: { start?: { dateTime?: string | null } | null; end?: { dateTime?: string | null } | null }[],
+  signal: CalendarSignal,
+  peakStart: string,
+  peakEnd: string,
+  now: Date
+): PlatformSignal[] {
+  const results: PlatformSignal[] = [];
+  if (!signal.connected) return results;
+
+  const busy = events
+    .filter(e => e.start?.dateTime && e.end?.dateTime)
+    .map(e => ({ start: new Date(e.start!.dateTime!), end: new Date(e.end!.dateTime!) }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  // Meeting overload: a run of 3+ consecutive events where every gap < 10 min.
+  let runLength = busy.length > 0 ? 1 : 0;
+  let maxRun = runLength;
+  for (let i = 1; i < busy.length; i++) {
+    const gapMinutes = (busy[i].start.getTime() - busy[i - 1].end.getTime()) / 60000;
+    if (gapMinutes < 10) {
+      runLength += 1;
+      maxRun = Math.max(maxRun, runLength);
+    } else {
+      runLength = 1;
+    }
+  }
+  if (maxRun >= 3) {
+    results.push({
+      type: 'calendar_meeting_overload',
+      headline: `${maxRun} reuniones seguidas sin respiro hoy`,
+      detail: 'Considera un buffer de 10 minutos entre reuniones para no llegar agotado a la siguiente.',
+      severity: 'warning',
+    });
+  }
+
+  // No real focus window: largest free gap under 30 minutes.
+  if (signal.largestFreeGapMinutes !== null && signal.largestFreeGapMinutes < 30) {
+    results.push({
+      type: 'calendar_no_focus_window',
+      headline: `Hoy tu hueco más grande es de ${signal.largestFreeGapMinutes} min`,
+      detail: 'No hay espacio real para trabajo profundo hoy — considera mover algo de baja prioridad.',
+      severity: 'warning',
+    });
+  }
+
+  // Peak-window conflict: any event overlaps the user's declared peak focus window.
+  const [peakStartH, peakStartM] = peakStart.split(':').map(Number);
+  const [peakEndH, peakEndM] = peakEnd.split(':').map(Number);
+  const peakStartDate = new Date(now); peakStartDate.setHours(peakStartH, peakStartM || 0, 0, 0);
+  const peakEndDate = new Date(now); peakEndDate.setHours(peakEndH, peakEndM || 0, 0, 0);
+  const conflict = busy.find(e => e.start < peakEndDate && e.end > peakStartDate);
+  if (conflict) {
+    results.push({
+      type: 'calendar_peak_conflict',
+      headline: `Una reunión cae dentro de tu ventana pico (${peakStart}–${peakEnd})`,
+      detail: 'Vale la pena revisar si esa hora es realmente necesaria para la reunión.',
+      severity: 'info',
+    });
+  }
+
+  return results;
 }
