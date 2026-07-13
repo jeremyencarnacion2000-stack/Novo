@@ -86,7 +86,9 @@ export function NowHero() {
   }, [])
 
   const phaseCopy = PHASE_COPY[phase] ?? PHASE_COPY.LINEAR_EXECUTION
-  const isOverdue = !!task?.dueDate && new Date(task.dueDate).getTime() < Date.now()
+  const now = Date.now()
+  const isUrgentTask = !!task && ((!!task.dueDate && new Date(task.dueDate).getTime() < now) || task.priority === 'high')
+  const isOverdue = !!task?.dueDate && new Date(task.dueDate).getTime() < now
   const frictionTip = twin.bottlenecks.mainFrictionPoint
     ? FRICTION_TIP[twin.bottlenecks.mainFrictionPoint]
     : null
@@ -95,8 +97,11 @@ export function NowHero() {
     return <div className="h-48 rounded-[28px] bg-foreground/[0.03] animate-pulse" />
   }
 
-  const showCalendarSignal = !task && !!calendarSignal
-  const linkHref = task ? '/checklist' : showCalendarSignal ? '/calendar' : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
+  // A calendar signal only preempts a task when that task isn't urgent — a non-urgent
+  // task with no competing signal still beats onboarding/generic fallback copy.
+  const showCalendarSignal = !isUrgentTask && !!calendarSignal
+  const showTask = !!task && !showCalendarSignal
+  const linkHref = showTask ? '/checklist' : showCalendarSignal ? '/calendar' : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
@@ -108,9 +113,9 @@ export function NowHero() {
           />
           <p className="relative text-[11px] font-black tracking-[0.25em] uppercase text-primary/70 mb-3">Ahora →</p>
 
-          {task ? (
+          {showTask ? (
             <>
-              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{task.title}</h2>
+              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{task!.title}</h2>
               <p className="relative text-sm md:text-base text-foreground/60">
                 {phaseCopy}
                 {isOverdue && <span className="text-red-400 font-medium"> · vencida</span>}
@@ -145,7 +150,7 @@ export function NowHero() {
           )}
 
           <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-            {task ? 'Ir a la tarea' : showCalendarSignal ? 'Ver calendario' : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+            {showTask ? 'Ir a la tarea' : showCalendarSignal ? 'Ver calendario' : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </div>
       </Link>
