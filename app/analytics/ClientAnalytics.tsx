@@ -131,16 +131,16 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
     >
       <motion.div variants={cardVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/40">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/40">
             Analytics & Insights
           </h1>
           <p className="text-muted-foreground mt-2 text-base md:text-lg font-medium">
             Track your productivity patterns and usage insights
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2">
+        <div className="flex items-center gap-2 bg-foreground/5 backdrop-blur-md border border-foreground/10 rounded-2xl px-4 py-2">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold uppercase tracking-widest text-white/60">Live Tracking Active</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-foreground/60">Live Tracking Active</span>
         </div>
       </motion.div>
 
@@ -162,7 +162,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                 transition={hoverSpring}
                 style={{ willChange: 'transform' }}
               >
-                <Card variant="primary" className="h-full border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 hover-premium-glow">
+                <Card variant="primary" className="h-full border-foreground/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 hover-premium-glow">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold tracking-tight">Best Day</CardTitle>
@@ -172,8 +172,8 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-col items-center justify-center py-4">
-                      <span className="text-4xl font-black tracking-tighter text-white mb-2">{insights.bestDay}s</span>
-                      <p className="text-sm text-white/60 text-center">You are consistently more productive on {insights.bestDay}s.</p>
+                      <span className="text-4xl font-black tracking-tighter text-foreground mb-2">{insights.bestDay}s</span>
+                      <p className="text-sm text-foreground/60 text-center">You are consistently more productive on {insights.bestDay}s.</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -186,7 +186,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                 transition={hoverSpring}
                 style={{ willChange: 'transform' }}
               >
-                <Card variant="primary" className="h-full border-white/10 hover-premium-glow">
+                <Card variant="primary" className="h-full border-foreground/10 hover-premium-glow">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold tracking-tight">Habit Insights</CardTitle>
@@ -201,7 +201,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                       </p>
                       {insights.habitInsights.top.map((habit, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
-                          <span className="text-white/80">{habit.name}</span>
+                          <span className="text-foreground/80">{habit.name}</span>
                           <span className="font-bold text-emerald-400">{habit.rate}%</span>
                         </div>
                       ))}
@@ -213,7 +213,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                         </p>
                         {insights.habitInsights.bottom.map((habit, i) => (
                           <div key={i} className="flex items-center justify-between text-sm">
-                            <span className="text-white/80">{habit.name}</span>
+                            <span className="text-foreground/80">{habit.name}</span>
                             <span className="font-bold text-rose-400">{habit.rate}%</span>
                           </div>
                         ))}
@@ -231,7 +231,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
               transition={hoverSpring}
               style={{ willChange: 'transform' }}
             >
-              <Card variant="primary" className="border-white/10 hover-premium-glow">
+              <Card variant="primary" className="border-foreground/10 hover-premium-glow">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg font-bold tracking-tight">Routine Consistency</CardTitle>
@@ -250,7 +250,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                           tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
                           tickFormatter={(val) => val.substring(0, 3)}
                         />
-                        <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+                        <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-foreground/10" />} />
                         <Bar
                           dataKey="count"
                           fill="#6366f1"
@@ -273,7 +273,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
             style={{ willChange: 'transform' }}
             className="flex flex-col"
           >
-            <Card variant="primary" className="border-white/10 flex flex-col h-full hover-premium-glow">
+            <Card variant="primary" className="border-foreground/10 flex flex-col h-full hover-premium-glow">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold tracking-tight">Goal Progress</CardTitle>
@@ -286,12 +286,12 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                   insights.goals.map((goal, i) => (
                     <div key={i} className="space-y-2">
                       <div className="flex justify-between items-end">
-                        <span className="text-sm font-bold text-white/90 line-clamp-1">{goal.title}</span>
-                        <span className="text-xs font-mono text-white/40">{Math.round(goal.progress)}%</span>
+                        <span className="text-sm font-bold text-foreground/90 line-clamp-1">{goal.title}</span>
+                        <span className="text-xs font-mono text-foreground/40">{Math.round(goal.progress)}%</span>
                       </div>
-                      <Progress value={goal.progress} className="h-1.5 bg-white/5" />
+                      <Progress value={goal.progress} className="h-1.5 bg-foreground/5" />
                       <div className="flex justify-between items-center">
-                        <Badge variant="outline" className="text-[8px] uppercase tracking-widest border-white/10 text-white/40">
+                        <Badge variant="outline" className="text-[8px] uppercase tracking-widest border-foreground/10 text-foreground/40">
                           {goal.status}
                         </Badge>
                         {goal.progress >= 100 && <CheckCircle2 className="h-3 w-3 text-emerald-500" strokeWidth={1.5} />}
@@ -300,8 +300,8 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                   ))
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <Target className="h-12 w-12 text-white/5 mb-4" strokeWidth={1.5} />
-                    <p className="text-sm text-white/40">No active goals found.</p>
+                    <Target className="h-12 w-12 text-foreground/5 mb-4" strokeWidth={1.5} />
+                    <p className="text-sm text-foreground/40">No active goals found.</p>
                   </div>
                 )}
               </CardContent>
@@ -324,7 +324,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
           transition={hoverSpring}
           style={{ willChange: 'transform' }}
         >
-          <Card variant="primary" className="border-white/10 overflow-hidden hover-premium-glow">
+          <Card variant="primary" className="border-foreground/10 overflow-hidden hover-premium-glow">
             <CardHeader className="pb-2">
               <CardTitle className="text-xl font-bold tracking-tight">Daily Completions</CardTitle>
               <CardDescription className="text-sm font-medium text-muted-foreground">Tasks, routines, and habits breakdown</CardDescription>
@@ -355,7 +355,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                     minTickGap={32}
                     tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
                   />
-                  <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+                  <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-foreground/10" />} />
                   <Area
                     type="monotone"
                     dataKey="tasksCompleted"
@@ -393,7 +393,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
           transition={hoverSpring}
           style={{ willChange: 'transform' }}
         >
-          <Card variant="primary" className="border-white/10 overflow-hidden hover-premium-glow">
+          <Card variant="primary" className="border-foreground/10 overflow-hidden hover-premium-glow">
             <CardHeader className="pb-2">
               <CardTitle className="text-xl font-bold tracking-tight">Module Usage</CardTitle>
               <CardDescription className="text-sm font-medium text-muted-foreground">Most used modules over the last 90 days</CardDescription>
@@ -419,14 +419,14 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                       />
                     ))}
                   </Pie>
-                  <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10" />} />
+                  <ChartTooltip content={<ChartTooltipContent className="bg-slate-900/90 backdrop-blur-xl border-foreground/10" />} />
                 </PieChart>
               </ChartContainer>
               <div className="hidden sm:flex flex-col gap-3 ml-4">
                 {pieData.map((entry, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill }} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">{entry.name}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/60">{entry.name}</span>
                   </div>
                 ))}
               </div>

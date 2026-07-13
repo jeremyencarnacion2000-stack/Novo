@@ -95,7 +95,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
-                <div className="bg-slate-800/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl text-white">
+                <div className="bg-slate-800/90 backdrop-blur-md border border-foreground/10 p-3 rounded-xl shadow-xl text-white">
                     <p className="text-xs font-medium text-slate-400 mb-1">{label}</p>
                     <p className="text-lg font-bold">
                         {payload[0].value} <span className="text-xs font-normal text-slate-300">{chartConfig.unit}</span>
@@ -107,7 +107,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
     };
 
     return (
-        <div className="w-full rounded-[40px] bg-white/5 backdrop-blur-[40px] border border-white/20 p-6 md:p-8 text-white shadow-2xl overflow-hidden relative transition-all duration-500 group">
+        <div className="w-full rounded-[28px] bg-foreground/5 backdrop-blur-[28px] border border-foreground/20 p-6 md:p-8 text-foreground shadow-2xl overflow-hidden relative transition-all duration-500 group">
             {/* Background Accents for Liquid Glass Effect */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-indigo-500/20 blur-[120px] rounded-full animate-pulse" />
@@ -119,27 +119,27 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                 {/* Header */}
                 <div className="flex justify-between items-start mb-8">
                     <div>
-                        <h2 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">Overview</h2>
-                        <p className="text-white/40 text-sm mt-1 font-medium uppercase tracking-wider">{chartConfig.label} Trends</p>
+                        <h2 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Overview</h2>
+                        <p className="text-foreground/40 text-sm mt-1 font-medium uppercase tracking-wider">{chartConfig.label} Trends</p>
                     </div>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-5 py-2 text-sm font-bold flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-all hover:scale-105 active:scale-95 outline-none shadow-lg">
+                            <button className="bg-foreground/10 backdrop-blur-md border border-foreground/10 rounded-full px-5 py-2 text-sm font-bold flex items-center gap-2 cursor-pointer hover:bg-foreground/20 transition-all hover:scale-105 active:scale-95 outline-none shadow-lg">
                                 <span>{viewMode === 'monthly' ? 'Monthly' : 'Weekly'}</span>
                                 <ChevronDown className="w-4 h-4 opacity-60" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-slate-900/80 backdrop-blur-2xl border-white/10 text-white min-w-[140px] rounded-2xl p-2 shadow-2xl">
+                        <DropdownMenuContent align="end" className="bg-slate-900/80 backdrop-blur-2xl border-foreground/10 text-white min-w-[140px] rounded-2xl p-2 shadow-2xl">
                             <DropdownMenuItem
                                 onClick={() => setViewMode('monthly')}
-                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer rounded-xl py-2 font-medium"
+                                className="hover:bg-foreground/10 focus:bg-foreground/10 cursor-pointer rounded-xl py-2 font-medium"
                             >
                                 Monthly View
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 onClick={() => setViewMode('weekly')}
-                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer rounded-xl py-2 font-medium"
+                                className="hover:bg-foreground/10 focus:bg-foreground/10 cursor-pointer rounded-xl py-2 font-medium"
                             >
                                 Weekly View
                             </DropdownMenuItem>
@@ -181,7 +181,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="flex items-center justify-center h-full text-white/20">
+                        <div className="flex items-center justify-center h-full text-foreground/20">
                             <p className="font-medium tracking-widest uppercase text-xs">No data for {selectedMonth}</p>
                         </div>
                     )}
@@ -197,7 +197,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                                 "text-xs font-bold transition-all duration-300 px-4 py-2 rounded-full whitespace-nowrap uppercase tracking-tighter",
                                 selectedMonth === month
                                     ? "bg-white text-indigo-600 shadow-[0_10px_20px_rgba(255,255,255,0.2)] scale-110"
-                                    : "text-white/40 hover:text-white hover:bg-white/5"
+                                    : "text-foreground/40 hover:text-foreground hover:bg-foreground/5"
                             )}
                         >
                             {month}
@@ -214,17 +214,17 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                         className={cn(
                             "rounded-[24px] p-5 border text-center transition-all duration-500 relative overflow-hidden group/btn",
                             selectedMetric === 'time'
-                                ? "bg-white/15 backdrop-blur-md border-white/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
-                                : "bg-white/5 backdrop-blur-sm border-white/10 hover:bg-white/10 hover:border-white/20"
+                                ? "bg-foreground/15 backdrop-blur-md border-foreground/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
+                                : "bg-foreground/5 backdrop-blur-sm border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20"
                         )}
                     >
                         <div className={cn(
                             "absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'time' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'time' ? "text-white" : "text-white/40")}>Active Hours</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'time' ? "text-foreground" : "text-foreground/40")}>Active Hours</p>
                         <p className="text-2xl md:text-3xl font-black relative z-10">
-                            {currentStats.totalTime} <span className="text-xs font-bold text-white/40 ml-1">Hr</span>
+                            {currentStats.totalTime} <span className="text-xs font-bold text-foreground/40 ml-1">Hr</span>
                         </p>
                     </motion.button>
 
@@ -234,15 +234,15 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                         className={cn(
                             "rounded-[24px] p-5 border text-center transition-all duration-500 relative overflow-hidden group/btn",
                             selectedMetric === 'productivity'
-                                ? "bg-white/15 backdrop-blur-md border-white/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
-                                : "bg-white/5 backdrop-blur-sm border-white/10 hover:bg-white/10 hover:border-white/20"
+                                ? "bg-foreground/15 backdrop-blur-md border-foreground/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
+                                : "bg-foreground/5 backdrop-blur-sm border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20"
                         )}
                     >
                         <div className={cn(
                             "absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'productivity' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'productivity' ? "text-white" : "text-white/40")}>Productivity</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'productivity' ? "text-foreground" : "text-foreground/40")}>Productivity</p>
                         <p className="text-3xl md:text-4xl font-black relative z-10">
                             {currentStats.productivity}%
                         </p>
@@ -254,15 +254,15 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                         className={cn(
                             "rounded-[24px] p-5 border text-center transition-all duration-500 relative overflow-hidden group/btn",
                             selectedMetric === 'completions'
-                                ? "bg-white/15 backdrop-blur-md border-white/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
-                                : "bg-white/5 backdrop-blur-sm border-white/10 hover:bg-white/10 hover:border-white/20"
+                                ? "bg-foreground/15 backdrop-blur-md border-foreground/30 transform scale-105 shadow-2xl ring-1 ring-white/20"
+                                : "bg-foreground/5 backdrop-blur-sm border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20"
                         )}
                     >
                         <div className={cn(
                             "absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'completions' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'completions' ? "text-white" : "text-white/40")}>Completions</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'completions' ? "text-foreground" : "text-foreground/40")}>Completions</p>
                         <p className="text-2xl md:text-3xl font-black relative z-10">
                             {currentStats.completions}
                         </p>

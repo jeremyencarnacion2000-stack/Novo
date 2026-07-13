@@ -145,17 +145,17 @@ export function SettingsIntegrations() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <p className="text-xs text-white/35">
+      <p className="text-xs text-foreground/35">
         Connect external services to sync your data with Novo. All connections use secure OAuth — no passwords are stored.
       </p>
 
       {/* Google */}
       <Section title="Google Workspace">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] divide-y divide-foreground/[0.04]">
           <div className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -164,8 +164,8 @@ export function SettingsIntegrations() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white/85">Google Account</p>
-                  <p className="text-xs text-white/35">
+                  <p className="text-sm font-semibold text-foreground/85">Google Account</p>
+                  <p className="text-xs text-foreground/35">
                     {session?.user?.email
                       ? `Connected as ${session.user.email}`
                       : 'Sync Calendar, Drive, and Contacts'}
@@ -180,7 +180,7 @@ export function SettingsIntegrations() {
                   </span>
                   <button
                     onClick={() => signOut({ callbackUrl: '/' })}
-                    className="text-[11px] text-white/30 hover:text-red-400 transition-colors font-medium"
+                    className="text-[11px] text-foreground/30 hover:text-red-400 transition-colors font-medium"
                   >
                     Disconnect
                   </button>
@@ -188,7 +188,7 @@ export function SettingsIntegrations() {
               ) : (
                 <button
                   onClick={() => signIn('google')}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all text-white/70"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   Connect
@@ -201,7 +201,7 @@ export function SettingsIntegrations() {
           <div className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
                     <path d="M7.71 3.5L1.15 15l3.43 5.96L10.14 9.46 7.71 3.5z" fill="#0066DA"/>
                     <path d="M16.29 3.5L13.86 9.46l5.56 11.5H25L21.57 15 16.29 3.5z" fill="#00AC47"/>
@@ -209,8 +209,8 @@ export function SettingsIntegrations() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white/85">Google Drive</p>
-                  <p className="text-xs text-white/35">
+                  <p className="text-sm font-semibold text-foreground/85">Google Drive</p>
+                  <p className="text-xs text-foreground/35">
                     {driveStatus?.connected && driveStatus?.hasScope
                       ? 'Backup your workspace data to Google Drive'
                       : driveStatus?.connected && !driveStatus?.hasScope
@@ -237,14 +237,14 @@ export function SettingsIntegrations() {
               ) : driveStatus?.connected ? (
                 <button
                   onClick={() => signIn('google')}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all text-white/70"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   Grant Access
                 </button>
               ) : (
-                <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-white/5 text-white/30 border border-white/8">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-foreground/5 text-foreground/30 border border-foreground/8">
+                  <span className="w-1.5 h-1.5 rounded-full bg-foreground/20" />
                   Not Connected
                 </span>
               )}
@@ -255,16 +255,16 @@ export function SettingsIntegrations() {
 
       {/* Notion -- live OAuth integration */}
       <Section title="Productivity">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] divide-y divide-foreground/[0.04]">
           <div className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-white/60 font-bold text-sm">
+                <div className="w-9 h-9 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center text-foreground/60 font-bold text-sm">
                   N
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white/85">Notion</p>
-                  <p className="text-xs text-white/35">
+                  <p className="text-sm font-semibold text-foreground/85">Notion</p>
+                  <p className="text-xs text-foreground/35">
                     {notionStatus?.connected
                       ? `Workspace: ${notionStatus.workspaceName ?? 'Connected'}`
                       : 'Import tasks and databases from Notion'}
@@ -288,7 +288,7 @@ export function SettingsIntegrations() {
                   <button
                     onClick={handleNotionDisconnect}
                     disabled={notionLoading}
-                    className="text-[11px] text-white/30 hover:text-red-400 transition-colors font-medium"
+                    className="text-[11px] text-foreground/30 hover:text-red-400 transition-colors font-medium"
                   >
                     Disconnect
                   </button>
@@ -296,7 +296,7 @@ export function SettingsIntegrations() {
               ) : (
                 <button
                   onClick={handleNotionConnect}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all text-white/70"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   Connect
@@ -306,10 +306,10 @@ export function SettingsIntegrations() {
 
             {/* Database selector -- shown when connected */}
             {notionStatus?.connected && (
-              <div className="mt-3 pt-3 border-t border-white/[0.05]">
+              <div className="mt-3 pt-3 border-t border-foreground/[0.05]">
                 <button
                   onClick={handleFetchNotionDbs}
-                  className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/60 transition-colors"
+                  className="flex items-center gap-1.5 text-[11px] text-foreground/40 hover:text-foreground/60 transition-colors"
                 >
                   <Database className="w-3 h-3" />
                   {notionDbsOpen ? 'Hide databases' : `Manage databases (${notionStatus.databaseIds?.length ?? 0} selected)`}
@@ -318,7 +318,7 @@ export function SettingsIntegrations() {
                 {notionDbsOpen && (
                   <div className="mt-2 space-y-1.5">
                     {notionDbs.length === 0 ? (
-                      <p className="text-xs text-white/30 italic">No databases found. Make sure Novo has access to your Notion pages.</p>
+                      <p className="text-xs text-foreground/30 italic">No databases found. Make sure Novo has access to your Notion pages.</p>
                     ) : (
                       notionDbs.map(db => {
                         const selected = notionStatus.databaseIds?.includes(db.id) ?? false
@@ -336,10 +336,10 @@ export function SettingsIntegrations() {
                               'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all',
                               selected
                                 ? 'bg-teal-500/10 border border-teal-500/20 text-teal-300'
-                                : 'bg-white/[0.02] border border-white/[0.06] text-white/50 hover:bg-white/[0.05]'
+                                : 'bg-foreground/[0.02] border border-foreground/[0.06] text-foreground/50 hover:bg-foreground/[0.05]'
                             )}
                           >
-                            <span className={cn('w-2 h-2 rounded-sm flex-shrink-0', selected ? 'bg-teal-400' : 'bg-white/20')} />
+                            <span className={cn('w-2 h-2 rounded-sm flex-shrink-0', selected ? 'bg-teal-400' : 'bg-foreground/20')} />
                             {db.title}
                           </button>
                         )
@@ -354,18 +354,18 @@ export function SettingsIntegrations() {
           <div className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#36C5F0">
                     <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white/85">Slack</p>
-                  <p className="text-xs text-white/35">Receive cognitive alerts in your Slack workspace</p>
+                  <p className="text-sm font-semibold text-foreground/85">Slack</p>
+                  <p className="text-xs text-foreground/35">Receive cognitive alerts in your Slack workspace</p>
                 </div>
               </div>
-              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-white/5 text-white/30 border border-white/8">
-                <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-foreground/5 text-foreground/30 border border-foreground/8">
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground/20" />
                 Coming Soon
               </span>
             </div>
@@ -373,7 +373,7 @@ export function SettingsIntegrations() {
         </div>
       </Section>
 
-      <p className="text-[10px] text-white/20 text-center pb-2">
+      <p className="text-[10px] text-foreground/20 text-center pb-2">
         More integrations are added with each Novo release.
       </p>
     </div>

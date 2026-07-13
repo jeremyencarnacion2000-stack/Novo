@@ -2,9 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CheckCircle2, Circle, Clock, BookOpen, Briefcase, Heart, GraduationCap } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
+import { useChecklist, useRoutines, useProjects } from '@/hooks/use-swr'
 
 interface Activity {
   id?: string
@@ -12,7 +12,7 @@ interface Activity {
   time: string
   completed: boolean
   type: 'routine' | 'task' | 'project' | 'book' | 'business' | 'spiritual' | 'school'
-  raw?: any // Store the raw object if available
+  raw?: any
 }
 
 interface RecentActivityProps {
@@ -20,95 +20,47 @@ interface RecentActivityProps {
 }
 
 export function RecentActivity({ onActivityClick }: RecentActivityProps) {
-  const { data: session } = useSession()
-  const [activities, setActivities] = useState<Activity[]>([])
+  // All 3 fetches fire in parallel — SWR deduplicates with other dashboard components
+  const { data: checklistData } = useChecklist()
+  const { data: routinesData } = useRoutines()
+  const { data: projectsData } = useProjects()
 
-  useEffect(() => {
+  const activities = useMemo<Activity[]>(() => {
+    const result: Activity[] = []
 
-    const fetchActivities = async () => {
-      // Prevent API calls if the user is not authenticated
-      if (!session?.user) {
-        setActivities([]) // Clear activities or set a placeholder
-        return
-      }
+    const checklistItems = Array.isArray(checklistData) ? checklistData : []
+    checklistItems
+      .filter((item: any) => item.completed)
+      .slice(0, 2)
+      .forEach((item: any) => {
+        result.push({ id: item.id, title: item.text, time: 'Today', completed: true, type: 'task', raw: item })
+      })
 
-      const recentActivities: Activity[] = []
+    const routines = Array.isArray(routinesData) ? routinesData : []
+    routines
+      .filter((r: any) => r.isActive)
+      .slice(0, 2)
+      .forEach((routine: any) => {
+        result.push({
+          id: routine.id,
+          title: routine.name,
+          time: routine.timeOfDay === 'morning' ? 'Morning' : routine.timeOfDay === 'afternoon' ? 'Afternoon' : 'Evening',
+          completed: false,
+          type: 'routine',
+          raw: routine,
+        })
+      })
 
-      try {
-        // Get completed tasks from today
-        const checklistRes = await fetch('/api/checklist')
-        const checklistData = checklistRes.ok ? await checklistRes.json().catch(() => []) : []
-        const checklistItems = Array.isArray(checklistData) ? checklistData : []
-        const itemsArray = Array.isArray(checklistItems) ? checklistItems : []
-        itemsArray
-          .filter((item: any) => item.completed)
-          .slice(0, 2)
-          .forEach((item: any) => {
-            recentActivities.push({
-              id: item.id,
-              title: item.text,
-              time: 'Today',
-              completed: true,
-              type: 'task',
-              raw: item
-            })
-          })
-      } catch (error) {
-        console.error('Failed to fetch checklist:', error)
-      }
+    const projects = Array.isArray(projectsData) ? projectsData : []
+    projects
+      .filter((p: any) => p.status === 'in-progress')
+      .slice(0, 1)
+      .forEach((project: any) => {
+        result.push({ id: project.id, title: project.title, time: 'Project', completed: false, type: 'project', raw: project })
+      })
 
-      try {
-        // Get active routines
-        const routinesRes = await fetch('/api/routines')
-        const routinesData = routinesRes.ok ? await routinesRes.json().catch(() => []) : []
-        const routines = Array.isArray(routinesData) ? routinesData : []
-        const routinesArray = Array.isArray(routines) ? routines : []
-        routinesArray
-          .filter((r: any) => r.isActive)
-          .slice(0, 2)
-          .forEach((routine: any) => {
-            recentActivities.push({
-              id: routine.id,
-              title: routine.name,
-              time: routine.timeOfDay === 'morning' ? 'Morning' : routine.timeOfDay === 'afternoon' ? 'Afternoon' : 'Evening',
-              completed: false,
-              type: 'routine',
-              raw: routine
-            })
-          })
-      } catch (error) {
-        console.error('Failed to fetch routines:', error)
-      }
-
-      try {
-        // Get in-progress projects
-        const projectsRes = await fetch('/api/projects')
-        const projectsData = projectsRes.ok ? await projectsRes.json().catch(() => []) : []
-        const projects = Array.isArray(projectsData) ? projectsData : []
-        const projectsArray = Array.isArray(projects) ? projects : []
-        projectsArray
-          .filter((p: any) => p.status === 'in-progress')
-          .slice(0, 1)
-          .forEach((project: any) => {
-            recentActivities.push({
-              id: project.id,
-              title: project.title,
-              time: 'Project',
-              completed: false,
-              type: 'project',
-              raw: project
-            })
-          })
-      } catch (error) {
-        console.error('Failed to fetch projects:', error)
-      }
-
-      // ... (rest of book/spiritual fetch remains same logic-wise)
-      setActivities(recentActivities.slice(0, 6))
-    }
-
-    fetchActivities()
-  }, [session?.user?.id])
+    return result.slice(0, 6)
+  }, [checklistData, routinesData, projectsData])
 
   const getIcon = (type: Activity['type']) => {
     switch (type) {
@@ -125,7 +77,7 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="subtitle-technical">Recent Activity</CardTitle>
-          <Clock className="h-4 w-4 text-white/10" />
+          <Clock className="h-4 w-4 text-foreground/10" />
         </div>
       </CardHeader>
       <CardContent>
@@ -139,13 +91,13 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
                 key={index}
                 onClick={() => isClickable && onActivityClick?.(activity.type as any, activity.raw)}
                 className={cn(
-                  "flex items-center gap-4 group p-3.5 rounded-2xl transition-all duration-300 border border-white/[0.04]",
-                  isClickable ? "cursor-pointer bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-[1.02] active:scale-[0.98]" : "bg-transparent"
+                  "flex items-center gap-4 group p-3.5 rounded-2xl transition-all duration-300 border border-foreground/[0.04]",
+                  isClickable ? "cursor-pointer bg-foreground/[0.03] hover:bg-foreground/[0.08] hover:border-foreground/[0.1] hover:scale-[1.02] active:scale-[0.98]" : "bg-transparent"
                 )}
               >
                 <div className={cn(
                   "p-2 rounded-xl transition-all duration-300 shadow-sm",
-                  activity.completed ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-white/20 group-hover:bg-primary group-hover:text-white'
+                  activity.completed ? 'bg-green-500/10 text-green-400' : 'bg-foreground/5 text-foreground/20 group-hover:bg-primary group-hover:text-foreground'
                 )}>
                   <Icon className="h-4 w-4 shrink-0" />
                 </div>
@@ -153,7 +105,7 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
                   <p className="text-[13px] font-semibold tracking-tight truncate opacity-80 group-hover:opacity-100 transition-opacity">
                     {activity.title}
                   </p>
-                  <p className="text-[9px] text-white/15 mt-1.5 uppercase tracking-[0.2em] font-black italic">
+                  <p className="text-[9px] text-foreground/15 mt-1.5 uppercase tracking-[0.2em] font-black italic">
                     {activity.time}
                   </p>
                 </div>

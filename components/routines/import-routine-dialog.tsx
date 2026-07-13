@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { safeViewTransition } from '@/hooks/use-view-transition'
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Upload, FileText, AlertCircle, Loader2 } from 'lucide-react'
+import { Upload, FileText, AlertCircle, Loader2, Calendar, Swords, TrendingUp, CheckSquare, Timer, Repeat, Dumbbell } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import * as pdfjsLib from 'pdfjs-dist'
 import mammoth from 'mammoth'
-import { blendy } from '@/lib/blendy'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 // Initialize PDF.js worker
 if (typeof window !== 'undefined') {
@@ -162,17 +162,10 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
     handleClose();
   }
 
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => {
-        blendy.update()
-        blendy.toggle('btn-import-routine')
-      }, 30)
-    }
-  }, [open])
+  const closeFlip = useModalFlip('btn-import-routine', open)
 
   const handleClose = () => {
-    blendy.untoggle('btn-import-routine', () => {
+    closeFlip(() => {
       setFile(null)
       setParsedText('')
       setError('')
@@ -187,11 +180,14 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        data-blendy-to="btn-import-routine"
+        data-flip-to="btn-import-routine"
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         <DialogHeader>
-          <DialogTitle>Import Routine</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload data-shared-item="icon" className="h-5 w-5" />
+            <span data-shared-item="text">Import Routine</span>
+          </DialogTitle>
           <DialogDescription>
             Upload a PDF, Word document, or text file to import a routine
           </DialogDescription>
@@ -261,7 +257,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
                           checked={selectedBlocks['planning']}
                           onCheckedChange={(checked) => setSelectedBlocks(prev => ({ ...prev, planning: !!checked }))}
                         />
-                        <CardTitle className="text-sm font-semibold">📅 Planificación: {parsedData.planning.title}</CardTitle>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> Planificación: {parsedData.planning.title}</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
@@ -287,16 +283,16 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
                           checked={selectedBlocks[`routine-${i}`]}
                           onCheckedChange={(checked) => setSelectedBlocks(prev => ({ ...prev, [`routine-${i}`]: !!checked }))}
                         />
-                        <CardTitle className="text-sm font-semibold">⚔️ Rutina: {routine.name}</CardTitle>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5"><Swords className="w-3.5 h-3.5 text-muted-foreground" /> Rutina: {routine.name}</CardTitle>
                       </div>
                       <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase font-bold">{routine.type || 'fitness'}</span>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
                       <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{routine.description}</p>
                       <div className="flex gap-4 text-[10px] text-muted-foreground">
-                        <span>⏱️ {routine.duration || 0} min</span>
-                        <span>🔄 {routine.frequency || 'N/A'}</span>
-                        <span>💪 {routine.exercises?.length || routine.days?.reduce((acc: number, d: any) => acc + (d.exercises?.length || 0), 0) || 0} ejercicios</span>
+                        <span className="flex items-center gap-1"><Timer className="w-3 h-3" /> {routine.duration || 0} min</span>
+                        <span className="flex items-center gap-1"><Repeat className="w-3 h-3" /> {routine.frequency || 'N/A'}</span>
+                        <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" /> {routine.exercises?.length || routine.days?.reduce((acc: number, d: any) => acc + (d.exercises?.length || 0), 0) || 0} ejercicios</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -311,7 +307,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
                           checked={selectedBlocks['trackers']}
                           onCheckedChange={(checked) => setSelectedBlocks(prev => ({ ...prev, trackers: !!checked }))}
                         />
-                        <CardTitle className="text-sm font-semibold">📈 Trackers y Hábitos</CardTitle>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-muted-foreground" /> Trackers y Hábitos</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
@@ -333,7 +329,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
                           checked={selectedBlocks['checklists']}
                           onCheckedChange={(checked) => setSelectedBlocks(prev => ({ ...prev, checklists: !!checked }))}
                         />
-                        <CardTitle className="text-sm font-semibold">✅ Checklists de Misión</CardTitle>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5"><CheckSquare className="w-3.5 h-3.5 text-muted-foreground" /> Checklists de Misión</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">

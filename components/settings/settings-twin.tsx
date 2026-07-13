@@ -26,16 +26,16 @@ export function SettingsTwin() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="rounded-3xl border border-white/[0.06] bg-white/[0.015] p-6 flex flex-col sm:flex-row items-center gap-6">
+      <div className="rounded-3xl border border-foreground/[0.06] bg-foreground/[0.015] p-6 flex flex-col sm:flex-row items-center gap-6">
         <OrbPrimitive size="lg" variant={twin.isInitialized ? 'active' : 'dormant'} />
         <div className="flex-1 text-center sm:text-left">
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/30 mb-1">Cognitive Twin</p>
-          <h2 className="text-xl font-bold text-white/90 mb-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground/30 mb-1">Cognitive Twin</p>
+          <h2 className="text-xl font-bold text-foreground/90 mb-2">
             {twin.isInitialized ? `${role.charAt(0).toUpperCase() + role.slice(1)} Profile` : 'Not Initialized'}
           </h2>
           <div className="flex items-center gap-3 justify-center sm:justify-start">
             <TrustBadge level={twin.trustLevel} />
-            <span className="text-xs text-white/30">Updated {new Date(twin.updatedAt).toLocaleDateString()}</span>
+            <span className="text-xs text-foreground/30">Updated {new Date(twin.updatedAt).toLocaleDateString()}</span>
           </div>
         </div>
         <ConfidenceGauge score={twin.confidenceScore} size="md" />
@@ -101,7 +101,7 @@ export function SettingsTwin() {
       </Section>
 
       <Section title="Workspace Behavior">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] divide-y divide-white/[0.04]">
           <div className="p-4">
             <Row label="Simplify Interface Automatically" description="Twin hides advanced features during high cognitive load.">
               <LiquidSwitch checked={simplifyAuto} onCheckedChange={setSimplifyAuto} />

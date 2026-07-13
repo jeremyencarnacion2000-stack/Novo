@@ -26,7 +26,7 @@ import { Plus, X, Sparkles } from 'lucide-react'
 import { Routine, RoutineTask } from '@/types/routine'
 import { Checkbox } from '@/components/ui/checkbox'
 import routineTemplates from '@/data/routine-templates.json'
-import { blendy } from '@/lib/blendy'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface RoutineDialogProps {
   open: boolean
@@ -57,20 +57,9 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
 
-  const blendyKey = routine ? `routine-${routine.id}` : 'btn-new-routine'
-
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => {
-        blendy.update()
-        blendy.toggle(blendyKey)
-      }, 30)
-    }
-  }, [open, blendyKey])
-
-  const handleClose = () => {
-    blendy.untoggle(blendyKey, onClose)
-  }
+  const flipKey = routine ? `routine-${routine.id}` : 'btn-new-routine'
+  const closeFlip = useModalFlip(flipKey, open)
+  const handleClose = () => closeFlip(onClose)
 
   useEffect(() => {
     if (routine) {
@@ -161,12 +150,15 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        data-blendy-to={blendyKey}
+        data-flip-to={flipKey}
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{routine ? 'Edit Routine' : 'Create New Routine'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {!routine && <Plus data-shared-item="icon" className="h-5 w-5" />}
+              <span data-shared-item="text">{routine ? 'Edit Routine' : 'Create New Routine'}</span>
+            </DialogTitle>
             <DialogDescription>
               {routine
                 ? 'Update your routine details and tasks'

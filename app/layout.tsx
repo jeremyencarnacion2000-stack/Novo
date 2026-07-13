@@ -2,8 +2,6 @@ import type { Metadata } from 'next'
 import React from 'react'
 import './globals.css'
 import ClientLayout from './client-layout'
-// NOTE: ChatbotSidebar is lazy-loaded via next/dynamic in client-layout.tsx
-// Importing it here again would double-bundle it — removed.
 
 
 export const metadata: Metadata = {
@@ -39,6 +37,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+      </head>
       <body className="font-sans h-full antialiased relative">
         {/* Background Image is now applied directly to the body in settings-context.tsx */}
 

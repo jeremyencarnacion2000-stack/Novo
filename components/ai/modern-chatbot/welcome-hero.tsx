@@ -1,53 +1,17 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
-import {
-  Sparkles, ListTodo, CalendarDays, Globe, Brain,
-  Zap, MessageSquare, ChevronRight, FileEdit, Lightbulb,
-  Mic, MicOff, TrendingUp
-} from 'lucide-react';
-import { useChatbot } from './context';
+import React from 'react';
+import { Mic, MicOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-const QUICK_CHIPS = [
-  { label: 'Write a draft', icon: FileEdit },
-  { label: 'Create a task', icon: ListTodo },
-  { label: 'Get advice', icon: Lightbulb },
-  { label: 'Make a plan', icon: CalendarDays },
-  { label: 'Search web', icon: Globe },
-];
-
-const SUGGESTION_CARDS = [
-  {
-    icon: MessageSquare,
-    title: 'Continue a conversation',
-    subtitle: 'Pick up where you left off',
-    color: 'from-violet-500/10 to-purple-500/5',
-    border: 'border-violet-500/20',
-  },
-  {
-    icon: Zap,
-    title: 'Quick actions',
-    subtitle: 'Tasks, routines, goals',
-    color: 'from-amber-500/10 to-orange-500/5',
-    border: 'border-amber-500/20',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Cognitive insights',
-    subtitle: 'Your focus & energy today',
-    color: 'from-emerald-500/10 to-teal-500/5',
-    border: 'border-emerald-500/20',
-  },
-];
+import { GlowingOrb } from './glowing-orb';
 
 function getGreetingTime(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return 'Buenos días';
+  if (hour < 18) return 'Buenas tardes';
+  return 'Buenas noches';
 }
 
 // Mobile Hero - DeepSeek/PulseChat style
@@ -61,7 +25,7 @@ export function MobileHero({
   isVoiceListening: boolean;
 }) {
   const { data: session } = useSession();
-  const firstName = session?.user?.name?.split(' ')[0] ?? 'there';
+  const firstName = session?.user?.name?.split(' ')[0] ?? '';
 
   return (
     <motion.div
@@ -71,30 +35,29 @@ export function MobileHero({
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.35 }}
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0d1b3e] via-[#0f1a40] to-[#1a0a3a] -z-10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-transparent to-transparent -z-10" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full bg-purple-600/15 blur-[80px] pointer-events-none" />
-
       <motion.div
         className="relative mb-8"
         animate={{ y: [0, -6, 0] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary via-violet-500 to-blue-500 shadow-[0_0_40px_rgba(139,92,246,0.5)] flex items-center justify-center">
-          <Brain className="w-7 h-7 text-white" />
-        </div>
-        <div className="absolute inset-0 rounded-full bg-primary/30 blur-xl animate-pulse" style={{ animationDuration: '3s' }} />
+        <GlowingOrb state={isVoiceListening ? 'listening' : 'idle'} size="md" />
       </motion.div>
 
+      <motion.p
+        className="text-white/50 text-[15px] tracking-wide font-medium mb-1.5"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        Hola{firstName ? `, ${firstName}` : ''}
+      </motion.p>
       <motion.h1
-        className="text-4xl font-extrabold text-white text-center leading-tight mb-2"
+        className="text-[28px] leading-tight font-semibold text-white text-center tracking-tight mb-2"
         initial={{ y: 16, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
       >
-        Hi, {firstName}.
-        <br />
-        <span className="text-white/60 font-semibold text-2xl">How can I help you?</span>
+        ¿En qué puedo ayudarte?
       </motion.h1>
 
       <motion.div
@@ -103,7 +66,7 @@ export function MobileHero({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.4 }}
       >
-        {['Create a task', 'Set a routine', 'Focus mode', 'Plan my day', 'Motivate me'].map((chip) => (
+        {['Crear una tarea', 'Crear una rutina', 'Modo enfoque', 'Planear mi día', 'Motívame'].map((chip) => (
           <button
             key={chip}
             onClick={() => onChipClick(chip)}
@@ -127,7 +90,7 @@ export function MobileHero({
         transition={{ delay: 0.45 }}
       >
         {isVoiceListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-        {isVoiceListening ? 'Listening... tap to stop' : 'Or tap to speak'}
+        {isVoiceListening ? 'Escuchando... toca para detener' : 'O toca para hablar'}
       </motion.button>
     </motion.div>
   );
@@ -135,6 +98,11 @@ export function MobileHero({
 
 // Voice Listening Overlay - PulseChat style full-screen orb
 export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
+  // Reduced motion means gentler, not zero — the opacity pulse on "Escuchando..."
+  // stays (it aids comprehension), but the continuous scaleY waveform movement
+  // is the kind of infinite motion prefers-reduced-motion exists to suppress.
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.div
       className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0a0f1e]"
@@ -144,13 +112,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
       transition={{ duration: 0.3 }}
     >
       <div className="relative flex items-center justify-center">
-        <motion.div
-          className="w-48 h-48 rounded-full bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-400"
-          animate={{ scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ boxShadow: '0 0 80px rgba(52, 211, 153, 0.45)' }}
-        />
-        <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl animate-pulse" />
+        <GlowingOrb state="listening" size="lg" />
         <Mic className="absolute w-10 h-10 text-white drop-shadow-lg" />
       </div>
 
@@ -159,7 +121,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
         animate={{ opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        Listening...
+        Escuchando...
       </motion.p>
 
       <div className="flex items-center gap-1.5 mt-3 mb-12">
@@ -167,35 +129,31 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
           <motion.div
             key={i}
             className="w-1 rounded-full bg-emerald-400"
-            style={{ height: '8px' }}
-            animate={{ height: ['8px', `${16 + i * 6}px`, '8px'] }}
-            transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }}
+            style={{ height: `${16 + i * 6}px`, transformOrigin: 'center' }}
+            animate={reduceMotion ? { scaleY: 0.75 } : { scaleY: [0.5, 1, 0.5] }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.7, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }}
           />
         ))}
       </div>
 
       <button
         onClick={onStop}
-        className="px-8 py-3 rounded-full bg-white/10 border border-white/15 text-white/80 text-sm font-semibold hover:bg-white/20 active:scale-95 transition-all"
+        className="px-8 py-3 rounded-full bg-white/10 border border-white/15 text-white/80 text-sm font-semibold hover:bg-white/20 active:scale-95 transition-[background-color,transform]"
       >
-        Stop listening
+        Detener
       </button>
     </motion.div>
   );
 }
 
-// Desktop Hero - Copilot style centered layout
+// Desktop Hero — PulseChat style: orb + greeting only, nothing else. Input is
+// the persistent bottom pill (rendered once, always docked, by index.tsx) —
+// this hero used to embed its own separate input box, which meant the app
+// had two different-looking composers depending on whether a chat was
+// active. One input surface, matching the reference, is the point.
 export function DesktopHero() {
-  const { sendMessage, createConversation } = useChatbot();
   const { data: session } = useSession();
-  const firstName = session?.user?.name?.split(' ')[0] ?? 'there';
-  const [inputVal, setInputVal] = useState('');
-
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
-    createConversation();
-    setTimeout(() => sendMessage(text), 80);
-  };
+  const firstName = session?.user?.name?.split(' ')[0] ?? '';
 
   return (
     <motion.div
@@ -205,99 +163,30 @@ export function DesktopHero() {
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <motion.div
+        className="mb-8"
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <GlowingOrb state="idle" size="lg" />
+      </motion.div>
 
-      <motion.h1
-        className="text-3xl lg:text-4xl font-extrabold text-white text-center tracking-tight mb-1"
-        initial={{ opacity: 0, y: 12 }}
+      <motion.p
+        className="text-white/50 text-[15px] tracking-wide font-medium mb-1.5"
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
       >
-        {getGreetingTime()}, {firstName}
-      </motion.h1>
-      <motion.p
-        className="text-white/40 text-sm font-medium mb-9"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.12 }}
-      >
-        What can I help you with today?
+        {getGreetingTime()}{firstName ? `, ${firstName}` : ''}
       </motion.p>
-
-      <motion.div
-        className="w-full max-w-2xl"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18 }}
-      >
-        <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3.5 focus-within:border-primary/30 focus-within:shadow-[0_0_40px_rgba(var(--primary-rgb),0.06)] transition-all duration-300 backdrop-blur-xl">
-          <Sparkles className="w-4 h-4 text-primary/60 flex-shrink-0" />
-          <input
-            type="text"
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && inputVal.trim()) handleSend(inputVal);
-            }}
-            placeholder="Ask anything..."
-            className="flex-1 bg-transparent text-white/90 placeholder-white/25 text-sm font-sans outline-none border-none focus:ring-0"
-            autoFocus
-          />
-          <button
-            onClick={() => handleSend(inputVal)}
-            disabled={!inputVal.trim()}
-            className="w-8 h-8 rounded-xl bg-primary disabled:bg-white/5 disabled:text-white/15 text-black flex items-center justify-center transition-all duration-200 active:scale-95"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </motion.div>
-
-      <motion.div
-        className="flex flex-wrap items-center justify-center gap-2 mt-5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.28 }}
-      >
-        {QUICK_CHIPS.map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            onClick={() => handleSend(label)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-white/55 text-xs font-medium hover:bg-primary/[0.06] hover:border-primary/20 hover:text-white/90 active:scale-95 transition-all duration-200"
-          >
-            <Icon className="w-3 h-3" />
-            {label}
-          </button>
-        ))}
-      </motion.div>
-
-      <motion.div
-        className="grid grid-cols-3 gap-3 mt-10 w-full max-w-2xl"
+      <motion.h1
+        className="text-[34px] leading-tight font-semibold text-white text-center tracking-tight"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.38 }}
+        transition={{ delay: 0.1 }}
       >
-        {SUGGESTION_CARDS.map(({ icon: Icon, title, subtitle, color, border }, i) => (
-          <button
-            key={i}
-            onClick={() => handleSend(title)}
-            className={cn(
-              'flex flex-col items-start gap-2.5 p-4 rounded-2xl bg-gradient-to-br border text-left group hover:border-white/20 active:scale-[0.98] transition-all duration-300',
-              color,
-              border
-            )}
-          >
-            <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Icon className="w-4 h-4 text-white/60" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-white/80 group-hover:text-white transition-colors leading-snug">{title}</div>
-              <div className="text-[10px] text-white/35 mt-0.5">{subtitle}</div>
-            </div>
-          </button>
-        ))}
-      </motion.div>
+        ¿En qué puedo<br />ayudarte hoy?
+      </motion.h1>
     </motion.div>
   );
 }

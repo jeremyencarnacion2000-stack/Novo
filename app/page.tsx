@@ -1,9 +1,10 @@
-'use client'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { DashboardPageClient } from './dashboard-page-client'
 
-import dynamic from 'next/dynamic'
-
-const DashboardClient = dynamic(() => import('@/components/dashboard-client'), { ssr: false })
-
-export default function DashboardPage() {
-  return <DashboardClient />
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions)
+  if (!session) redirect('/landing')
+  return <DashboardPageClient />
 }

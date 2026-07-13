@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tracker } from '@/types/tracker'
+import { Plus } from 'lucide-react'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface TrackerDialogProps {
   open: boolean
@@ -33,6 +35,10 @@ export function TrackerDialog({ open, onClose, onSave, tracker }: TrackerDialogP
   const [type, setType] = useState<'habit' | 'metric'>('habit')
   const [unit, setUnit] = useState('')
   const [goal, setGoal] = useState(1)
+
+  const flipKey = tracker ? `tracker-${tracker.id}` : 'btn-new-tracker'
+  const closeFlip = useModalFlip(flipKey, open)
+  const handleClose = () => closeFlip(onClose)
 
   useEffect(() => {
     if (tracker) {
@@ -66,11 +72,14 @@ export function TrackerDialog({ open, onClose, onSave, tracker }: TrackerDialogP
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent data-flip-to={flipKey} className="max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{tracker ? 'Edit Tracker' : 'Create New Tracker'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {!tracker && <Plus data-shared-item="icon" className="h-5 w-5" />}
+              <span data-shared-item="text">{tracker ? 'Edit Tracker' : 'New Tracker'}</span>
+            </DialogTitle>
             <DialogDescription>
               {tracker
                 ? 'Update your tracker settings'
@@ -144,7 +153,7 @@ export function TrackerDialog({ open, onClose, onSave, tracker }: TrackerDialogP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button type="submit">{tracker ? 'Update' : 'Create'} Tracker</Button>

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         const courses = await prisma.course.findMany({
             where,
             include: {
-                grades: true,
+                grades: { orderBy: { date: 'desc' } },
             },
             orderBy: [
                 { year: 'desc' },

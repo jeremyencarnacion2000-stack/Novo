@@ -3,20 +3,23 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import Image from 'next/image'
 import { useAnalytics } from '@/hooks/use-swr'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { TrendingUp } from 'lucide-react'
+import { HiOutlineClipboardDocumentCheck, HiOutlineClock, HiOutlineFire, HiOutlineTrophy } from 'react-icons/hi2'
 import { motion } from 'framer-motion'
 import { springConfig } from '@/lib/design-tokens'
 
 interface DashboardMetricsProps {
   refreshKey: number
+  /** Slim single-row strip instead of the full card grid — used once the
+   * "Ahora →" hero owns the primary spotlight on the Today dashboard. */
+  compact?: boolean
 }
 
 export const DashboardMetrics = React.memo(
-  function DashboardMetrics({ refreshKey }: DashboardMetricsProps) {
+  function DashboardMetrics({ refreshKey, compact }: DashboardMetricsProps) {
   const { data, error, isLoading } = useAnalytics()
 
   const metrics = [
@@ -24,70 +27,50 @@ export const DashboardMetrics = React.memo(
       title: 'Tasks Completed',
       value: data?.tasksCompleted,
       progress: data?.taskCompletionRate,
-      icon: (
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          <Image
-            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Clipboard/3D/clipboard_3d.png"
-            alt="Tasks"
-            width={48}
-            height={48}
-            className="drop-shadow-[0_10px_10px_rgba(34,197,94,0.3)] group-hover:scale-110 transition-transform duration-500"
-          />
-        </div>
-      ),
+      icon: <HiOutlineClipboardDocumentCheck className="h-6 w-6 text-emerald-400 group-hover:scale-110 transition-transform duration-500" />,
       change: data?.taskTrend,
     },
     {
       title: 'Focus Time',
       value: data?.focusTime,
-      icon: (
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          <Image
-            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Stopwatch/3D/stopwatch_3d.png"
-            alt="Focus"
-            width={48}
-            height={48}
-            className="drop-shadow-[0_10px_10px_rgba(59,130,246,0.3)] group-hover:rotate-12 group-hover:scale-110 transition-all duration-500"
-          />
-        </div>
-      ),
+      icon: <HiOutlineClock className="h-6 w-6 text-blue-400 group-hover:rotate-12 group-hover:scale-110 transition-all duration-500" />,
       change: data?.focusTrend,
     },
     {
       title: 'Habits Mastered',
       value: data?.habitsMastered,
       progress: data?.habitCompletionRate,
-      icon: (
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          <Image
-            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Fire/3D/fire_3d.png"
-            alt="Habits"
-            width={48}
-            height={48}
-            className="drop-shadow-[0_10px_10px_rgba(234,179,8,0.4)] group-hover:scale-125 transition-transform duration-700 ease-out"
-          />
-        </div>
-      ),
+      icon: <HiOutlineFire className="h-6 w-6 text-orange-400 group-hover:scale-125 transition-transform duration-700 ease-out" />,
       change: data?.habitTrend,
     },
     {
       title: 'Goals Achieved',
       value: data?.goalsAchieved,
       progress: data?.goalCompletionRate,
-      icon: (
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          <Image
-            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bullseye/3D/bullseye_3d.png"
-            alt="Goals"
-            width={48}
-            height={48}
-            className="drop-shadow-[0_10px_10px_rgba(239,68,68,0.3)] group-hover:scale-110 group-hover:brightness-110 transition-all duration-500"
-          />
-        </div>
-      ),
+      icon: <HiOutlineTrophy className="h-6 w-6 text-amber-400 group-hover:scale-110 group-hover:brightness-110 transition-all duration-500" />,
       change: data?.goalTrend,
     },
   ]
+
+  if (compact) {
+    if (isLoading) {
+      return <div className="h-14 rounded-2xl bg-foreground/[0.03] animate-pulse" />
+    }
+    if (error) {
+      return null
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 px-1">
+        {metrics.map((metric) => (
+          <div key={metric.title} className="flex items-center gap-2.5">
+            <div className="text-muted-foreground/70 [&>svg]:h-4 [&>svg]:w-4">{metric.icon}</div>
+            <span className="text-lg font-semibold tabular-nums">{metric.value ?? '-'}</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">{metric.title}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -151,14 +134,14 @@ export const DashboardMetrics = React.memo(
               className={cn(
                 "relative transition-[box-shadow,border-color,opacity] duration-300",
                 "hover:shadow-m",
-                "group border-white/5",
+                "group border-foreground/5",
                 cardClass,
                 isFocusCard && "bloom-soft border-indigo-500/30",
                 borderColor
               )}
             >
               {/* Glossy Overlay Reflection */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
               <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors duration-300">
@@ -166,7 +149,7 @@ export const DashboardMetrics = React.memo(
                 </CardTitle>
                 <div className={cn(
                   "p-2.5 rounded-2xl transition-all duration-300",
-                  isHero ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground group-hover:bg-white/10 group-hover:text-foreground"
+                  isHero ? "bg-primary/20 text-primary" : "bg-foreground/5 text-muted-foreground group-hover:bg-foreground/10 group-hover:text-foreground"
                 )}>
                   {metric.icon}
                 </div>
@@ -174,10 +157,21 @@ export const DashboardMetrics = React.memo(
               <CardContent className="relative z-10">
                 <div className="flex items-baseline gap-1.5">
                   <div className={cn(
-                    "text-4xl md:text-5xl font-extralight tracking-tight transition-transform duration-300 group-hover:scale-105 origin-left tabular-nums",
+                    "text-4xl md:text-5xl tracking-tight transition-transform duration-300 group-hover:scale-105 origin-left tabular-nums",
                     isHero ? "text-primary" : "text-foreground"
                   )}>
-                    {typeof metric.value === 'number' || typeof metric.value === 'string' ? metric.value : '-'}
+                    {typeof metric.value === 'number' || typeof metric.value === 'string'
+                      ? String(metric.value)
+                        .split(/(\d+)/)
+                        .filter(Boolean)
+                        .map((part, i) =>
+                          /^\d+$/.test(part) ? (
+                            <span key={i} className="font-extrabold">{part}</span>
+                          ) : (
+                            <span key={i} className="font-medium text-[0.6em] opacity-70">{part}</span>
+                          )
+                        )
+                      : '-'}
                   </div>
                 </div>
 
@@ -187,7 +181,7 @@ export const DashboardMetrics = React.memo(
                       <span>Performance</span>
                       <span>{metric.progress}%</span>
                     </div>
-                    <Progress value={metric.progress} className="h-1.5 bg-white/5" />
+                    <Progress value={metric.progress} className="h-1.5 bg-foreground/5" />
                   </div>
                 )}
 

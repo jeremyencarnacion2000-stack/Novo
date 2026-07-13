@@ -35,7 +35,7 @@ export default async function MobileAuthBridge() {
                 <h1 className="text-2xl font-bold">Authenticating...</h1>
                 <p className="text-gray-400">Verifying session and returning to Novo Mobile app.</p>
 
-                <div className="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl">
+                <div className="mt-8 p-4 bg-foreground/5 border border-foreground/10 rounded-2xl">
                     <p className="text-sm mb-4">Click below if the app doesn't open automatically</p>
                     <a
                         href={`novoapp://auth?token=${token}`}

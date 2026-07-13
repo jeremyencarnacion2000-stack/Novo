@@ -83,7 +83,7 @@ export function ConfidenceGauge({ score, size = 'md', showLabel = true, classNam
             {score}
           </span>
           {size !== 'sm' && (
-            <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 mt-0.5">Score</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-foreground/40 mt-0.5">Score</span>
           )}
         </div>
       )}
@@ -293,7 +293,7 @@ interface TelemetryPillProps {
 }
 
 const STATUS_COLORS = {
-  normal: { text: 'text-white/80', accent: 'bg-indigo-500/10 border-indigo-500/15' },
+  normal: { text: 'text-foreground/80', accent: 'bg-indigo-500/10 border-indigo-500/15' },
   good:   { text: 'text-emerald-400', accent: 'bg-emerald-500/10 border-emerald-500/15' },
   warning: { text: 'text-amber-400', accent: 'bg-amber-500/10 border-amber-500/15' },
   critical: { text: 'text-red-400', accent: 'bg-red-500/10 border-red-500/15' },
@@ -304,12 +304,15 @@ export function TelemetryPill({ label, value, unit, status = 'normal', icon: Ico
   return (
     <div className={cn('flex items-center gap-3 rounded-2xl border p-3', s.accent, className)}>
       {Icon && (
-        <div className="w-7 h-7 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+        <div className="w-7 h-7 rounded-xl bg-foreground/5 flex items-center justify-center flex-shrink-0">
           <Icon className={cn('w-3.5 h-3.5', s.text)} />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-white/35 truncate">{label}</p>
+        {/* Wraps instead of truncating: these are the product's canonical
+            metric names (Cognitive Clarity, Recovery Reserve, etc.) — losing
+            characters to "COGNITI…" reads as broken, not just tight. */}
+        <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/35 leading-tight">{label}</p>
         <p className={cn('text-sm font-bold mt-0.5 truncate', s.text)}>
           {value}{unit && <span className="text-[10px] font-normal ml-0.5 opacity-60">{unit}</span>}
         </p>
@@ -330,6 +333,7 @@ interface CognitiveStateHeroProps {
   fatigueScore: number
   minutesToNextPhase: number
   chronotype: string
+  twinConfidence?: number
   onActionClick?: () => void
 }
 
@@ -340,6 +344,7 @@ export function CognitiveStateHero({
   fatigueScore,
   minutesToNextPhase,
   chronotype,
+  twinConfidence,
   onActionClick,
 }: CognitiveStateHeroProps) {
   const isPeak = phase === 'PEAK_FOCUS'
@@ -400,10 +405,13 @@ export function CognitiveStateHero({
         }}
       />
 
-      {/* Ambient phase glow */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[120px] opacity-[0.08] pointer-events-none"
+      {/* Ambient phase glow — continuous slow breathing, so the panel reads
+          as a live system even between data refreshes, not just a static card */}
+      <motion.div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[120px] pointer-events-none"
         style={{ background: phaseColor }}
+        animate={{ opacity: [0.06, 0.11, 0.06] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       <div className="relative z-10">
@@ -412,8 +420,8 @@ export function CognitiveStateHero({
           <span className="text-[10px] font-black tracking-[0.3em] uppercase" style={{ color: phaseColor }}>
             {phaseLabel}
           </span>
-          <span className="text-[10px] text-white/30 font-medium capitalize tracking-wider">
-            {chronotype} · {minutesToNextPhase}m to next phase
+          <span className="text-[10px] text-foreground/30 font-medium capitalize tracking-wider">
+            {chronotype} · updates in {minutesToNextPhase}m
           </span>
         </div>
 
@@ -432,10 +440,10 @@ export function CognitiveStateHero({
           </div>
 
           <div>
-            <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight uppercase italic leading-none">
+            <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight uppercase italic leading-none">
               {phaseTitle}
             </h2>
-            <p className="text-sm text-white/40 mt-3 leading-relaxed max-w-xl mx-auto">
+            <p className="text-sm text-foreground/40 mt-3 leading-relaxed max-w-xl mx-auto">
               {phaseDesc}
             </p>
           </div>
@@ -444,9 +452,11 @@ export function CognitiveStateHero({
         {/* Telemetry bar — full width, prominent */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <TelemetryPill label="Cognitive Clarity" value={attentionScore} unit="%" status={attentionScore >= 70 ? 'good' : attentionScore >= 50 ? 'warning' : 'critical'} icon={Brain} />
-          <TelemetryPill label="Exec Momentum" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
+          <TelemetryPill label="Burnout Risk" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
           <TelemetryPill label="Recovery Reserve" value={100 - fatigueScore} unit="%" status={100 - fatigueScore >= 60 ? 'good' : 'warning'} icon={Battery} />
-          <TelemetryPill label="Synaptic Load" value={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4))} unit="%" status={Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 40 ? 'good' : Math.round((fatigueScore * 0.6 + (100 - attentionScore) * 0.4)) < 70 ? 'warning' : 'critical'} icon={Zap} />
+          {typeof twinConfidence === 'number' && (
+            <TelemetryPill label="Twin Confidence" value={twinConfidence} unit="%" status={twinConfidence >= 70 ? 'good' : twinConfidence >= 40 ? 'warning' : 'critical'} icon={Zap} />
+          )}
           <TelemetryPill label="Biological Clock" value={minutesToNextPhase} unit=" min" status="normal" icon={Clock} />
         </div>
       </div>
@@ -518,11 +528,11 @@ export function RecommendationHero({
             )}
           </div>
 
-          <h3 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase italic">
+          <h3 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase italic">
             {headline}
           </h3>
 
-          <p className="text-xs md:text-sm text-white/60 mt-2.5 leading-relaxed max-w-3xl">
+          <p className="text-xs md:text-sm text-foreground/60 mt-2.5 leading-relaxed max-w-3xl">
             {detail}
           </p>
         </div>
@@ -614,7 +624,7 @@ export function InsightCard({ insight, onActionClick, className }: InsightCardPr
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2.5 mb-1.5">
-          <span className="text-[14px] font-bold text-white/95 truncate transition-colors group-hover:text-white">
+          <span className="text-[14px] font-bold text-foreground/95 truncate transition-colors group-hover:text-foreground">
             {insight.headline}
           </span>
           <span className={cn(
@@ -624,7 +634,7 @@ export function InsightCard({ insight, onActionClick, className }: InsightCardPr
             {SEVERITY_LABELS[insight.severity]}
           </span>
         </div>
-        <p className="text-xs text-white/45 leading-relaxed font-normal">{insight.detail}</p>
+        <p className="text-xs text-foreground/45 leading-relaxed font-normal">{insight.detail}</p>
         {insight.action && (
           <div className="mt-3 flex">
             <button
@@ -632,7 +642,7 @@ export function InsightCard({ insight, onActionClick, className }: InsightCardPr
               className={cn(
                 'text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full border transition-all duration-350 cursor-pointer',
                 styles.badge,
-                'bg-white/[0.02] hover:bg-white/[0.08]'
+                'bg-foreground/[0.02] hover:bg-foreground/[0.08]'
               )}
             >
               → {insight.action}

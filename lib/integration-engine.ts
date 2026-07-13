@@ -7,10 +7,12 @@ export interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school' | 'notion';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'ai-task';
     sourceId: string;
     dueDate?: Date;
     timeOfDay?: string; // for routine tasks
+    scheduledHour?: number | null; // 0-23, set by the cognitive engine's auto-schedule
+    scheduledReason?: string | null;
     metadata?: {
         projectTitle?: string;
         routineName?: string;
@@ -47,21 +49,63 @@ export class IntegrationEngine {
         else timeOfDay = 'evening';
 
         const tasks: IntegratedTask[] = [];
+        const todayStr = today.toISOString().split('T')[0];
 
-        // 1. Get routine tasks for current time of day
-        const routines = await prisma.routine.findMany({
-            where: {
-                userId,
-                isActive: true,
-                OR: [
-                    { timeOfDay },
-                    { timeOfDay: 'anytime' }
-                ]
-            },
-            include: {
-                tasks: true
-            }
-        });
+        // All 5 sources are independent reads — fetch them in parallel
+        // instead of one round trip after another.
+        const [routines, projects, checklistItems, aiTasks, courses] = await Promise.all([
+            // 1. Routine tasks for current time of day
+            prisma.routine.findMany({
+                where: {
+                    userId,
+                    isActive: true,
+                    OR: [
+                        { timeOfDay },
+                        { timeOfDay: 'anytime' }
+                    ]
+                },
+                include: { tasks: true }
+            }),
+            // 2. Project subtasks due today
+            prisma.project.findMany({
+                where: { userId },
+                include: {
+                    subtasks: {
+                        where: { dueDate: { gte: today, lt: tomorrow } }
+                    }
+                }
+            }),
+            // 3. Manual and Notion checklist items
+            prisma.checklistItem.findMany({
+                where: { userId, source: { in: ['manual', 'notion'] } }
+            }),
+            // 3b. Task-model tasks (created via /api/tasks or the AI assistant's
+            // CREATE_TASK / CREATE_TASKS actions) — due today, or already
+            // assigned a scheduledHour by the cognitive engine (which only
+            // ever schedules for the current day).
+            prisma.task.findMany({
+                where: {
+                    userId,
+                    status: { not: 'done' },
+                    OR: [
+                        { dueDate: todayStr },
+                        { scheduledHour: { not: null } },
+                    ],
+                }
+            }),
+            // 4. School assignments due today
+            prisma.course.findMany({
+                where: { userId },
+                include: {
+                    grades: {
+                        where: {
+                            date: { gte: today, lt: tomorrow },
+                            category: { in: ['Exam', 'Assignment', 'Project', 'Quiz'] }
+                        }
+                    }
+                }
+            }),
+        ]);
 
         for (const routine of routines) {
             for (const task of routine.tasks) {
@@ -81,23 +125,7 @@ export class IntegrationEngine {
             }
         }
 
-        // 2. Get project subtasks due today
-        const projects = await prisma.project.findMany({
-            where: {
-                userId
-            },
-            include: {
-                subtasks: {
-                    where: {
-                        dueDate: {
-                            gte: today,
-                            lt: tomorrow
-                        }
-                    }
-                }
-            }
-        });
-
+        // 2. Project subtasks due today
         for (const project of projects) {
             for (const subtask of project.subtasks) {
                 const priority = this.mapProjectPriority(project.priority);
@@ -117,16 +145,7 @@ export class IntegrationEngine {
             }
         }
 
-        // 3. Get manual and Notion checklist items
-        const checklistItems = await prisma.checklistItem.findMany({
-            where: {
-                userId,
-                source: {
-                    in: ['manual', 'notion']
-                }
-            }
-        });
-
+        // 3. Manual and Notion checklist items
         for (const item of checklistItems) {
             tasks.push({
                 id: `checklist:${item.id}`,
@@ -139,26 +158,22 @@ export class IntegrationEngine {
             });
         }
 
-        // 4. Get school assignments due today (if any)
-        const courses = await prisma.course.findMany({
-            where: {
-                userId
-            },
-            include: {
-                grades: {
-                    where: {
-                        date: {
-                            gte: today,
-                            lt: tomorrow
-                        },
-                        category: {
-                            in: ['Exam', 'Assignment', 'Project', 'Quiz']
-                        }
-                    }
-                }
-            }
-        });
+        // 3b. Task-model tasks (created via /api/tasks or the AI assistant's
+        // CREATE_TASK / CREATE_TASKS actions)
+        for (const task of aiTasks) {
+            tasks.push({
+                id: `task:${task.id}`,
+                text: task.title,
+                completed: task.status === 'done',
+                priority: task.priority as 'low' | 'medium' | 'high',
+                source: 'ai-task',
+                sourceId: task.id,
+                scheduledHour: task.scheduledHour,
+                scheduledReason: task.scheduledReason,
+            });
+        }
 
+        // 4. School assignments due today (if any)
         for (const course of courses) {
             for (const grade of course.grades) {
                 if (!grade.score || grade.score === 0) {
@@ -301,6 +316,14 @@ export class IntegrationEngine {
             case 'school':
                 // School grades don't have a "completed" status
                 // When user completes, we could create a checklist reminder to study
+                break;
+
+            case 'task':
+                const aiTaskId = idParts[0];
+                await prisma.task.update({
+                    where: { id: aiTaskId },
+                    data: { status: completed ? 'done' : 'todo' }
+                });
                 break;
         }
     }

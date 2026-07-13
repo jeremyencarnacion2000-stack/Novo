@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { blendy } from '@/lib/blendy';
+import { modalFlip } from '@/lib/modal-flip';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, X, Loader2, User, Brain } from 'lucide-react';
+import { Calendar as CalendarIcon, X, Loader2, User, Brain, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarToolbar, CalendarView } from '@/components/calendar/calendar-toolbar';
 import { CalendarSidebar } from '@/components/calendar/calendar-sidebar';
@@ -48,7 +48,7 @@ export default function CalendarPage() {
 
   const [filters, setFilters] = useState({
     google: true, checklist: true, project: true, school: true,
-    routine: true, habit: true, business: true, holidays: true,
+    routine: true, habit: true, business: true, holidays: true, novo: true,
   });
 
   const sourceLabels: Record<string, { label: string; icon: string; color: string }> = {
@@ -60,6 +60,7 @@ export default function CalendarPage() {
     habit:     { label: 'Habits',    icon: '✨', color: '#5EEAD4' },
     business:  { label: 'Business',  icon: '💼', color: '#FCA5A5' },
     holidays:  { label: 'Holidays',  icon: '🎉', color: '#CBD5E1' },
+    novo:      { label: 'Asistente', icon: '🤖', color: '#818CF8' },
   };
 
   // ── Fetch events ──
@@ -131,46 +132,73 @@ export default function CalendarPage() {
 
   const handleCreateEvent = () => {
     setNewEvent({ title: '', date: currentDate, startTime: '09:00', endTime: '10:00', source: 'google' });
-    setTimeout(() => { blendy.update(); blendy.toggle('btn-create-event'); }, 10);
     setIsCreateDialogOpen(true);
   };
 
   const handleSelectEvent = (event: CalendarEvent) => {
     setSelectedEvent(event);
-    setTimeout(() => { blendy.update(); blendy.toggle(`event-${event.id}`); }, 10);
   };
 
+  // Fire the flip *after* React has committed the new DOM (dialog/detail div
+  // mounted) and the browser has had a frame to lay it out — a fixed
+  // setTimeout() raced the render and could fire before the target existed,
+  // leaving the modal permanently invisible (data-flip-target defaults to
+  // opacity:0 and only modalFlip's own success path clears that).
+  useEffect(() => {
+    if (!isCreateDialogOpen) return
+    const id = requestAnimationFrame(() => { modalFlip.toggle('btn-create-event') })
+    return () => cancelAnimationFrame(id)
+  }, [isCreateDialogOpen])
+
+  useEffect(() => {
+    if (!selectedEvent) return
+    const id = requestAnimationFrame(() => { modalFlip.toggle(`event-${selectedEvent.id}`) })
+    return () => cancelAnimationFrame(id)
+  }, [selectedEvent])
+
   const handleCloseCreateDialog = () => {
-    blendy.untoggle('btn-create-event', () => setIsCreateDialogOpen(false));
+    modalFlip.untoggle('btn-create-event', () => setIsCreateDialogOpen(false));
   };
 
   const handleCloseSelectedEvent = () => {
-    if (selectedEvent) blendy.untoggle(`event-${selectedEvent.id}`, () => setSelectedEvent(null));
+    if (selectedEvent) modalFlip.untoggle(`event-${selectedEvent.id}`, () => setSelectedEvent(null));
     else setSelectedEvent(null);
   };
 
   const submitCreateEvent = async () => {
     if (!newEvent.title) { toast({ title: 'Error', description: 'Please enter a title', variant: 'destructive' }); return; }
     setIsCreating(true);
-    await new Promise(r => setTimeout(r, 800));
     const start = new Date(newEvent.date);
     const [sh, sm] = newEvent.startTime.split(':').map(Number);
     start.setHours(sh, sm);
     const end = new Date(newEvent.date);
     const [eh, em] = newEvent.endTime.split(':').map(Number);
     end.setHours(eh, em);
-    const created: CalendarEvent = {
-      id: Math.random().toString(36).slice(2),
-      title: newEvent.title,
-      start, end,
-      allDay: false,
-      source: newEvent.source,
-      color: sourceLabels[newEvent.source]?.color ?? '#A5B4FC',
-    };
-    setEvents(prev => [...prev, created]);
-    setIsCreating(false);
-    handleCloseCreateDialog();
-    toast({ title: 'Success', description: 'Event created successfully' });
+    try {
+      const res = await fetch('/api/calendar/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newEvent.title, start, end, allDay: false }),
+      });
+      if (!res.ok) throw new Error('Failed to create event');
+      const { event } = await res.json();
+      const created: CalendarEvent = {
+        id: `novo:event:${event.id}`,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        allDay: event.allDay,
+        source: 'novo',
+        color: sourceLabels['novo']?.color ?? '#818CF8',
+      };
+      setEvents(prev => [...prev, created]);
+      handleCloseCreateDialog();
+      toast({ title: 'Success', description: 'Event created successfully' });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo crear el evento', variant: 'destructive' });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const filteredEvents = events.filter(e =>
@@ -182,7 +210,7 @@ export default function CalendarPage() {
   return (
     <>
       <div className="h-full w-full p-0 md:p-4 overflow-hidden">
-        <Card variant="secondary" className="flex flex-col lg:flex-row gap-6 h-full min-h-0 rounded-none md:rounded-[32px] p-4 md:p-6 pb-24 md:pb-6 overflow-hidden relative border-white/10">
+        <Card variant="secondary" className="flex flex-col lg:flex-row gap-6 h-full min-h-0 rounded-none md:rounded-[28px] p-4 md:p-6 pb-24 md:pb-6 overflow-hidden relative border-foreground/10">
 
           {/* Mobile sidebar toggle */}
           <div className="lg:hidden flex justify-between items-center mb-4">
@@ -244,7 +272,7 @@ export default function CalendarPage() {
             {/* Search overlay */}
             {searchQuery && (
               <div className="relative z-20 mb-2">
-                <div className="absolute top-0 left-0 right-0 bg-background/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl p-4 max-h-[360px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-0 left-0 right-0 bg-background/95 backdrop-blur-md border border-foreground/10 rounded-2xl shadow-2xl p-4 max-h-[360px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Search Results</h3>
                     <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="h-6 w-6 p-0 rounded-full"><X className="h-4 w-4" /></Button>
@@ -253,7 +281,7 @@ export default function CalendarPage() {
                     <div>
                       <h4 className="text-xs font-bold text-primary mb-2 flex items-center gap-2"><CalendarIcon className="h-3 w-3" /> Events ({filteredEvents.length})</h4>
                       {filteredEvents.slice(0, 5).map(ev => (
-                        <div key={ev.id} className="p-2 rounded-lg hover:bg-white/5 cursor-pointer" onClick={() => { setSelectedEvent(ev); setSearchQuery(''); }}>
+                        <div key={ev.id} className="p-2 rounded-lg hover:bg-foreground/5 cursor-pointer" onClick={() => { setSelectedEvent(ev); setSearchQuery(''); }}>
                           <div className="font-medium text-sm">{ev.title}</div>
                           <div className="text-xs text-muted-foreground">{format(ev.start, 'MMM d, yyyy')}</div>
                         </div>
@@ -263,7 +291,7 @@ export default function CalendarPage() {
                       <div>
                         <h4 className="text-xs font-bold text-primary mb-2 flex items-center gap-2"><User className="h-3 w-3" /> Contacts ({contacts.length})</h4>
                         {contacts.map(c => (
-                          <div key={c.id} className="p-2 rounded-lg hover:bg-white/5 cursor-pointer flex items-center gap-3">
+                          <div key={c.id} className="p-2 rounded-lg hover:bg-foreground/5 cursor-pointer flex items-center gap-3">
                             <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{c.name[0]}</div>
                             <div>
                               <div className="font-medium text-sm">{c.name}</div>
@@ -320,31 +348,34 @@ export default function CalendarPage() {
 
       {/* Create Event Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={(o) => !o && handleCloseCreateDialog()}>
-        <DialogContent data-blendy-to="btn-create-event" className="sm:max-w-[425px] glass-panel border-white/10">
+        <DialogContent data-flip-to="btn-create-event" className="sm:max-w-[425px] glass-panel border-foreground/10">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold tracking-tight">Create New Event</DialogTitle>
+            <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <Plus data-shared-item="icon" className="h-5 w-5" />
+              <span data-shared-item="text">Create New Event</span>
+            </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-title" className="text-right">Title</Label>
-              <Input id="ev-title" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} className="col-span-3 bg-white/5 border-white/10" autoComplete="off" />
+              <Input id="ev-title" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" autoComplete="off" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-type" className="text-right">Type</Label>
               <Select value={newEvent.source} onValueChange={v => setNewEvent({ ...newEvent, source: v })}>
-                <SelectTrigger className="col-span-3 bg-white/5 border-white/10"><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent className="glass-panel border-white/10">
+                <SelectTrigger className="col-span-3 bg-foreground/5 border-foreground/10"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent className="glass-panel border-foreground/10">
                   {Object.entries(sourceLabels).map(([k, { label }]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-start" className="text-right">Start</Label>
-              <Input id="ev-start" type="time" value={newEvent.startTime} onChange={e => setNewEvent({ ...newEvent, startTime: e.target.value })} className="col-span-3 bg-white/5 border-white/10" />
+              <Input id="ev-start" type="time" value={newEvent.startTime} onChange={e => setNewEvent({ ...newEvent, startTime: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-end" className="text-right">End</Label>
-              <Input id="ev-end" type="time" value={newEvent.endTime} onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })} className="col-span-3 bg-white/5 border-white/10" />
+              <Input id="ev-end" type="time" value={newEvent.endTime} onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" />
             </div>
           </div>
           <DialogFooter>
@@ -358,16 +389,16 @@ export default function CalendarPage() {
 
       {/* Event detail modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-        <div data-blendy-to={selectedEvent ? `event-${selectedEvent.id}` : ''} className="glass-panel rounded-3xl shadow-2xl border border-white/10 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+        <div data-flip-to={selectedEvent ? `event-${selectedEvent.id}` : ''} data-state="open" className="modal-flip-target glass-panel rounded-3xl shadow-2xl border border-foreground/10 w-full max-w-md overflow-hidden">
             <div className="p-6 space-y-5">
               <div className="flex items-start justify-between">
-                <h3 className="text-xl font-bold leading-none tracking-tight">{selectedEvent.title}</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-white/10" onClick={handleCloseSelectedEvent}>
+                <h3 data-shared-item="text" className="text-xl font-bold leading-none tracking-tight">{selectedEvent.title}</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-foreground/10" onClick={handleCloseSelectedEvent}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/5 p-3 rounded-xl">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-foreground/5 p-3 rounded-xl">
                 <CalendarIcon className="h-4 w-4 text-primary" />
                 <span className="font-medium">
                   {format(selectedEvent.start, 'EEEE, MMMM d')}
@@ -378,12 +409,12 @@ export default function CalendarPage() {
                 {sourceLabels[selectedEvent.source]?.icon} {sourceLabels[selectedEvent.source]?.label}
               </Badge>
               {selectedEvent.metadata?.description && (
-                <div className="bg-white/5 p-4 rounded-xl text-sm text-muted-foreground leading-relaxed">
+                <div className="bg-foreground/5 p-4 rounded-xl text-sm text-muted-foreground leading-relaxed">
                   {selectedEvent.metadata.description}
                 </div>
               )}
             </div>
-            <div className="bg-white/5 p-4 flex justify-end border-t border-white/10">
+            <div className="bg-foreground/5 p-4 flex justify-end border-t border-foreground/10">
               <Button onClick={handleCloseSelectedEvent} className="rounded-xl px-6">Close</Button>
             </div>
           </div>

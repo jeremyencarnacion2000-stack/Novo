@@ -9,7 +9,7 @@ export interface CalendarEvent {
     start: Date;
     end: Date;
     allDay: boolean;
-    source: 'google' | 'checklist' | 'project' | 'school' | 'routine' | 'habit' | 'business' | 'holidays';
+    source: 'google' | 'checklist' | 'project' | 'school' | 'routine' | 'habit' | 'business' | 'holidays' | 'novo';
     color: string;
     metadata?: {
         projectId?: string;
@@ -32,6 +32,7 @@ const SOURCE_COLORS = {
     habit: '#5EEAD4',       // Teal 300
     business: '#FCA5A5',    // Red 300
     holidays: '#CBD5E1',    // Slate 300
+    novo: '#818CF8',        // Indigo 400 — native/AI-created events
 };
 
 export class CalendarAggregator {
@@ -46,11 +47,14 @@ export class CalendarAggregator {
     ): Promise<CalendarEvent[]> {
         const events: CalendarEvent[] = [];
 
-        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit', 'business', 'holidays'];
+        const enabledSources = sources || ['google', 'checklist', 'project', 'school', 'routine', 'habit', 'business', 'holidays', 'novo'];
 
         // Fetch from all enabled sources in parallel
         const promises: Promise<CalendarEvent[]>[] = [];
 
+        if (enabledSources.includes('novo')) {
+            promises.push(this.getNovoEvents(userId, start, end));
+        }
         if (enabledSources.includes('google')) {
             promises.push(this.getGoogleEvents(userId, start, end));
         }
@@ -81,6 +85,36 @@ export class CalendarAggregator {
 
         // Sort by start date
         return events.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+
+    /**
+     * Get native Novo calendar events — created directly by the user or by
+     * the AI assistant via the CREATE_EVENT action.
+     */
+    private static async getNovoEvents(
+        userId: string,
+        start: Date,
+        end: Date
+    ): Promise<CalendarEvent[]> {
+        const events = await prisma.calendarEvent.findMany({
+            where: {
+                userId,
+                start: { gte: start, lte: end },
+            },
+        });
+
+        return events.map(event => ({
+            id: `novo:event:${event.id}`,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            allDay: event.allDay,
+            source: 'novo' as const,
+            color: SOURCE_COLORS.novo,
+            metadata: {
+                description: event.description || undefined,
+            },
+        }));
     }
 
     /**

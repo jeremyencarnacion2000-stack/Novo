@@ -182,7 +182,7 @@ export default function ArtistProfilePage() {
                     >
                       <div className="w-4 text-center text-gray-500 font-mono text-sm group-hover:text-white transition-colors">{idx + 1}</div>
                       <div className="relative w-12 h-12 shrink-0 overflow-hidden rounded-lg">
-                        <img src={song.image || '/placeholder-album.png'} className="w-full h-full object-cover" />
+                        <img src={song.image || '/placeholder-album.png'} loading="lazy" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Play className="h-4 w-4 text-white fill-current" />
                         </div>
@@ -221,7 +221,7 @@ export default function ArtistProfilePage() {
                       {artist.topAlbums.map((album) => (
                         <div key={album.id} className="w-40 sm:w-48 space-y-4 group cursor-pointer">
                           <div className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group-hover:shadow-indigo-500/20 transition-all duration-500">
-                            <img src={album.image || '/placeholder-album.png'} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            <img src={album.image || '/placeholder-album.png'} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                                 <Button size="icon" className="h-12 w-12 rounded-full bg-white text-black hover:scale-110 transition-transform shadow-2xl">
                                     <Disc className="h-6 w-6" />
@@ -248,7 +248,7 @@ export default function ArtistProfilePage() {
                     {artist.similarArtists.slice(0, 6).map((sa) => (
                       <Link key={sa.id} href={`/music/artist/${sa.id}`} className="group space-y-4 text-center">
                         <div className="aspect-square rounded-full overflow-hidden shadow-lg transition-all duration-500 group-hover:scale-105 group-hover:shadow-indigo-500/10">
-                          <img src={sa.image || '/placeholder-album.png'} className="w-full h-full object-cover" />
+                          <img src={sa.image || '/placeholder-album.png'} loading="lazy" className="w-full h-full object-cover" />
                         </div>
                         <h4 className="font-bold text-white truncate text-sm group-hover:text-indigo-400 transition-colors">{sa.name}</h4>
                       </Link>

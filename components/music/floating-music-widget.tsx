@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NowPlayingFullscreen } from '@/components/music/now-playing-fullscreen';
 
 interface Particle {
   id: number;
@@ -44,6 +45,8 @@ const FloatingMusicWidgetComponent = () => {
   // Reward triggers
   const [isRewarding, setIsRewarding] = useState(false);
   const [rewardParticles, setRewardParticles] = useState<Particle[]>([]);
+  // Full-screen Now Playing (opened by tapping the pill's track info)
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   // Decoupled Global Reward Listener for instant feedback
   useEffect(() => {
@@ -89,58 +92,72 @@ const FloatingMusicWidgetComponent = () => {
   // ─── MUSIC PAGE: Horizontal bottom bar player ───
   if (isMusicPage && isOpen && currentTrack) {
     return (
+      <>
+      <NowPlayingFullscreen open={fullscreenOpen} onClose={() => setFullscreenOpen(false)} />
       <div
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[680px] h-[85px] rounded-full bg-gradient-to-r from-[#0d0f0d]/95 via-[#141a14]/95 to-[#0b0c0a]/95 backdrop-blur-2xl border border-white/10 px-8 flex items-center justify-between shadow-[0_8px_32px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 transition-all overflow-hidden"
+        // Below `md`, components/mobile-nav.tsx floats its own pill+FAB at
+        // `bottom-4` — stacking this player above it (not sharing the same
+        // offset) is what the reference mockup does, and it's the only way
+        // the two don't visually and hit-test overlap (they used to, almost
+        // completely, on the same `bottom-4` band).
+        className="fixed bottom-[84px] md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-[680px] h-[68px] md:h-[85px] rounded-full bg-gradient-to-r from-[#0d0f0d]/95 via-[#141a14]/95 to-[#0b0c0a]/95 backdrop-blur-2xl border border-white/10 px-3 md:px-8 flex items-center justify-between gap-2 shadow-[0_8px_32px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 transition-all overflow-hidden"
       >
-        {/* Left: Track Info with Rotating Vinyl Cover */}
-        <div className="flex items-center gap-4 w-[210px] relative z-10">
+        {/* Left: Track Info with Rotating Vinyl Cover — tap opens fullscreen */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Abrir reproductor a pantalla completa"
+          onClick={() => setFullscreenOpen(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFullscreenOpen(true) }}
+          className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1 sm:w-[210px] sm:flex-none relative z-10 cursor-pointer active:scale-[0.98] transition-transform"
+        >
           <div className="relative group flex-shrink-0">
             {isPlaying && (
               <span className="absolute inset-0 rounded-full bg-emerald-500/20 blur-md scale-105 animate-pulse" />
             )}
             <div
-              className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl animate-[spin_20s_linear_infinite]"
+              className="relative w-10 h-10 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl animate-[spin_20s_linear_infinite]"
               style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
             >
               <img src={currentTrack.image || '/placeholder-album.png'} alt={currentTrack.name} className="w-full h-full object-cover rounded-full" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.3)_0%,transparent_60%)] pointer-events-none rounded-full" />
               <div className="absolute inset-2 border border-white/5 rounded-full" />
-              <div className="absolute inset-4 border border-black/40 rounded-full" />
+              <div className="hidden sm:block absolute inset-4 border border-black/40 rounded-full" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#0d0f0d] border border-white/20 shadow-inner flex items-center justify-center">
                 <div className="w-1 h-1 rounded-full bg-black" />
               </div>
             </div>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-white text-sm font-bold truncate tracking-tight">{currentTrack.name}</span>
-            <span className="text-emerald-400/80 text-xs truncate font-medium">{currentTrack.artist}</span>
+            <span className="text-white text-xs sm:text-sm font-bold truncate tracking-tight">{currentTrack.name}</span>
+            <span className="text-emerald-400/80 text-[10px] sm:text-xs truncate font-medium">{currentTrack.artist}</span>
           </div>
         </div>
 
         {/* Center: Controls */}
-        <div className="flex items-center gap-5 relative z-10">
-          <Button variant="ghost" size="icon" onClick={previousTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-9 w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
-            <SkipBack className="h-5 w-5 fill-current" />
+        <div className="flex items-center gap-1.5 sm:gap-5 relative z-10 flex-shrink-0">
+          <Button variant="ghost" size="icon" onClick={previousTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
+            <SkipBack className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />
           </Button>
           <Button
             onClick={togglePlayPause}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all duration-300 active:scale-95 border border-white/10",
+              "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all duration-300 active:scale-95 border border-white/10",
               isPlaying
                 ? "bg-gradient-to-tr from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]"
                 : "bg-white hover:bg-gray-100 text-black"
             )}
             disabled={!isReady}
           >
-            {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
+            {isPlaying ? <Pause className="h-4 w-4 sm:h-5 sm:w-5 fill-current" /> : <Play className="h-4 w-4 sm:h-5 sm:w-5 fill-current ml-0.5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={nextTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-9 w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
-            <SkipForward className="h-5 w-5 fill-current" />
+          <Button variant="ghost" size="icon" onClick={nextTrack} className="text-white/70 hover:text-white hover:bg-white/5 h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:scale-115 active:scale-90 transition-all duration-200">
+            <SkipForward className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />
           </Button>
         </div>
 
-        {/* Right: Time & Volume */}
-        <div className="flex items-center gap-4 w-[210px] justify-end relative z-10">
+        {/* Right: Time & Volume — reclaimed on mobile, there's no room for it */}
+        <div className="hidden sm:flex items-center gap-4 w-[210px] justify-end relative z-10">
           <span className="text-xs text-white/50 font-mono tracking-wider tabular-nums bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
             {formatTime(progress)} <span className="opacity-40">/</span> {formatTime(duration)}
           </span>
@@ -159,6 +176,7 @@ const FloatingMusicWidgetComponent = () => {
           <div className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 transition-all duration-1000 ease-linear shadow-[0_0_8px_#10b981]" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
+      </>
     );
   }
 

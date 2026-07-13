@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useOnlineStatus } from '@/hooks/use-online-status'
-import { getQueue } from '@/lib/sync-queue'
+import { getQueue, SYNC_QUEUE_CHANGE_EVENT } from '@/lib/sync-queue'
 import { WifiOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -11,11 +11,11 @@ export function OfflineIndicator() {
     const [pendingCount, setPendingCount] = useState(0)
 
     useEffect(() => {
-        // Update pending count periodically
+        // Update pending count only when the queue actually changes
         const update = () => setPendingCount(getQueue().length)
         update()
-        const interval = setInterval(update, 3000)
-        return () => clearInterval(interval)
+        window.addEventListener(SYNC_QUEUE_CHANGE_EVENT, update)
+        return () => window.removeEventListener(SYNC_QUEUE_CHANGE_EVENT, update)
     }, [])
 
     if (isOnline && pendingCount === 0) return null

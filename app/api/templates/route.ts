@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/templates - Get all templates
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
 // POST /api/templates - Create a template
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

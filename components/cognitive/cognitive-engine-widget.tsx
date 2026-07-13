@@ -78,7 +78,7 @@ export function CognitiveEngineWidget() {
         whileHover={{ scale: 1.015, y: -2, transition: { ...springConfig.snappy } }}
         className={cn(
           'relative rounded-3xl p-5 border transition-all duration-500 cursor-pointer',
-          'border-white/[0.08] bg-white/[0.01]',
+          'border-foreground/[0.08] bg-foreground/[0.01]',
           'hover:border-primary/30 hover:bg-primary/[0.02]',
           'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_50px_rgba(0,0,0,0.3)]',
           'hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(99,102,241,0.2)]',
@@ -118,18 +118,18 @@ export function CognitiveEngineWidget() {
               <Brain className="w-4 h-4 text-primary transition-transform duration-300 group-hover:scale-110" />
             </div>
             <div>
-              <p className="text-[9px] font-black tracking-[0.25em] uppercase text-white/35">Cognitive Engine</p>
-              <p className="text-xs font-bold text-white/70">Performance Report</p>
+              <p className="text-[9px] font-black tracking-[0.25em] uppercase text-foreground/35">Cognitive Engine</p>
+              <p className="text-xs font-bold text-foreground/70">Performance Report</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all duration-300" />
+          <ArrowRight className="w-4 h-4 text-foreground/20 group-hover:text-primary group-hover:translate-x-1 transition-all duration-300" />
         </div>
 
         {/* Body */}
         <div className="relative z-10">
           {loading ? (
             <div className="flex items-center gap-3 py-2">
-              <div className="w-14 h-14 rounded-full animate-pulse flex-shrink-0 border border-white/[0.04]"
+              <div className="w-14 h-14 rounded-full animate-pulse flex-shrink-0 border border-foreground/[0.04]"
                 style={{ background: 'rgba(255,255,255,0.02)' }}
               />
               <div className="flex-1 space-y-2">
@@ -154,8 +154,8 @@ export function CognitiveEngineWidget() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-1">Focus Score</p>
-                  <p className="text-sm font-bold text-white/75 leading-snug truncate">{data.topInsight}</p>
+                  <p className="text-[10px] font-bold text-foreground/25 uppercase tracking-widest mb-1">Focus Score</p>
+                  <p className="text-sm font-bold text-foreground/75 leading-snug truncate">{data.topInsight}</p>
 
                   <div className="flex items-center gap-1.5 mt-1.5">
                     {riskLevel !== 'safe' && (
@@ -174,18 +174,18 @@ export function CognitiveEngineWidget() {
 
               {/* Recommendation glass pill */}
               <div
-                className="px-3.5 py-2.5 rounded-xl border border-white/[0.06] transition-all duration-300 group-hover:border-white/[0.10]"
+                className="px-3.5 py-2.5 rounded-xl border border-foreground/[0.06] transition-all duration-300 group-hover:border-foreground/[0.10]"
                 style={{
                   background: 'rgba(255,255,255,0.015)',
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
                 }}
               >
                 <p className="text-[9px] font-black tracking-widest uppercase text-primary/45 mb-0.5 group-hover:text-primary/70 transition-colors">Now →</p>
-                <p className="text-[11px] text-white/40 leading-relaxed line-clamp-2">{data.recommendation}</p>
+                <p className="text-[11px] text-foreground/40 leading-relaxed line-clamp-2">{data.recommendation}</p>
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-2 py-2 text-white/20">
+            <div className="flex items-center gap-2 py-2 text-foreground/20">
               <TrendingDown className="w-4 h-4" />
               <span className="text-xs">Engine offline · Check connection</span>
             </div>

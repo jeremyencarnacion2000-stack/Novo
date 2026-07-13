@@ -56,7 +56,7 @@ export function BusinessStats() {
         return (
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                 {[...Array(4)].map((_, i) => (
-                    <Card key={i} className="bg-card border-border">
+                    <Card key={i} className="liquid-glass">
                         <CardContent className="p-5">
                             <div className="animate-pulse h-20 bg-muted rounded" />
                         </CardContent>
@@ -72,28 +72,28 @@ export function BusinessStats() {
         {
             label: 'Total Revenue',
             value: formatCurrency(stats.totalRevenue),
-            subtext: '+0% from last month',
+            subtext: `${stats.wonDeals} deals won`,
             icon: CheckCircle2,
             accentColor: 'bg-emerald-500',
         },
         {
             label: 'Pipeline Value',
             value: formatCurrency(stats.totalPipelineValue),
-            subtext: '+0% from last month',
+            subtext: `${stats.openDeals} open deals`,
             icon: Clock,
             accentColor: 'bg-blue-500',
         },
         {
             label: 'Conversion Rate',
             value: `${stats.conversionRate.toFixed(0)}%`,
-            subtext: '+0% from last month',
+            subtext: `Avg deal ${formatCurrency(stats.avgDealSize)}`,
             icon: Zap,
             accentColor: 'bg-amber-500',
         },
         {
             label: 'Active Clients',
             value: stats.activeClients.toString(),
-            subtext: '+0% from last month',
+            subtext: `${stats.prospects} prospects`,
             icon: Target,
             accentColor: 'bg-rose-500',
         },
@@ -102,7 +102,7 @@ export function BusinessStats() {
     return (
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             {statCards.map((stat) => (
-                <Card key={stat.label} className="bg-card border-border hover:border-border/80 transition-colors">
+                <Card key={stat.label} className="liquid-glass hover:border-foreground/10 transition-colors">
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-sm text-muted-foreground">{stat.label}</span>

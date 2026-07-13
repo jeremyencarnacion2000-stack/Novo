@@ -43,7 +43,7 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
       style={{ viewTransitionName: `cal-day-${format(currentDate, 'yyyy-MM-dd')}` } as React.CSSProperties}
     >
       {/* Day header */}
-      <div className="shrink-0 pb-3 border-b border-white/5 mb-1">
+      <div className="shrink-0 pb-3 border-b border-foreground/5 mb-1">
         <h3 className="text-lg font-bold text-foreground">
           {format(currentDate, 'EEEE, MMMM d')}
         </h3>
@@ -52,10 +52,11 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
 
       {/* All-day events banner */}
       {allDayEvents.length > 0 && (
-        <div className="shrink-0 flex flex-wrap gap-2 pb-3 mb-1 border-b border-white/5">
+        <div className="shrink-0 flex flex-wrap gap-2 pb-3 mb-1 border-b border-foreground/5">
           {allDayEvents.map((ev) => (
             <button
               key={ev.id}
+              data-flip-from={`event-${ev.id}`}
               onClick={() => onSelectEvent(ev)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold truncate max-w-[200px] transition-opacity hover:opacity-80"
               style={{
@@ -64,7 +65,7 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
                 color: ev.color,
               }}
             >
-              {ev.title}
+              <span data-shared-item="text">{ev.title}</span>
             </button>
           ))}
         </div>
@@ -90,12 +91,12 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
           </div>
 
           {/* Events column */}
-          <div className="relative border-l border-white/5">
+          <div className="relative border-l border-foreground/5">
             {/* Grid lines */}
             {hours.map((h) => (
               <div
                 key={h}
-                className="absolute w-full border-t border-white/[0.04]"
+                className="absolute w-full border-t border-foreground/[0.04]"
                 style={{ top: `${(h - HOUR_START) * PX_PER_HOUR}px` }}
               />
             ))}
@@ -107,6 +108,7 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
               return (
                 <button
                   key={ev.id}
+                  data-flip-from={`event-${ev.id}`}
                   onClick={() => onSelectEvent(ev)}
                   className="absolute left-2 right-2 rounded-xl px-3 py-2 text-left overflow-hidden transition-opacity hover:brightness-125"
                   style={{
@@ -118,7 +120,7 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
                     opacity: dimmed ? 0.25 : 1,
                   }}
                 >
-                  <p className="text-xs font-bold truncate">{ev.title}</p>
+                  <p data-shared-item="text" className="text-xs font-bold truncate">{ev.title}</p>
                   <p className="text-[10px] opacity-70 mt-0.5">
                     {format(ev.start, 'p')} – {format(ev.end, 'p')}
                   </p>

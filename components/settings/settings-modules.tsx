@@ -189,7 +189,7 @@ export function SettingsModules() {
           return (
             <div
               key={moduleId}
-              className="flex items-center justify-between p-3.5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+              className="flex items-center justify-between p-3.5 rounded-2xl border border-foreground/5 bg-foreground/[0.01] hover:bg-foreground/[0.03] transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
@@ -219,14 +219,14 @@ export function SettingsModules() {
 
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-white/95">{modInfo.title}</span>
+                    <span className="font-semibold text-sm text-foreground/95">{modInfo.title}</span>
                     {isPinned && (
                       <span className="text-[9px] font-black tracking-widest uppercase bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">
                         Pinned
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-white/35">{modInfo.desc}</p>
+                  <p className="text-xs text-foreground/35">{modInfo.desc}</p>
                 </div>
               </div>
 
@@ -234,7 +234,7 @@ export function SettingsModules() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn('h-8 w-8', isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-white/40 hover:text-white')}
+                  className={cn('h-8 w-8', isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-foreground/40 hover:text-foreground')}
                   onClick={() => handleTogglePinModule(moduleId)}
                   title={isPinned ? 'Unpin module' : 'Pin module'}
                 >
@@ -257,21 +257,21 @@ export function SettingsModules() {
               return (
                 <div
                   key={modInfo.id}
-                  className="flex items-center justify-between p-3.5 rounded-2xl border border-white/5 bg-white/[0.005] hover:bg-white/[0.015] transition-colors"
+                  className="flex items-center justify-between p-3.5 rounded-2xl border border-foreground/5 bg-foreground/[0.005] hover:bg-foreground/[0.015] transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-white/5 text-muted-foreground">
+                    <div className="p-2 rounded-lg bg-foreground/5 text-muted-foreground">
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-sm text-white/50">{modInfo.title}</span>
-                      <p className="text-xs text-white/30">{modInfo.desc}</p>
+                      <span className="font-semibold text-sm text-foreground/50">{modInfo.title}</span>
+                      <p className="text-xs text-foreground/30">{modInfo.desc}</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 hover:bg-primary/20 text-white/40 hover:text-primary"
+                    className="h-8 w-8 hover:bg-primary/20 text-foreground/40 hover:text-primary"
                     onClick={() => handleToggleModule(modInfo.id)}
                   >
                     <Plus className="h-4 w-4" />
@@ -291,19 +291,19 @@ export function SettingsModules() {
               return (
                 <div key={mod.id} className="p-4 rounded-2xl border border-amber-500/10 bg-amber-500/[0.03]">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Icon className="w-4 h-4 text-white/30" />
+                    <div className="w-8 h-8 rounded-xl bg-foreground/5 border border-foreground/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon className="w-4 h-4 text-foreground/30" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-semibold text-white/50">{mod.title}</p>
+                        <p className="text-sm font-semibold text-foreground/50">{mod.title}</p>
                         <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/15">
                           <EyeOff className="w-2.5 h-2.5 text-amber-400" />
                           <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Twin Hidden</span>
                         </div>
                       </div>
-                      <p className="text-xs text-white/30 mb-1">{mod.reason}</p>
-                      <div className="flex items-center gap-3 text-[10px] text-white/25">
+                      <p className="text-xs text-foreground/30 mb-1">{mod.reason}</p>
+                      <div className="flex items-center gap-3 text-[10px] text-foreground/25">
                         <span>Confidence: {mod.confidence}%</span>
                         <span>.</span>
                         <span>Since {new Date(mod.timestamp).toLocaleDateString()}</span>
@@ -313,7 +313,7 @@ export function SettingsModules() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleEnableAnyway(mod.id)}
-                      className="text-xs border-white/10 hover:border-primary/30 hover:bg-primary/10 hover:text-primary flex-shrink-0"
+                      className="text-xs border-foreground/10 hover:border-primary/30 hover:bg-primary/10 hover:text-primary flex-shrink-0"
                     >
                       Enable Anyway
                     </Button>

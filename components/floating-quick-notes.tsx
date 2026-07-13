@@ -19,9 +19,9 @@ export function FloatingQuickNotes() {
             className={cn(
                 "fixed bottom-24 right-4 z-50",
                 "h-12 w-12 rounded-full",
-                "bg-white/5 backdrop-blur-md border border-white/10",
+                "bg-foreground/5 backdrop-blur-md border border-foreground/10",
                 "flex items-center justify-center",
-                "text-white/40 hover:text-primary hover:border-primary/50 transition-all duration-300",
+                "text-foreground/40 hover:text-primary hover:border-primary/50 transition-all duration-300",
                 "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-primary/20",
                 "group"
             )}
@@ -30,8 +30,8 @@ export function FloatingQuickNotes() {
             <StickyNote size={20} className="group-hover:rotate-12 transition-transform" />
 
             {/* Tooltip hint for desktop */}
-            <div className="absolute right-14 px-3 py-1.5 rounded-lg bg-black/80 border border-white/10 backdrop-blur-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                <span className="text-[10px] font-black tracking-widest uppercase italic text-white/60">
+            <div className="absolute right-14 px-3 py-1.5 rounded-lg bg-black/80 border border-foreground/10 backdrop-blur-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                <span className="text-[10px] font-black tracking-widest uppercase italic text-foreground/60">
                     Notas Rápidas
                 </span>
             </div>

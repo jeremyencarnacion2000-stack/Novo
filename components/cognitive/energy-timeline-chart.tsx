@@ -3,6 +3,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { motion } from 'framer-motion';
+import { Zap, TrendingDown, Play } from 'lucide-react';
 import type { EnergyPoint } from './types';
 
 interface EnergyTimelineChartProps {
@@ -16,12 +17,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const point: EnergyPoint = payload[0]?.payload;
   return (
-    <div className="bg-[#0d0d12]/95 border border-white/10 rounded-xl px-3 py-2 shadow-xl backdrop-blur-xl">
-      <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{label}</p>
+    <div className="bg-[#0d0d12]/95 border border-foreground/10 rounded-xl px-3 py-2 shadow-xl backdrop-blur-xl">
+      <p className="text-[10px] text-foreground/40 uppercase tracking-widest font-bold">{label}</p>
       <p className="text-sm font-bold text-white mt-0.5">{point.energy}% capacity</p>
-      {point.isPeak && <p className="text-[10px] text-green-400 font-bold">⚡ PEAK WINDOW</p>}
-      {point.isDip && <p className="text-[10px] text-amber-400 font-bold">📉 AFTERNOON DIP</p>}
-      {point.isCurrent && <p className="text-[10px] text-indigo-400 font-bold">▶ NOW</p>}
+      {point.isPeak && <p className="flex items-center gap-1 text-[10px] text-green-400 font-bold"><Zap className="w-3 h-3" /> PEAK WINDOW</p>}
+      {point.isDip && <p className="flex items-center gap-1 text-[10px] text-amber-400 font-bold"><TrendingDown className="w-3 h-3" /> AFTERNOON DIP</p>}
+      {point.isCurrent && <p className="flex items-center gap-1 text-[10px] text-indigo-400 font-bold"><Play className="w-2.5 h-2.5 fill-indigo-400" /> NOW</p>}
     </div>
   );
 };
@@ -36,23 +37,23 @@ export function EnergyTimelineChart({ timeline, currentHour, peakStart, peakEnd 
     >
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-white/70">
+          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-foreground/70">
             Mental Energy Timeline
           </h3>
-          <p className="text-[10px] text-white/30 mt-0.5">Circadian performance model · 24h</p>
+          <p className="text-[10px] text-foreground/30 mt-0.5">Circadian performance model · 24h</p>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e]" />
-            <span className="text-white/40 font-medium">Peak</span>
+            <span className="text-foreground/40 font-medium">Peak</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500" />
-            <span className="text-white/40 font-medium">Dip</span>
+            <span className="text-foreground/40 font-medium">Dip</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
-            <span className="text-white/40 font-medium">Now</span>
+            <span className="text-foreground/40 font-medium">Now</span>
           </span>
         </div>
       </div>

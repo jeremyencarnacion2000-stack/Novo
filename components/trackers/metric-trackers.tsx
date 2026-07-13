@@ -163,6 +163,7 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
                   variant="outline"
                   size="sm"
                   className="flex-1"
+                  data-flip-from={`tracker-${tracker.id}`}
                   onClick={() => onEdit(tracker)}
                 >
                   <Edit className="h-3 w-3 mr-2" />

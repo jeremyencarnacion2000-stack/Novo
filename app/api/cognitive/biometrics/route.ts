@@ -14,46 +14,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { fetchBiometricPayload } from '@/lib/google-fit'
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics'
+import { getGoogleAccessToken } from '@/lib/google'
 import type { BiometricPayload } from '@/types/biometrics'
-
-/**
- * Retrieve the Google OAuth access token for the authenticated user.
- * Falls back to the Prisma Account model if the session token is stale.
- */
-async function getGoogleAccessToken(userId: string, sessionToken?: string): Promise<string | null> {
-  // Primary: Use the session-level token (already refreshed by NextAuth JWT callback)
-  if (sessionToken) return sessionToken
-
-  // Fallback: Query the database Account model directly
-  try {
-    const account = await prisma.account.findFirst({
-      where: {
-        userId,
-        provider: 'google',
-      },
-      select: {
-        access_token: true,
-        expires_at: true,
-      },
-    })
-
-    if (!account?.access_token) return null
-
-    // Check if the DB token is still valid (with 60s buffer)
-    if (account.expires_at && account.expires_at < Math.floor(Date.now() / 1000) + 60) {
-      console.warn('[Biometrics] DB access token is expired. User needs token refresh.')
-      return null
-    }
-
-    return account.access_token
-  } catch (err) {
-    console.error('[Biometrics] Failed to query Google account from DB:', err)
-    return null
-  }
-}
 
 // ─── GET Handler ─────────────────────────────────────────────────────────────
 

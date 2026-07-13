@@ -11,7 +11,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import React, { startTransition, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { usePlayerStore } from '@/lib/player-store';
 import { useSettings } from '@/lib/settings-context';
@@ -22,13 +22,12 @@ import type { CognitivePhase } from '@/lib/cognitive-engine';
 import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
   Sun, Moon, Music, CloudSun, Cloud, CloudRain, Zap,
-  Brain, X
+  Brain, X, GripVertical
 } from 'lucide-react';
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
-import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { springConfig } from '@/lib/design-tokens';
 
 // ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
 const PHASE_COLOR: Record<CognitivePhase, string> = {
@@ -338,8 +337,21 @@ function ClockSection({
 
   useEffect(() => {
     setTime(new Date());
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
+    let t: ReturnType<typeof setInterval> | null = setInterval(() => setTime(new Date()), 1000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setTime(new Date());
+        if (!t) t = setInterval(() => setTime(new Date()), 1000);
+      } else if (t) {
+        clearInterval(t);
+        t = null;
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (t) clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   if (!time) {
@@ -385,81 +397,34 @@ function ClockSection({
 }
 
 // ─── Capsule Content Sub-component ──────────────────────────────────────────
-function CapsuleContent({
-  cognitiveAlert,
-  dopaminePulse,
-  springY,
-  handlePointerDown,
-  handlePointerMove,
-  handlePointerUp,
-  handleClick,
-}: {
-  cognitiveAlert: boolean;
-  dopaminePulse: boolean;
-  springY: any;
-  handlePointerDown: (e: React.PointerEvent) => void;
-  handlePointerMove: (e: React.PointerEvent) => void;
-  handlePointerUp: (e: React.PointerEvent) => void;
-  handleClick: (e: React.MouseEvent) => void;
-}) {
+function CapsuleContent({ cognitiveAlert }: { cognitiveAlert: boolean }) {
   const { bioState } = useCognitiveState();
   return (
-    <motion.div
-      key="hub-capsule"
-      layoutId="context-hub-shape"
-      className={cn(
-        "flex flex-col items-center justify-between py-4 px-2 rounded-full select-none cursor-pointer border shadow-[0_16px_48px_rgba(0,0,0,0.7)] backdrop-blur-2xl pointer-events-auto relative overflow-hidden transition-colors duration-300",
-        cognitiveAlert
-          ? 'bg-gradient-to-b from-indigo-950/70 to-zinc-950/70 border-indigo-500/40'
-          : 'bg-black/90 border-white/10 hover:border-white/20',
-        dopaminePulse && "animate-dopamine-pulse"
-      )}
-      style={{
-        width: '46px',
-        height: '190px',
-        marginRight: '0px',
-        y: springY,
-        touchAction: 'none',
-      }}
-      initial={false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-      transition={springConfig.smooth}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onClick={handleClick}
-    >
+    <div className="flex flex-col items-center justify-between py-4 px-2 w-full h-full">
       <ClockSection attentionScore={bioState.attentionScore} showDetails={false} />
 
-      <div
-        className="px-2 py-1 rounded-full text-[8px] font-bold tracking-widest uppercase bg-white/5 backdrop-blur-md text-white/60 border border-white/5 flex-shrink-0 text-center leading-none"
-      >
+      <div className="px-2 py-1 rounded-full text-[8px] font-bold tracking-widest uppercase bg-white/5 backdrop-blur-md text-white/60 border border-white/5 flex-shrink-0 text-center leading-none">
         {PHASE_LABEL[bioState.phase]}
       </div>
 
       {cognitiveAlert && (
         <motion.div
-          className="absolute inset-0 rounded-full pointer-events-none"
+          className="absolute inset-0 pointer-events-none"
           style={{ border: `1.5px solid ${PHASE_COLOR[bioState.phase]}50` }}
           animate={{ opacity: [1, 0, 1, 0] }}
           transition={{ duration: 1.2, repeat: 2 }}
         />
       )}
-    </motion.div>
+    </div>
   );
 }
 
 // ─── Expanded Content Sub-component ─────────────────────────────────────────
 function ExpandedContent({
-  dopaminePulse,
-  springY,
   setHubState,
   activeTab,
   setActiveTab,
 }: {
-  dopaminePulse: boolean;
-  springY: any;
   setHubState: React.Dispatch<React.SetStateAction<HubState>>;
   activeTab: 'music' | 'controls';
   setActiveTab: React.Dispatch<React.SetStateAction<'music' | 'controls'>>;
@@ -467,27 +432,9 @@ function ExpandedContent({
   // ── Real settings connections ──────────────────────────────────────────────
   const { settings, updateSettings } = useSettings();
   const { isActive: focusTimerActive, toggleTimer } = useFocus();
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const { bioState } = useCognitiveState();
   return (
-    <motion.div
-      key="hub-expanded"
-      layoutId="context-hub-shape"
-      className={cn(
-        "rounded-[24px] border border-white/10 bg-black/95 backdrop-blur-3xl p-4 cursor-default pointer-events-auto relative overflow-hidden flex flex-col",
-        dopaminePulse && "animate-dopamine-pulse"
-      )}
-      style={{
-        width: '360px',
-        height: '310px',
-        y: springY,
-        boxShadow: '0 32px 64px rgba(0,0,0,0.8), inset 0 0 24px rgba(255, 255, 255, 0.02), inset 0 1px 0 rgba(255,255,255,0.08)',
-      }}
-      initial={false}
-      animate={{ opacity: 1, scale: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.95, x: 10, transition: { duration: 0.18 } }}
-      transition={springConfig.smooth}
-    >
+    <div className="w-full h-full p-4 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-2 pt-1 pb-2.5 border-b border-white/[0.06] mb-2.5 flex-shrink-0">
         <ClockSection attentionScore={bioState.attentionScore} showDetails={true}>
@@ -651,14 +598,13 @@ function ExpandedContent({
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 // ─── Main ContextHub Component ──────────────────────────────────────────────
 const ContextHubComponent = () => {
   const pathname = usePathname();
-  const { settings } = useSettings();
   const { scrollContainer } = useScrollContainer();
   const { logHabit } = useCognitiveDispatch();
 
@@ -670,13 +616,11 @@ const ContextHubComponent = () => {
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Motion values for vertical positioning
-  const scrollYProgress = useMotionValue(0);
-  const y = useMotionValue(120);
-  const springY = useSpring(y, { stiffness: 300, damping: 35, mass: 0.6 });
+  // Direct y motion value — no spring to avoid oscillation
+  const y = useMotionValue(24);
   const [windowHeight, setWindowHeight] = useState(800);
+  const SCROLL_BAR_HEIGHT = 80;
 
-  // Resize boundaries
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handle = () => setWindowHeight(window.innerHeight);
@@ -685,26 +629,6 @@ const ContextHubComponent = () => {
     return () => window.removeEventListener('resize', handle);
   }, []);
 
-  // Sync scroll dynamics — constant travelRange prevents position jumps
-  const SCROLL_BAR_HEIGHT = 80;
-  useEffect(() => {
-    const updateY = (progress: number) => {
-      const topPadding = 24;
-      const bottomPadding = 24;
-      const travelRange = Math.max(0, windowHeight - topPadding - bottomPadding - SCROLL_BAR_HEIGHT);
-
-      if (hubState === 'expanded') {
-        y.set((windowHeight - 310) / 2);
-      } else {
-        y.set(progress * travelRange + topPadding);
-      }
-    };
-
-    const unsubscribe = scrollYProgress.on('change', updateY);
-    updateY(scrollYProgress.get());
-
-    return unsubscribe;
-  }, [hubState, windowHeight, scrollYProgress, y]);
 
   // Refs to avoid scroll handler re-creation on state changes
   const hubStateRef = useRef(hubState);
@@ -712,15 +636,21 @@ const ContextHubComponent = () => {
   const isHoveredRef = useRef(isHovered);
   isHoveredRef.current = isHovered;
 
-  // Scroll physics observer — stable deps, no re-creation on state change
+  // Scroll observer — moves hub + triggers state change
   useEffect(() => {
     if (!scrollContainer) return;
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
       const maxScroll = Math.max(1, scrollHeight - clientHeight);
-      const progress = maxScroll > 0 ? (scrollTop / maxScroll) : 0;
-      scrollYProgress.set(progress);
+      const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
+
+      // Update vertical position directly (no spring)
+      if (hubStateRef.current !== 'expanded') {
+        const topPadding = 24;
+        const travelRange = Math.max(0, windowHeight - topPadding - 24 - SCROLL_BAR_HEIGHT);
+        y.set(progress * travelRange + topPadding);
+      }
 
       if (hubStateRef.current === 'idle') setHubState('capsule');
 
@@ -738,57 +668,53 @@ const ContextHubComponent = () => {
       scrollContainer.removeEventListener('scroll', handleScroll);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [scrollContainer]);
+  }, [scrollContainer, windowHeight, y]);
 
-  // Auto-expand capsule → expanded on hover after 400ms
+  // Auto-expand capsule → expanded on hover after 400ms (desktop only in
+  // practice — touch devices never dispatch mouseenter).
   useEffect(() => {
     if (hubState === 'capsule' && isHovered) {
-      const t = setTimeout(() => setHubState('expanded'), 400);
+      const t = setTimeout(() => {
+        setHubState('expanded');
+        expandedViaHoverRef.current = true;
+      }, 400);
       return () => clearTimeout(t);
     }
   }, [hubState, isHovered]);
 
-  // Auto-collapse expanded → capsule when not hovered (0.5s)
+  // Auto-collapse expanded → capsule on mouse-leave (0.5s) — but ONLY for
+  // expansions that were themselves triggered by hover. A tap/click-triggered
+  // expansion (the only kind that exists on touch, since `isHovered` never
+  // becomes true there) used to collapse ~500ms after ANY tap regardless of
+  // intent, because this effect only ever checked `!isHovered`, which is
+  // permanently true on touch. Dismissal for those is the tap-outside
+  // handler below instead — the same interaction model as iOS's Dynamic
+  // Island: tap to open, stays open until you tap elsewhere.
+  const expandedViaHoverRef = useRef(false);
   useEffect(() => {
-    if (hubState === 'expanded' && !isHovered) {
+    if (hubState === 'expanded' && !isHovered && expandedViaHoverRef.current) {
       const t = setTimeout(() => setHubState('capsule'), 500);
       return () => clearTimeout(t);
     }
   }, [hubState, isHovered]);
 
-  // Drag-to-Scroll interaction
-  const isDragging = useRef(false);
-  const hasDragged = useRef(false);
-  const dragStartY = useRef(0);
-  const dragStartScrollTop = useRef(0);
+  // Tap/click outside the hub collapses it — the touch equivalent of
+  // mouse-leave, and also a nice desktop shortcut (click away to dismiss
+  // instead of waiting on the hover-out timeout).
+  const hubRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hubState !== 'expanded') return;
+    const handleOutside = (e: PointerEvent) => {
+      if (hubRef.current && !hubRef.current.contains(e.target as Node)) {
+        setHubState('capsule');
+      }
+    };
+    document.addEventListener('pointerdown', handleOutside);
+    return () => document.removeEventListener('pointerdown', handleOutside);
+  }, [hubState]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (!scrollContainer) return;
-    isDragging.current = true;
-    hasDragged.current = false;
-    dragStartY.current = e.clientY;
-    dragStartScrollTop.current = scrollContainer.scrollTop;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging.current || !scrollContainer) return;
-    const delta = e.clientY - dragStartY.current;
-    if (Math.abs(delta) > 3) hasDragged.current = true;
-
-    const travelRange = Math.max(1, windowHeight - 48 - SCROLL_BAR_HEIGHT);
-    const scrollRange = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    const ratio = Math.min(scrollRange / travelRange, 3);
-    scrollContainer.scrollTop = dragStartScrollTop.current + delta * ratio;
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    isDragging.current = false;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (hasDragged.current) { e.stopPropagation(); return; }
+  const handleClick = () => {
+    expandedViaHoverRef.current = false;
     setHubState('expanded');
   };
 
@@ -823,6 +749,7 @@ const ContextHubComponent = () => {
     };
     const onReduced = () => {
       setCognitiveAlert(true);
+      expandedViaHoverRef.current = false;
       setHubState('expanded');
       setTimeout(() => setCognitiveAlert(false), 5000);
     };
@@ -846,10 +773,12 @@ const ContextHubComponent = () => {
   // Agent Event Triggers
   useEffect(() => {
     const handlePlayMusic = () => {
+      expandedViaHoverRef.current = false;
       setHubState('expanded');
       setActiveTab('music');
     };
     const handleExpandHub = () => {
+      expandedViaHoverRef.current = false;
       setHubState('expanded');
     };
     window.addEventListener('cognitive:play-music', handlePlayMusic);
@@ -864,75 +793,94 @@ const ContextHubComponent = () => {
     return null;
   }
 
-  // ─── Idle state: sleek vertical hardware slider line ───────────────────────
-  const idleContent = (
-    <motion.div
-      key="hub-idle"
-      layoutId="context-hub-shape"
-      className="rounded-full bg-white/20 hover:bg-white/40 border border-white/5 shadow-sm cursor-pointer pointer-events-auto transition-colors duration-300"
-      style={{
-        width: '8px',
-        height: '80px',
-        marginRight: '0px',
-        y: springY,
-        touchAction: 'none',
-      }}
-      initial={false}
-      animate={{ opacity: 0.35 }}
-      exit={{ opacity: 0, transition: { duration: 0.12 } }}
-      whileHover={{ opacity: 0.7 }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onClick={() => setHubState('capsule')}
-      title="Novo Context Hub"
-    />
-  );
-
+  // ─── Single morphing hub — no FLIP, no element switching, pure shape animation ───
   return (
-    <div
-      className="fixed right-0 top-0 h-full w-[380px] z-[60] flex flex-col items-end justify-start pointer-events-none"
-    >
-      <div
-        className="pointer-events-auto"
+    <div className="fixed right-0 top-0 h-full w-[60px] z-[60] flex flex-col items-end justify-start pointer-events-none">
+      <motion.div
+        ref={hubRef}
+        className={cn(
+          "pointer-events-auto select-none relative overflow-hidden border transition-colors duration-300",
+          hubState === 'idle'
+            ? 'bg-white/20 border-white/5 cursor-pointer hover:bg-white/40'
+            : hubState === 'capsule' && cognitiveAlert
+              ? 'bg-gradient-to-b from-indigo-950/70 to-zinc-950/70 border-indigo-500/40 backdrop-blur-2xl cursor-pointer'
+              : hubState === 'capsule'
+                ? 'bg-black/90 border-white/10 hover:border-white/20 backdrop-blur-2xl cursor-pointer'
+                : 'border-white/10 bg-black/95 backdrop-blur-3xl cursor-default',
+          (hubState === 'capsule' || hubState === 'expanded') && dopaminePulse && 'animate-dopamine-pulse',
+        )}
+        style={{ marginRight: '4px', y }}
+        initial={{
+          width: 8, height: 80, borderRadius: 20, opacity: 0.55,
+          boxShadow: '0 0 0 rgba(0,0,0,0)',
+        }}
+        animate={{
+          width: hubState === 'idle' ? 8 : hubState === 'capsule' ? 46 : 360,
+          height: hubState === 'idle' ? 80 : hubState === 'capsule' ? 190 : 310,
+          borderRadius: hubState === 'idle' ? 20 : hubState === 'capsule' ? 9999 : 24,
+          opacity: hubState === 'idle' ? 0.55 : 1,
+          boxShadow: hubState === 'idle'
+            ? '0 0 0 rgba(0,0,0,0)'
+            : hubState === 'expanded'
+              ? '0 32px 64px rgba(0,0,0,0.8), inset 0 0 24px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.08)'
+              : '0 16px 48px rgba(0,0,0,0.7)',
+        }}
+        transition={{ type: 'tween', duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
         onMouseEnter={() => {
           setIsHovered(true);
-          // Open on hover — idle → capsule immediately, capsule → expanded after delay
-          setHubState(cur => {
-            if (cur === 'idle') return 'capsule';
-            return cur;
-          });
+          if (hubState === 'idle') setHubState('capsule');
         }}
         onMouseLeave={() => setIsHovered(false)}
-        style={{
-          marginRight: hubState === 'expanded' ? '12px' : '0px',
-          transition: 'margin-right 0.3s ease',
-        }}
+        onClick={
+          hubState === 'idle' ? () => setHubState('capsule')
+          : hubState === 'capsule' ? handleClick
+          : undefined
+        }
+        title={hubState === 'idle' ? 'Novo Context Hub' : undefined}
       >
-        <AnimatePresence>
-          {hubState === 'idle' && idleContent}
+        <AnimatePresence mode="wait">
+          {hubState === 'idle' && (
+            <motion.div
+              key="idle"
+              className="absolute inset-0 flex items-center justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+            >
+              <GripVertical className="w-3 h-3 text-white/50" strokeWidth={1.5} />
+            </motion.div>
+          )}
           {hubState === 'capsule' && (
-            <CapsuleContent
-              cognitiveAlert={cognitiveAlert}
-              dopaminePulse={dopaminePulse}
-              springY={springY}
-              handlePointerDown={handlePointerDown}
-              handlePointerMove={handlePointerMove}
-              handlePointerUp={handlePointerUp}
-              handleClick={handleClick}
-            />
+            <motion.div
+              key="capsule"
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+            >
+              <CapsuleContent cognitiveAlert={cognitiveAlert} />
+            </motion.div>
           )}
           {hubState === 'expanded' && (
-            <ExpandedContent
-              dopaminePulse={dopaminePulse}
-              springY={springY}
-              setHubState={setHubState}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-            />
+            <motion.div
+              key="expanded"
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+            >
+              <ExpandedContent
+                setHubState={setHubState}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   );
 };

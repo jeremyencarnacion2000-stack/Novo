@@ -153,99 +153,6 @@ const ALBUMS_FOR_YOU = [
   }
 ]
 
-const COMMUNITY_PLAYLISTS = [
-  {
-    id: "community-chill",
-    name: "Chill",
-    creator: "Vinny Caldera",
-    views: "2 M de vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=200&h=200&fit=crop"
-    ]
-  },
-  {
-    id: "community-mj",
-    name: "Michael Jackson",
-    creator: "Óscar Muro",
-    views: "202 k vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=200&h=200&fit=crop"
-    ]
-  },
-  {
-    id: "community-fref",
-    name: "fref",
-    creator: "roger deoner",
-    views: "14 k vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop"
-    ]
-  },
-  {
-    id: "community-pop",
-    name: "pop",
-    creator: "Dudziak",
-    views: "125 k vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=200&h=200&fit=crop"
-    ]
-  },
-  {
-    id: "community-lofi",
-    name: "Lo-fi Fav's",
-    creator: "Hany Amorim",
-    views: "108 k vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop"
-    ]
-  },
-  {
-    id: "community-ff",
-    name: "ff",
-    creator: "Ten Gou",
-    views: "4.2 K vistas",
-    creatorAvatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=100&h=100&fit=crop",
-    image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&h=400&fit=crop",
-    isCollage: true,
-    collageImages: [
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=200&h=200&fit=crop",
-      "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=200&h=200&fit=crop"
-    ]
-  }
-]
-
 export default function MusicPage() {
   const { data: session } = useSession()
   
@@ -291,7 +198,6 @@ export default function MusicPage() {
   const jpopScrollRef = useRef<HTMLDivElement>(null)
   const albumsScrollRef = useRef<HTMLDivElement>(null)
   const recentScrollRef = useRef<HTMLDivElement>(null)
-  const communityScrollRef = useRef<HTMLDivElement>(null)
 
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
@@ -354,13 +260,10 @@ export default function MusicPage() {
 
       if (historyRes.ok) {
         const historyData = await historyRes.json()
-        setRecentlyPlayed(historyData && historyData.length > 0 ? historyData : JPOP_RECOMMENDED.slice(0, 6))
-      } else {
-        setRecentlyPlayed(JPOP_RECOMMENDED.slice(0, 6))
+        setRecentlyPlayed(historyData || [])
       }
     } catch (e) {
       console.error("Failed to load user custom music data:", e)
-      setRecentlyPlayed(JPOP_RECOMMENDED.slice(0, 6))
     }
   }
 
@@ -763,8 +666,7 @@ export default function MusicPage() {
   const TrackRow = ({ track, i, onClick }: { track: any; i: number; onClick: (t: any, e?: React.MouseEvent) => void }) => {
     const songId = track.id || track.trackId
     const name = track.name || track.title
-    const playCount = ((name.charCodeAt(0) * 1234567) % 987654321 + 10000000).toLocaleString()
-    
+
     // Correct mapping for track artists, supporting both searches, followed, and liked tracks!
     const artistObject = track.artists?.[0] || { name: track.artist || 'Unknown', id: track.artistId || null }
 
@@ -789,7 +691,7 @@ export default function MusicPage() {
           </div>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-black/20 shrink-0">
-              <img src={track.image || track.thumbnail || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+              <img loading="lazy" src={track.image || track.thumbnail || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
             </div>
             <div className="min-w-0">
               <p className={cn("text-sm font-semibold truncate", currentTrack?.id === songId ? "text-[#1db954]" : "text-white")}>{name}</p>
@@ -808,10 +710,6 @@ export default function MusicPage() {
               </p>
             </div>
           </div>
-        </div>
-
-        <div className="hidden sm:block text-sm tabular-nums text-left w-36 opacity-80">
-          {playCount}
         </div>
 
         <div className="flex items-center justify-end gap-4 shrink-0">
@@ -890,7 +788,7 @@ export default function MusicPage() {
   return (
     <div className="absolute inset-0 p-0 sm:p-4 lg:p-6 flex flex-col justify-between bg-transparent">
       {/* ─── FLOATING MAIN CONTAINER ─── */}
-      <div className="w-full h-full bg-[#151713]/85 backdrop-blur-2xl border-0 sm:border sm:border-white/10 rounded-none sm:rounded-[2rem] flex overflow-hidden shadow-2xl relative">
+      <div className="w-full h-full bg-[#151713]/85 backdrop-blur-2xl border-0 sm:border sm:border-white/10 rounded-none sm:rounded-[28px] flex overflow-hidden shadow-2xl relative">
         
         {/* ─── LEFT SIDEBAR ─── */}
         <div className="w-[240px] bg-black/35 border-r border-white/5 flex flex-col hidden lg:flex shrink-0 p-5">
@@ -978,9 +876,90 @@ export default function MusicPage() {
 
         {/* ─── MIDDLE CONTENT AREA ─── */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-transparent relative">
-          
-          {/* Top navigation breadcrumbs */}
-          <div className="h-16 px-8 flex items-center gap-4 shrink-0 z-10 bg-transparent">
+
+          {/* ─── MOBILE TOP NAV (hidden on lg+) ─── */}
+          <div className="flex lg:hidden flex-col shrink-0 border-b border-white/5 bg-[#151713]/60">
+            <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#b3b3b3] pointer-events-none" />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search music..."
+                  className="w-full bg-white/5 border border-white/5 rounded-full pl-9 pr-4 h-9 text-sm text-white placeholder:text-[#b3b3b3]/60 focus:outline-none focus:ring-1 focus:ring-white/10 transition-all"
+                />
+              </div>
+              <button
+                onClick={() => setIsCreatePlaylistOpen(true)}
+                className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
+                title="New playlist"
+              >
+                <Plus className="h-4 w-4 text-[#b3b3b3]" />
+              </button>
+            </div>
+            {/* Library grid — fixed categories get their own uncluttered row
+                of tiles instead of being crammed into one long horizontal
+                scroll strip alongside every custom playlist. */}
+            {/* pr-20 (not px-3 on both sides): the global floating
+                notifications button sits `fixed top-16 right-4` at ~48px
+                wide, right in the top-right corner this row would otherwise
+                reach — the extra right clearance keeps the last tile from
+                landing under it. */}
+            <div className="grid grid-cols-5 gap-1.5 pl-3 pr-20 pb-2.5">
+              {[
+                { id: 'home', icon: Home, label: 'Home' },
+                { id: 'discover', icon: Compass, label: 'Discover' },
+                { id: 'liked-songs', icon: Heart, label: 'Liked' },
+                { id: 'albums', icon: Disc, label: 'Albums' },
+                { id: 'artists', icon: Mic2, label: 'Artists' },
+              ].map(({ id, icon: Icon, label }) => {
+                const isActive = activeTab === id && !selectedArtistId
+                return (
+                  <button
+                    key={id}
+                    onClick={() => navigateTo(id)}
+                    className={cn(
+                      'flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-semibold transition-all',
+                      isActive
+                        ? 'bg-white/10 text-white border border-white/15'
+                        : 'bg-white/[0.03] border border-white/5 text-[#b3b3b3] hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate w-full text-center leading-none">{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Custom playlists — separate horizontal strip, only rendered when there are any */}
+            {customPlaylists.length > 0 && (
+              <div className="flex gap-1.5 px-3 pb-2.5 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {customPlaylists.map(pl => {
+                  const id = `playlist:${pl.id}`
+                  const isActive = activeTab === id && !selectedArtistId
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => navigateTo(id)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                        isActive
+                          ? 'bg-white/10 text-white border border-white/15'
+                          : 'text-[#b3b3b3] hover:text-white hover:bg-white/5'
+                      )}
+                    >
+                      <PlaySquare className="h-3 w-3 shrink-0 text-[#1db954]" />
+                      {pl.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Top navigation breadcrumbs — desktop only */}
+          <div className="h-16 px-8 hidden lg:flex items-center gap-4 shrink-0 z-10 bg-transparent">
             <div className="flex items-center gap-2">
               <button 
                 onClick={navigateBack}
@@ -1020,7 +999,7 @@ export default function MusicPage() {
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="px-8 pb-32">
+            <div className="px-4 sm:px-6 lg:px-8 pb-32">
               {error && (
                 <div className="p-3 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-200 text-sm">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
@@ -1055,7 +1034,7 @@ export default function MusicPage() {
               ) : selectedArtistId && artistData ? (
                 /* ─── DYNAMIC ARTIST PROFILE VIEW ─── */
                 <div>
-                  <div className="bg-[#0b0c0a]/90 rounded-[2rem] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden border border-white/5 shadow-2xl mb-8 group min-h-[220px]">
+                  <div className="bg-[#0b0c0a]/90 rounded-[28px] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden border border-white/5 shadow-2xl mb-8 group min-h-[220px]">
                     {/* Left details */}
                     <div className="relative z-10 max-w-xl">
                       <div className="flex items-center gap-2 mb-4 bg-white/5 border border-white/10 rounded-full py-1.5 px-3.5 w-fit">
@@ -1098,7 +1077,7 @@ export default function MusicPage() {
 
                     {/* Right cut-out style image */}
                     <div className="absolute right-0 bottom-0 top-0 w-1/2 hidden md:block z-0">
-                      <img src={artistData.thumbnails?.[artistData.thumbnails.length - 1]?.url || DEFAULT_IMG} className="w-full h-full object-cover object-center opacity-85" alt="" />
+                      <img loading="lazy" src={artistData.thumbnails?.[artistData.thumbnails.length - 1]?.url || DEFAULT_IMG} className="w-full h-full object-cover object-center opacity-85" alt="" />
                       <div className="absolute inset-0 bg-gradient-to-r from-[#0b0c0a] via-[#0b0c0a]/40 to-transparent" />
                     </div>
                   </div>
@@ -1125,7 +1104,7 @@ export default function MusicPage() {
                             className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center text-center hover:bg-white/[0.07] transition-all cursor-pointer group"
                           >
                             <div className="w-24 h-24 rounded-full overflow-hidden mb-3 shadow-md relative">
-                              <img src={sa.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                              <img loading="lazy" src={sa.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
                               <button className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Play className="h-6 w-6 text-white fill-white" />
                               </button>
@@ -1141,7 +1120,7 @@ export default function MusicPage() {
               ) : activeTab === 'liked-songs' ? (
                 /* ─── LIKED SONGS VIEW TAB ─── */
                 <div>
-                  <div className="bg-gradient-to-r from-rose-950/70 to-pink-950/40 border border-rose-500/10 rounded-[2rem] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden shadow-2xl mb-8 min-h-[200px]">
+                  <div className="bg-gradient-to-r from-rose-950/70 to-pink-950/40 border border-rose-500/10 rounded-[28px] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden shadow-2xl mb-8 min-h-[200px]">
                     <div className="relative z-10 max-w-xl">
                       <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center mb-4 shadow-lg shadow-rose-500/20">
                         <Heart className="h-6 w-6 text-black fill-black" />
@@ -1173,7 +1152,7 @@ export default function MusicPage() {
               ) : activePlaylist ? (
                 /* ─── CUSTOM PLAYLIST VIEW TAB ─── */
                 <div>
-                  <div className="bg-gradient-to-r from-purple-950/70 to-indigo-950/40 border border-purple-500/10 rounded-[2rem] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden shadow-2xl mb-8 min-h-[220px]">
+                  <div className="bg-gradient-to-r from-purple-950/70 to-indigo-950/40 border border-purple-500/10 rounded-[28px] p-8 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden shadow-2xl mb-8 min-h-[220px]">
                     <div className="relative z-10 max-w-xl">
                       <div className="w-12 h-12 rounded-2xl bg-purple-500 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
                         <PlaySquare className="h-6 w-6 text-black" />
@@ -1209,7 +1188,7 @@ export default function MusicPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center bg-white/[0.01] border border-white/5 rounded-[2rem] p-8">
+                    <div className="flex flex-col items-center justify-center py-20 text-center bg-white/[0.01] border border-white/5 rounded-[28px] p-8">
                       <Music className="h-12 w-12 text-purple-500 mb-4" />
                       <p className="text-[#b3b3b3] text-sm mb-2">This playlist is empty.</p>
                       <p className="text-xs text-[#b3b3b3]/60 max-w-xs">Use the Search box or home sections, click the three dots on any track, and select this playlist to add songs!</p>
@@ -1220,7 +1199,7 @@ export default function MusicPage() {
                 /* ─── HOME VIEW TAB (Perfect Adaptability!) ─── */
                 <div className="space-y-8">
                   {/* Big Welcoming Hero Card */}
-                  <div className="bg-gradient-to-r from-emerald-950/70 to-teal-950/40 border border-emerald-500/10 rounded-[2rem] p-8 flex flex-col justify-end min-h-[220px] shadow-lg relative overflow-hidden">
+                  <div className="bg-gradient-to-r from-emerald-950/70 to-teal-950/40 border border-emerald-500/10 rounded-[28px] p-8 flex flex-col justify-end min-h-[220px] shadow-lg relative overflow-hidden">
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
                     <div className="relative z-10 max-w-xl">
                       <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2">Editor's Pick</p>
@@ -1269,7 +1248,7 @@ export default function MusicPage() {
                           className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                         >
                           <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
-                            <img src={track.image} className="w-full h-full object-cover" alt={track.name} />
+                            <img loading="lazy" src={track.image} className="w-full h-full object-cover" alt={track.name} />
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <button className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg">
                                 <Play className="h-5 w-5 text-black fill-black ml-0.5" />
@@ -1283,10 +1262,10 @@ export default function MusicPage() {
                     </div>
                   </section>
 
-                  {/* Álbumes para ti */}
+                  {/* Álbumes destacados */}
                   <section className="relative">
                     <div className="flex items-center justify-between mb-4 px-1">
-                      <h2 className="text-xl font-bold text-white tracking-tight">Álbumes para ti</h2>
+                      <h2 className="text-xl font-bold text-white tracking-tight">Álbumes destacados</h2>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => scrollContainer(albumsScrollRef, 'left')} 
@@ -1314,7 +1293,7 @@ export default function MusicPage() {
                           className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                         >
                           <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
-                            <img src={album.image} className="w-full h-full object-cover" alt={album.name} />
+                            <img loading="lazy" src={album.image} className="w-full h-full object-cover" alt={album.name} />
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <button className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg">
                                 <Play className="h-5 w-5 text-black fill-black ml-0.5" />
@@ -1362,7 +1341,7 @@ export default function MusicPage() {
                               className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
                             >
                               <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
-                                <img src={track.thumbnail || track.image || DEFAULT_IMG} className="w-full h-full object-cover" alt={track.title || track.name} />
+                                <img loading="lazy" src={track.thumbnail || track.image || DEFAULT_IMG} className="w-full h-full object-cover" alt={track.title || track.name} />
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg">
                                     <Play className="h-5 w-5 text-black fill-black ml-0.5" />
@@ -1378,62 +1357,6 @@ export default function MusicPage() {
                     </section>
                   )}
 
-                  {/* De la comunidad */}
-                  <section className="relative">
-                    <div className="flex items-center justify-between mb-4 px-1">
-                      <h2 className="text-xl font-bold text-white tracking-tight">De la comunidad</h2>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => scrollContainer(communityScrollRef, 'left')} 
-                          className="w-8 h-8 rounded-full bg-black/45 flex items-center justify-center hover:bg-black/60 transition-colors"
-                        >
-                          <ArrowLeft className="h-4 w-4 text-white" />
-                        </button>
-                        <button 
-                          onClick={() => scrollContainer(communityScrollRef, 'right')} 
-                          className="w-8 h-8 rounded-full bg-black/45 flex items-center justify-center hover:bg-black/60 transition-colors"
-                        >
-                          <ArrowRight className="h-4 w-4 text-white" />
-                        </button>
-                      </div>
-                    </div>
-                    <div 
-                      ref={communityScrollRef}
-                      className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
-                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {COMMUNITY_PLAYLISTS.map((pl) => (
-                        <div 
-                          key={pl.id}
-                          onClick={() => navigateTo('artists')}
-                          className="w-[140px] sm:w-[180px] shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3 hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm snap-start relative"
-                        >
-                          <div className="aspect-square rounded-xl overflow-hidden mb-3 shadow-md relative">
-                            {pl.isCollage ? (
-                              <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
-                                {pl.collageImages.map((src, idx) => (
-                                  <img key={idx} src={src} className="w-full h-full object-cover" alt="" />
-                                ))}
-                              </div>
-                            ) : (
-                              <img src={pl.image} className="w-full h-full object-cover" alt={pl.name} />
-                            )}
-                            <div className="absolute bottom-2 left-2 w-7 h-7 rounded-full overflow-hidden border border-white/20 shadow-md">
-                              <img src={pl.creatorAvatar} className="w-full h-full object-cover" alt={pl.creator} />
-                            </div>
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg">
-                                <Play className="h-5 w-5 text-black fill-black ml-0.5" />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-sm font-bold text-white truncate w-full group-hover:text-[#1db954] transition-colors">{pl.name}</p>
-                          <p className="text-xs text-[#b3b3b3] truncate w-full mt-1">{pl.creator} • {pl.views}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
                   {/* Top Artists Circular Grid */}
                   {topArtists.length > 0 && (
                     <section>
@@ -1446,7 +1369,7 @@ export default function MusicPage() {
                             className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center text-center hover:bg-white/[0.07] transition-all cursor-pointer group shadow-sm"
                           >
                             <div className="w-24 h-24 rounded-full overflow-hidden mb-3 shadow-md relative">
-                              <img src={artist.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                              <img loading="lazy" src={artist.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
                               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Play className="h-6 w-6 text-white fill-white" />
                               </div>
@@ -1485,7 +1408,7 @@ export default function MusicPage() {
                             className="bg-white/[0.03] backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:bg-white/[0.08] transition-all cursor-pointer group shadow-sm"
                           >
                             <div className="aspect-square rounded-xl overflow-hidden mb-4 shadow-md relative">
-                              <img src={pl.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                              <img loading="lazy" src={pl.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
                               <button className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-lg">
                                 <Play className="h-4 w-4 text-black fill-black ml-0.5" />
                               </button>
@@ -1511,7 +1434,7 @@ export default function MusicPage() {
                           className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex flex-col items-center text-center hover:bg-white/[0.08] transition-all cursor-pointer group shadow-md"
                         >
                           <div className="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-lg relative">
-                            <img src={artist.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                            <img loading="lazy" src={artist.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <Play className="h-7 w-7 text-white fill-white" />
                             </div>
@@ -1552,7 +1475,7 @@ export default function MusicPage() {
           {rightSidebarFeatured && (
             <div className="mb-6">
               <div className="aspect-square rounded-2xl overflow-hidden mb-3 shadow-lg bg-black/40">
-                <img src={currentTrack?.image || rightSidebarFeatured.image || rightSidebarFeatured.thumbnails?.[0]?.url || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                <img loading="lazy" src={currentTrack?.image || rightSidebarFeatured.image || rightSidebarFeatured.thumbnails?.[0]?.url || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
               </div>
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
@@ -1626,7 +1549,7 @@ export default function MusicPage() {
           {rightSidebarFeatured && (
             <div className="rounded-2xl overflow-hidden bg-white/[0.03] border border-white/5 p-4 shadow-md relative min-h-[160px] flex flex-col justify-end">
               <div className="absolute inset-0 z-0">
-                <img src={rightSidebarFeatured.image || rightSidebarFeatured.thumbnails?.[0]?.url || DEFAULT_IMG} className="w-full h-full object-cover opacity-35" alt="" />
+                <img loading="lazy" src={rightSidebarFeatured.image || rightSidebarFeatured.thumbnails?.[0]?.url || DEFAULT_IMG} className="w-full h-full object-cover opacity-35" alt="" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#151713] via-[#151713]/70 to-transparent" />
               </div>
               
@@ -1651,7 +1574,7 @@ export default function MusicPage() {
               </div>
               <div className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                  <img src={nextInQueueTrack.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
+                  <img loading="lazy" src={nextInQueueTrack.image || DEFAULT_IMG} className="w-full h-full object-cover" alt="" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-white truncate">{nextInQueueTrack.name}</p>
@@ -1667,7 +1590,7 @@ export default function MusicPage() {
       {/* ─── CREATE PLAYLIST GLASSMORPHIC MODAL ─── */}
       {isCreatePlaylistOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-[#191b16]/95 border border-white/10 rounded-[2rem] p-8 w-full max-w-md shadow-2xl relative">
+          <div className="bg-[#191b16]/95 border border-white/10 rounded-[28px] p-8 w-full max-w-md shadow-2xl relative">
             <button 
               onClick={() => setIsCreatePlaylistOpen(false)}
               className="absolute top-6 right-6 text-[#b3b3b3] hover:text-white transition-colors"

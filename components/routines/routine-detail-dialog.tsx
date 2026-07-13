@@ -9,7 +9,7 @@ import { createPortal } from 'react-dom'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { AnimatePresence } from 'framer-motion'
 import { safeViewTransition } from '@/hooks/use-view-transition'
-import { blendy } from '@/lib/blendy'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface RoutineDetailDialogProps {
   open: boolean
@@ -21,23 +21,10 @@ interface RoutineDetailDialogProps {
 export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }: RoutineDetailDialogProps) {
   const [isWorkoutActive, setIsWorkoutActive] = useState(false)
 
-  useEffect(() => {
-    if (open && routine) {
-      // Small delay to ensure the modal container is rendered and sized in DOM
-      setTimeout(() => {
-        blendy.update()
-        blendy.toggle(`routine-${routine.id}`)
-      }, 30)
-    }
-  }, [open, routine])
-
-  const handleClose = () => {
-    if (routine) {
-      blendy.untoggle(`routine-${routine.id}`, onClose)
-    } else {
-      onClose()
-    }
-  }
+  // modalFlip.untoggle() no-ops safely when the flip pair can't be found
+  // (routine null), so the key can stay constant across renders.
+  const closeFlip = useModalFlip(`routine-${routine?.id}`, open && !!routine)
+  const handleClose = () => closeFlip(onClose)
 
   if (!routine) return null
 
@@ -75,7 +62,7 @@ export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }
       {workoutPortal}
       <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
         <DialogContent
-          data-blendy-to={`routine-${routine.id}`}
+          data-flip-to={`routine-${routine.id}`}
           className="max-w-7xl w-[95vw] h-[90vh] p-0 shadow-none [&>button]:text-white [&>button]:z-20 z-[5001] rounded-[24px] md:rounded-[32px] overflow-hidden !bg-black/80 dark:!bg-black/80 backdrop-blur-2xl border border-white/10 liquid-glass-premium"
         >
           {/* Content Viewport — overflow-y-auto directly on this div */}

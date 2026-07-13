@@ -26,7 +26,8 @@ function DashboardShellInner({ children }: DashboardShellProps) {
     pathname?.startsWith('/music') ||
     pathname?.startsWith('/ai') ||
     pathname?.startsWith('/calendar') ||
-    pathname?.startsWith('/cognitive')
+    pathname?.startsWith('/cognitive') ||
+    pathname?.startsWith('/social')
 
   // Voice hub drawer state
   const [voiceOpen, setVoiceOpen] = useState(false)
@@ -58,10 +59,16 @@ function DashboardShellInner({ children }: DashboardShellProps) {
   }, [])
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <div
         className={cn(
-          'flex h-screen w-full overflow-hidden',
+          // h-dvh, not h-screen: on mobile, 100vh is sized against the
+          // largest possible viewport (address bar collapsed), not what's
+          // actually visible — right after page load, with the address bar
+          // still expanded, this pushed bottom content (like the chat
+          // composer) below the real visible fold. 100dvh tracks the actual
+          // visible viewport as the browser chrome collapses/expands.
+          'flex h-dvh w-full overflow-hidden',
           settings.compactMode && 'compact-mode',
           !settings.showAnimations && 'no-animations'
         )}
@@ -109,8 +116,8 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     exit={{ opacity: 0, y: 12, scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 420, damping: 30 }}
                     className="
-                      max-w-xs w-full rounded-2xl border border-white/10 px-4 py-3
-                      backdrop-blur-2xl bg-background/90
+                      max-w-xs w-full rounded-[28px] border border-foreground/10 px-4 py-3
+                      backdrop-blur-[28px] bg-background/90
                       shadow-[0_8px_40px_rgba(0,0,0,0.5)]
                       flex items-start gap-3
                     "
@@ -120,7 +127,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     </p>
                     <button
                       onClick={dismissInsight}
-                      className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-foreground/30 hover:text-foreground/60"
+                      className="shrink-0 p-1 rounded-lg hover:bg-foreground/10 transition-colors text-foreground/30 hover:text-foreground/60"
                       aria-label="Dismiss insight"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -138,16 +145,16 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     exit={{ opacity: 0, y: 16, scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     className="
-                      fixed bottom-24 right-6 z-[160] w-80 rounded-3xl border border-white/10 p-5
-                      backdrop-blur-2xl bg-background/95
+                      fixed bottom-24 right-6 z-[160] w-80 rounded-[28px] border border-foreground/10 p-5
+                      backdrop-blur-[28px] bg-background/95
                       shadow-[0_20px_80px_rgba(0,0,0,0.6)]
                     "
                   >
-                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/5">
+                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-foreground/5">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</span>
                       <button
                         onClick={() => setVoiceOpen(false)}
-                        className="p-1 rounded-lg hover:bg-white/5 text-foreground/40 hover:text-foreground transition-colors"
+                        className="p-1 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
                         title="Cerrar panel"
                       >
                         <X className="h-3.5 w-3.5" />

@@ -5,7 +5,6 @@ import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
-import { GlassSurface } from '@/components/ui/GlassSurface'
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-sm font-medium transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:scale-100 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
@@ -22,7 +21,6 @@ const buttonVariants = cva(
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',
-        glass: 'bg-transparent text-foreground border-transparent hover:bg-transparent shadow-none scale-100 active:scale-95 hover:scale-[1.02]',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
@@ -50,50 +48,6 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  if (variant === 'glass') {
-    // GlassSurface can't be used with Slot (asChild) because it renders
-    // internal layers — Slot requires a single child. When asChild, render
-    // the child directly with a glass overlay sibling instead.
-    if (asChild) {
-      return (
-        <span className={cn("relative inline-flex", buttonVariants({ variant, size }), className)} style={{ borderRadius: 9999 }}>
-          <GlassSurface
-            radius={9999}
-            depth={4}
-            blur={1}
-            strength={25}
-            chromaticAberration={3}
-            backgroundColor="transparent"
-            elevation="low"
-            aria-hidden
-            className="pointer-events-none"
-            style={{ position: 'absolute', inset: '-2px', zIndex: 0, borderRadius: 'inherit' }}
-          />
-          <Slot className="relative z-10" {...props} />
-        </span>
-      )
-    }
-    return (
-      <GlassSurface
-        as="button"
-        radius={9999}
-        depth={4}
-        blur={1}
-        strength={25}
-        chromaticAberration={3}
-        backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.05)"
-        elevation="low"
-        contrastObserver
-        className={cn(
-          buttonVariants({ variant, size }),
-          "border-0 shadow-none",
-          className
-        )}
-        {...props}
-      />
-    )
-  }
-
   const Comp = asChild ? Slot : 'button'
 
   return (

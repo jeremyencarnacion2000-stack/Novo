@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
@@ -18,6 +19,7 @@ export default function ProjectsPage() {
   const { data: projects, error, isLoading, mutate } = useProjects()
   const { toast } = useToast()
   const { bioState } = useCognitiveEngine()
+  const [activeTab, setActiveTab] = useState("projects")
 
   useEffect(() => {
     if (error) {
@@ -198,12 +200,12 @@ export default function ProjectsPage() {
             ⚠️ Reduced Capacity Mode Active
           </div>
           <h1 className="text-3xl md:text-5xl font-light tracking-tight italic">Single Priority Shield</h1>
-          <p className="text-xs text-white/40 uppercase tracking-widest leading-relaxed">
+          <p className="text-xs text-foreground/40 uppercase tracking-widest leading-relaxed">
             Attentional capacity constrained by biometric fatigue. Secondary directive complexity hidden.
           </p>
         </div>
 
-        <div className="rounded-[2rem] p-8 border border-amber-500/20 relative overflow-hidden shadow-2xl"
+        <div className="rounded-[28px] p-8 border border-amber-500/20 relative overflow-hidden shadow-2xl"
           style={{
             background: 'linear-gradient(135deg, rgba(20, 10, 5, 0.8), rgba(9, 9, 11, 0.9))',
             backdropFilter: 'blur(24px)',
@@ -215,20 +217,20 @@ export default function ProjectsPage() {
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-400/80">Active Macro-Task</span>
             
             <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-white/95">
+              <h2 className="text-2xl font-semibold text-foreground/95">
                 {primaryTask ? primaryTask.name : "Deep Circadian Rest & Reset"}
               </h2>
-              <p className="text-sm text-white/50 leading-relaxed">
+              <p className="text-sm text-foreground/50 leading-relaxed">
                 {primaryTask && primaryTask.description 
                   ? primaryTask.description 
                   : "Your current heart rate variability and sleep deficit require visual relief. Minimize complex decision paths."}
               </p>
             </div>
 
-            <div className="h-px bg-white/[0.06]" />
+            <div className="h-px bg-foreground/[0.06]" />
 
             <div className="space-y-4">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Suggested Immediate Sub-Actions</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground/30">Suggested Immediate Sub-Actions</span>
               
               <div className="space-y-3">
                 {[
@@ -240,7 +242,7 @@ export default function ProjectsPage() {
                     <div className="w-5 h-5 rounded-full border border-amber-500/30 flex items-center justify-center text-[10px] text-amber-400 bg-amber-500/5">
                       ✓
                     </div>
-                    <span className="text-xs text-white/70 font-medium">{action}</span>
+                    <span className="text-xs text-foreground/70 font-medium">{action}</span>
                   </div>
                 ))}
               </div>
@@ -265,17 +267,41 @@ export default function ProjectsPage() {
       </ScrollReveal>
 
       <ScrollReveal delay={0.05}>
-      <Tabs defaultValue="projects" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="relative grid w-full grid-cols-2 max-w-[400px] mb-6 bg-foreground/5 border border-foreground/5 rounded-full p-1 h-11">
+          <TabsTrigger
+            value="projects"
+            className="relative h-9 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
+          >
+            {activeTab === 'projects' && (
+              <motion.div
+                layoutId="active-project-tab"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              />
+            )}
+            <span className="relative z-10">Projects</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="tasks"
+            className="relative h-9 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
+          >
+            {activeTab === 'tasks' && (
+              <motion.div
+                layoutId="active-project-tab"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              />
+            )}
+            <span className="relative z-10">Tasks</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="projects" className="space-y-6">
           <div className="flex justify-end">
-            <Button onClick={() => setDialogOpen(true)} data-blendy-from="btn-new-project" className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Project
+            <Button onClick={() => setDialogOpen(true)} data-flip-from="btn-new-project" className="w-full sm:w-auto">
+              <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
+              <span data-shared-item="text">New Project</span>
             </Button>
           </div>
           <KanbanBoard

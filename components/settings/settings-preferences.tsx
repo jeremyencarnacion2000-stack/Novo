@@ -56,7 +56,7 @@ export function SettingsPreferences() {
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* User Profile */}
       <Section title={t('settings.profile.title')}>
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="displayName">{t('settings.display_name')}</Label>
             <Input
@@ -64,7 +64,7 @@ export function SettingsPreferences() {
               value={settings.displayName}
               onChange={(e) => updateSettings({ displayName: e.target.value })}
               placeholder="Enter name"
-              className="bg-white/5 border-white/10 text-white"
+              className="bg-foreground/5 border-foreground/10 text-foreground"
             />
           </div>
 
@@ -76,15 +76,15 @@ export function SettingsPreferences() {
               value={settings.email}
               onChange={(e) => updateSettings({ email: e.target.value })}
               placeholder="Enter email"
-              className="bg-white/5 border-white/10 text-white"
+              className="bg-foreground/5 border-foreground/10 text-foreground"
             />
           </div>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <div className="space-y-2">
             <Label>{t('settings.password')}</Label>
-            <Button variant="outline" className="w-full border-white/10 hover:bg-white/5">
+            <Button variant="outline" className="w-full border-foreground/10 hover:bg-foreground/5">
               <Lock className="mr-2 h-4 w-4" />
               {t('settings.change_password')}
             </Button>
@@ -94,7 +94,7 @@ export function SettingsPreferences() {
 
       {/* Regional Formats */}
       <Section title={t('settings.general.title')}>
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <Row label={t('settings.language.label')} description={t('settings.language.desc')}>
             <Select value={settings.language} onValueChange={(value: any) => updateSettings({ language: value })}>
               <SelectTrigger className="w-[180px]">
@@ -109,7 +109,7 @@ export function SettingsPreferences() {
             </Select>
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.start_week.label')} description={t('settings.start_week.desc')}>
             <Select value={settings.startOfWeek} onValueChange={(value: any) => updateSettings({ startOfWeek: value })}>
@@ -124,7 +124,7 @@ export function SettingsPreferences() {
             </Select>
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.date_format.label')} description={t('settings.date_format.desc')}>
             <Select value={settings.dateFormat} onValueChange={(value: any) => updateSettings({ dateFormat: value })}>
@@ -139,7 +139,7 @@ export function SettingsPreferences() {
             </Select>
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.time_format.label')} description={t('settings.time_format.desc')}>
             <Select value={settings.timeFormat} onValueChange={(value: any) => updateSettings({ timeFormat: value })}>
@@ -157,7 +157,7 @@ export function SettingsPreferences() {
 
       {/* Desktop Push Notifications */}
       <Section title={t('settings.notifications.title')}>
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <Row label={t('settings.daily_reminder.label')} description={t('settings.daily_reminder.desc')}>
             <LiquidSwitch checked={settings.dailyReminder} onCheckedChange={(checked) => updateSettings({ dailyReminder: checked })} />
           </Row>
@@ -167,11 +167,11 @@ export function SettingsPreferences() {
               type="time"
               value={settings.reminderTime}
               onChange={(e) => updateSettings({ reminderTime: e.target.value })}
-              className="w-[180px] bg-white/5 border-white/10"
+              className="w-[180px] bg-foreground/5 border-foreground/10"
             />
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.routine_notif.label')} description={t('settings.routine_notif.desc')}>
             <LiquidSwitch checked={settings.routineNotifications} onCheckedChange={(checked) => updateSettings({ routineNotifications: checked })} />
@@ -181,25 +181,25 @@ export function SettingsPreferences() {
             <LiquidSwitch checked={settings.projectDeadlines} onCheckedChange={(checked) => updateSettings({ projectDeadlines: checked })} />
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           {isSupported ? (
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-white/85">Push Notifications Status</p>
-                  <p className="text-xs text-white/35">
+                  <p className="text-sm font-semibold text-foreground/85">Push Notifications Status</p>
+                  <p className="text-xs text-foreground/35">
                     Status: <span className="capitalize">{permission}</span>
                   </p>
                 </div>
                 {permission !== 'granted' && (
-                  <Button variant="outline" size="sm" onClick={handleRequestPermission} className="border-white/10 hover:bg-white/5">
+                  <Button variant="outline" size="sm" onClick={handleRequestPermission} className="border-foreground/10 hover:bg-foreground/5">
                     Enable Notifications
                   </Button>
                 )}
               </div>
 
-              <Separator className="bg-white/[0.05]" />
+              <Separator className="bg-foreground/[0.05]" />
 
               <Row label="Habit Reminders" description="Push updates to log daily habit progress.">
                 <LiquidSwitch
@@ -234,14 +234,14 @@ export function SettingsPreferences() {
               </Row>
             </div>
           ) : (
-            <p className="text-xs text-white/30">Desktop push notifications are not supported in this browser.</p>
+            <p className="text-xs text-foreground/30">Desktop push notifications are not supported in this browser.</p>
           )}
         </div>
       </Section>
 
       {/* Auto Backup */}
       <Section title="Automatic Backup">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <Row label="Auto Backup" description="Automatically back up your workspace data on a recurring schedule.">
             <LiquidSwitch
               checked={settings.autoBackup}
@@ -250,7 +250,7 @@ export function SettingsPreferences() {
           </Row>
           {settings.autoBackup && (
             <>
-              <Separator className="bg-white/[0.05]" />
+              <Separator className="bg-foreground/[0.05]" />
               <Row label="Backup Frequency" description="How often Novo creates an automatic snapshot of your workspace.">
                 <Select
                   value={settings.backupFrequency}
@@ -268,7 +268,7 @@ export function SettingsPreferences() {
               </Row>
             </>
           )}
-          <p className="text-[10px] text-white/25 leading-relaxed pt-1">
+          <p className="text-[10px] text-foreground/25 leading-relaxed pt-1">
             Backups are stored locally and can be restored from the Advanced tab. Connect Google Drive for cloud redundancy.
           </p>
         </div>

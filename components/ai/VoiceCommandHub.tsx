@@ -32,7 +32,7 @@ import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
 import { eventBus } from '@/lib/events/event-bus'
-import { sileo } from 'sileo'
+import { sileo } from '@/lib/sileo-bell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ function WaveformBars({ isActive }: { isActive: boolean }) {
       {Array.from({ length: BARS }).map((_, i) => (
         <motion.div
           key={i}
-          className="w-[3px] bg-white/80 rounded-full"
+          className="w-[3px] bg-foreground/80 rounded-full"
           animate={
             isActive
               ? {
@@ -138,7 +138,7 @@ function ResultCard({ result, text }: { result: VoiceExecutionResult; text: stri
       `}
     >
       {/* Transcript */}
-      <p className="text-xs text-white/40 mb-2 font-mono tracking-wide">
+      <p className="text-xs text-foreground/40 mb-2 font-mono tracking-wide">
         "{text}"
       </p>
 
@@ -153,7 +153,7 @@ function ResultCard({ result, text }: { result: VoiceExecutionResult; text: stri
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           )}
         </div>
-        <p className="text-sm text-white/85 leading-relaxed">{result.message}</p>
+        <p className="text-sm text-foreground/85 leading-relaxed">{result.message}</p>
       </div>
 
       {/* Deferral notice */}
@@ -373,7 +373,7 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
         {history.length > 0 && (
           <button
             onClick={() => setShowHistory(h => !h)}
-            className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
+            className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
           >
             History
             {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -410,7 +410,7 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
           <AnimatePresence>
             {(recording || processing) && (
               <motion.span
-                className="absolute inset-0 rounded-full bg-white/10"
+                className="absolute inset-0 rounded-full bg-foreground/10"
                 initial={{ scale: 1, opacity: 0.6 }}
                 animate={{ scale: 1.4, opacity: 0 }}
                 exit={{ opacity: 0 }}
@@ -437,7 +437,7 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
         <WaveformBars isActive={recording} />
 
         {/* Status text */}
-        <p className="text-xs text-white/50 tracking-wide">
+        <p className="text-xs text-foreground/50 tracking-wide">
           {processing
             ? 'Thinking...'
             : recording
@@ -485,15 +485,15 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
             exit={{ opacity: 0, height: 0 }}
             className="flex flex-col gap-2 overflow-hidden"
           >
-            <p className="text-xs text-white/30 uppercase tracking-widest">Recent commands</p>
+            <p className="text-xs text-foreground/30 uppercase tracking-widest">Recent commands</p>
             {history.map(entry => (
               <div
                 key={entry.id}
-                className="rounded-xl border border-white/8 bg-white/4 px-3 py-2.5"
+                className="rounded-xl border border-foreground/8 bg-foreground/4 px-3 py-2.5"
               >
-                <p className="text-xs text-white/50 font-mono mb-1">"{entry.text}"</p>
-                <p className="text-xs text-white/65">{entry.result.message}</p>
-                <p className="text-[10px] text-white/25 mt-1">
+                <p className="text-xs text-foreground/50 font-mono mb-1">"{entry.text}"</p>
+                <p className="text-xs text-foreground/65">{entry.result.message}</p>
+                <p className="text-[10px] text-foreground/25 mt-1">
                   {entry.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </p>
               </div>

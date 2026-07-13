@@ -14,7 +14,11 @@ export async function GET(request: NextRequest) {
 
     const projects = await prisma.project.findMany({
       where: { userId: session.user.id },
-      include: { subtasks: true },
+      include: {
+        subtasks: {
+          select: { id: true, title: true, completed: true }
+        }
+      },
       orderBy: { updatedAt: 'desc' }
     })
 

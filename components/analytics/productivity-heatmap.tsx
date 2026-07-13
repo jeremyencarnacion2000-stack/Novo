@@ -43,7 +43,7 @@ export function ProductivityHeatmap({ data }: ProductivityHeatmapProps) {
     }, [data])
 
     const getColor = (score: number) => {
-        if (score === 0) return 'bg-white/5'
+        if (score === 0) return 'bg-foreground/5'
         if (score < 25) return 'bg-emerald-500/20'
         if (score < 50) return 'bg-emerald-500/40'
         if (score < 75) return 'bg-emerald-500/70'
@@ -60,7 +60,7 @@ export function ProductivityHeatmap({ data }: ProductivityHeatmapProps) {
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                     <span>Less</span>
                     <div className="flex gap-1">
-                        <div className="w-3 h-3 rounded-sm bg-white/5" />
+                        <div className="w-3 h-3 rounded-sm bg-foreground/5" />
                         <div className="w-3 h-3 rounded-sm bg-emerald-500/20" />
                         <div className="w-3 h-3 rounded-sm bg-emerald-500/40" />
                         <div className="w-3 h-3 rounded-sm bg-emerald-500/70" />
@@ -70,27 +70,35 @@ export function ProductivityHeatmap({ data }: ProductivityHeatmapProps) {
                 </div>
             </div>
 
+            {/* Native scrollbars are hidden globally (app/globals.css), so a
+                clipped 90-day grid gave zero visual cue that it scrolls —
+                the right edge just looked cut off. These fade overlays are
+                that missing cue: the right one only shows content is
+                clipped, the left one only once you've scrolled past it. */}
             <TooltipProvider>
-                <div className="grid grid-flow-col grid-rows-7 gap-1.5 overflow-x-auto pb-2 no-scrollbar">
-                    {heatmapData.map((day, i) => (
-                        <Tooltip key={i}>
-                            <TooltipTrigger asChild>
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: i * 0.002 }}
-                                    className={cn(
-                                        "w-3 h-3 sm:w-4 sm:h-4 rounded-sm transition-all duration-300 hover:ring-2 hover:ring-white/30 cursor-pointer",
-                                        getColor(day.score)
-                                    )}
-                                />
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-slate-900/90 backdrop-blur-xl border-white/10 text-white p-2">
-                                <p className="text-xs font-bold">{day.score}% Productivity</p>
-                                <p className="text-[10px] text-white/60">{day.fullDate}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    ))}
+                <div className="relative">
+                    <div className="grid grid-flow-col grid-rows-7 gap-1.5 overflow-x-auto pb-2 no-scrollbar">
+                        {heatmapData.map((day, i) => (
+                            <Tooltip key={i}>
+                                <TooltipTrigger asChild>
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: i * 0.002 }}
+                                        className={cn(
+                                            "w-3 h-3 sm:w-4 sm:h-4 rounded-sm transition-all duration-300 hover:ring-2 hover:ring-white/30 cursor-pointer",
+                                            getColor(day.score)
+                                        )}
+                                    />
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-slate-900/90 backdrop-blur-xl border-foreground/10 text-white p-2">
+                                    <p className="text-xs font-bold">{day.score}% Productivity</p>
+                                    <p className="text-[10px] text-foreground/60">{day.fullDate}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        ))}
+                    </div>
+                    <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none" />
                 </div>
             </TooltipProvider>
 

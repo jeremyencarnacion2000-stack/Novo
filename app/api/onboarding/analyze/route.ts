@@ -1,4 +1,36 @@
 import { NextResponse } from 'next/server'
+import { groqAPI } from '@/lib/groq'
+import { openRouterAPI } from '@/lib/openrouter'
+
+const SYSTEM_PROMPT = `You are Novo's onboarding analyst. Read the user's onboarding conversation and infer their real cognitive/work profile from what they actually said — do not invent details they didn't mention or imply.
+
+Return ONLY valid JSON (no markdown) with exactly this shape:
+{
+  "identity": { "role": "student|founder|developer|creator|professional", "industry": string, "focusStyle": string, "deepWorkCapacity": number },
+  "energyCurve": { "chronotype": "morning_lark|night_owl|intermediate", "peakFocusStart": "HH:MM", "peakFocusEnd": "HH:MM", "typicalSlumpHour": number },
+  "metrics": { "currentCognitiveLoad": number 0-100, "decisionFatigueRisk": "low|moderate|high", "burnoutIndex": number 0-100 },
+  "bottlenecks": { "mainFrictionPoint": "context_switching|procrastination|overcommitment|lack_of_structure", "motivationDrivers": string[], "planningPreference": "adaptive|rigid" },
+  "workspaceLayout": { "enabledModules": string[] (from: today, ai, cognitive, focus, school, library, business, projects, music, trackers), "collapsedSidebar": false, "heroWidget": "cognitive_twin_orb" },
+  "selfDiscoveryText": "2-3 sentence personalized diagnosis, in Spanish, referencing what they specifically said"
+}
+
+Rules:
+- Base every field on evidence in the transcript. If something wasn't discussed, use a reasonable default rather than guessing wildly.
+- "today", "ai", "cognitive", "focus" are always in enabledModules; add role-relevant ones on top (school/library for students, business/projects for founders, projects for developers, music/projects for creators, trackers otherwise).
+- selfDiscoveryText must feel specific to this person, not generic.`
+
+async function analyzeWithLLM(textLog: string) {
+  const userMessage = `Onboarding transcript:\n\n${textLog}`
+  let raw: string
+  try {
+    raw = (await groqAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'qwen/qwen3-32b')).content
+  } catch (groqError) {
+    console.error('[Onboarding Analyze] Groq failed, trying OpenRouter:', groqError)
+    raw = (await openRouterAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'qwen/qwen3-235b-a22b:free')).content
+  }
+  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim()
+  return JSON.parse(cleaned)
+}
 
 export async function POST(req: Request) {
   try {
@@ -7,7 +39,16 @@ export async function POST(req: Request) {
       .map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`)
       .join('\n')
 
-    // Local heuristic engine to parse transcripts (ensures 100% reliability for offline/demo/hackathon environments)
+    try {
+      const profile = await analyzeWithLLM(textLog)
+      return NextResponse.json(profile)
+    } catch (llmError) {
+      console.error('[Onboarding Analyze] LLM analysis failed, falling back to heuristic parser:', llmError)
+    }
+
+    // Local heuristic fallback — only reached if every LLM provider failed or
+    // returned unparseable JSON. Keeps onboarding working even if Groq/
+    // OpenRouter are both down, at the cost of the generic profile below.
     // 1. Identity
     let role: 'student' | 'founder' | 'developer' | 'creator' | 'professional' = 'professional'
     if (/estudiante|estudio|uni|universidad|clase|colegio|escuela/i.test(textLog)) {

@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -17,6 +16,29 @@
   --novo-duration: 500ms;
   --novo-duration-fast: 350ms;
   --novo-duration-slow: 650ms;
+}
+
+/* ── Modal shared-element ("Container Transform") dialog target ───────────
+   lib/modal-flip.ts drives the entire animation via inline GSAP tweens on
+   the real box model (left/top/width/height/border-radius) — no CSS
+   keyframes or toggled classes are involved anymore. This rule only hides
+   the target for the one-frame gap between React mounting DialogContent at
+   its natural position and modalFlip.toggle()'s requestAnimationFrame
+   snapping it to the origin's rect; without it that gap would flash the
+   dialog at its centered resting position before the animation starts.
+   modalFlip.toggle() sets opacity back to 1 as its very first inline style
+   write, and the fallback path (missing flip pair) also forces it to 1 so a
+   misconfigured pair never leaves a dialog stuck invisible. ────────────── */
+.modal-flip-target {
+  opacity: 0;
+}
+
+/* Same one-frame guard as .modal-flip-target, for the backdrop. The overlay's
+   opacity is now driven entirely by the same GSAP timeline as the box/icon/
+   text tweens (matching the reference exactly) instead of a separate
+   Tailwind animate-in/out class — one clock for the whole animation. */
+.modal-flip-overlay {
+  opacity: 0;
 }
 
 @keyframes novo-panel-in {
@@ -327,7 +349,6 @@
   background: var(--card-hero-bg);
   border: 1px solid var(--card-hero-border);
   backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(180%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(180%);
 }
 
 @utility card--primary {
@@ -335,37 +356,31 @@
   border: 1px solid var(--card-primary-border);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
 }
 
 @utility card--secondary {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
 }
 
 @utility card--tertiary {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
 }
 
 /* Glass Blur Utility — heavier for 'milky' look */
 @utility glass-blur {
   backdrop-filter: blur(var(--glass-blur-px, 32px)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px, 32px)) saturate(180%);
 }
 
 @utility glass-blur-sm {
   backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
 @utility glass-blur-lg {
   backdrop-filter: blur(48px) saturate(200%);
-  -webkit-backdrop-filter: blur(48px) saturate(200%);
 }
 
 /* Card Hierarchy System - Soft Frosted */
@@ -380,32 +395,51 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--glass-radius);
   backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
   box-shadow: var(--glass-shadow);
 }
 
-/* NDL Glass Primitives */
+/* NDL Glass Primitives — light-mode default (white surface, dark hairline
+   border, matching .liquid-glass's tiering); .dark overrides below restore
+   the original dark-mode values. Previously these had no light variant at
+   all, so every Card variant="primary" (the app's default card) rendered
+   an near-invisible near-white-on-white surface whenever the user actually
+   switched to light theme. */
 @utility glass-surface {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 @utility glass-floating {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 @utility glass-active {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--cognitive-card-border, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--cognitive-card-border, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.dark .glass-surface {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dark .glass-floating {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dark .glass-active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--cognitive-card-border, rgba(255, 255, 255, 0.12));
   box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
@@ -454,13 +488,11 @@
 .card-bg-tertiary {
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 @utility glass-blur-xl {
   backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
 }
 
 /* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
@@ -471,7 +503,6 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--glass-radius);
   backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
   box-shadow: var(--glass-shadow);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -483,6 +514,27 @@
   }
 }
 
+/* Same look as .glass-card at rest, but the blur itself only turns on for
+   :hover — for repeated rows (action lists, insight feeds) where N copies
+   render and mount-animate at once, an always-on backdrop-filter per row
+   compounds into real jank that a single card never shows. */
+.glass-card-list {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, var(--glass-opacity));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:hover {
+    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+  }
+}
+
 .glass-button {
   display: flex;
   align-items: center;
@@ -491,7 +543,6 @@
   border: 1px solid var(--glass-border);
   border-radius: 999px;
   backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
   box-shadow: var(--glass-shadow);
   padding: 8px 16px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -512,7 +563,6 @@
   @apply rounded-xl border p-4 transition-all duration-300;
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-color: rgba(255, 255, 255, 0.06);
 }
 
@@ -551,7 +601,6 @@
   @apply relative overflow-hidden;
   background: var(--glass-panel-bg);
   backdrop-filter: blur(var(--glass-blur-px, 20px)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-px, 20px)) saturate(140%);
   border-radius: 24px;
   border: 1px solid var(--glass-panel-border);
   box-shadow:
@@ -664,6 +713,156 @@
   }
 }
 
+/* ── Novo Liquid Glass Tier System ──────────────────────────────────────────
+   Tier 1 (Subtle)  → dashboard cards, list items, inputs
+   Tier 2 (Medium)  → dialogs, floating panels, sidebar sections
+   Tier 3 (Premium) → hero cards, overlays, featured elements
+
+   Settings controls: cardLiquidIntensity → --card-blur-px
+                      cardOpacity        → --card-liquid-opacity
+
+   Lives in @layer components (not utilities): several consumers combine
+   these classes with Tailwind positioning utilities (fixed, absolute, inset-*)
+   on the same element and expect the utility to win. Tailwind's own utilities
+   layer always beats components regardless of source order — same-layer
+   selectors fall back to source order, which silently broke
+   mobile-section-drawer.tsx's `fixed ... liquid-glass-elevated` panel when
+   this block lived in @layer utilities (its `position: relative` clobbered
+   `fixed`, pushing the panel 16px off-screen). Moving the whole tier system
+   here fixes it at the root for every current and future consumer. */
+@layer components {
+  /* Tier 1: Subtle — frosted glass, readable, everyday surfaces */
+  .liquid-glass,
+  .liquid-glass-subtle {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.60),
+      0 4px 24px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Tier 2: Elevated — chromatic edge glow + heavier blur */
+  .liquid-glass-elevated {
+    position: relative;
+    background: rgba(255, 255, 255, 0.60);
+    backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.70),
+      0 8px 40px rgba(0, 0, 0, 0.08);
+  }
+  .liquid-glass-elevated::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 100, 100, 0.12) 0%,
+      rgba(100, 255, 100, 0.08) 35%,
+      transparent 50%,
+      rgba(100, 100, 255, 0.08) 65%,
+      rgba(255, 100, 255, 0.10) 100%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    padding: 2px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.7;
+  }
+
+  /* Tier 3: Premium — stronger chromatic edge + max blur */
+  .liquid-glass-premium {
+    position: relative;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.80),
+      0 16px 60px rgba(0, 0, 0, 0.10);
+  }
+  .liquid-glass-premium::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 80, 80, 0.18) 0%,
+      rgba(255, 200, 50, 0.10) 20%,
+      rgba(80, 255, 80, 0.12) 40%,
+      transparent 50%,
+      rgba(80, 80, 255, 0.12) 60%,
+      rgba(200, 50, 255, 0.10) 80%,
+      rgba(255, 80, 120, 0.15) 100%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    padding: 3px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.8;
+  }
+
+  /* List-item variant: same resting look as Tier 1 (translucent panel, no
+     blur), but only pays for backdrop-filter on :hover — for grids where
+     N of these render and animate in at once (routine/course cards), an
+     always-on blur per card compounds into real jank that a single card
+     never shows. */
+  .liquid-glass-hover {
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.60),
+      0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: backdrop-filter 0.2s ease, box-shadow 0.2s ease;
+  }
+  .liquid-glass-hover:hover {
+    backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
+  }
+  .dark .liquid-glass-hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 4px 24px rgba(0, 0, 0, 0.30);
+  }
+
+  /* Dark mode overrides */
+  .dark .liquid-glass,
+  .dark .liquid-glass-subtle {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 4px 24px rgba(0, 0, 0, 0.30);
+  }
+  .dark .liquid-glass-elevated {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.10);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 8px 40px rgba(0, 0, 0, 0.45);
+  }
+  .dark .liquid-glass-elevated::before { opacity: 0.5; }
+  .dark .liquid-glass-premium::before { opacity: 0.6; }
+  .dark .liquid-glass-premium {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+      0 16px 60px rgba(0, 0, 0, 0.55);
+  }
+}
+
 @layer utilities {
 
   /* App Background - Silent Dark */
@@ -734,7 +933,6 @@
     /* Defaulting to small card style as base */
     background: var(--card-primary-bg);
     backdrop-filter: blur(calc(var(--glass-blur) * 0.6px));
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.6px));
     border: 1px solid var(--card-primary-border);
     border-radius: 20px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
@@ -764,7 +962,6 @@
     @apply transition-all duration-300 ease-out relative overflow-hidden;
     background: rgba(255, 255, 255, 0.70);
     backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
-    -webkit-backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
     border-right: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
   }
@@ -772,130 +969,12 @@
   .dark .glass-sidebar {
     background: rgba(255, 255, 255, var(--sidebar-opacity));
     backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
-    -webkit-backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
     border-right: 1px solid rgba(255, 255, 255, 0.04);
   }
 
-  /* ── Novo Liquid Glass Tier System ────────────────────────────────────────
-     Tier 1 (Subtle)  → dashboard cards, list items, inputs
-     Tier 2 (Medium)  → dialogs, floating panels, sidebar sections
-     Tier 3 (Premium) → hero cards, overlays, featured elements
-
-     Settings controls: cardLiquidIntensity → --card-blur-px
-                        cardOpacity        → --card-liquid-opacity            */
-
-  /* Tier 1: Subtle — frosted glass, readable, everyday surfaces */
-  .liquid-glass,
-  .liquid-glass-subtle {
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
-    -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.60),
-      0 4px 24px rgba(0, 0, 0, 0.06);
-  }
-
-  /* Tier 2: Elevated — chromatic edge glow + heavier blur */
-  .liquid-glass-elevated {
-    position: relative;
-    background: rgba(255, 255, 255, 0.60);
-    backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
-    -webkit-backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
-    border: 1px solid rgba(0, 0, 0, 0.10);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.70),
-      0 8px 40px rgba(0, 0, 0, 0.08);
-  }
-  .liquid-glass-elevated::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 100, 100, 0.12) 0%,
-      rgba(100, 255, 100, 0.08) 35%,
-      transparent 50%,
-      rgba(100, 100, 255, 0.08) 65%,
-      rgba(255, 100, 255, 0.10) 100%
-    );
-    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    padding: 2px;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0.7;
-  }
-
-  /* Tier 3: Premium — stronger chromatic edge + max blur */
-  .liquid-glass-premium {
-    position: relative;
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
-    -webkit-backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.80),
-      0 16px 60px rgba(0, 0, 0, 0.10);
-  }
-  .liquid-glass-premium::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 80, 80, 0.18) 0%,
-      rgba(255, 200, 50, 0.10) 20%,
-      rgba(80, 255, 80, 0.12) 40%,
-      transparent 50%,
-      rgba(80, 80, 255, 0.12) 60%,
-      rgba(200, 50, 255, 0.10) 80%,
-      rgba(255, 80, 120, 0.15) 100%
-    );
-    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    padding: 3px;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0.8;
-  }
-
-  /* Dark mode overrides */
-  .dark .liquid-glass,
-  .dark .liquid-glass-subtle {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.10),
-      0 4px 24px rgba(0, 0, 0, 0.30);
-  }
-  .dark .liquid-glass-elevated {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.14),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      0 8px 40px rgba(0, 0, 0, 0.45);
-  }
-  .dark .liquid-glass-elevated::before { opacity: 0.5; }
-  .dark .liquid-glass-premium::before { opacity: 0.6; }
-  .dark .liquid-glass-premium {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-      0 16px 60px rgba(0, 0, 0, 0.55);
-  }
-
-
-
+  /* Novo Liquid Glass Tier System moved to @layer components above —
+     several consumers rely on it losing to Tailwind's own utilities
+     (fixed, absolute, etc.) on the same element. See that block for why. */
 
 
   /* Active Sidebar Item — clean glass accent with inset accent line */
@@ -1396,7 +1475,6 @@ html, body, * {
   .glass-panel,
   [data-novo-glass] {
     backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
     transition: none !important;
     animation: none !important;
   }
@@ -1676,7 +1754,12 @@ html.cognitive-peak .liquid-glass-premium {
 
 /* Fatigue: more whitespace, calmer, slower — the app exhales */
 html.cognitive-fatigue .container { gap: 1.5rem; }
-html.cognitive-fatigue * {
+/* :not() exclusions: GSAP writes inline styles every frame during the
+   shared-element flights; a !important CSS transition chasing those writes
+   turns each instant snap into a 500ms glide — the whole animation reads as
+   lag, not calm. Everything the flip system touches opts out. :where() keeps
+   specificity at zero so nothing else changes. */
+html.cognitive-fatigue *:where(:not([data-flying-clone], [data-shared-item], [data-flip-from], [data-flip-to], [data-flip-to] > *, [data-flip-overlay], [data-radix-popper-content-wrapper], [data-slot="select-content"], [data-slot="select-content"] *)) {
   transition-duration: var(--cognitive-transition-speed, 500ms) !important;
 }
 html.cognitive-fatigue .liquid-glass,
@@ -1684,7 +1767,6 @@ html.cognitive-fatigue .liquid-glass-elevated,
 html.cognitive-fatigue .liquid-glass-premium {
   transition: all 600ms cubic-bezier(0.25, 0.8, 0.25, 1);
   backdrop-filter: blur(24px) saturate(130%) brightness(0.98) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(130%) brightness(0.98) !important;
 }
 html.cognitive-fatigue h1,
 html.cognitive-fatigue h2 { letter-spacing: 0.01em; }
@@ -1695,7 +1777,8 @@ html.cognitive-fatigue .text-\[11px\] { opacity: 0.7; }
 
 /* Reduced Capacity: minimal stimulation, maximum calm */
 html.cognitive-reduced-capacity .container { gap: 2rem; }
-html.cognitive-reduced-capacity * {
+/* Same GSAP exclusions as cognitive-fatigue above. */
+html.cognitive-reduced-capacity *:where(:not([data-flying-clone], [data-shared-item], [data-flip-from], [data-flip-to], [data-flip-to] > *, [data-flip-overlay], [data-radix-popper-content-wrapper], [data-slot="select-content"], [data-slot="select-content"] *)) {
   transition-duration: var(--cognitive-transition-speed, 700ms) !important;
 }
 html.cognitive-reduced-capacity .liquid-glass,
@@ -1703,7 +1786,6 @@ html.cognitive-reduced-capacity .liquid-glass-elevated,
 html.cognitive-reduced-capacity .liquid-glass-premium {
   transition: all 800ms cubic-bezier(0.25, 0.8, 0.25, 1);
   backdrop-filter: blur(20px) saturate(110%) brightness(0.95) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(110%) brightness(0.95) !important;
 }
 html.cognitive-reduced-capacity .text-xs,
 html.cognitive-reduced-capacity .text-\[9px\],
@@ -1718,43 +1800,28 @@ html.cognitive-reduced-capacity .animate-ping {
 
 /* Linear: balanced baseline — no overrides needed, CSS defaults apply */
 
-/* ─── Blendy Morph Transition Layer ─────────────────────────────────────── */
-
-/* The clone element Blendy creates during morphing */
-.blendy-clone {
-  border-radius: 16px;
-  backdrop-filter: blur(20px) saturate(180%);
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  /* Ensure the morph clone is always above content but below modals */
-  z-index: 9998 !important;
-  /* Smooth spring-like scale easing during morph */
-  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-}
-
-/* Source element during active morph — fade it slightly */
-[data-blendy-from].blendy-active {
+/* ─── Modal Flip origin fade (GSAP) ──────────────────────────────────────
+   The origin element (card/button) dims slightly while its dialog is open,
+   since GSAP Flip animates the dialog content directly rather than a
+   cloned element — no clone-specific styling needed. ─────────────────── */
+[data-flip-from].modal-flip-source-active {
   opacity: 0.6;
   transition: opacity 180ms ease;
 }
 
-/* Target element snap-in — fade from invisible so the clone hand-off is seamless */
-[data-blendy-to] {
-  animation: blendyFadeIn 120ms ease forwards;
-}
-
-@keyframes blendyFadeIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
 /* Swapy drag handle cursor feedback */
-[data-swapy-handle] {
+[data-swapy-item] {
   cursor: grab;
 }
-[data-swapy-handle]:active {
+[data-swapy-item]:active {
   cursor: grabbing;
+}
+[data-swapy-item] button,
+[data-swapy-item] a,
+[data-swapy-item] input,
+[data-swapy-item] select,
+[data-swapy-item] textarea {
+  cursor: default;
 }
 
 /* Swapy dragging item — lift effect */

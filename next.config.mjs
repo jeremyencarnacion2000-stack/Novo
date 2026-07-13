@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: process.env.NEXT_PUBLIC_CAPACITOR === 'true' ? 'export' : undefined,
-  trailingSlash: true,
   reactStrictMode: true,
   compress: true,
   typescript: {
@@ -10,14 +9,11 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     unoptimized: true,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'raw.githubusercontent.com',
-        port: '',
-        pathname: '/microsoft/fluentui-emoji/**',
-      },
-    ],
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production'
+      ? { exclude: ['error'] }
+      : false,
   },
   experimental: {
     // Deep tree-shaking: only ship icons/components actually imported
@@ -34,7 +30,7 @@ const nextConfig = {
       '@radix-ui/react-scroll-area',
     ],
   },
-  turbopack: {},
+  // ponytail: --webpack flag required for prod builds on Windows; Turbopack native binary segfaults
   serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma', 'onnxruntime-node', '@xenova/transformers'],
   // Optimize for Vercel serverless functions
   poweredByHeader: false,

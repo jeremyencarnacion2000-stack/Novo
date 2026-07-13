@@ -11,11 +11,12 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { DashboardQuickView } from './dashboard/dashboard-quick-view'
 import { motion } from 'framer-motion'
 import { CognitiveEngineWidget } from '@/components/cognitive/cognitive-engine-widget'
-import { VoiceCommandButton } from '@/components/cognitive/voice-command-button'
+import { NowHero } from '@/components/dashboard/now-hero'
 import { springConfig } from '@/lib/design-tokens'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
 import { useCognitivePhase } from '@/lib/cognitive-context'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -41,6 +42,7 @@ export default function DashboardClient() {
   const { t } = useTranslation()
   const [refreshKey, setRefreshKey] = useState(0)
   const phase = useCognitivePhase()
+  const isMobile = useIsMobile()
 
   // Reactive greeting — re-computed each render, uses i18n system
   const getGreeting = useCallback(() => {
@@ -79,17 +81,22 @@ export default function DashboardClient() {
       animate="visible"
     >
       {/* --- DESKTOP VIEW --- */}
-      <div className="hidden md:flex flex-col gap-12">
+      {!isMobile && (
+      <div className="flex flex-col gap-8">
+        <motion.div variants={itemVariants}>
+          <NowHero />
+        </motion.div>
+
         <motion.div variants={itemVariants} className="flex justify-between items-center w-full">
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-7xl font-light tracking-tight italic opacity-90 flex items-center gap-4 flex-wrap">
+          <div className="space-y-1.5">
+            <h2 className="text-xl md:text-2xl font-light tracking-tight italic opacity-70 flex items-center gap-3 flex-wrap">
               {getGreeting()}
               {phase !== 'LINEAR_EXECUTION' && (
                 <motion.span
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className={cn(
-                    "text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border leading-none shadow-sm transition-all duration-500",
+                    "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border leading-none shadow-sm transition-all duration-500",
                     phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/5",
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
                     phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5"
@@ -99,16 +106,15 @@ export default function DashboardClient() {
                   🛡️ Adaptive Shield: {phase === 'PEAK_FOCUS' ? 'Peak Focus' : phase === 'SYNAPTIC_FATIGUE' ? 'Recovery Mode' : 'Stress Adapt'}
                 </motion.span>
               )}
-            </h1>
+            </h2>
             <p className="subtitle-technical">
               System status · live pulse · encrypted
             </p>
           </div>
-          <VoiceCommandButton />
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <DashboardMetrics refreshKey={refreshKey} />
+          <DashboardMetrics refreshKey={refreshKey} compact />
         </motion.div>
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
@@ -130,13 +136,20 @@ export default function DashboardClient() {
           </ScrollReveal>
         </div>
       </div>
+      )}
 
       {/* --- MOBILE VIEW --- */}
-      <div className="md:hidden flex flex-col gap-8 pb-24">
-        {/* Greeting & Voice Command */}
+      {isMobile && (
+      <div className="flex flex-col gap-8 pb-24">
+        {/* Ahora → — the one decision, leads the page */}
+        <motion.div variants={itemVariants} className="px-1">
+          <NowHero />
+        </motion.div>
+
+        {/* Greeting */}
         <motion.div variants={itemVariants} className="flex justify-between items-center w-full px-1">
           <div className="space-y-1">
-            <h1 className="text-4xl font-light tracking-tight italic opacity-90 flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-light tracking-tight italic opacity-70 flex items-center gap-2 flex-wrap">
               {getGreeting()}
               {phase !== 'LINEAR_EXECUTION' && (
                 <span
@@ -150,22 +163,16 @@ export default function DashboardClient() {
                   🛡️ Shield Active
                 </span>
               )}
-            </h1>
+            </h2>
             <p className="subtitle-technical text-[8px]">
               System status · live pulse
             </p>
           </div>
-          <VoiceCommandButton />
         </motion.div>
 
-        {/* Cognitive Engine Widget */}
-        <motion.div variants={itemVariants}>
-          <CognitiveEngineWidget />
-        </motion.div>
-
-        {/* Metrics (2-column grid, same real data as desktop) */}
-        <motion.div variants={itemVariants} className="cognitive-secondary-element">
-          <DashboardMetrics refreshKey={refreshKey} />
+        {/* Metrics (slim strip, same real data as desktop) */}
+        <motion.div variants={itemVariants} className="cognitive-secondary-element px-1">
+          <DashboardMetrics refreshKey={refreshKey} compact />
         </motion.div>
 
         {/* Recent Activity (full width) */}
@@ -177,7 +184,13 @@ export default function DashboardClient() {
         <motion.div variants={itemVariants} className="cognitive-secondary-element">
           <QuickActions />
         </motion.div>
+
+        {/* Cognitive Engine Widget — demoted, detail view lives at /cognitive */}
+        <motion.div variants={itemVariants}>
+          <CognitiveEngineWidget />
+        </motion.div>
       </div>
+      )}
 
       {/* Quick View Side Panel */}
       <DashboardQuickView

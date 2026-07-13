@@ -41,7 +41,7 @@ import {
 import { usePlayerStore } from '@/lib/player-store'
 import { eventBus } from '@/lib/events/event-bus'
 import { startMorphTransition } from '@/lib/morphing-engine'
-import { novoToast } from '@/components/ui/novo-toast'
+import { sileo } from '@/lib/sileo-bell'
 
 // ─── Event Bus → Engine energy cost table ────────────────────────────────────
 // These calibrated weights translate behavioral signals into attentional depletion.
@@ -133,8 +133,21 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchBiometrics()
-    const id = setInterval(fetchBiometrics, 180_000)
-    return () => clearInterval(id)
+    let id: ReturnType<typeof setInterval> | null = setInterval(fetchBiometrics, 180_000)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBiometrics()
+        if (!id) id = setInterval(fetchBiometrics, 180_000)
+      } else if (id) {
+        clearInterval(id)
+        id = null
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      if (id) clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [fetchBiometrics])
 
   // ── Event Bus → Engine bridge — ref handles (declared early so refresh/logHabit can populate them) ──
@@ -181,8 +194,21 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh()
-    const id = setInterval(refresh, 60_000)
-    return () => clearInterval(id)
+    let id = setInterval(refresh, 300_000)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh()
+        clearInterval(id)
+        id = setInterval(refresh, 300_000)
+      } else {
+        clearInterval(id)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [refresh])
 
   // ── Circadian HTML class injection ────────────────────────────────────────
@@ -207,10 +233,9 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new CustomEvent('cognitive:fatigue-onset', {
         detail: { fatigueScore: bioState.fatigueScore, label: bioState.label }
       }))
-      novoToast.warning({
+      sileo.warning({
         title: 'Rest Cycle Recommended',
         description: 'Synaptic Fatigue onset detected. Warm blue-light filter activated, ambient player initialized. High-load pages restricted.',
-        badge: 'Rest & Recover',
         duration: 6000
       })
     }
@@ -218,10 +243,9 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new CustomEvent('cognitive:reduced-capacity-onset', {
         detail: { attentionScore: bioState.attentionScore, userStressScore, label: bioState.label }
       }))
-      novoToast.show('cognitive', {
+      sileo.action({
         title: 'Adaptive Protection Enabled',
         description: 'High fatigue detected. Dashboard layout simplified, secondary components dimmed, high-load items rescheduled.',
-        badge: 'Reduced Load',
         duration: 6000
       })
     }
@@ -229,18 +253,16 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new CustomEvent('cognitive:peak-onset', {
         detail: { attentionScore: bioState.attentionScore }
       }))
-      novoToast.success({
+      sileo.success({
         title: 'Peak Focus Cycle',
         description: 'Circadian attention peak reached. Focus frequencies loaded, notification badges silenced, deep work state secured.',
-        badge: 'Peak Performance',
         duration: 6000
       })
     }
     if (bioState.phase === 'LINEAR_EXECUTION' && prev && prev !== 'LINEAR_EXECUTION') {
-      novoToast.info({
+      sileo.info({
         title: 'Balanced State Active',
         description: 'Focus reserves are optimal. Standard UI layouts and normal notification settings restored.',
-        badge: 'Linear Execution',
         duration: 5000
       })
     }
@@ -411,7 +433,7 @@ function FatigueNavigationWarning({
 }) {
   return (
     <div
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] max-w-md w-[calc(100%-2rem)]"
+      className="fixed top-4 right-4 z-[200] max-w-sm w-[calc(100%-2rem)] sm:w-full"
       role="alert"
       style={{ animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both' }}
     >

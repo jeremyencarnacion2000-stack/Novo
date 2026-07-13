@@ -9,6 +9,12 @@ interface CardProps extends React.ComponentProps<'div'> {
 }
 
 function Card({ className, style, variant = 'primary', children, ...props }: CardProps) {
+  // A caller passing one of the .liquid-glass* utility classes already gets
+  // its own backdrop-filter — stacking the base .glass-surface blur under it
+  // just doubles the compositing cost for a result the browser collapses to
+  // whichever rule wins the cascade anyway.
+  const hasLiquidGlassClass = typeof className === 'string' && className.includes('liquid-glass')
+
   // `liquid` opts a hero/primary card into the real Liquid Glass renderer
   // (SVG displacement in backdrop-filter) instead of the CSS glassmorphism
   // surfaces. Use sparingly — it's GPU-heavier than .glass-surface.
@@ -42,9 +48,9 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
       data-variant={variant}
       className={cn(
         'text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative isolate shadow-none bg-transparent overflow-hidden border transition-all duration-300',
-        variant === 'primary' && 'glass-surface',
-        variant === 'secondary' && 'glass-surface bg-white/[0.04]',
-        variant === 'tertiary' && 'glass-surface bg-black/40 border-white/5',
+        variant === 'primary' && !hasLiquidGlassClass && 'glass-surface',
+        variant === 'secondary' && (hasLiquidGlassClass ? 'bg-foreground/[0.04]' : 'glass-surface bg-foreground/[0.04]'),
+        variant === 'tertiary' && (hasLiquidGlassClass ? 'bg-black/40 border-white/5' : 'glass-surface bg-black/40 border-white/5'),
         variant === 'ghost' && 'border-transparent',
         className,
       )}

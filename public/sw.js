@@ -1,7 +1,10 @@
 // Service Worker for Novo Offline Support
 
-const CACHE_NAME = 'novo-v2';
-const API_CACHE_NAME = 'novo-api-v2';
+// Bump these on every deploy that changes caching behavior — the activate
+// handler below only clears caches whose name doesn't match, so reusing a
+// name across deploys means old entries never get invalidated.
+const CACHE_NAME = 'novo-v4';
+const API_CACHE_NAME = 'novo-api-v4';
 
 // Only cache assets that are guaranteed to exist as static files.
 // NOTE: Next.js hashes CSS/JS at build time — never list hashed assets here.
@@ -53,6 +56,20 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // NEVER let the SW touch auth or RSC/data navigation payloads. These are a
+  // `fetch` with destination 'empty', so without this early return they fell
+  // through to the cache-first branch at the bottom — which cached
+  // /api/auth/session and then served the STALE (often logged-out) copy on
+  // every reload, logging the user out until they cleared their cache. Let
+  // them hit the network directly, with cookies, always fresh.
+  if (
+    url.pathname.startsWith('/api/auth/') ||
+    request.headers.get('RSC') === '1' ||
+    url.search.includes('_rsc=')
+  ) {
+    return; // no respondWith → default browser network fetch
+  }
+
   // Handle API requests (exclude next-auth to prevent auth loops or stale session caches)
   if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/')) {
     event.respondWith(
@@ -78,8 +95,36 @@ self.addEventListener('fetch', (event) => {
         });
       })
     );
+  } else if (
+    request.destination === 'document' ||
+    request.destination === 'script' ||
+    request.destination === 'style'
+  ) {
+    // Network-first for anything that determines "which version of the app
+    // is running" (HTML shell + hashed JS/CSS). Cache is an offline
+    // fallback only — never the source of truth while online. This is what
+    // cache-first got wrong: a deploy's new HTML references new chunk
+    // hashes, but cache-first kept serving the old HTML forever, which then
+    // requested chunks that no longer existed on the new deployment.
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+        }
+        return response;
+      }).catch(() => {
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          if (request.mode === 'navigate') {
+            return caches.match('/').then((cached) => cached || new Response('Offline - Content not available', { status: 503 }));
+          }
+        });
+      })
+    );
   } else {
-    // Handle static assets
+    // Cache-first for images/fonts/etc — staleness doesn't affect which
+    // version of the app is running, so prefer offline resilience here.
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
@@ -87,25 +132,13 @@ self.addEventListener('fetch', (event) => {
         }
 
         return fetch(request).then((response) => {
-          // Cache static assets
-          if (response.status === 200 && (request.destination === 'document' ||
-              request.destination === 'script' ||
-              request.destination === 'style' ||
-              request.destination === 'image' ||
-              request.destination === 'font')) {
+          if (response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
             });
           }
           return response;
-        }).catch(() => {
-          // Return offline page for navigation requests
-          if (request.mode === 'navigate') {
-            return caches.match('/').then((cachedResponse) => {
-              return cachedResponse || new Response('Offline - Content not available', { status: 503 });
-            });
-          }
         });
       })
     );

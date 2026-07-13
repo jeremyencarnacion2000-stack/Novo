@@ -43,6 +43,7 @@ model Session {
 
 model User {
   id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
   name          String?
   email         String    @unique
   emailVerified DateTime?
@@ -51,6 +52,8 @@ model User {
   isPublic      Boolean   @default(true)
   password      String?
   role          String    @default("user") // "user" or "admin"
+  plan          String    @default("free") // "free" | "pro" — denormalized from Subscription for fast gating checks
+  subscription  Subscription?
   accounts      Account[]
   sessions      Session[]
   checklistItems ChecklistItem[]
@@ -63,6 +66,9 @@ model User {
   dailyAnalytics DailyAnalytics[]
   cognitiveSnapshot UserCognitiveSnapshot?
   insights       Insight[]
+  aiCallLogs     AICallLog[]
+  aiActionLogs   AiActionLog[]
+  calendarEvents CalendarEvent[]
   conversations  Conversation[]
   aiConversations AIConversation[]
   businessClients BusinessClient[]
@@ -103,6 +109,9 @@ model User {
 
   // External Integrations (Notion, Drive, etc.)
   integrationAccounts IntegrationAccount[]
+
+  // Behavioral Intelligence Pilot (interruption-frequency experiment)
+  experimentDays ExperimentDay[]
 }
 
 model VerificationToken {
@@ -149,6 +158,7 @@ model ChecklistItem {
   version   Int      @default(1)
 
   @@index([userId])
+  @@index([userId, completed])
   @@map("checklist_items")
 }
 
@@ -315,11 +325,14 @@ model Task {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   checklistItems ChecklistItem[]
+  scheduledHour Int?    // 0-23, set by the cognitive engine's auto-schedule
+  scheduledReason String? // why the cognitive engine picked this hour
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
   @@index([userId])
+  @@index([userId, status])
   @@map("tasks")
 }
 
@@ -349,6 +362,26 @@ model TrackerEntry {
   version   Int      @default(1)
 
   @@map("tracker_entries")
+}
+
+// Native Novo calendar events — created directly by the user or the AI
+// assistant (CREATE_EVENT action). Distinct from Google Calendar, which is
+// synced separately; the aggregator merges both into one unified view.
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  start       DateTime
+  end         DateTime
+  allDay      Boolean  @default(false)
+  source      String   @default("novo") // 'novo' | 'ai'
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, start])
+  @@map("calendar_events")
 }
 
 
@@ -699,12 +732,65 @@ model FocusSession {
   interruptions  Int      @default(0)
   focusQuality   Int?     // 1-5 rating
   notes          String?
-  
+
   createdAt      DateTime @default(now())
-  
+
   @@index([userId])
   @@index([userId, startTime])
   @@map("focus_sessions")
+}
+
+// ─── Behavioral Intelligence Pilot ────────────────────────────────────────────
+// Pre-registered experiment: does an interruption-frequency-derived deep-work
+// window outperform a yoked control window? Condition is AES-256-GCM encrypted
+// per day and not decryptable by the app itself — see scripts/experiment/.
+// Objective metrics (completed high-priority tasks, focus duration,
+// interruptions, schedule adherence) are NOT duplicated here; they're derived
+// at analysis time from Task/FocusSession rows filtered by
+// [displayedWindowStart, displayedWindowEnd]. Only the two self-report metrics
+// the experiment can't get elsewhere live on this row.
+model ExperimentDay {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date         DateTime @db.Date // calendar day this assignment applies to
+  dayNumber    Int      // 1-28, position in the pilot
+  blockIndex   Int      // 0-6, which 4-day randomization block
+  positionInBlock Int   // 0-3, position within the block
+
+  // AES-256-GCM ciphertext of 'REAL' | 'CONTROL' — key held outside the repo
+  // (physical envelope), not decryptable until day 29.
+  encryptedCondition String
+  iv                 String
+  authTag            String
+
+  // The window actually shown to the user that day — filled in each morning
+  // once that day's condition is decrypted server-side and the corresponding
+  // window (real or yoked-control) is computed. Never store the un-chosen
+  // candidate window; it's recomputed retroactively at analysis time from
+  // historical FocusSession data so the running pilot can't be reverse-
+  // engineered by comparing "what was shown" to "what else could've been."
+  displayedWindowStart DateTime?
+  displayedWindowEnd   DateTime?
+  generatedAt          DateTime?
+
+  // Self-report — the two metrics with no other data source.
+  subjectiveFocusScore   Int? // 1-5
+  subjectiveFatigueScore Int? // 1-5
+  notes                  String?
+
+  // Filled in once, after day 28, when the envelope is opened.
+  revealedCondition String? // 'REAL' | 'CONTROL'
+  revealedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@unique([userId, dayNumber])
+  @@index([userId])
+  @@map("experiment_days")
 }
 
 model Template {
@@ -790,6 +876,8 @@ model DirectMessage {
 
   @@index([senderId])
   @@index([receiverId])
+  @@index([senderId, receiverId])
+  @@index([receiverId, senderId])
   @@map("direct_messages")
 }
 
@@ -819,6 +907,71 @@ model Insight {
 
   @@index([userId, status])
   @@map("insights")
+}
+
+// Audit trail of every autonomous AI provider call (background jobs + on-demand
+// engine requests) — records which model executed, token usage, latency, and
+// outcome. This is the evidence layer for "AI executes real business decisions
+// in production," distinct from Insight/TwinEvolutionLog which record *what*
+// was decided, not *which model, at what cost* made the decision.
+model AICallLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String   // 'gemini' | 'groq' | 'openrouter'
+  model        String   // e.g. 'gemini-1.5-flash', 'llama3-8b-8192', 'qwen/qwen3-32b'
+  purpose      String   // 'fatigue_insight' | 'daily_wrapup' | 'cognitive_reorg' | ...
+  tokensIn     Int?
+  tokensOut    Int?
+  latencyMs    Int
+  success      Boolean  @default(true)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([provider, createdAt])
+  @@map("ai_call_logs")
+}
+
+// Audit trail of every autonomous AI action (task/project/routine/note/course
+// mutations executed by the AI, in-chat or from a cron job) — the evidence
+// layer for "AI executes real business decisions," distinct from AICallLog
+// (which model was called) and TwinEvolutionLog (what the twin inferred).
+model AiActionLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType      String   // 'CREATE_TASK' | 'UPDATE_PROJECT' | 'DELETE_ROUTINE' | ... (AIActionType)
+  payload         String   // JSON string of the action payload the model produced
+  success         Boolean
+  errorMessage    String?
+  triggeredBy     String   @default("ai_chat") // 'ai_chat' | 'cron' — autonomous cron run vs in-chat action
+  executionTimeMs Int?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([actionType, createdAt])
+  @@map("ai_action_logs")
+}
+
+// Stripe subscription state, one row per user. Source of truth for billing;
+// User.plan is a denormalized copy kept in sync by the webhook, so gating
+// checks (e.g. lib/ai/executor.ts) don't need a join on every AI action.
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               String    @default("free") // 'free' | 'active' | 'past_due' | 'canceled'
+  interval             String?   // 'month' | 'year'
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("subscriptions")
 }
 
 model LikedTrack {

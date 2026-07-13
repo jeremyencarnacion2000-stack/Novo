@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "agent-browser@agent-browser": true,
+    "superpowers@superpowers-dev": true,
+    "watch@claude-video": true
+  }
+}

@@ -328,6 +328,10 @@ export interface BackupData {
   trackers: any[]
 }
 
+// Module-level timer so we can clear it across calls within the same session.
+// localStorage cannot store live timer IDs — they are process-local and meaningless after reload.
+let _autoBackupTimer: ReturnType<typeof setInterval> | null = null
+
 export const DataIntegrator = {
   // Initialize sync listeners and run initial sync (idempotent — safe to call multiple times)
   _initialized: false,
@@ -593,9 +597,10 @@ export const DataIntegrator = {
 
   // Auto-backup scheduling
   scheduleAutoBackup: (userId: string, frequency: 'daily' | 'weekly' | 'monthly') => {
-    const existingTimer = localStorage.getItem('novo-auto-backup-timer')
-    if (existingTimer) {
-      clearInterval(parseInt(existingTimer))
+    // Clear the previous interval from this session (module-level ref, not localStorage)
+    if (_autoBackupTimer !== null) {
+      clearInterval(_autoBackupTimer)
+      _autoBackupTimer = null
     }
 
     const getInterval = (freq: string) => {
@@ -620,8 +625,7 @@ export const DataIntegrator = {
       }
     }
 
-    const timerId = setInterval(backup, interval)
-    localStorage.setItem('novo-auto-backup-timer', timerId.toString())
+    _autoBackupTimer = setInterval(backup, interval)
     localStorage.setItem('novo-auto-backup-frequency', frequency)
   },
 

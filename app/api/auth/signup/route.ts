@@ -67,14 +67,7 @@ export async function POST(request: NextRequest) {
             name: user.name
         })
 
-        return NextResponse.json({
-            success: true,
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email
-            }
-        })
+        return NextResponse.json({ success: true }, { status: 201 })
     } catch (error) {
         console.error('💥 [API-SignUp] Exception during registration:', error)
         console.error('📊 [API-SignUp] Error details:', {

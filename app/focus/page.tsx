@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { GlassSurface } from '@/components/ui/GlassSurface';
-import { Play, Pause, Square, SkipForward, Plus, CheckCircle2, Circle } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, Plus, CheckCircle2, Circle, Target, Coffee, Trees, Flame } from 'lucide-react';
 import { useFocus } from '@/lib/focus-context';
 import { FocusSettings } from '@/components/focus/focus-settings';
 import { useAnalytics } from '@/hooks/use-swr';
@@ -72,18 +72,18 @@ export default function FocusPage() {
                 {/* Main Timer Column */}
                 <div className="lg:col-span-2 space-y-6">
                     <div
-                        className="relative rounded-3xl border border-white/[0.07] p-8"
+                        className="relative rounded-[28px] border border-foreground/[0.07] p-8"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
                             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}
                     >
                         <GlassSurface
-                            radius={24}
+                            radius={28}
                             depth={12}
                             blur={1}
                             strength={50}
-                            chromaticAberration={8}
+                            chromaticAberration={14}
                             backgroundColor="transparent"
                             elevation="low"
                             aria-hidden
@@ -102,9 +102,10 @@ export default function FocusPage() {
                             {/* Session Type Badge */}
                             <Badge
                                 variant={mode === 'work' ? 'default' : 'secondary'}
-                                className="text-base px-5 py-1.5 transition-colors duration-300"
+                                className="text-base px-5 py-1.5 transition-colors duration-300 gap-1.5"
                             >
-                                {mode === 'work' ? '🎯 Focus Session' : (mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break')}
+                                {mode === 'work' ? <Target className="w-4 h-4" /> : (mode === 'shortBreak' ? <Coffee className="w-4 h-4" /> : <Trees className="w-4 h-4" />)}
+                                {mode === 'work' ? 'Focus Session' : (mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
                             </Badge>
 
                             {/* Timer Display */}
@@ -190,46 +191,46 @@ export default function FocusPage() {
                     </div>
 
                     {/* Stats Cards Row */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div
-                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
                                 backdropFilter: 'blur(12px)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
-                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Deep work today</p>
-                            <p className="text-xl font-black text-white mt-1.5">{todayFocusTimeStr}</p>
-                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                            <p className="text-[10px] font-black tracking-widest uppercase text-foreground/40 group-hover:text-foreground/60 transition-colors">Deep work today</p>
+                            <p className="text-xl font-black text-foreground mt-1.5">{todayFocusTimeStr}</p>
+                            <p className="text-[9px] text-foreground/30 font-medium mt-1">
                                 {parseFloat(todayFocusTimeStr) > 0 ? 'above yesterday\'s session' : 'establish focus index'}
                             </p>
                         </div>
                         <div
-                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
                                 backdropFilter: 'blur(12px)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
-                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Sessions completed</p>
-                            <p className="text-xl font-black text-white mt-1.5">{pomodoroCount}</p>
-                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                            <p className="text-[10px] font-black tracking-widest uppercase text-foreground/40 group-hover:text-foreground/60 transition-colors">Sessions completed</p>
+                            <p className="text-xl font-black text-foreground mt-1.5">{pomodoroCount}</p>
+                            <p className="text-[9px] text-foreground/30 font-medium mt-1">
                                 {pomodoroCount > 0 ? 'building consistency momentum' : 'no sessions registered today'}
                             </p>
                         </div>
                         <div
-                            className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-4 cursor-default group"
+                            className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
                                 backdropFilter: 'blur(12px)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
-                            <p className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">Active streak</p>
-                            <p className="text-xl font-black text-white mt-1.5">🔥 {streakDays}d</p>
-                            <p className="text-[9px] text-white/30 font-medium mt-1">
+                            <p className="text-[10px] font-black tracking-widest uppercase text-foreground/40 group-hover:text-foreground/60 transition-colors">Active streak</p>
+                            <p className="text-xl font-black text-foreground mt-1.5 flex items-center gap-1"><Flame className="w-4 h-4 text-orange-400" /> {streakDays}d</p>
+                            <p className="text-[9px] text-foreground/30 font-medium mt-1">
                                 {streakDays > 0 ? 'maintaining execution fidelity' : 'start a streak today'}
                             </p>
                         </div>
@@ -239,7 +240,7 @@ export default function FocusPage() {
                 {/* Task Column */}
                 <div className="space-y-6">
                     <div
-                        className="h-full flex flex-col relative overflow-hidden rounded-3xl border border-white/[0.07] p-4"
+                        className="h-full flex flex-col relative overflow-hidden rounded-[28px] border border-foreground/[0.07] p-4"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
                             backdropFilter: 'blur(12px)',
@@ -247,11 +248,11 @@ export default function FocusPage() {
                         }}
                     >
                         <div className="p-0 pb-4">
-                            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+                            <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
                                 <CheckCircle2 className="h-5 w-5 text-primary" />
                                 Tasks
                             </h2>
-                            <p className="text-xs text-white/40 mt-1">Select a task to track your focus</p>
+                            <p className="text-xs text-foreground/40 mt-1">Select a task to track your focus</p>
                         </div>
                         <div className="flex-1 flex flex-col gap-4">
                             <form onSubmit={handleAddTask} className="flex gap-2">

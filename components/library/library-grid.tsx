@@ -75,13 +75,15 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
                         transition={{ ...springConfig.gentle, delay: Math.min(i, 20) * 0.04 }}
                     >
                     <Card
-                        className="group cursor-pointer hover:shadow-lg transition-all duration-300 border-0 bg-card/50 hover:bg-card rounded-xl overflow-hidden"
+                        className="group cursor-pointer border-0 bg-card/50 hover:bg-card rounded-xl overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] active:scale-95"
+                        data-flip-from={`book-${book.id}`}
                         onClick={() => onBookClick(book)}
                     >
                         <CardContent className="p-3 md:p-4">
                             <div className="aspect-[2/3] relative rounded-lg overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all">
                                 {book.coverUrl ? (
                                     <img
+                                        data-shared-item="cover"
                                         src={book.coverUrl}
                                         alt={book.title}
                                         className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
@@ -114,7 +116,7 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
                                 )}
                             </div>
 
-                            <h3 className="font-semibold text-sm line-clamp-1 mb-0.5" title={book.title}>
+                            <h3 data-shared-item="title" className="font-semibold text-sm line-clamp-1 mb-0.5" title={book.title}>
                                 {book.title}
                             </h3>
                             <p className="text-xs text-muted-foreground line-clamp-1 mb-2">

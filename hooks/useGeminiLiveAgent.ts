@@ -199,9 +199,6 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
     setAgentState('thinking')
     setThinkingMessage(thinkingLabels[name] || 'Procesando...')
 
-    // Brief pause so the user can read the thinking state
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
     try {
       if (name === 'MapsToSection') {
         const section = args.sectionName?.toLowerCase() || 'dashboard'

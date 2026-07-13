@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Send, Paperclip, Mic, MicOff, Loader2, Camera, Image, FileText, X, Globe, Code } from 'lucide-react';
+import { Send, Plus, Loader2, Camera, Image, FileText, X, Globe } from 'lucide-react';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 import { ModelSelector } from './model-selector';
+import { GlowingOrb, type OrbState } from './glowing-orb';
 
 const SUGGESTIONS = [
     'Crear una tarea',
@@ -191,17 +192,23 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
             <div className={`max-w-4xl mx-auto ${variant === 'center' ? 'px-0' : 'px-4'}`}>
                 {/* Voice Animation - Centralized Copiloto Voice State */}
                 {voiceState !== 'idle' && (
-                    <div className="mb-2.5 flex items-center justify-center gap-2 text-primary animate-pulse bg-primary/5 border border-primary/10 rounded-full py-1.5 px-4 w-fit mx-auto shadow-sm">
-                        <Mic className="w-4 h-4 animate-bounce" />
+                    <div className="mb-2.5 flex items-center justify-center gap-2.5 text-primary bg-primary/5 border border-primary/10 rounded-full py-1 px-4 pl-2 w-fit mx-auto shadow-sm">
+                        <GlowingOrb
+                            state={(['listening', 'speaking', 'thinking'].includes(voiceState) ? voiceState : 'thinking') as OrbState}
+                            size="sm"
+                        />
                         <span className="text-xs font-mono font-bold tracking-wide uppercase">
                             Asistente de Voz: {voiceState === 'listening' ? 'Escuchando' : voiceState === 'speaking' ? 'Hablando' : voiceState === 'thinking' ? 'Procesando' : 'Conectando'}...
                         </span>
                     </div>
                 )}
                 <form onSubmit={handleSubmit} className="relative group">
-                    <div className="flex flex-col bg-black/60 border border-white/10 rounded-[24px] p-3 focus-within:border-primary/30 focus-within:shadow-[0_0_30px_rgba(var(--primary-rgb),0.04)] transition-all duration-300 shadow-2xl backdrop-blur-3xl">
+                    {/* No card/border/blur — the composer floats directly on the
+                        page background (PulseChat reference: "+", model name as
+                        plain text, and a circular send button, nothing else). */}
+                    <div className="flex flex-col px-1 py-1 transition-all duration-300">
 
-                        {/* Attached Files Preview Inside the Capsule */}
+                        {/* Attached Files Preview */}
                         {attachedFiles.length > 0 && (
                             <div className="mb-2.5 flex flex-wrap gap-2 animate-in fade-in duration-300 px-1 pt-1">
                                 {attachedFiles.map((file, index) => (
@@ -222,45 +229,31 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                             onKeyDown={handleKeyDown}
                             onPaste={handlePaste}
                             placeholder="Escribe tu comando o pregunta aquí..."
-                            className="w-full bg-transparent text-white/95 placeholder-white/20 outline-none resize-none px-3 py-2 text-[15px] sm:text-sm font-sans leading-relaxed min-h-[3rem] max-h-40 focus:ring-0 focus:outline-none focus-visible:ring-0"
+                            className="w-full bg-transparent text-white/95 placeholder-white/20 outline-none resize-none px-2 py-2 text-[15px] sm:text-sm font-sans leading-relaxed min-h-[3rem] max-h-40 focus:ring-0 focus:outline-none focus-visible:ring-0"
                             rows={1}
                             disabled={isLoading || disabled}
                         />
 
-                        {/* Accessories Action Row */}
-                        <div className="flex items-center justify-between mt-2 pt-2.5 border-t border-white/5 flex-wrap gap-2 px-1">
+                        {/* Accessories row — a single "+" (attachments + web
+                            search live in its popup now, see below) and the
+                            model name as plain text, matching the reference's
+                            minimal "+ · Model · send" row instead of a bank
+                            of separate bordered icon buttons. */}
+                        <div className="flex items-center justify-between mt-1.5 px-1">
                             {/* Left Controls */}
-                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                {/* Attachment Toggle */}
+                            <div className="flex items-center gap-2.5">
                                 <button
                                     type="button"
                                     onClick={() => setShowAttachments(!showAttachments)}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-primary/30 text-white/50 hover:text-primary transition-all duration-300 ${showAttachments ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
-                                    title="Adjuntar archivo"
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.06] transition-all duration-300 ${showAttachments || webSearchEnabled ? 'text-primary' : ''}`}
+                                    title="Más opciones"
                                     disabled={isLoading || disabled}
                                 >
-                                    <Paperclip className="w-3.5 h-3.5" />
+                                    <Plus className="w-4 h-4" />
                                 </button>
 
-                                {/* Web Search Toggle */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setWebSearchEnabled(!webSearchEnabled);
-                                        toast({
-                                            title: !webSearchEnabled ? "Búsqueda Web Activada" : "Búsqueda Web Desactivada",
-                                            description: !webSearchEnabled ? "La IA buscará información en internet." : "La IA usará solo su conocimiento interno.",
-                                        });
-                                    }}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-primary/30 text-white/50 hover:text-primary transition-all duration-300 ${webSearchEnabled ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
-                                    title="Búsqueda Web"
-                                    disabled={isLoading || disabled}
-                                >
-                                    <Globe className="w-3.5 h-3.5" />
-                                </button>
-
-                                {/* Model Selector Pill */}
-                                <div className="ml-1 animate-in fade-in duration-300">
+                                {/* Model — plain text, no pill/border */}
+                                <div className="animate-in fade-in duration-300">
                                     <ModelSelector />
                                 </div>
                             </div>
@@ -291,7 +284,22 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                 className="fixed inset-0 z-40"
                                 onClick={() => setShowAttachments(false)}
                             />
-                            <div className="absolute bottom-full right-0 mb-2 flex flex-col gap-1 bg-[#09090e]/95 border border-white/10 rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 min-w-[170px] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="absolute bottom-full left-0 mb-2 flex flex-col gap-1 bg-[#09090e]/95 border border-white/10 rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 min-w-[190px] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setWebSearchEnabled(!webSearchEnabled);
+                                        toast({
+                                            title: !webSearchEnabled ? "Búsqueda Web Activada" : "Búsqueda Web Desactivada",
+                                            description: !webSearchEnabled ? "La IA buscará información en internet." : "La IA usará solo su conocimiento interno.",
+                                        });
+                                    }}
+                                    className={`flex items-center justify-between gap-2 px-3 py-2 text-xs rounded-xl text-left transition-colors ${webSearchEnabled ? 'text-primary bg-primary/[0.06]' : 'text-white/70 hover:text-white hover:bg-white/[0.03]'}`}
+                                >
+                                    <span className="flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Búsqueda web</span>
+                                    {webSearchEnabled && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                </button>
+                                <div className="h-px bg-white/[0.06] my-0.5" />
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}

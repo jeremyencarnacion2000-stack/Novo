@@ -13,7 +13,7 @@ import {
   useTransform,
   useAnimation,
 } from 'framer-motion'
-import { novoToast } from '@/components/ui/novo-toast'
+import { sileo, subscribeSileoBell, type BellToast } from '@/lib/sileo-bell'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon'
 
@@ -134,7 +134,7 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       id: 'night-review', type: 'suggestion', read: false,
       title: 'Resumen del día 🌙',
       body: 'Es buen momento para revisar lo que lograste hoy.',
-      timestamp: now.toISOString(), source: 'system', actionUrl: '/stats',
+      timestamp: now.toISOString(), source: 'system', actionUrl: '/analytics',
     })
   }
 
@@ -185,7 +185,7 @@ function NotificationRow({
         strength={30}
         chromaticAberration={4}
         backgroundColor="transparent"
-        className="w-full border border-white/[0.04]"
+        className="w-full border border-foreground/[0.04]"
       >
         <motion.div
           drag="x"
@@ -196,8 +196,8 @@ function NotificationRow({
             if (info.offset.x < -100) onDelete(notification.id)
             else x.set(0)
           }}
-          className={`group flex gap-3 px-4 py-3.5 cursor-default select-none transition-colors hover:bg-white/[0.025] ${
-            !notification.read ? 'bg-white/[0.018]' : ''
+          className={`group flex gap-3 px-4 py-3.5 cursor-default select-none transition-colors hover:bg-foreground/[0.025] ${
+            !notification.read ? 'bg-foreground/[0.018]' : ''
           }`}
           onClick={() => {
             onRead(notification.id)
@@ -221,7 +221,7 @@ function NotificationRow({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <p className={`text-xs font-medium leading-snug ${
-                notification.read ? 'text-white/45' : 'text-white/90'
+                notification.read ? 'text-foreground/45' : 'text-foreground/90'
               }`}>
                 {notification.title}
               </p>
@@ -233,15 +233,15 @@ function NotificationRow({
                 />
               )}
             </div>
-            <p className="text-[11px] text-white/35 mt-0.5 leading-relaxed line-clamp-2">
+            <p className="text-[11px] text-foreground/35 mt-0.5 leading-relaxed line-clamp-2">
               {notification.body}
             </p>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[9px] text-white/20 uppercase tracking-wider">
+              <span className="text-[9px] text-foreground/20 uppercase tracking-wider">
                 {timeAgo(notification.timestamp)}
               </span>
               {notification.source && (
-                <span className="text-[9px] text-white/15 uppercase tracking-wider">
+                <span className="text-[9px] text-foreground/15 uppercase tracking-wider">
                   · {notification.source}
                 </span>
               )}
@@ -252,7 +252,7 @@ function NotificationRow({
           <motion.button
             onClick={(e) => { e.stopPropagation(); onDelete(notification.id) }}
             aria-label="Delete notification"
-            className="shrink-0 p-1 rounded-md text-white/0 group-hover:text-white/25 hover:!text-red-400 hover:bg-red-500/15 transition-colors"
+            className="shrink-0 p-1 rounded-md text-foreground/0 group-hover:text-foreground/25 hover:!text-red-400 hover:bg-red-500/15 transition-colors"
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.9 }}
             title="Eliminar"
@@ -299,6 +299,40 @@ export function NotificationCenter() {
     setPrevUnread(unreadCount)
   }, [unreadCount])
 
+  // ── Sileo morph: the bell physically expands into the incoming toast HUD ──
+  // Actions (tracker completed, task created, cognitive phase change, voice
+  // command result) fire `sileo` (the real npm package's API shape, bridged
+  // through lib/sileo-bell) → the button itself is the notification's origin.
+  const [sileoToast, setSileoToast] = useState<BellToast | null>(null)
+
+  useEffect(() => {
+    return subscribeSileoBell(toast => {
+      setSileoToast(toast)
+      if (toast) {
+        bellControls.start({
+          rotate: [0, -14, 12, -8, 4, 0],
+          transition: { duration: 0.5, ease: 'easeInOut' },
+        })
+      }
+    })
+  }, [])
+
+  const sileoColor =
+    sileoToast?.type === 'success' ? '#34d399'
+    : sileoToast?.type === 'warning' ? '#f59e0b'
+    : sileoToast?.type === 'error' ? '#ef4444'
+    : sileoToast?.type === 'action' ? '#a855f7'
+    : sileoToast?.type === 'loading' ? 'rgba(255, 255, 255, 0.6)'
+    : 'rgba(255, 255, 255, 0.85)'
+
+  const sileoIconState: IconState =
+    sileoToast?.type === 'success' ? 'recovery'
+    : sileoToast?.type === 'warning' ? 'notification'
+    : sileoToast?.type === 'error' ? 'notification'
+    : sileoToast?.type === 'action' ? 'prediction'
+    : sileoToast?.type === 'loading' ? 'sync'
+    : 'sync'
+
   const lastFetchTimeRef = useRef<number>(0)
   const cachedNotificationsRef = useRef<AppNotification[]>([])
 
@@ -333,13 +367,13 @@ export function NotificationCenter() {
                 duration: 5000,
               }
               if (n.type === 'success' || n.type === 'achievement') {
-                novoToast.success(options)
+                sileo.success(options)
               } else if (n.type === 'warning') {
-                novoToast.warning(options)
+                sileo.warning(options)
               } else if (n.type === 'reminder') {
-                novoToast.warning(options)
+                sileo.warning(options)
               } else {
-                novoToast.info(options)
+                sileo.info(options)
               }
             }
           })
@@ -355,8 +389,21 @@ export function NotificationCenter() {
   useEffect(() => {
     if (status !== 'authenticated') return
     loadNotifications()
-    const interval = setInterval(loadNotifications, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    let interval: ReturnType<typeof setInterval> | null = setInterval(loadNotifications, 5 * 60 * 1000)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications()
+        if (!interval) interval = setInterval(loadNotifications, 5 * 60 * 1000)
+      } else if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [status, loadNotifications])
 
   // Close on outside click
@@ -401,27 +448,95 @@ export function NotificationCenter() {
 
   return (
     <>
-      {/* ── Bell Button ──────────────────────────────────────────────── */}
-      <button
+      {/* ── Bell Button — two physical phases: idle pill ↔ Sileo HUD ──── */}
+      <motion.button
         ref={buttonRef as any}
+        layout
+        transition={{ layout: { type: 'spring', stiffness: 400, damping: 30 } }}
         onClick={() => {
           setIsOpen(prev => !prev)
           if (!isOpen) loadNotifications()
+          if (sileoToast) sileo.dismiss(sileoToast.id)
         }}
         aria-label="Notifications"
-        className="fixed top-4 right-4 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all border border-white/15 glass-blur hover:scale-110 active:scale-95"
-        style={{ background: 'rgba(255,255,255,0.05)', isolation: 'isolate' }}
+        whileHover={{ scale: sileoToast ? 1.02 : 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        className={
+          sileoToast
+            ? "fixed top-16 right-4 z-[200] h-12 max-w-[min(360px,calc(100vw-2rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
+            : "fixed top-16 right-4 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
+        }
+        style={{ isolation: 'isolate' }}
       >
-        <AnimatedSVGIcon state="notification" size={18} color="rgba(255, 255, 255, 0.85)" />
+        {/* Liquid glass background overlay */}
+        <GlassSurface
+          radius={9999}
+          depth={4}
+          blur={1}
+          strength={20}
+          chromaticAberration={sileoToast ? 10 : 8}
+          backgroundColor="rgba(10, 10, 15, 0.35)"
+          elevation="low"
+          aria-hidden
+          className="pointer-events-none"
+          style={{ position: 'absolute', inset: 0, borderRadius: '9999px', zIndex: 0 }}
+        />
+
+        {/* Icon above glass — morphs to the toast's icon during Sileo phase */}
+        <motion.div layout="position" animate={bellControls} className="relative z-10 shrink-0">
+          <AnimatedSVGIcon
+            state={sileoToast ? sileoIconState : 'notification'}
+            size={18}
+            color={sileoColor}
+          />
+        </motion.div>
+
+        {/* Sileo HUD content — title + description reveal inside the capsule */}
+        <AnimatePresence mode="popLayout">
+          {sileoToast && (
+            <motion.div
+              key={sileoToast.id}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0, transition: { delay: 0.14, duration: 0.25 } }}
+              exit={{ opacity: 0, x: 6, transition: { duration: 0.12 } }}
+              className="relative z-10 flex items-center gap-2.5 min-w-0"
+            >
+              <div className="flex flex-col items-start min-w-0 text-left">
+                <span className="text-[11px] font-semibold text-foreground/90 truncate max-w-[230px] leading-tight">
+                  {sileoToast.title}
+                </span>
+                {sileoToast.description && (
+                  <span className="text-[9px] text-foreground/45 truncate max-w-[230px] leading-tight mt-0.5">
+                    {sileoToast.description}
+                  </span>
+                )}
+              </div>
+              {sileoToast.button && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    sileoToast.button!.onClick()
+                    sileo.dismiss(sileoToast.id)
+                  }}
+                  className="shrink-0 px-2.5 py-1 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground/85 text-[9px] font-semibold transition-colors cursor-pointer"
+                >
+                  {sileoToast.button.title}
+                </span>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Badge */}
         <AnimatePresence>
-          {unreadCount > 0 && (
+          {unreadCount > 0 && !sileoToast && (
             <motion.span
               key="badge"
-              initial={{ scale: 0, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 22 }}
               className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-black/40 z-20"
             >
@@ -429,7 +544,7 @@ export function NotificationCenter() {
             </motion.span>
           )}
         </AnimatePresence>
-      </button>
+      </motion.button>
 
       {/* ── Panel Portal ──────────────────────────────────────────────── */}
       {typeof document !== 'undefined' && createPortal(
@@ -442,7 +557,7 @@ export function NotificationCenter() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.18 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className="liquid-glass-premium fixed top-16 right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-5rem))] flex flex-col rounded-3xl overflow-hidden"
+              className="liquid-glass-premium fixed top-[104px] right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-9rem))] flex flex-col rounded-3xl overflow-hidden"
               style={{
                 boxShadow: '0 30px 80px rgba(0,0,0,0.65)',
               }}
@@ -457,7 +572,7 @@ export function NotificationCenter() {
                 className="w-full flex-1 flex flex-col max-h-[min(620px,calc(100vh-5rem))]"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] shrink-0">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <motion.div
                       animate={{ rotate: [0, 15, -10, 5, 0] }}
@@ -465,7 +580,7 @@ export function NotificationCenter() {
                     >
                       <AnimatedSVGIcon state="prediction" size={16} color="#a78bfa" />
                     </motion.div>
-                    <h3 className="text-sm font-semibold text-white/90 tracking-tight">Notificaciones</h3>
+                    <h3 className="text-sm font-semibold text-foreground/90 tracking-tight">Notificaciones</h3>
                     <AnimatePresence>
                       {unreadCount > 0 && (
                         <motion.span
@@ -494,7 +609,7 @@ export function NotificationCenter() {
                           <motion.button
                             onClick={markAllRead}
                             aria-label="Mark all as read"
-                            className="p-1.5 rounded-lg hover:bg-white/10 text-white/35 hover:text-white/75 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
                             whileHover={{ scale: 1.12 }}
                             whileTap={{ scale: 0.9 }}
                             title="Marcar todo como leído"
@@ -504,7 +619,7 @@ export function NotificationCenter() {
                           <motion.button
                             onClick={clearAll}
                             aria-label="Clear all notifications"
-                            className="p-1.5 rounded-lg hover:bg-red-500/15 text-white/35 hover:text-red-400 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-red-500/15 text-foreground/35 hover:text-red-400 transition-colors"
                             whileHover={{ scale: 1.12 }}
                             whileTap={{ scale: 0.9 }}
                             title="Limpiar todo"
@@ -517,7 +632,7 @@ export function NotificationCenter() {
                     <motion.button
                       onClick={() => setIsOpen(false)}
                       aria-label="Close notifications"
-                      className="p-1.5 rounded-lg hover:bg-white/10 text-white/35 hover:text-white/75 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
                       whileHover={{ scale: 1.12, rotate: 90 }}
                       whileTap={{ scale: 0.9 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
@@ -543,7 +658,7 @@ export function NotificationCenter() {
                           animate={{ rotate: 360 }}
                           transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                         />
-                        <span className="text-[11px] text-white/25">Cargando…</span>
+                        <span className="text-[11px] text-foreground/25">Cargando…</span>
                       </motion.div>
                     ) : notifications.length === 0 ? (
                       <motion.div
@@ -555,15 +670,15 @@ export function NotificationCenter() {
                         className="flex flex-col items-center justify-center py-14 gap-3"
                       >
                         <motion.div
-                          className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center"
+                          className="w-14 h-14 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] flex items-center justify-center"
                           animate={{ y: [0, -5, 0] }}
                           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                         >
                           <AnimatedSVGIcon state="sync" size={24} color="rgba(255,255,255,0.25)" />
                         </motion.div>
                         <div className="text-center">
-                          <p className="text-xs text-white/30 font-medium">Todo en orden</p>
-                          <p className="text-[10px] text-white/18 mt-0.5">Sin notificaciones pendientes 🎉</p>
+                          <p className="text-xs text-foreground/30 font-medium">Todo en orden</p>
+                          <p className="text-[10px] text-foreground/18 mt-0.5">Sin notificaciones pendientes 🎉</p>
                         </div>
                       </motion.div>
                     ) : (
@@ -595,14 +710,14 @@ export function NotificationCenter() {
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 6 }}
-                      className="px-5 py-3.5 border-t border-white/[0.06] shrink-0 flex items-center justify-between"
+                      className="px-5 py-3.5 border-t border-foreground/[0.06] shrink-0 flex items-center justify-between"
                     >
-                      <p className="text-[10px] text-white/18">
+                      <p className="text-[10px] text-foreground/18">
                         Se actualiza cada 5 min
                       </p>
                       <motion.button
                         onClick={loadNotifications}
-                        className="text-[10px] text-white/25 hover:text-primary transition-colors flex items-center gap-1"
+                        className="text-[10px] text-foreground/25 hover:text-primary transition-colors flex items-center gap-1"
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >

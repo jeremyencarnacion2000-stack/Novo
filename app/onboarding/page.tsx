@@ -68,7 +68,7 @@ function OnboardingContent() {
   
   const [currentStep, setCurrentStep] = useState(0)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Bienvenido a Novo. No soy una app de tareas común; soy un Sistema Operativo Cognitivo. Mi meta es adaptarme a cómo funciona tu cerebro. ¿Empezamos?' }
+    { role: 'assistant', content: 'Bienvenido a Novo. No soy una app de tareas común: soy un Sistema Operativo Cognitivo, y vamos a construir tu Cognitive Twin juntos. Cada respuesta que me des lo hace más tuyo. ¿Empezamos?' }
   ])
   const [inputVal, setInputVal] = useState('')
   const [stage, setStage] = useState<'interview' | 'compilation' | 'self_discovery'>('interview')
@@ -229,6 +229,24 @@ function OnboardingContent() {
           <span className={`w-1.5 h-1.5 rounded-full ${isDemoMode ? 'bg-emerald-400 animate-pulse' : 'bg-indigo-400 animate-pulse'}`} />
         </div>
       </div>
+
+      {/* PROGRESS — goal-gradient: showing how close the user is drives completion */}
+      {stage === 'interview' && (
+        <div className="px-8 py-3 border-b border-white/[0.05] bg-[#070709]/60 relative z-10">
+          <div className="max-w-2xl mx-auto flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Tu Cognitive Twin</span>
+            <span className="text-[10px] font-bold text-indigo-400">{Math.round((currentStep / STEPS.length) * 100)}% construido</span>
+          </div>
+          <div className="max-w-2xl mx-auto h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <motion.div
+              className="h-full bg-indigo-500 rounded-full"
+              initial={false}
+              animate={{ width: `${(currentStep / STEPS.length) * 100}%` }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* STAGE CONTAINER */}
       <div className="flex-1 flex flex-col relative">
@@ -437,11 +455,14 @@ function OnboardingContent() {
 
               {/* Confirm initialization Action */}
               <div className="mt-8 pt-4 border-t border-white/[0.05]">
+                <p className="text-[11px] text-white/30 text-center mb-3 leading-relaxed">
+                  Lo construiste vos, respondiendo {STEPS.length} preguntas — no es una plantilla genérica.
+                </p>
                 <button
                   onClick={handleFinalize}
                   className="w-full h-14 rounded-2xl bg-white hover:bg-white/95 text-black font-bold text-sm tracking-wide active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center justify-center gap-2"
                 >
-                  Activar mi Espacio Cognitivo
+                  Activar Mi Cognitive Twin
                   <ArrowRight className="w-4 h-4 text-black" />
                 </button>
               </div>

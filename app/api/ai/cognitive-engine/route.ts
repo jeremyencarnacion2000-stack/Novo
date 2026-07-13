@@ -4,6 +4,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { groqAPI } from '@/lib/groq';
+import { logAICall } from '@/lib/ai-call-log';
+import { calendarService, getGoogleAccessToken } from '@/lib/google';
+import { fetchBiometricPayload } from '@/lib/google-fit';
+import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
+import type { BiometricPayload } from '@/types/biometrics';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
@@ -32,6 +37,56 @@ function getCognitiveWeight(priority: string): number {
   return priority === 'high' ? 3 : priority === 'medium' ? 2 : 1;
 }
 
+// ─── Calendar signal: meeting density + biggest free block within waking hours ─
+// Real commitments outside Novo (synced from the user's own Google Calendar)
+// are a direct cognitive-load signal the engine was previously blind to.
+interface CalendarSignal {
+  connected: boolean;
+  meetingCount: number;
+  meetingMinutesToday: number;
+  largestFreeGapMinutes: number | null;
+}
+
+const WAKING_HOURS_START = 7;
+const WAKING_HOURS_END = 22;
+
+function computeCalendarSignal(
+  events: { start?: { dateTime?: string | null } | null; end?: { dateTime?: string | null } | null }[],
+  now: Date
+): CalendarSignal {
+  const dayStart = new Date(now); dayStart.setHours(WAKING_HOURS_START, 0, 0, 0);
+  const dayEnd = new Date(now); dayEnd.setHours(WAKING_HOURS_END, 0, 0, 0);
+
+  // Only timed events count as "busy" — all-day events (date-only, no dateTime) don't block focus time.
+  const busy = events
+    .filter(e => e.start?.dateTime && e.end?.dateTime)
+    .map(e => ({ start: new Date(e.start!.dateTime!), end: new Date(e.end!.dateTime!) }))
+    .filter(e => e.end > dayStart && e.start < dayEnd)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const meetingMinutesToday = Math.round(
+    busy.reduce((acc, e) =>
+      acc + (Math.min(e.end.getTime(), dayEnd.getTime()) - Math.max(e.start.getTime(), dayStart.getTime())), 0
+    ) / 60000
+  );
+
+  let cursor = dayStart.getTime();
+  let largestGapMs = 0;
+  for (const e of busy) {
+    const s = Math.max(e.start.getTime(), dayStart.getTime());
+    if (s > cursor) largestGapMs = Math.max(largestGapMs, s - cursor);
+    cursor = Math.max(cursor, Math.min(e.end.getTime(), dayEnd.getTime()));
+  }
+  if (dayEnd.getTime() > cursor) largestGapMs = Math.max(largestGapMs, dayEnd.getTime() - cursor);
+
+  return {
+    connected: true,
+    meetingCount: busy.length,
+    meetingMinutesToday,
+    largestFreeGapMinutes: Math.round(largestGapMs / 60000),
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -41,7 +96,6 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const chronotypeOverride = searchParams.get('chronotype');
-    const phaseOverride = searchParams.get('phase');
 
     const userId = session.user.id;
     const now = new Date();
@@ -50,8 +104,30 @@ export async function GET(req: NextRequest) {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const todayStr = now.toISOString().split('T')[0];
 
-    // ── Collect all signals in parallel ─────────────────────────────────────
-    const [tasks, focusSessions, dailyAnalytics, recentSessions, twinRecord] = await Promise.all([
+    // Fetched first (not in the Promise.all below) so a cache hit can skip
+    // the other 4 queries AND the LLM round-trip entirely — the dashboard
+    // widget was re-running a full Gemini/Groq generation on every visit.
+    const twinRecord = await prisma.cognitiveTwinRecord.findUnique({ where: { userId } });
+
+    const CACHE_TTL_MS = 10 * 60 * 1000; // signals don't meaningfully shift faster than this
+    const cached = (twinRecord?.metrics as any)?.cognitiveEngineCache;
+    if (
+      cached &&
+      !chronotypeOverride &&
+      Date.now() - new Date(cached.generatedAt).getTime() < CACHE_TTL_MS
+    ) {
+      return NextResponse.json({
+        success: true,
+        report: cached.report,
+        signals: cached.signals,
+        generatedAt: cached.generatedAt,
+        modelUsed: cached.modelUsed ?? null,
+        twin: cached.twin ?? (twinRecord ? { confidenceScore: twinRecord.confidenceScore, trustLevel: twinRecord.trustLevel } : null),
+      });
+    }
+
+    // ── Collect remaining signals in parallel ────────────────────────────────
+    const [dbTasks, focusSessions, dailyAnalytics, recentSessions, notionItems] = await Promise.all([
       prisma.task.findMany({
         where: { userId },
         orderBy: { createdAt: 'asc' },
@@ -72,10 +148,53 @@ export async function GET(req: NextRequest) {
         orderBy: { startTime: 'desc' },
         take: 20,
       }),
-      prisma.cognitiveTwinRecord.findUnique({
-        where: { userId },
-      }),
+      // Notion tasks already sync into ChecklistItem (see IntegrationEngine.
+      // getTodayTasks) — the cognitive engine just never read them. Normalize
+      // to the Task shape so every downstream calculation picks them up for
+      // free instead of duplicating the load/overdue/completion logic.
+      prisma.checklistItem.findMany({ where: { userId, source: 'notion' } }),
     ]);
+
+    const tasks = [
+      ...dbTasks,
+      ...notionItems.map(c => ({
+        id: c.id,
+        title: c.text,
+        priority: c.priority,
+        status: c.completed ? 'done' : 'todo',
+        dueDate: c.dueDate ? c.dueDate.toISOString().split('T')[0] : null,
+        createdAt: c.updatedAt,
+        updatedAt: c.updatedAt,
+      })),
+    ];
+
+    // Google Calendar is optional — most of this app's users sign in with
+    // credentials, not "Sign in with Google", so no access token exists.
+    // Same graceful-degrade pattern as app/api/calendar/google/route.ts.
+    let calendarSignal: CalendarSignal = {
+      connected: false, meetingCount: 0, meetingMinutesToday: 0, largestFreeGapMinutes: null,
+    };
+    try {
+      const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const events = await calendarService.listEvents(todayStart.toISOString(), 50, dayEndIso);
+      calendarSignal = computeCalendarSignal(events as any, now);
+    } catch {
+      // Not connected, or the Google API call failed — no calendar signal this run.
+    }
+
+    // Real sleep/stress signal — Google Fit when connected, otherwise the
+    // existing DB-driven estimate (app/api/cognitive/biometrics already does
+    // this same tiered lookup for its own widget; reused here rather than
+    // re-implemented).
+    let biometrics: BiometricPayload | null = null;
+    try {
+      const fitAccessToken = await getGoogleAccessToken(userId, (session as any)?.accessToken);
+      biometrics = fitAccessToken
+        ? await fetchBiometricPayload(fitAccessToken, userId)
+        : await fetchDbBiometricPayload(userId);
+    } catch {
+      // Leave biometrics null — recoveryState falls back to the session-time heuristic below.
+    }
 
     // ── Compute signals ──────────────────────────────────────────────────────
     const todayTasks = tasks.filter(t => t.dueDate === todayStr);
@@ -86,6 +205,13 @@ export async function GET(req: NextRequest) {
     const completedTasks = tasks.filter(t => t.status === 'done');
     const pendingTasks = tasks.filter(t => t.status !== 'done');
     const highPriorityPending = pendingTasks.filter(t => t.priority === 'high');
+
+    // No completed/pending tasks and no focus sessions ever recorded — there is
+    // no real behavioral history yet. The insights below must not phrase
+    // circadian-math defaults as "detected" patterns when nothing has been
+    // observed; time-of-day heuristics (recoveryState, currentEnergy) are still
+    // honest to show since they're computed live, not claimed as learned.
+    const isColdStart = tasks.length === 0 && focusSessions.length === 0;
 
     // Task completion rate (last 7 days)
     const recentCompleted = completedTasks.filter(t =>
@@ -113,11 +239,28 @@ export async function GET(req: NextRequest) {
       ? new Date(earliestSessionToday.startTime).getHours()
       : now.getHours();
 
-    let recoveryState: 'optimal' | 'moderate' | 'impaired' | 'critical';
+    type RecoveryState = 'optimal' | 'moderate' | 'impaired' | 'critical';
+    const RECOVERY_SEVERITY: Record<RecoveryState, number> = { optimal: 0, moderate: 1, impaired: 2, critical: 3 };
+
+    let recoveryState: RecoveryState;
     if (sessionStartHour <= 4) recoveryState = 'critical';      // Active before 4am
     else if (sessionStartHour <= 6) recoveryState = 'impaired'; // Active before 6am
     else if (totalFocusMinutesToday > 240) recoveryState = 'moderate'; // >4h focus today
     else recoveryState = 'optimal';
+
+    // Real sleep/stress overrides the time-of-day heuristic above whenever it
+    // indicates something WORSE — either signal pointing at trouble should be
+    // believed, not averaged away.
+    if (biometrics) {
+      let biometricRecovery: RecoveryState = 'optimal';
+      if (biometrics.userStressScore >= 80 || biometrics.sleep.totalSleepMinutes < 300) biometricRecovery = 'critical';
+      else if (biometrics.userStressScore >= 65 || biometrics.sleep.totalSleepMinutes < 360) biometricRecovery = 'impaired';
+      else if (biometrics.userStressScore >= 50 || biometrics.sleep.totalSleepMinutes < 420) biometricRecovery = 'moderate';
+
+      if (RECOVERY_SEVERITY[biometricRecovery] > RECOVERY_SEVERITY[recoveryState]) {
+        recoveryState = biometricRecovery;
+      }
+    }
 
     // Procrastination signal
     const procrastinationScore = Math.min(100,
@@ -173,8 +316,10 @@ export async function GET(req: NextRequest) {
       ? Math.round((fragmentedSessions / todayFocusSessions.length) * 100)
       : 0;
 
-    // Workload density (tasks per day over last week)
-    const workloadDensity = Math.min(100, overdueTasks.length * 10 + todayTasks.length * 5);
+    // Workload density (tasks per day over last week + real calendar commitments)
+    const workloadDensity = Math.min(100,
+      overdueTasks.length * 10 + todayTasks.length * 5 + Math.round(calendarSignal.meetingMinutesToday / 20)
+    );
 
     // Burnout risk composite
     let burnoutRisk = Math.min(100, Math.round(
@@ -195,35 +340,6 @@ export async function GET(req: NextRequest) {
       recoveryBonus * 0.1
     )));
 
-    // Apply Overrides if present
-    if (phaseOverride) {
-      if (phaseOverride === 'PEAK_FOCUS') {
-        focusScore = 95;
-        cognitiveLoad = 15;
-        recoveryState = 'optimal';
-        burnoutRisk = 12;
-        currentEnergy = 92;
-      } else if (phaseOverride === 'LINEAR_EXECUTION') {
-        focusScore = 70;
-        cognitiveLoad = 40;
-        recoveryState = 'optimal';
-        burnoutRisk = 30;
-        currentEnergy = 72;
-      } else if (phaseOverride === 'SYNAPTIC_FATIGUE') {
-        focusScore = 20;
-        cognitiveLoad = 85;
-        recoveryState = 'critical';
-        burnoutRisk = 80;
-        currentEnergy = 22;
-      } else if (phaseOverride === 'REDUCED_CAPACITY_MODE') {
-        focusScore = 30;
-        cognitiveLoad = 75;
-        recoveryState = 'impaired';
-        burnoutRisk = 75;
-        currentEnergy = 35;
-      }
-    }
-
     // Build the 24-hour energy timeline
     const energyTimeline = Array.from({ length: 24 }, (_, h) => ({
       hour: h,
@@ -234,19 +350,13 @@ export async function GET(req: NextRequest) {
       isDip: h === dipHour,
     }));
 
-    // Tasks formatted for Gemini (top 15 pending, ordered for reorganization)
-    let displayTasks = pendingTasks;
-    if (displayTasks.length === 0) {
-      displayTasks = [
-        { id: 'demo-1', title: 'Synthesize productivity patterns & metrics', priority: 'high', status: 'pending', dueDate: todayStr },
-        { id: 'demo-2', title: 'Optimize PostgreSQL query index performance', priority: 'high', status: 'pending', dueDate: todayStr },
-        { id: 'demo-3', title: 'Refine cinematic dashboard animation transitions', priority: 'medium', status: 'pending', dueDate: todayStr },
-        { id: 'demo-4', title: 'Draft technical pitch deck for hackathon', priority: 'high', status: 'pending', dueDate: todayStr },
-        { id: 'demo-5', title: 'Review open-source security compliance', priority: 'low', status: 'pending', dueDate: todayStr },
-        { id: 'demo-6', title: 'Organize project repository backlog items', priority: 'low', status: 'pending', dueDate: todayStr },
-        { id: 'demo-7', title: 'Publish updated REST API documentation specs', priority: 'medium', status: 'pending', dueDate: todayStr },
-      ] as any[];
-    }
+    // Tasks formatted for Gemini (top 15 pending, ordered for reorganization).
+    // No fabricated demo tasks when the user has none — the engine used to
+    // invent 7 fake "hackathon pitch deck"-style tasks and hand them to the
+    // LLM as if real, so a brand-new user with an empty list got scheduling
+    // advice for work they never created. An empty list is a real, valid
+    // state the prompt/fallback below both handle honestly instead.
+    const displayTasks = pendingTasks;
 
     const taskContext = displayTasks.slice(0, 15).map(t => ({
       id: t.id,
@@ -287,11 +397,24 @@ ${twinProfileContext}
 - Focus Score computed: ${focusScore}/100
 
 ## Task Load
-- Total tasks pending: ${pendingTasks.length}
+- Total tasks pending: ${pendingTasks.length}${notionItems.length > 0 ? ` (${notionItems.length} synced from Notion)` : ''}
 - High priority pending: ${highPriorityPending.length}
 - Today's tasks: ${todayTasks.length}
 - Overdue tasks: ${overdueTasks.length}
 - 7-day completion rate: ${completionRate}%
+
+## Calendar (real commitments outside Novo)
+${calendarSignal.connected
+  ? `- Meetings today: ${calendarSignal.meetingCount} (${calendarSignal.meetingMinutesToday} minutes total)
+- Largest free block today (${WAKING_HOURS_START}:00-${WAKING_HOURS_END}:00): ${calendarSignal.largestFreeGapMinutes} minutes — do NOT schedule reorganizedDay tasks outside this window if it's small`
+  : '- Not connected — schedule purely off task/energy signals'}
+
+## Biometrics (${biometrics?.meta.sleepDataSource === 'google_fit' ? 'Google Fit' : 'estimated from activity data'})
+${biometrics
+  ? `- Sleep last night: ${biometrics.sleep.totalSleepMinutes} minutes (efficiency ${biometrics.sleep.sleepEfficiency}%)
+- Resting heart rate: ${biometrics.heartRate.hasData ? `${biometrics.heartRate.averageBpm} bpm avg` : 'no data'}
+- Stress score: ${biometrics.userStressScore}/100 (${biometrics.stressLevel})`
+  : '- Unavailable this run'}
 
 ## Cognitive Signals
 - Cognitive Load: ${cognitiveLoad}/100
@@ -303,7 +426,7 @@ ${twinProfileContext}
 - Avg 7-day productivity score: ${Math.round(avgProductivity)}
 
 ## Pending Tasks (for day reorganization)
-${JSON.stringify(taskContext, null, 2)}
+${taskContext.length > 0 ? JSON.stringify(taskContext, null, 2) : 'None — the user has no pending tasks right now. Leave reorganizedDay empty and base the recommendation on their energy/recovery state instead of inventing tasks.'}
 
 ## Instructions
 Return ONLY valid JSON (no markdown, no explanation outside JSON):
@@ -355,9 +478,19 @@ Rules:
     if (process.env.GEMINI_API_KEY && genAI) {
       try {
         console.log('[Cognitive API] Attempting Gemini query...');
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const result = await model.generateContent(prompt);
-        text = result.response.text().trim();
+        const result = await logAICall(
+          { userId: session.user.id, provider: 'gemini', model: 'gemini-1.5-flash', purpose: 'cognitive_reorg' },
+          async () => {
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const geminiResult = await model.generateContent(prompt);
+            return {
+              content: geminiResult.response.text().trim(),
+              tokensIn: geminiResult.response.usageMetadata?.promptTokenCount,
+              tokensOut: geminiResult.response.usageMetadata?.candidatesTokenCount,
+            };
+          }
+        );
+        text = result.content;
         successModel = 'gemini';
       } catch (geminiError) {
         console.error('[Cognitive API] Gemini request failed:', geminiError);
@@ -368,12 +501,15 @@ Rules:
     if (!text && process.env.GROQ_API_KEY) {
       try {
         console.log('[Cognitive API] Falling back to Groq...');
-        const result = await groqAPI.generateResponse(
-          prompt,
-          '',
-          [],
-          'You are NOVO\'s Adaptive Cognitive Engine — an elite performance intelligence system.',
-          'qwen/qwen3-32b'
+        const result = await logAICall(
+          { userId: session.user.id, provider: 'groq', model: 'qwen/qwen3-32b', purpose: 'cognitive_reorg' },
+          () => groqAPI.generateResponse(
+            prompt,
+            '',
+            [],
+            'You are NOVO\'s Adaptive Cognitive Engine — an elite performance intelligence system.',
+            'qwen/qwen3-32b'
+          )
         );
         text = result.content.trim();
         successModel = 'groq';
@@ -400,11 +536,15 @@ Rules:
       const insights = [
         {
           type: 'recovery',
-          severity: recoveryState === 'critical' ? 'critical' : recoveryState === 'impaired' ? 'warning' : 'info',
-          headline: recoveryState === 'critical' ? 'Impaired Sleep Debt Detected' : 'Optimal Recovery Cycle',
-          detail: recoveryState === 'critical'
-            ? 'Activity patterns before 4:00 AM indicate high sleep debt. Prioritize cognitive restoration and low-friction tasks.'
-            : 'Estimated recovery state is optimal. Your neural networks show high receptivity for deep focused work.'
+          severity: isColdStart ? 'info' : recoveryState === 'critical' ? 'critical' : recoveryState === 'impaired' ? 'warning' : 'info',
+          headline: isColdStart
+            ? 'Aún sin historial real'
+            : recoveryState === 'critical' ? 'Impaired Sleep Debt Detected' : 'Optimal Recovery Cycle',
+          detail: isColdStart
+            ? `Todavía no tienes tareas ni sesiones registradas — el Twin aún no puede detectar patrones. Por ahora, según la hora actual, tu ventana de energía estimada está en ${currentEnergy}% de capacidad.`
+            : recoveryState === 'critical'
+              ? 'Activity patterns before 4:00 AM indicate high sleep debt. Prioritize cognitive restoration and low-friction tasks.'
+              : 'Estimated recovery state is optimal. Your neural networks show high receptivity for deep focused work.'
         },
         {
           type: 'cognitive_load',
@@ -414,9 +554,11 @@ Rules:
         },
         {
           type: 'procrastination',
-          severity: procrastinationScore > 50 ? 'warning' : 'info',
-          headline: procrastinationScore > 50 ? 'Task Rescheduling Habit Detected' : 'High Focus Momentum',
-          detail: `Procrastination index stands at ${procrastinationScore}%. A 7-day completion rate of ${completionRate}% supports task focus.`
+          severity: isColdStart ? 'info' : procrastinationScore > 50 ? 'warning' : 'info',
+          headline: isColdStart ? 'Sin datos de procrastinación aún' : procrastinationScore > 50 ? 'Task Rescheduling Habit Detected' : 'High Focus Momentum',
+          detail: isColdStart
+            ? 'Agrega y completa tareas para que el Twin empiece a medir tu ritmo real de ejecución.'
+            : `Procrastination index stands at ${procrastinationScore}%. A 7-day completion rate of ${completionRate}% supports task focus.`
         },
         {
           type: 'focus_window',
@@ -482,33 +624,73 @@ Rules:
         insights,
         recommendation: burnoutRisk > 60
           ? 'Workload density triggers high burnout warnings. Initiate a 15-minute screen-free rest window immediately.'
-          : `Align your highest effort task: "${displayTasks[0]?.title || 'Main Project'}" with your circadian peak window today.`,
-        cognitiveMemory: `Historically, your completion momentum stays high until overdue task counts cross 5 units.`
+          : displayTasks.length > 0
+            ? `Align your highest effort task: "${displayTasks[0].title}" with your circadian peak window today.`
+            : 'No pending tasks right now — a good moment to plan your next priority before it becomes urgent.',
+        // Real numbers, not a fixed narrative: this used to be a hardcoded
+        // sentence ("completion momentum stays high until overdue task
+        // counts cross 5 units") that never changed regardless of the
+        // user's actual data.
+        cognitiveMemory: `Your 7-day completion rate is ${completionRate}%${overdueTasks.length > 0 ? `, with ${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} currently overdue` : ', with nothing overdue right now'}.`
       };
+      successModel = 'local-fallback';
+    }
+
+    const responseSignals = {
+      focusScore,
+      currentHour,
+      currentEnergy,
+      energyTimeline,
+      cognitiveLoad,
+      procrastinationScore,
+      burnoutRisk,
+      focusFragmentation,
+      workloadDensity,
+      recoveryState,
+      totalFocusMinutesToday,
+      overdueTasks: overdueTasks.length,
+      pendingTasks: pendingTasks.length,
+      completionRate,
+      todayTaskCount: todayTasks.length,
+      notionTaskCount: notionItems.length,
+      calendar: calendarSignal,
+      biometrics: biometrics ? {
+        sleepMinutes: biometrics.sleep.totalSleepMinutes,
+        sleepEfficiency: biometrics.sleep.sleepEfficiency,
+        stressScore: biometrics.userStressScore,
+        stressLevel: biometrics.stressLevel,
+        source: biometrics.meta.sleepDataSource,
+      } : null,
+    };
+    const generatedAt = now.toISOString();
+    // Real attribution instead of a static "Powered by Gemini" footer claim,
+    // and the twin's actual learning output (process-twin-signal.ts) —
+    // previously computed but never sent past the prompt, so the one page
+    // named "Cognitive Twin" never showed the twin's own confidence/trust.
+    const twin = twinRecord ? { confidenceScore: twinRecord.confidenceScore, trustLevel: twinRecord.trustLevel } : null;
+
+    // Best-effort cache write for the next request within CACHE_TTL_MS — a
+    // failure here shouldn't fail a response the user is already waiting on.
+    if (twinRecord) {
+      prisma.cognitiveTwinRecord.update({
+        where: { userId },
+        data: {
+          metrics: {
+            ...((twinRecord.metrics as any) || {}),
+            cognitiveEngineCache: { report: cognitiveReport, signals: responseSignals, generatedAt, modelUsed: successModel, twin },
+          },
+        },
+      }).catch((err) => console.error('[Cognitive API] cache write failed:', err));
     }
 
     // Attach computed timeline and raw signals to response
     return NextResponse.json({
       success: true,
       report: cognitiveReport,
-      signals: {
-        focusScore,
-        currentHour,
-        currentEnergy,
-        energyTimeline,
-        cognitiveLoad,
-        procrastinationScore,
-        burnoutRisk,
-        focusFragmentation,
-        workloadDensity,
-        recoveryState,
-        totalFocusMinutesToday,
-        overdueTasks: overdueTasks.length,
-        pendingTasks: pendingTasks.length,
-        completionRate,
-        todayTaskCount: todayTasks.length,
-      },
-      generatedAt: now.toISOString(),
+      signals: responseSignals,
+      generatedAt,
+      modelUsed: successModel,
+      twin,
     });
 
   } catch (error) {

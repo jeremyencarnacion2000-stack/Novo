@@ -28,9 +28,9 @@ export function FocusScoreRing({ score, energyLevel, animated = true }: FocusSco
     <motion.div 
       className={cn(
         "relative flex items-center justify-center w-60 h-60 rounded-full transition-all duration-500",
-        "border border-white/10 bg-white/[0.01] backdrop-blur-xl",
+        "border border-foreground/10 bg-foreground/[0.01] backdrop-blur-xl",
         "shadow-[inset_0_1px_2px_rgba(255,255,255,0.08),0_20px_50px_rgba(0,0,0,0.4)]",
-        "hover:border-white/20 hover:bg-white/[0.02]"
+        "hover:border-foreground/20 hover:bg-foreground/[0.02]"
       )}
       whileHover={{ scale: 1.02 }}
     >
@@ -49,7 +49,7 @@ export function FocusScoreRing({ score, energyLevel, animated = true }: FocusSco
       />
 
       {/* Cockpit instrument bezel scale ticks */}
-      <div className="absolute inset-0 rounded-full border border-white/[0.04] scale-[0.9] pointer-events-none z-0" />
+      <div className="absolute inset-0 rounded-full border border-foreground/[0.04] scale-[0.9] pointer-events-none z-0" />
       
       {/* SVG gauge overlay */}
       <svg width="240" height="240" viewBox="0 0 240 240" className="absolute inset-0 -rotate-90 z-10">
@@ -136,7 +136,7 @@ export function FocusScoreRing({ score, energyLevel, animated = true }: FocusSco
           </span>
         </motion.div>
         
-        <span className="text-[9px] font-black tracking-[0.35em] uppercase text-white/30 mt-2 leading-none">
+        <span className="text-[9px] font-black tracking-[0.35em] uppercase text-foreground/30 mt-2 leading-none">
           FOCUS VALUE
         </span>
 

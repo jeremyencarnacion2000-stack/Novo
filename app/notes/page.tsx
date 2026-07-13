@@ -62,18 +62,18 @@ export default function NotesPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight text-white/90">Quick Notes</h1>
-                    <p className="text-xs text-white/30 font-medium mt-0.5">Capture ideas and thoughts instantly</p>
+                    <h1 className="text-2xl font-black tracking-tight text-foreground/90">Quick Notes</h1>
+                    <p className="text-xs text-foreground/30 font-medium mt-0.5">Capture ideas and thoughts instantly</p>
                 </div>
                 <QuickCapture />
             </div>
 
             <div className="flex items-center gap-4">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground/30" />
                     <Input
                         placeholder="Search notes..."
-                        className="pl-9 bg-white/[0.03] border-white/[0.08] text-white/80 placeholder:text-white/25 rounded-2xl h-10 focus:border-white/20 focus:bg-white/[0.05] transition-all"
+                        className="pl-9 bg-foreground/[0.03] border-foreground/[0.08] text-foreground/80 placeholder:text-foreground/25 rounded-2xl h-10 focus:border-foreground/20 focus:bg-foreground/[0.05] transition-all"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -91,7 +91,7 @@ export default function NotesPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
                                 <Pin className="h-3 w-3 text-amber-400/70" />
-                                <span className="text-[10px] font-black tracking-[0.25em] uppercase text-white/35">Pinned</span>
+                                <span className="text-[10px] font-black tracking-[0.25em] uppercase text-foreground/35">Pinned</span>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {pinnedNotes.map(note => (
@@ -103,7 +103,7 @@ export default function NotesPage() {
 
                     <div className="space-y-4">
                         {pinnedNotes.length > 0 && otherNotes.length > 0 && (
-                            <span className="text-[10px] font-black tracking-[0.25em] uppercase text-white/25">Others</span>
+                            <span className="text-[10px] font-black tracking-[0.25em] uppercase text-foreground/25">Others</span>
                         )}
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {otherNotes.map(note => (
@@ -129,8 +129,8 @@ export default function NotesPage() {
                                 </div>
 
                                 <div className="max-w-xs space-y-2">
-                                    <p className="text-base font-bold text-white/80">Your thought space is clear</p>
-                                    <p className="text-sm text-white/35 leading-relaxed">
+                                    <p className="text-base font-bold text-foreground/80">Your thought space is clear</p>
+                                    <p className="text-sm text-foreground/35 leading-relaxed">
                                         Novo captures your ideas instantly and surfaces them at the right moment.
                                         Start with a single thought — no structure required.
                                     </p>
@@ -138,11 +138,11 @@ export default function NotesPage() {
 
                                 {/* CTA pill */}
                                 <div
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-white/40"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-foreground/[0.08] text-xs font-semibold text-foreground/40"
                                     style={{ background: 'rgba(255,255,255,0.025)' }}
                                 >
                                     <ChevronRight className="w-3.5 h-3.5 text-indigo-400/60" />
-                                    Use <span className="text-indigo-300/80 font-black">Quick Capture</span> above or press <kbd className="ml-1 text-[9px] bg-white/5 border border-white/10 rounded px-1 py-0.5 font-bold text-white/30">⌘ K</kbd>
+                                    Use <span className="text-indigo-300/80 font-black">Quick Capture</span> above or press <kbd className="ml-1 text-[9px] bg-foreground/5 border border-foreground/10 rounded px-1 py-0.5 font-bold text-foreground/30">⌘ K</kbd>
                                 </div>
                             </motion.div>
                         )}
@@ -164,14 +164,14 @@ export default function NotesPage() {
                             className="flex flex-col items-center justify-center py-20 gap-5 text-center"
                         >
                             <div
-                                className="w-16 h-16 rounded-3xl border border-white/10 flex items-center justify-center"
+                                className="w-16 h-16 rounded-3xl border border-foreground/10 flex items-center justify-center"
                                 style={{ background: 'rgba(255,255,255,0.025)', boxShadow: '0 0 24px rgba(255,255,255,0.03)' }}
                             >
-                                <Archive className="w-7 h-7 text-white/20" />
+                                <Archive className="w-7 h-7 text-foreground/20" />
                             </div>
                             <div className="max-w-xs space-y-2">
-                                <p className="text-base font-bold text-white/50">No archived notes</p>
-                                <p className="text-sm text-white/25 leading-relaxed">
+                                <p className="text-base font-bold text-foreground/50">No archived notes</p>
+                                <p className="text-sm text-foreground/25 leading-relaxed">
                                     Notes you archive will appear here. Use archiving to declutter without losing your captures.
                                 </p>
                             </div>

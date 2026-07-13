@@ -16,10 +16,12 @@ interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school' | 'notion';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'ai-task';
     sourceId: string;
     dueDate?: string;
     timeOfDay?: string;
+    scheduledHour?: number | null;
+    scheduledReason?: string | null;
     metadata?: {
         projectTitle?: string;
         routineName?: string;
@@ -46,16 +48,16 @@ function TodaySkeleton() {
             {/* Header skeleton */}
             <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                    <div className="h-8 w-32 bg-white/5 rounded-2xl" />
-                    <div className="h-4 w-48 bg-white/[0.03] rounded-xl" />
+                    <div className="h-8 w-32 bg-foreground/5 rounded-2xl" />
+                    <div className="h-4 w-48 bg-foreground/[0.03] rounded-xl" />
                 </div>
-                <div className="h-16 w-16 bg-white/5 rounded-2xl" />
+                <div className="h-16 w-16 bg-foreground/5 rounded-2xl" />
             </div>
             {/* Progress skeleton */}
-            <div className="h-2 w-full bg-white/5 rounded-full" />
+            <div className="h-2 w-full bg-foreground/5 rounded-full" />
             {/* Card skeletons */}
             {[1, 2, 3].map(i => (
-                <div key={i} className="h-40 bg-white/[0.03] rounded-3xl border border-white/5" />
+                <div key={i} className="h-40 bg-foreground/[0.03] rounded-3xl border border-foreground/5" />
             ))}
         </div>
     );
@@ -122,8 +124,8 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
             className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors duration-200 group cursor-pointer select-none',
                 task.completed
-                    ? 'bg-white/[0.01] opacity-50'
-                    : 'hover:bg-white/[0.04] active:bg-white/[0.06]'
+                    ? 'bg-foreground/[0.01] opacity-50'
+                    : 'hover:bg-foreground/[0.04] active:bg-foreground/[0.06]'
             )}
             onClick={() => onToggle(task)}
         >
@@ -132,7 +134,7 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
                 'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
                 task.completed
                     ? 'bg-primary border-primary'
-                    : 'border-white/20 group-hover:border-primary/60'
+                    : 'border-foreground/20 group-hover:border-primary/60'
             )}>
                 <AnimatePresence>
                     {task.completed && (
@@ -154,13 +156,22 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
                 )}>
                     {task.text}
                 </p>
-                {task.metadata && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                {(task.metadata || task.scheduledReason) && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
                         <SourceIcon source={task.source} />
-                        {task.metadata.routineName || task.metadata.projectTitle || task.metadata.courseCode}
+                        <span className="truncate">
+                            {task.scheduledReason || task.metadata?.routineName || task.metadata?.projectTitle || task.metadata?.courseCode}
+                        </span>
                     </p>
                 )}
             </div>
+
+            {/* Scheduled time chip */}
+            {task.scheduledHour !== undefined && task.scheduledHour !== null && (
+                <span className="text-[10px] font-black tabular-nums px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
+                    {task.scheduledHour.toString().padStart(2, '0')}:00
+                </span>
+            )}
 
             {/* Priority */}
             <PriorityPill priority={task.priority} />
@@ -170,6 +181,7 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent: string }> = {
+    scheduled: { label: 'Organizado por IA', icon: <Zap className="w-4 h-4" />,   accent: 'text-primary' },
     morning:   { label: 'Mañana',    icon: <Sun className="w-4 h-4" />,           accent: 'text-amber-400' },
     afternoon: { label: 'Tarde',     icon: <Zap className="w-4 h-4" />,           accent: 'text-orange-400' },
     evening:   { label: 'Noche',     icon: <Circle className="w-4 h-4" />,        accent: 'text-indigo-400' },
@@ -177,6 +189,7 @@ const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent
     project:   { label: 'Proyectos', icon: <FolderKanban className="w-4 h-4" />, accent: 'text-blue-400' },
     school:    { label: 'Escuela',   icon: <GraduationCap className="w-4 h-4" />,accent: 'text-violet-400' },
     manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-foreground/50' },
+    'ai-task': { label: 'Del Asistente', icon: <Pencil className="w-4 h-4" />,    accent: 'text-primary/70' },
     notion:    { label: 'Notion',    icon: <Link2 className="w-4 h-4" />,        accent: 'text-teal-400' },
 };
 
@@ -196,39 +209,43 @@ function SectionCard({
             layout
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="liquid-glass rounded-3xl overflow-hidden"
         >
-            {/* Section header */}
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
-            >
-                <div className="flex items-center gap-2.5">
-                    <span className={meta.accent}>{meta.icon}</span>
-                    <span className="text-xs font-black tracking-widest uppercase text-foreground/60">{meta.label}</span>
-                    <span className="text-[10px] text-muted-foreground font-medium">{done}/{tasks.length}</span>
-                </div>
-                <ChevronRight className={cn('w-4 h-4 text-muted-foreground transition-transform duration-300', open && 'rotate-90')} />
-            </button>
+            {/* liquid-glass lives on a plain div, not the layout-animated motion.div
+                above — backdrop-filter re-samples the backdrop every frame a layout
+                animation moves this node, which read as lag during collapse/expand. */}
+            <div className="liquid-glass rounded-3xl overflow-hidden">
+                {/* Section header */}
+                <button
+                    onClick={() => setOpen(o => !o)}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-foreground/[0.02] transition-colors"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <span className={meta.accent}>{meta.icon}</span>
+                        <span className="text-xs font-black tracking-widest uppercase text-foreground/60">{meta.label}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium">{done}/{tasks.length}</span>
+                    </div>
+                    <ChevronRight className={cn('w-4 h-4 text-muted-foreground transition-transform duration-300', open && 'rotate-90')} />
+                </button>
 
-            {/* Tasks */}
-            <AnimatePresence>
-                {open && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: 'easeInOut' }}
-                        className="overflow-hidden"
-                    >
-                        <div className="px-2 pb-3 flex flex-col gap-0.5">
-                            {tasks.map(task => (
-                                <TaskRow key={task.id} task={task} onToggle={onToggle} />
-                            ))}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                {/* Tasks */}
+                <AnimatePresence>
+                    {open && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                        >
+                            <div className="px-2 pb-3 flex flex-col gap-0.5">
+                                {tasks.map(task => (
+                                    <TaskRow key={task.id} task={task} onToggle={onToggle} />
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </motion.div>
     );
 }
@@ -326,17 +343,27 @@ export default function TodayPage() {
     const total = tasks.length;
     const progress = total > 0 ? (completed / total) * 100 : 0;
 
-    // Group tasks
-    const routines = tasks.filter(t => t.source === 'routine');
+    // Group tasks — tasks the cognitive engine already scheduled a real hour
+    // for get pulled into their own "Organizado por IA" section, sorted by
+    // time, regardless of which module they came from.
+    const scheduled = tasks
+        .filter(t => t.scheduledHour !== undefined && t.scheduledHour !== null)
+        .sort((a, b) => (a.scheduledHour ?? 0) - (b.scheduledHour ?? 0));
+    const scheduledIds = new Set(scheduled.map(t => t.id));
+
+    const unscheduled = tasks.filter(t => !scheduledIds.has(t.id));
+    const routines = unscheduled.filter(t => t.source === 'routine');
     const groups: Array<{ key: string; tasks: IntegratedTask[] }> = [
+        { key: 'scheduled', tasks: scheduled },
         { key: 'morning',   tasks: routines.filter(t => t.timeOfDay === 'morning') },
         { key: 'afternoon', tasks: routines.filter(t => t.timeOfDay === 'afternoon') },
         { key: 'evening',   tasks: routines.filter(t => t.timeOfDay === 'evening') },
         { key: 'anytime',   tasks: routines.filter(t => t.timeOfDay === 'anytime') },
-        { key: 'project',   tasks: tasks.filter(t => t.source === 'project') },
-        { key: 'school',    tasks: tasks.filter(t => t.source === 'school') },
-        { key: 'manual',    tasks: tasks.filter(t => t.source === 'manual') },
-        { key: 'notion',    tasks: tasks.filter(t => t.source === 'notion') },
+        { key: 'project',   tasks: unscheduled.filter(t => t.source === 'project') },
+        { key: 'school',    tasks: unscheduled.filter(t => t.source === 'school') },
+        { key: 'manual',    tasks: unscheduled.filter(t => t.source === 'manual') },
+        { key: 'ai-task',   tasks: unscheduled.filter(t => t.source === 'ai-task') },
+        { key: 'notion',    tasks: unscheduled.filter(t => t.source === 'notion') },
     ].filter(g => g.tasks.length > 0);
 
     const dayLabel = new Date().toLocaleDateString('es', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -356,7 +383,7 @@ export default function TodayPage() {
                 </div>
 
                 {loading ? (
-                    <div className="w-16 h-16 rounded-2xl bg-white/5 animate-pulse" />
+                    <div className="w-16 h-16 rounded-2xl bg-foreground/5 animate-pulse" />
                 ) : (
                     <ProgressRing progress={progress} completed={completed} total={total} />
                 )}
@@ -368,7 +395,7 @@ export default function TodayPage() {
                     initial={{ opacity: 0, scaleX: 0 }}
                     animate={{ opacity: 1, scaleX: 1 }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className="relative h-1.5 w-full rounded-full overflow-hidden bg-white/[0.05]"
+                    className="relative h-1.5 w-full rounded-full overflow-hidden bg-foreground/[0.05]"
                     style={{ transformOrigin: 'left' }}
                 >
                     <motion.div
@@ -396,7 +423,7 @@ export default function TodayPage() {
                     ].map(stat => (
                         <div
                             key={stat.label}
-                            className="liquid-glass flex flex-col gap-1 px-4 py-3 rounded-2xl border border-white/[0.06]"
+                            className="liquid-glass flex flex-col gap-1 px-4 py-3 rounded-2xl border border-foreground/[0.06]"
                             style={{ background: 'rgba(255,255,255,0.015)' }}
                         >
                             <span className="text-muted-foreground flex items-center gap-1">{stat.icon}
@@ -448,7 +475,7 @@ export default function TodayPage() {
                     </div>
                     {/* Forward action */}
                     <div
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-foreground/40 cursor-default"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-foreground/[0.08] text-xs font-semibold text-foreground/40 cursor-default"
                         style={{ background: 'rgba(255,255,255,0.025)' }}
                     >
                         <ChevronRight className="w-3.5 h-3.5 text-primary/60" />

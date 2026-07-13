@@ -1,46 +1,23 @@
 'use client';
 
-import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
-import { Bot, Sparkles, Calendar, FolderPlus } from 'lucide-react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useChatbot } from './context';
 import { Message as ChatMessage } from './message';
-import { ChatInput } from './chat-input';
-import { MobileHero, VoiceListeningOverlay } from './welcome-hero';
-import { cn } from '@/lib/utils';
-import { useSession } from 'next-auth/react';
-import { AnimatePresence } from 'framer-motion';
+import { ThinkingSteps } from './thinking-steps';
 
+// Pure message list — index.tsx decides whether to show this or a hero, and
+// owns the single persistent composer + voice overlay (one input surface,
+// not a different one per view). This component only ever mounts once a
+// chat is active, so it has no empty-state branch of its own to keep in sync.
 export function ChatArea() {
-    const { messages, isLoading, streamingMessage, sendMessage, currentConversationId } = useChatbot();
-    const { data: session } = useSession();
+    const { messages, isLoading, streamingMessage, currentConversationId } = useChatbot();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const prevLengthRef = useRef(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const prevConversationIdRef = useRef<string | null>(null);
-    // Ref for the composer wrapper — used to measure its real rendered height
-    const composerRef = useRef<HTMLDivElement>(null);
     // rAF handle for debounced streaming scroll — prevents firing hundreds of
     // times per second and avoids fighting user-initiated scroll positions.
     const streamingRafRef = useRef<number | null>(null);
-
-    // ── Dynamic safe-area via ResizeObserver ──────────────────────────────────
-    // Writes --composer-h onto the scroll container so the padded spacer below
-    // the last message always matches the exact rendered composer height.
-    useLayoutEffect(() => {
-        const composer = composerRef.current;
-        const scroller = scrollContainerRef.current;
-        if (!composer || !scroller) return;
-
-        const apply = () => {
-            scroller.style.setProperty('--composer-h', `${composer.offsetHeight}px`);
-        };
-
-        // Apply immediately then observe for resizes (multi-line, attachments, etc.)
-        apply();
-        const ro = new ResizeObserver(apply);
-        ro.observe(composer);
-        return () => ro.disconnect();
-    }, []);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
         if (behavior === 'instant') {
@@ -95,96 +72,39 @@ export function ChatArea() {
         };
     }, [streamingMessage]);
 
-    const isChatActive = messages.length > 0 || streamingMessage !== null;
-    const firstName = session?.user?.name ? session.user.name.split(' ')[0] : 'Alex';
-    const [isVoiceListening, setIsVoiceListening] = useState(false);
-
-    const handleVoiceToggle = useCallback(() => {
-        setIsVoiceListening(v => !v);
-        window.dispatchEvent(new CustomEvent('toggle-gemini-live'));
-    }, []);
-
-    // Sync external voice state
-    useEffect(() => {
-        const handleStateChange = (e: any) => {
-            const state = e.detail?.state || 'idle';
-            setIsVoiceListening(state === 'listening' || state === 'speaking');
-        };
-        window.addEventListener('gemini-live-state-change', handleStateChange);
-        return () => window.removeEventListener('gemini-live-state-change', handleStateChange);
-    }, []);
-
     // The safe-area bottom padding: composer height + 32px breathing room + env()
-    // Falls back to 144px (≈ standard composer height) before the ResizeObserver fires.
+    // --composer-h is set by index.tsx's persistent composer and inherits down
+    // through the DOM via normal CSS custom-property cascade.
     const safeAreaStyle: React.CSSProperties = {
         paddingBottom: 'calc(var(--composer-h, 144px) + 32px + env(safe-area-inset-bottom, 0px))',
     };
 
     return (
         <div className="flex-1 flex flex-col relative min-h-0 bg-transparent overflow-hidden">
-            {/* Full-screen voice overlay (mobile) */}
-            <AnimatePresence>
-                {isVoiceListening && (
-                    <VoiceListeningOverlay onStop={handleVoiceToggle} />
-                )}
-            </AnimatePresence>
-
             {/* Messages scroll area */}
             <div
                 ref={scrollContainerRef}
                 className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar min-h-0 relative"
                 data-lenis-prevent
             >
-                {!isChatActive ? (
-                    <>
-                        {/* Mobile: gradient DeepSeek-style hero */}
-                        <div className="md:hidden absolute inset-0 flex flex-col min-h-0 overflow-hidden">
-                            <MobileHero
-                                onChipClick={(text) => {
-                                    sendMessage(text);
-                                }}
-                                onVoiceClick={handleVoiceToggle}
-                                isVoiceListening={isVoiceListening}
-                            />
-                        </div>
-
-                        {/* Desktop: simple centered placeholder (DesktopHero is rendered by index.tsx) */}
-                        <div className="hidden md:flex absolute inset-0 items-center justify-center">
-                            <p className="text-white/10 text-xs tracking-widest uppercase font-medium">Start a conversation above</p>
-                        </div>
-                    </>
-                ) : (
-                    /* Messages list — safe area is dynamically measured */
-                    <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6" style={safeAreaStyle}>
-                        {messages.map((message) => (
-                            <ChatMessage key={message.id} message={message} />
-                        ))}
-                        {streamingMessage && (
-                            <ChatMessage message={streamingMessage} />
-                        )}
-                        {isLoading && !streamingMessage && (
-                            <div className="flex items-center gap-3 p-6 text-primary animate-pulse bg-white/[0.01] border-y border-white/5">
-                                <Bot className="w-5 h-5 animate-spin" />
-                                <span className="text-xs font-medium tracking-wider uppercase">Pensando...</span>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-                )}
-            </div>
-
-            {/*
-              ─── Bottom ChatInput ────────────────────────────────────────────────
-              composerRef is attached here so ResizeObserver can measure the
-              exact rendered height of the input area at all times.
-              flex-shrink-0 ensures this never participates in scrolling.
-            */}
-            <div ref={composerRef} className="flex-shrink-0 z-20">
-                <div
-                    className="p-3 pb-6 md:pb-3 bg-gradient-to-t from-[#050505] via-[#050505]/95 to-transparent border-t border-white/5"
-                    style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
-                >
-                    <ChatInput variant="bottom" />
+                <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6" style={safeAreaStyle}>
+                    {messages.map((message) => (
+                        <ChatMessage key={message.id} message={message} />
+                    ))}
+                    {streamingMessage && streamingMessage.content && (
+                        <ChatMessage message={streamingMessage} />
+                    )}
+                    {/* Real pipeline stages (classifier/model from the `meta`
+                        SSE event), not a canned spinner — hidden the moment
+                        actual tokens start rendering as the message above. */}
+                    {((isLoading && !streamingMessage) || (streamingMessage && !streamingMessage.content)) && (
+                        <ThinkingSteps
+                            modelLabel={streamingMessage && streamingMessage.model !== 'auto' ? streamingMessage.model ?? null : null}
+                            intent={streamingMessage?.intent ?? null}
+                            fallback={!!streamingMessage?.fallback}
+                        />
+                    )}
+                    <div ref={messagesEndRef} />
                 </div>
             </div>
         </div>

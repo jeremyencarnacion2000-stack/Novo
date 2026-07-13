@@ -63,7 +63,7 @@ export function MonthGrid({
       </div>
 
       {/* Day cells */}
-      <div className="grid grid-cols-7 flex-1 w-full gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+      <div className="grid grid-cols-7 flex-1 w-full gap-px bg-foreground/5 rounded-2xl overflow-hidden border border-foreground/5">
         {days.map((d) => {
           const dayEvents = eventsOnDay(d);
           const visible = dayEvents.slice(0, MAX_VISIBLE);
@@ -77,7 +77,7 @@ export function MonthGrid({
               onClick={() => onSelectDay(d)}
               className={[
                 'relative flex flex-col gap-0.5 p-1 sm:p-1.5 min-h-[48px] sm:min-h-[80px] cursor-pointer transition-colors duration-150',
-                'bg-background/60 hover:bg-white/[0.04]',
+                'bg-background/60 hover:bg-foreground/[0.04]',
                 !inMonth && 'opacity-30',
               ].filter(Boolean).join(' ')}
               style={{ viewTransitionName: `cal-day-${format(d, 'yyyy-MM-dd')}` } as React.CSSProperties}
@@ -100,6 +100,7 @@ export function MonthGrid({
                 return (
                   <button
                     key={ev.id}
+                    data-flip-from={`event-${ev.id}`}
                     onClick={(e) => { e.stopPropagation(); onSelectEvent(ev); }}
                     title={ev.title}
                     className="w-full text-left px-1.5 py-0.5 rounded-md text-[10px] font-semibold truncate transition-opacity"
@@ -110,7 +111,7 @@ export function MonthGrid({
                       opacity: dimmed ? 0.25 : 1,
                     }}
                   >
-                    {ev.title}
+                    <span data-shared-item="text">{ev.title}</span>
                   </button>
                 );
               })}

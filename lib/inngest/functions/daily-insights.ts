@@ -1,6 +1,7 @@
 import { inngest } from "../client";
 import { prisma } from "@/lib/prisma";
 import { groqAPI } from "@/lib/groq";
+import { logAICall } from "@/lib/ai-call-log";
 
 const DAILY_INSIGHT_MODEL = "llama3-8b-8192";
 
@@ -50,8 +51,11 @@ export const processDailyInsights = inngest.createFunction(
             `;
 
                 try {
-                    const response = await groqAPI.generateResponse(
-                        context, '', [], DAILY_PROMPT, DAILY_INSIGHT_MODEL, 0.5
+                    const response = await logAICall(
+                        { userId: snapshot.userId, provider: 'groq', model: DAILY_INSIGHT_MODEL, purpose: 'daily_wrapup' },
+                        () => groqAPI.generateResponse(
+                            context, '', [], DAILY_PROMPT, DAILY_INSIGHT_MODEL, 0.5
+                        )
                     );
 
                     await prisma.insight.create({

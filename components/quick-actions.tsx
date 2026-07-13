@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, CheckSquare, FolderKanban, Activity, Dumbbell, Calendar, Mic } from 'lucide-react'
+import { Plus, CheckSquare, FolderKanban, Activity, Dumbbell, Calendar } from 'lucide-react'
 import Link from 'next/link'
-import { VoiceAssistantButton } from './ai/voice-command-button'
 
 const createActions = [
   {
@@ -35,7 +34,7 @@ const registerActions = [
   {
     title: 'Start Workout',
     icon: Dumbbell,
-    href: '/workout',
+    href: '/routines',
     shortcut: '⌘W'
   },
   {
@@ -53,14 +52,6 @@ export function QuickActions() {
         <CardTitle className="subtitle-technical">Command Center</CardTitle>
       </CardHeader>
       <CardContent className="space-y-8">
-        {/* Voice Command Section */}
-        <div className="space-y-4">
-          <h3 className="subtitle-technical text-primary">
-            AI Assistant
-          </h3>
-          <VoiceAssistantButton className="w-full justify-center py-6 rounded-2xl" />
-        </div>
-
         {/* Create Section */}
         <div className="space-y-4">
           <h3 className="subtitle-technical">Actions</h3>
@@ -71,17 +62,17 @@ export function QuickActions() {
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className="justify-between h-auto py-3 px-4 glass-card hover:!bg-white/[0.06] group transition-all duration-300"
+                  className="justify-between h-auto py-3 px-4 glass-card-list hover:!bg-foreground/[0.06] group transition-all duration-300"
                   asChild
                 >
                   <Link href={action.href}>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-white/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                      <div className="p-2 rounded-lg bg-foreground/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
                         <Icon className="h-4 w-4" />
                       </div>
                       <span className="font-semibold text-xs tracking-tight opacity-70 group-hover:opacity-100">{action.title}</span>
                     </div>
-                    <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-white/5 bg-white/5 px-1.5 font-mono text-[9px] font-medium text-white/20 opacity-40 group-hover:opacity-100 transition-all">
+                    <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-foreground/5 bg-foreground/5 px-1.5 font-mono text-[9px] font-medium text-foreground/20 opacity-40 group-hover:opacity-100 transition-all">
                       {action.shortcut}
                     </kbd>
                   </Link>
@@ -103,9 +94,9 @@ export function QuickActions() {
                 <Button
                   key={action.title}
                   variant="ghost"
-                  className={`justify-between h-auto py-3 px-4 glass-card group transition-all duration-300 ${isProbable
+                  className={`justify-between h-auto py-3 px-4 glass-card-list group transition-all duration-300 ${isProbable
                     ? 'border-primary/20 bg-primary/10 bloom-soft hover:bg-primary/20'
-                    : 'hover:!bg-white/[0.06]'
+                    : 'hover:!bg-foreground/[0.06]'
                     }`}
                   asChild
                 >
@@ -125,7 +116,7 @@ export function QuickActions() {
                       {isProbable && (
                         <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_var(--primary-glow)]" />
                       )}
-                      <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-white/10 bg-muted/30 px-1.5 font-mono text-[9px] font-medium text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity">
+                      <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-[6px] border border-foreground/10 bg-muted/30 px-1.5 font-mono text-[9px] font-medium text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity">
                         {action.shortcut}
                       </kbd>
                     </div>

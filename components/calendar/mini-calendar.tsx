@@ -30,7 +30,7 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
   }, [viewDate])
 
   return (
-    <div className="rounded-[20px] border border-white/[0.06] p-5 relative overflow-hidden"
+    <div className="rounded-[20px] border border-foreground/[0.06] p-5 relative overflow-hidden"
       style={{
         background: 'linear-gradient(145deg, rgba(20,16,28,0.95) 0%, rgba(10,8,16,0.98) 100%)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.4)',
@@ -40,16 +40,16 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
       <div className="flex items-center justify-between mb-5">
         <button
           onClick={() => setViewDate(subMonths(viewDate, 1))}
-          className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:border-white/25 transition-all"
+          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/50 hover:text-foreground hover:border-foreground/25 transition-all"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-semibold text-white/90 tracking-wide">
+        <span className="text-sm font-semibold text-foreground/90 tracking-wide">
           {format(viewDate, 'MMM yyyy')}
         </span>
         <button
           onClick={() => setViewDate(addMonths(viewDate, 1))}
-          className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:border-white/25 transition-all"
+          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/50 hover:text-foreground hover:border-foreground/25 transition-all"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -58,7 +58,7 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
       {/* Weekday headers */}
       <div className="grid grid-cols-7 mb-2">
         {WEEKDAYS.map(d => (
-          <div key={d} className="text-center text-[9px] font-bold tracking-widest text-white/25 uppercase">
+          <div key={d} className="text-center text-[9px] font-bold tracking-widest text-foreground/25 uppercase">
             {d}
           </div>
         ))}
@@ -77,8 +77,8 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
               onClick={() => onSelect(day)}
               className={cn(
                 'relative w-full aspect-square flex items-center justify-center text-sm font-medium rounded-full transition-all duration-200',
-                !inMonth && 'text-white/10',
-                inMonth && !today && !sel && 'text-white/60 hover:text-white hover:bg-white/[0.06]',
+                !inMonth && 'text-foreground/10',
+                inMonth && !today && !sel && 'text-foreground/60 hover:text-foreground hover:bg-foreground/[0.06]',
                 sel && !today && 'bg-primary text-primary-foreground',
                 today && 'text-primary-foreground font-bold',
               )}

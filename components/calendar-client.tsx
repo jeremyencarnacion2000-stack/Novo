@@ -124,7 +124,7 @@ export default function CalendarClient() {
           {...buttonProps}
           className={`
             relative w-10 h-10 flex flex-col items-center justify-center rounded-lg text-sm transition-all duration-150 select-none
-            hover:bg-white/5 active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40
+            hover:bg-foreground/5 active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40
             ${buttonProps.className || ""}
             ${isSelected ? "bg-primary text-black font-semibold hover:bg-primary/90" : ""}
             ${isToday && !isSelected ? "text-primary border border-primary/30" : ""}
@@ -220,7 +220,7 @@ export default function CalendarClient() {
                     {selectedDateEvents.map((event) => (
                       <div
                         key={event.id}
-                        className="flex flex-col gap-2 p-3 rounded-lg border bg-card hover:bg-accent transition-colors"
+                        className="flex flex-col gap-2 p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span className={`text-sm font-medium ${event.completed ? "line-through text-muted-foreground" : ""}`}>

@@ -105,7 +105,7 @@ export function FocusMode() {
           <Focus className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[380px]" align="end" side="top">
+      <PopoverContent className="w-[calc(100vw-2rem)] max-w-[380px]" align="end" side="top">
         <div className="space-y-4">
           <div className="space-y-1">
             <h4 className="font-medium leading-none flex items-center gap-2">

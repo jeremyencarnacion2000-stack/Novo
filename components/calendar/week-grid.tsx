@@ -43,7 +43,7 @@ export function WeekGrid({ currentDate, events, onSelectEvent, fatigueDimSources
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Day headers */}
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-white/5 shrink-0">
+      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-foreground/5 shrink-0">
         <div /> {/* time gutter */}
         {days.map((d) => (
           <div
@@ -87,12 +87,12 @@ export function WeekGrid({ currentDate, events, onSelectEvent, fatigueDimSources
           {days.map((d) => {
             const dayEvents = events.filter((e) => isSameDay(e.start, d) && !e.allDay);
             return (
-              <div key={d.toISOString()} className="relative border-l border-white/5">
+              <div key={d.toISOString()} className="relative border-l border-foreground/5">
                 {/* Hour grid lines */}
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute w-full border-t border-white/[0.04]"
+                    className="absolute w-full border-t border-foreground/[0.04]"
                     style={{ top: `${(h - HOUR_START) * PX_PER_HOUR}px` }}
                   />
                 ))}
@@ -104,6 +104,7 @@ export function WeekGrid({ currentDate, events, onSelectEvent, fatigueDimSources
                   return (
                     <button
                       key={ev.id}
+                      data-flip-from={`event-${ev.id}`}
                       onClick={() => onSelectEvent(ev)}
                       title={ev.title}
                       className="absolute left-0.5 right-0.5 rounded-lg px-1.5 py-1 text-left overflow-hidden transition-opacity hover:brightness-125 text-[10px] font-semibold"
@@ -116,7 +117,7 @@ export function WeekGrid({ currentDate, events, onSelectEvent, fatigueDimSources
                         opacity: dimmed ? 0.25 : 1,
                       }}
                     >
-                      <div className="truncate">{ev.title}</div>
+                      <div data-shared-item="text" className="truncate">{ev.title}</div>
                       <div className="text-[9px] opacity-70">
                         {format(ev.start, 'p')} – {format(ev.end, 'p')}
                       </div>

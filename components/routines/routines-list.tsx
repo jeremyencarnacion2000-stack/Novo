@@ -31,10 +31,10 @@ export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransit
 
         {/* Narrative — Cognitive Compression: not "no routines", but "what you gain" */}
         <div className="max-w-sm space-y-2">
-          <p className="text-base font-bold text-white/80">
+          <p className="text-base font-bold text-foreground/80">
             Your consistency layer is empty
           </p>
-          <p className="text-sm text-white/35 leading-relaxed">
+          <p className="text-sm text-foreground/35 leading-relaxed">
             Routines let Novo predict your day, balance your workload, and protect
             your peak focus hours automatically.
           </p>
@@ -42,7 +42,7 @@ export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransit
 
         {/* Suggested first step */}
         <div
-          className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.08] text-xs font-semibold text-white/40"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-foreground/[0.08] text-xs font-semibold text-foreground/40"
           style={{ background: 'rgba(255,255,255,0.025)' }}
         >
           <ArrowRight className="w-3.5 h-3.5 text-primary/60" />

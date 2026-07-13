@@ -22,7 +22,12 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
-    const [selectedModel, setSelectedModel] = useState('qwen-2.5-coder-32b');
+    // 'auto' lets the server's intent classifier route each message to the
+    // right model (fast Llama 3.3 for chat, Qwen for actual code requests)
+    // instead of forcing every message through one fixed model regardless of
+    // intent — restores the server's per-message routing for users who never
+    // touch the model picker (the vast majority).
+    const [selectedModel, setSelectedModel] = useState('auto');
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,8 +41,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     const availableModels: AIModel[] = [
         {
-            id: 'qwen-2.5-coder-32b',
-            name: 'Qwen 2.5 Coder',
+            id: 'qwen/qwen3-32b',
+            name: 'Qwen 3 Coder',
             provider: 'Qwen',
             description: 'Altamente estable, de alta velocidad y especialista en código. Recomendado.',
             enabled: true
@@ -113,15 +118,15 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const storedModel = localStorage.getItem(MODEL_KEY);
         if (storedModel) {
             let mappedModel = storedModel;
-            if (mappedModel === 'qwen/qwen3-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'openai/gpt-oss-120b') {
-                mappedModel = 'qwen-2.5-coder-32b';
+            if (mappedModel === 'qwen-2.5-coder-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'openai/gpt-oss-120b') {
+                mappedModel = 'qwen/qwen3-32b';
             } else if (mappedModel === 'meta-llama/llama-4-scout-17b-16e-instruct') {
                 mappedModel = 'llama-3.2-11b-vision-preview';
             }
 
             // Ensure it is one of the available models
-            const isValid = ['qwen-2.5-coder-32b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.2-11b-vision-preview'].includes(mappedModel);
-            const finalModel = isValid ? mappedModel : 'qwen-2.5-coder-32b';
+            const isValid = ['qwen/qwen3-32b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.2-11b-vision-preview'].includes(mappedModel);
+            const finalModel = isValid ? mappedModel : 'qwen/qwen3-32b';
             
             setSelectedModel(finalModel);
             localStorage.setItem(MODEL_KEY, finalModel);
@@ -435,6 +440,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             });
 
             let activeModelLabel = '💬 Cognitive Core';
+            let activeIntent: string | undefined;
+            let activeFallback = false;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -454,9 +461,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                             // Parse model metadata from orchestra
                             if (json.meta) {
                                 activeModelLabel = json.meta.label || activeModelLabel;
+                                activeIntent = json.meta.intent;
+                                activeFallback = !!json.meta.fallback;
                                 setStreamingMessage(prev => prev ? {
                                     ...prev,
-                                    model: activeModelLabel
+                                    model: activeModelLabel,
+                                    intent: activeIntent,
+                                    fallback: activeFallback
                                 } : prev);
                                 continue;
                             }
@@ -468,7 +479,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     role: 'assistant',
                                     content: accumulatedContent,
                                     timestamp: new Date().toISOString(),
-                                    model: activeModelLabel
+                                    model: activeModelLabel,
+                                    intent: activeIntent,
+                                    fallback: activeFallback
                                 });
                             }
                         } catch (e) { }
@@ -578,6 +591,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE',
                                     'ADD_GRADE', 'UPDATE_GRADE', 'DELETE_GRADE',
                                     'CREATE_NOTE', 'UPDATE_NOTE',
+                                    'CREATE_EVENT', 'CREATE_TRACKER', 'REQUEST_INFO',
                                     'ANALYZE_PROGRESS', 'SYSTEM_QUERY', 'DELETE_ALL_TASKS',
                                     'GENERATE_FILE', 'UPDATE_COGNITIVE_STATE', 'COGNITIVE_PIPELINE'
                                 ];
@@ -608,7 +622,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     'actualizar_nota_rapida': 'UPDATE_NOTE',
                                     'analizar_progreso': 'ANALYZE_PROGRESS',
                                     'consulta_sistema': 'SYSTEM_QUERY',
-                                    'eliminar_todas_las_tareas': 'DELETE_ALL_TASKS'
+                                    'eliminar_todas_las_tareas': 'DELETE_ALL_TASKS',
+                                    'crear_evento': 'CREATE_EVENT',
+                                    'agendar_evento': 'CREATE_EVENT',
+                                    'crear_tracker': 'CREATE_TRACKER',
+                                    'crear_habito': 'CREATE_TRACKER',
+                                    'solicitar_info': 'REQUEST_INFO',
+                                    'pedir_detalles': 'REQUEST_INFO'
                                 };
 
                                 if (typeMap[finalType.toLowerCase()]) {
@@ -655,6 +675,16 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                         content: res.message || 'Operación completada.',
                                         status: res.success ? 'success' : 'failed',
                                         metadata: res.metadata || {}
+                                    });
+                                } else if (finalType === 'REQUEST_INFO') {
+                                    // The model flagged the request as ambiguous — render a mini
+                                    // form instead of a confirmation card so the user can fill in
+                                    // exactly what's missing before anything is created.
+                                    blocks.push({
+                                        id: crypto.randomUUID(),
+                                        type: 'clarification_form',
+                                        content: action.payload,
+                                        status: 'waiting'
                                     });
                                 } else {
                                     blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: action, status: 'waiting' });
@@ -752,7 +782,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             };
 
             setConversations(prev => prev.map(c =>
-                c.id === currentConversationId
+                c.id === activeConversationId
                     ? {
                         ...c,
                         messages: [...c.messages, assistantMessage],
@@ -762,8 +792,25 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             ));
 
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error desconocido');
+            const errMsg = err instanceof Error ? err.message : 'Error desconocido';
+            setError(errMsg);
             console.error('Send message error:', err);
+            setStreamingMessage(null);
+            // Nothing in chat-area.tsx/chat-input.tsx renders context.error —
+            // without this, a request that fails before/outside the stream
+            // loop (network error, non-ok response) left the user's message
+            // sitting with no reply and no visible failure at all.
+            const errorMessage: Message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: `⚠️ No se pudo obtener una respuesta: ${errMsg}. Intenta de nuevo.`,
+                timestamp: new Date().toISOString(),
+            };
+            setConversations(prev => prev.map(c =>
+                c.id === activeConversationId
+                    ? { ...c, messages: [...c.messages, errorMessage], updatedAt: new Date().toISOString() }
+                    : c
+            ));
         } finally {
             setIsLoading(false);
             setIsTyping(false);
@@ -925,7 +972,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     role: 'assistant',
                                     content: followUpContent,
                                     timestamp: new Date().toISOString(),
-                                    model: 'qwen-2.5-coder-32b'
+                                    model: 'qwen/qwen3-32b'
                                 };
 
                                 setConversations(prev => prev.map(c =>
@@ -974,6 +1021,44 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const updatedBlocks = message.blocks.map(b =>
             b.id === blockId ? { ...b, status: 'cancelled' as const } : b
         );
+
+        const updatedMessages = conversation.messages.map(m =>
+            m.id === messageId ? { ...m, blocks: updatedBlocks } : m
+        );
+        updateConversation(currentConversationId!, { messages: updatedMessages });
+    }, [conversations, currentConversationId, updateConversation]);
+
+    // Called when the user fills in the mini clarification form (rendered when
+    // the AI flags a creation request as ambiguous via REQUEST_INFO). Merges
+    // the form values into the originally-intended action and hands off to
+    // the normal confirmation flow — the user still explicitly confirms the
+    // completed action before anything is created.
+    const submitClarification = useCallback((messageId: string, blockId: string, values: Record<string, any>) => {
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (!conversation) return;
+
+        const message = conversation.messages.find(m => m.id === messageId);
+        if (!message || !message.blocks) return;
+
+        const block = message.blocks.find(b => b.id === blockId);
+        if (!block || block.type !== 'clarification_form') return;
+
+        const request = block.content as { pendingAction: string; knownPayload?: Record<string, any> };
+        const completedAction = {
+            type: request.pendingAction,
+            name: request.pendingAction,
+            payload: { ...(request.knownPayload || {}), ...values },
+        };
+
+        const updatedBlocks = message.blocks.map(b =>
+            b.id === blockId ? { ...b, status: 'confirmed' as const } : b
+        );
+        updatedBlocks.push({
+            id: crypto.randomUUID(),
+            type: 'confirmation',
+            content: completedAction,
+            status: 'waiting',
+        });
 
         const updatedMessages = conversation.messages.map(m =>
             m.id === messageId ? { ...m, blocks: updatedBlocks } : m
@@ -1157,6 +1242,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         dislikeMessage,
         confirmAction,
         cancelAction,
+        submitClarification,
         sidebarCollapsed,
         setSidebarCollapsed,
         artifactsPanelCollapsed,

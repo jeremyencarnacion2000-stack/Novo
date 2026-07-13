@@ -4,13 +4,14 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Task } from "@/types/project"
 import { useNotifications } from "@/lib/notification-context"
-import { blendy } from "@/lib/blendy"
+import { useModalFlip } from "@/hooks/use-modal-flip"
 
 interface TaskDialogProps {
   open: boolean
@@ -26,20 +27,9 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
   const [priority, setPriority] = useState<Task["priority"]>("medium")
   const [dueDate, setDueDate] = useState("")
 
-  const blendyKey = task ? `task-${task.id}` : 'btn-new-task'
-
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => {
-        blendy.update()
-        blendy.toggle(blendyKey)
-      }, 30)
-    }
-  }, [open, blendyKey])
-
-  const handleClose = () => {
-    blendy.untoggle(blendyKey, onClose)
-  }
+  const flipKey = task ? `task-${task.id}` : 'btn-new-task'
+  const closeFlip = useModalFlip(flipKey, open)
+  const handleClose = () => closeFlip(onClose)
 
   useEffect(() => {
     if (task) {
@@ -82,9 +72,12 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent data-blendy-to={blendyKey} className="sm:max-w-[425px]">
+      <DialogContent data-flip-to={flipKey} className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{task ? "Edit Task" : "New Task"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {!task && <Plus data-shared-item="icon" className="h-5 w-5" />}
+            <span data-shared-item="text">{task ? "Edit Task" : "New Task"}</span>
+          </DialogTitle>
           <DialogDescription>
             {task ? "Update task details" : "Create a new task"}
           </DialogDescription>

@@ -89,7 +89,7 @@ export const notionService = {
     listDatabases: async (accessToken: string) => {
         const notion = getNotionClient(accessToken);
         const res = await notion.search({
-            filter: { property: 'object', value: 'database' },
+            filter: { property: 'object', value: 'data_source' },
             page_size: 50,
         });
         return res.results.map((db: any) => ({
@@ -111,8 +111,8 @@ export const notionService = {
         let cursor: string | undefined;
 
         do {
-            const res = await notion.databases.query({
-                database_id: databaseId,
+            const res = await notion.dataSources.query({
+                data_source_id: databaseId,
                 start_cursor: cursor,
                 page_size: 100,
                 filter: {

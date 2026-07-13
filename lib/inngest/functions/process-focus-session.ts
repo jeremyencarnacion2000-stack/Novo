@@ -1,6 +1,7 @@
 import { inngest } from "../client";
 import { prisma } from "@/lib/prisma";
 import { groqAPI } from "@/lib/groq";
+import { logAICall } from "@/lib/ai-call-log";
 
 // Using Llama3 for insights generation as per requirements for low cost & speed
 const INSIGHT_MODEL = "llama3-8b-8192";
@@ -62,13 +63,16 @@ export const processFocusSession = inngest.createFunction(
                 const context = `User just completed a ${event.data.duration}m focus session. Reason for trigger: ${shouldGenerateInsight.reason}. Generating insight...`;
 
                 try {
-                    const result = await groqAPI.generateResponse(
-                        context,
-                        '',
-                        [],
-                        INSIGHTS_SYSTEM_PROMPT,
-                        INSIGHT_MODEL,
-                        0.5 // Slight creativity allowed for wording
+                    const result = await logAICall(
+                        { userId: event.data.userId, provider: 'groq', model: INSIGHT_MODEL, purpose: 'fatigue_insight' },
+                        () => groqAPI.generateResponse(
+                            context,
+                            '',
+                            [],
+                            INSIGHTS_SYSTEM_PROMPT,
+                            INSIGHT_MODEL,
+                            0.5 // Slight creativity allowed for wording
+                        )
                     );
                     return result.content.trim();
                 } catch (error) {

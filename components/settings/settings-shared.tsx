@@ -14,7 +14,7 @@ export interface DisabledModule {
 }
 
 // ─── Tab type ────────────────────────────────────────────────────────────────
-export type Tab = 'twin' | 'personalization' | 'modules' | 'preferences' | 'ai_models' | 'advanced' | 'integrations'
+export type Tab = 'twin' | 'personalization' | 'modules' | 'preferences' | 'ai_models' | 'advanced' | 'integrations' | 'billing'
 
 // ─── All available modules ───────────────────────────────────────────────────
 import {
@@ -43,7 +43,7 @@ export const ALL_MODULES = [
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/30">{title}</p>
+      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground/30">{title}</p>
       {children}
     </div>
   )
@@ -52,10 +52,10 @@ export function Section({ title, children }: { title: string; children: React.Re
 // ─── Row wrapper ──────────────────────────────────────────────────────────────
 export function Row({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3 border-b border-white/[0.04] last:border-0">
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-foreground/[0.04] last:border-0">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-white/85">{label}</p>
-        {description && <p className="text-xs text-white/35 mt-0.5">{description}</p>}
+        <p className="text-sm font-medium text-foreground/85">{label}</p>
+        {description && <p className="text-xs text-foreground/35 mt-0.5">{description}</p>}
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
@@ -77,9 +77,9 @@ export function DangerAction({ icon: Icon, label, description, onClick, loading 
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-red-300">{loading ? 'Processing...' : label}</p>
-        <p className="text-xs text-white/35 mt-0.5">{description}</p>
+        <p className="text-xs text-foreground/35 mt-0.5">{description}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-red-400 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-red-400 transition-colors" />
     </button>
   )
 }
@@ -92,16 +92,16 @@ export function SafeAction({ icon: Icon, label, description, onClick, loading }:
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300 text-left group"
+      className="w-full flex items-center gap-3 p-4 rounded-2xl border border-foreground/[0.06] bg-foreground/[0.02] hover:bg-foreground/[0.05] hover:border-foreground/10 transition-all duration-300 text-left group"
     >
       <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
         <Icon className="w-4 h-4 text-primary" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-white/80">{loading ? 'Processing...' : label}</p>
-        <p className="text-xs text-white/35 mt-0.5">{description}</p>
+        <p className="text-sm font-semibold text-foreground/80">{loading ? 'Processing...' : label}</p>
+        <p className="text-xs text-foreground/35 mt-0.5">{description}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors" />
+      <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-primary transition-colors" />
     </button>
   )
 }
@@ -117,14 +117,14 @@ export function OptionButton({ label, description, selected, onClick }: {
         'w-full flex flex-col items-start gap-1 p-3.5 rounded-2xl border transition-all duration-300 text-left',
         selected
           ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(99,102,241,0.08)]'
-          : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/10',
+          : 'bg-foreground/[0.02] border-foreground/[0.06] hover:bg-foreground/[0.04] hover:border-foreground/10',
       )}
     >
       <div className="flex items-center gap-2">
-        <div className={cn('w-2 h-2 rounded-full transition-colors', selected ? 'bg-primary' : 'bg-white/20')} />
-        <span className={cn('text-sm font-semibold', selected ? 'text-primary' : 'text-white/70')}>{label}</span>
+        <div className={cn('w-2 h-2 rounded-full transition-colors', selected ? 'bg-primary' : 'bg-foreground/20')} />
+        <span className={cn('text-sm font-semibold', selected ? 'text-primary' : 'text-foreground/70')}>{label}</span>
       </div>
-      <p className="text-[11px] text-white/35 pl-4">{description}</p>
+      <p className="text-[11px] text-foreground/35 pl-4">{description}</p>
     </button>
   )
 }

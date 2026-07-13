@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle } from 'lucide-react';
+import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle, Activity } from 'lucide-react';
 
 interface ConfirmationBlockProps {
     onConfirm: () => void;
@@ -87,6 +87,35 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                             <span className="font-semibold text-white/40 block text-[10px] uppercase tracking-wider mb-0.5">Crear Proyecto</span>
                             <span className="text-white/90 break-words font-medium text-sm block leading-relaxed" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                                 {payload.title}
+                            </span>
+                        </div>
+                    </div>
+                );
+            case 'CREATE_EVENT':
+                return (
+                    <div className={detailItemClass}>
+                        <Calendar className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-white/40 block text-[10px] uppercase tracking-wider mb-0.5">Agendar Evento</span>
+                            <span className="text-white/90 break-words font-medium text-sm block leading-relaxed" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                                {payload.title}
+                            </span>
+                            {payload.start && (
+                                <span className="text-white/40 text-[11px] block mt-1">
+                                    {new Date(payload.start).toLocaleString()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            case 'CREATE_TRACKER':
+                return (
+                    <div className={detailItemClass}>
+                        <Activity className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-white/40 block text-[10px] uppercase tracking-wider mb-0.5">Crear Tracker</span>
+                            <span className="text-white/90 break-words font-medium text-sm block leading-relaxed" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                                {payload.name} {payload.goal ? `— meta: ${payload.goal} ${payload.unit || ''}` : ''}
                             </span>
                         </div>
                     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { blendy } from '@/lib/blendy'
+import { modalFlip } from '@/lib/modal-flip'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -46,7 +46,9 @@ export default function TrackersPage() {
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = [...currentTrackers, optimisticTracker]
 
-    setDialogOpen(false)
+    // untoggle first: it restores the origin button's hidden icon/text and
+    // plays the return flight before the dialog unmounts.
+    modalFlip.untoggle('btn-new-tracker', () => setDialogOpen(false))
     toast({
       title: 'Tracker created',
       description: 'Your new tracker has been created successfully.',
@@ -92,8 +94,10 @@ export default function TrackersPage() {
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = currentTrackers.map((t) => (t.id === tracker.id ? { ...t, ...tracker } : t))
 
-    setDialogOpen(false)
-    setEditingTracker(undefined)
+    modalFlip.untoggle(`tracker-${tracker.id}`, () => {
+      setDialogOpen(false)
+      setEditingTracker(undefined)
+    })
     toast({
       title: 'Tracker updated',
       description: 'Your tracker has been updated successfully.',
@@ -181,24 +185,24 @@ export default function TrackersPage() {
     }
   }
 
+  // The dialog fires its own modalFlip.toggle() once mounted — calling it
+  // here raced the render (flip target not in the DOM yet → plain reveal).
   const handleEdit = (tracker: Tracker) => {
     setEditingTracker(tracker)
-    blendy.toggle(`tracker-${tracker.id}`)
     setDialogOpen(true)
   }
 
   const handleOpenNewTracker = () => {
     setEditingTracker(undefined)
-    blendy.toggle('btn-new-tracker')
     setDialogOpen(true)
   }
 
+  // TrackerDialog already plays its own return flight before calling this
+  // (via useModalFlip) — wrapping it again here would double-untoggle and
+  // delay the unmount by a second, redundant animation.
   const handleDialogClose = () => {
-    const key = editingTracker ? `tracker-${editingTracker.id}` : 'btn-new-tracker'
-    blendy.untoggle(key, () => {
-      setDialogOpen(false)
-      setEditingTracker(undefined)
-    })
+    setDialogOpen(false)
+    setEditingTracker(undefined)
   }
 
   const handleLogEntry = async (id: string, value: number) => {
@@ -303,22 +307,22 @@ export default function TrackersPage() {
             Track your habits and metrics over time
           </p>
         </div>
-        <Button onClick={handleOpenNewTracker} data-blendy-from="btn-new-tracker" className="w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-2" />
-          New Tracker
+        <Button onClick={handleOpenNewTracker} data-flip-from="btn-new-tracker" className="w-full sm:w-auto">
+          <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
+          <span data-shared-item="text">New Tracker</span>
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full sm:w-auto relative bg-white/5 border border-white/5 rounded-full p-1 h-11">
+        <TabsList className="w-full sm:w-auto relative bg-foreground/5 border border-foreground/5 rounded-full p-1 h-11">
           <TabsTrigger
             value="habits"
-            className="flex-1 sm:flex-none relative h-9 px-6 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-white transition-colors duration-300"
+            className="flex-1 sm:flex-none relative h-9 px-6 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
           >
             {activeTab === 'habits' && (
               <motion.div
                 layoutId="active-tracker-tab"
-                className="absolute inset-0 bg-white/10 border border-white/10 rounded-full z-0"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               />
             )}
@@ -327,12 +331,12 @@ export default function TrackersPage() {
           </TabsTrigger>
           <TabsTrigger
             value="metrics"
-            className="flex-1 sm:flex-none relative h-9 px-6 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-white transition-colors duration-300"
+            className="flex-1 sm:flex-none relative h-9 px-6 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
           >
             {activeTab === 'metrics' && (
               <motion.div
                 layoutId="active-tracker-tab"
-                className="absolute inset-0 bg-white/10 border border-white/10 rounded-full z-0"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               />
             )}

@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
       where: { userId: session.user.id },
       include: {
         task: {
-          include: {
-            project: true
+          select: {
+            id: true,
+            title: true,
+            project: { select: { id: true, title: true } }
           }
         }
       },

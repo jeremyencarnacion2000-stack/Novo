@@ -5,7 +5,30 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, Settings, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Calendar, CalendarRange, Sun, Bot, Music, LogOut, LogIn, User, BarChart3, Timer, PanelLeft, Brain, Users } from 'lucide-react'
+import {
+  HiOutlineSquares2X2 as LayoutDashboard,
+  HiOutlineListBullet as ListChecks,
+  HiOutlineCheckCircle as CheckSquare,
+  HiOutlineViewColumns as KanbanSquare,
+  HiOutlineArrowTrendingUp as TrendingUp,
+  HiOutlineCog6Tooth as Settings,
+  HiOutlineAcademicCap as GraduationCap,
+  HiOutlineBriefcase as Briefcase,
+  HiOutlineBookOpen as BookOpen,
+  HiOutlineSparkles as Sparkles,
+  HiOutlineHeart as Heart,
+  HiOutlineCalendarDays as CalendarRange,
+  HiOutlineSun as Sun,
+  HiOutlineCpuChip as Bot,
+  HiOutlineMusicalNote as Music,
+  HiOutlineArrowLeftOnRectangle as LogIn,
+  HiOutlineChartBar as BarChart3,
+  HiOutlineClock as Timer,
+  HiOutlineBars3 as PanelLeft,
+  HiOutlineBolt as Brain,
+  HiOutlineUsers as Users,
+  HiOutlineChevronDown as ChevronDown,
+} from 'react-icons/hi2'
 import {
   Sidebar,
   SidebarContent,
@@ -30,7 +53,6 @@ import { GlassSurface } from '@/components/ui/GlassSurface'
 import { useTranslation } from '@/lib/i18n'
 import { useSettings } from '@/lib/settings-context'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 import { useRef } from 'react'
@@ -215,7 +237,7 @@ export function AppSidebar() {
     >
       <div className={cn(
         "h-full w-full flex flex-col overflow-hidden transition-[border-radius] duration-300",
-        isMobile ? "rounded-none" : "rounded-[40px]"
+        isMobile ? "rounded-none" : "rounded-[28px]"
       )}>
         <SidebarHeader className={cn("py-8 flex justify-center transition-[padding] duration-300", state === 'collapsed' ? "!px-0" : "px-6")}>
           <div className={cn("flex items-center justify-center transition-[width] duration-300", state === 'collapsed' ? 'w-full' : 'w-full')}>
@@ -437,7 +459,7 @@ export function AppSidebar() {
                             : "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
                         )}>
                           <span className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
-                          <span>{isOnline ? 'Online' : 'Sin conexión'}</span>
+                          <span>{isOnline ? t('sidebar.online') : t('sidebar.offline')}</span>
                         </div>
                       )}
                     </GlassSurface>
@@ -455,7 +477,7 @@ export function AppSidebar() {
                             : "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
                         )}>
                           <span className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
-                          <span>{isOnline ? 'Online' : 'Sin conexión'}</span>
+                          <span>{isOnline ? t('sidebar.online') : t('sidebar.offline')}</span>
                         </div>
                       )}
                       {state === 'collapsed' && (
@@ -483,16 +505,16 @@ export function AppSidebar() {
                     }
                   }}
                   aria-label={isMac ? 'Búsqueda rápida ⌘K' : 'Búsqueda rápida Ctrl+K'}
-                  className="mt-2 w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-white/[0.025] hover:bg-white/[0.05] border border-white/[0.06] transition-all group"
+                  className="mt-2 w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-foreground/[0.025] hover:bg-foreground/[0.05] border border-foreground/[0.06] transition-all group"
                 >
-                  <span className="text-[10px] text-white/30 font-medium group-hover:text-white/50 transition-colors">Búsqueda rápida</span>
+                  <span className="text-[10px] text-foreground/30 font-medium group-hover:text-foreground/50 transition-colors">Búsqueda rápida</span>
                   <span className="flex items-center gap-0.5">
                     {isMac ? (
-                      <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">⌘</kbd>
+                      <kbd className="text-[9px] text-foreground/25 font-bold bg-foreground/5 border border-foreground/10 rounded px-1 py-0.5">⌘</kbd>
                     ) : (
-                      <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">Ctrl</kbd>
+                      <kbd className="text-[9px] text-foreground/25 font-bold bg-foreground/5 border border-foreground/10 rounded px-1 py-0.5">Ctrl</kbd>
                     )}
-                    <kbd className="text-[9px] text-white/25 font-bold bg-white/5 border border-white/10 rounded px-1 py-0.5">K</kbd>
+                    <kbd className="text-[9px] text-foreground/25 font-bold bg-foreground/5 border border-foreground/10 rounded px-1 py-0.5">K</kbd>
                   </span>
                 </button>
               )

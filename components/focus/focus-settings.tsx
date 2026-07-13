@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useFocus, TimerProfile } from '@/lib/focus-context'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -12,8 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Settings, Plus, Trash2, Volume2, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 export function FocusSettings() {
+    const [open, setOpen] = useState(false)
+    const closeFlip = useModalFlip('btn-focus-settings', open)
+
+    const handleOpenChange = (o: boolean) => {
+        if (!o) closeFlip(() => setOpen(false))
+        else setOpen(true)
+    }
+
     const {
         profiles,
         activeProfileId,
@@ -60,15 +69,18 @@ export function FocusSettings() {
     }
 
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="icon">
-                    <Settings className="h-4 w-4" />
+                <Button variant="outline" size="icon" data-flip-from="btn-focus-settings">
+                    <Settings data-shared-item="icon" className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent data-flip-to="btn-focus-settings" className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Focus Settings</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Settings data-shared-item="icon" className="h-5 w-5" />
+                        Focus Settings
+                    </DialogTitle>
                     <DialogDescription>Configure your timer profiles and sound settings</DialogDescription>
                 </DialogHeader>
 
@@ -95,7 +107,7 @@ export function FocusSettings() {
                             </Select>
                         </div>
 
-                        <div className="space-y-4 border rounded-lg p-4">
+                        <div className="space-y-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] p-4">
                             <h4 className="font-medium flex items-center gap-2">
                                 <Plus className="h-4 w-4" /> Create New Profile
                             </h4>

@@ -8,7 +8,6 @@ import { Client } from '@/types/client'
 import { Subject } from '@/types/subject'
 import { ActivityHistory } from '@/types/activity-history'
 import { AnalyticsData } from '@/types/analytics'
-import { CalendarEvent, IntegratedTask } from '@/lib/data-integrator'
 import { Tracker } from '@/types/tracker'
 
 // Fetcher function
@@ -96,16 +95,6 @@ export const useBusinessClients = () => {
 
 export const useBusinessContent = () => {
   return useSWRWithConfig<any[]>('/api/business?type=content')
-}
-
-// Daily tasks hook (integrated from DataIntegrator)
-export const useDailyTasks = () => {
-  return useSWRWithConfig<IntegratedTask[]>('/api/daily-tasks')
-}
-
-// Calendar events hook (integrated from DataIntegrator)
-export const useCalendarEvents = () => {
-  return useSWRWithConfig<CalendarEvent[]>('/api/calendar-events')
 }
 
 // Routine Stats hook

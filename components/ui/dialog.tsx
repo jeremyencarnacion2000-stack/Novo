@@ -34,11 +34,15 @@ function DialogOverlay({
   className,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+  const isFlipModal = Boolean((props as any)['data-flip-overlay'])
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm',
+        'fixed inset-0 z-[5000] bg-black/60',
+        isFlipModal
+          ? 'modal-flip-overlay'
+          : 'backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -46,39 +50,104 @@ function DialogOverlay({
   )
 }
 
+// Anchors a flip-mode dialog near its trigger instead of centering it on
+// screen — for small, single-purpose dialogs (a quick form, a confirmation)
+// where jumping to the middle of the viewport reads as a bigger interruption
+// than the content warrants. Runs before paint so modalFlip's own
+// requestAnimationFrame (in the next frame) always reads a settled rect.
+function FlipAnchoredPositioner({
+  flipId,
+  children,
+}: {
+  flipId: string
+  children: React.ReactNode
+}) {
+  const ref = React.useRef<HTMLDivElement>(null)
+
+  React.useLayoutEffect(() => {
+    const wrapper = ref.current
+    const origin = document.querySelector<HTMLElement>(`[data-flip-from="${flipId}"]`)
+    if (!wrapper || !origin) return
+
+    const margin = 16
+    const gap = 8
+    const originRect = origin.getBoundingClientRect()
+
+    wrapper.style.left = `${originRect.left}px`
+    wrapper.style.top = `${originRect.bottom + gap}px`
+
+    // Now that it's placed, measure its real size and clamp to the viewport
+    // — flipping above the trigger if there's no room below.
+    const rect = wrapper.getBoundingClientRect()
+    let left = originRect.left
+    let top = originRect.bottom + gap
+    if (left + rect.width > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - rect.width - margin)
+    }
+    if (top + rect.height > window.innerHeight - margin) {
+      top = Math.max(margin, originRect.top - rect.height - gap)
+    }
+    wrapper.style.left = `${Math.max(margin, left)}px`
+    wrapper.style.top = `${Math.max(margin, top)}px`
+  }, [flipId])
+
+  return (
+    <div ref={ref} className="fixed z-[5001] pointer-events-none" style={{ left: 0, top: 0 }}>
+      {children}
+    </div>
+  )
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  flipAnchored = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Anchor near the trigger instead of centering — for small, single-purpose dialogs. */
+  flipAnchored?: boolean
 }) {
+  const flipId = (props as any)['data-flip-to'] as string | undefined
+  const isFlipModal = Boolean(flipId)
+
+  const content = (
+    <DialogPrimitive.Content
+      data-slot="dialog-content"
+      aria-describedby={undefined}
+      className={cn(
+        'bg-background pointer-events-auto relative w-full max-w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto gap-4 rounded-lg border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
+        isFlipModal
+          ? 'modal-flip-target'
+          : 'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {showCloseButton && (
+        <DialogPrimitive.Close
+          data-slot="dialog-close"
+          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+        >
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
+    </DialogPrimitive.Content>
+  )
+
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <div className="fixed inset-0 z-[5001] flex items-center justify-center pointer-events-none">
-        <DialogPrimitive.Content
-          data-slot="dialog-content"
-          aria-describedby={undefined}
-          className={cn(
-            'bg-background pointer-events-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] duration-200 sm:max-w-lg',
-            className,
-          )}
-          {...props}
-        >
-          {children}
-          {showCloseButton && (
-            <DialogPrimitive.Close
-              data-slot="dialog-close"
-              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-            >
-              <XIcon />
-              <span className="sr-only">Close</span>
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Content>
-      </div>
+      <DialogOverlay {...(isFlipModal ? { 'data-flip-overlay': flipId } as any : {})} />
+      {isFlipModal && flipAnchored ? (
+        <FlipAnchoredPositioner flipId={flipId!}>{content}</FlipAnchoredPositioner>
+      ) : (
+        <div className="fixed inset-0 z-[5001] flex items-center justify-center pointer-events-none">
+          {content}
+        </div>
+      )}
     </DialogPortal>
   )
 }

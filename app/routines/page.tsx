@@ -255,17 +255,17 @@ export default function RoutinesPage() {
       <div className="flex flex-col gap-6 animate-pulse">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-8 w-28 bg-white/5 rounded-2xl" />
-            <div className="h-4 w-52 bg-white/[0.03] rounded-xl" />
+            <div className="h-8 w-28 bg-foreground/5 rounded-2xl" />
+            <div className="h-4 w-52 bg-foreground/[0.03] rounded-xl" />
           </div>
           <div className="flex gap-2">
-            <div className="h-9 w-24 bg-white/5 rounded-xl" />
-            <div className="h-9 w-32 bg-white/[0.06] rounded-xl" />
+            <div className="h-9 w-24 bg-foreground/5 rounded-xl" />
+            <div className="h-9 w-32 bg-foreground/[0.06] rounded-xl" />
           </div>
         </div>
-        <div className="h-20 w-full bg-white/[0.03] rounded-2xl border border-white/5" />
+        <div className="h-20 w-full bg-foreground/[0.03] rounded-2xl border border-foreground/5" />
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-36 bg-white/[0.03] rounded-3xl border border-white/5" />
+          <div key={i} className="h-36 bg-foreground/[0.03] rounded-3xl border border-foreground/5" />
         ))}
       </div>
     )
@@ -286,20 +286,20 @@ export default function RoutinesPage() {
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
             onClick={() => setImportDialogOpen(true)}
-            data-blendy-from="btn-import-routine"
+            data-flip-from="btn-import-routine"
             variant="outline"
             className="w-full sm:w-auto"
           >
-            <Upload className="h-4 w-4 mr-2" />
-            Import
+            <Upload data-shared-item="icon" className="h-4 w-4 mr-2" />
+            <span data-shared-item="text">Import</span>
           </Button>
           <Button
             onClick={() => setDialogOpen(true)}
-            data-blendy-from="btn-new-routine"
+            data-flip-from="btn-new-routine"
             className="w-full sm:w-auto"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            New Routine
+            <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
+            <span data-shared-item="text">New Routine</span>
           </Button>
         </div>
       </div>

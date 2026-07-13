@@ -4,9 +4,6 @@ import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { SessionProvider, useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
-import { Toaster as SileoToaster } from 'sileo'
-import 'sileo/styles.css'
-import { NovoToaster } from '@/components/ui/novo-toast'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
@@ -72,10 +69,6 @@ const CommandPalette = dynamic(
   () => import('@/components/command-palette').then(m => ({ default: m.CommandPalette })),
   { ssr: false }
 )
-const ChatbotSidebar = dynamic(
-  () => import('@/components/ai/modern-chatbot/chatbot-sidebar').then(m => ({ default: m.ChatbotSidebar })),
-  { ssr: false }
-)
 const NotificationCenter = dynamic(
   () => import('@/components/notification-center').then(m => ({ default: m.NotificationCenter })),
   { ssr: false }
@@ -92,6 +85,10 @@ const FloatingMusicWidget = dynamic(
   () => import('@/components/music/floating-music-widget').then(m => ({ default: m.FloatingMusicWidget })),
   { ssr: false }
 )
+const TwinInsightToast = dynamic(
+  () => import('@/components/cognitive/twin-insight-toast').then(m => ({ default: m.TwinInsightToast })),
+  { ssr: false }
+)
 
 // ─── Auth wrapper ────────────────────────────────────────────────────────────
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -102,15 +99,29 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   useSessionTracking()
 
-  const isPublicPage = pathname?.startsWith('/auth/') || pathname?.startsWith('/welcome') || pathname?.startsWith('/onboarding')
+  const isPublicPage = pathname?.startsWith('/auth/') || pathname?.startsWith('/welcome') || pathname?.startsWith('/onboarding') || pathname?.startsWith('/landing') || pathname?.startsWith('/privacy') || pathname?.startsWith('/terms')
+  const isAuthFormPage = pathname?.startsWith('/auth/')
 
   useEffect(() => {
     if (status === 'unauthenticated' && !isPublicPage) {
-      router.push('/welcome')
+      // A cold mount right after an external redirect (Google OAuth,
+      // Stripe Checkout) can report 'unauthenticated' for one tick before
+      // the session cookie's fetch actually resolves — bail out if a
+      // fast re-render flips us back to 'authenticated' or 'loading'
+      // before this fires, instead of bouncing to /landing on a false read.
+      const timeout = setTimeout(() => {
+        router.push('/landing')
+      }, 800)
+      return () => clearTimeout(timeout)
+    } else if (status === 'authenticated' && isAuthFormPage) {
+      // Already signed in but stuck on a login/signup route (stale bookmark,
+      // back-button, or the SlideToSignIn push('/') racing this render) —
+      // bounce out instead of leaving the fixed-overlay login stuck on screen.
+      router.push('/')
     } else if (status === 'authenticated' && !isTwinLoading && !twin.isInitialized && pathname !== '/onboarding') {
       router.push('/onboarding')
     }
-  }, [status, router, pathname, isPublicPage, twin.isInitialized, isTwinLoading])
+  }, [status, router, pathname, isPublicPage, isAuthFormPage, twin.isInitialized, isTwinLoading])
 
   if (status === 'loading' || isTwinLoading) {
     return (
@@ -141,8 +152,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Authenticated floating widgets (all lazy) ──────────────────────────────
-// MiniChatbot REMOVED — superseded by GeminiLiveOrb + ChatbotSidebar (OmniHub v2)
+// MiniChatbot REMOVED — superseded by GeminiLiveOrb
 // FloatingQuickNotes REMOVED — function migrated to OmniHub State 2 pill shortcuts
+// ChatbotSidebar (OmniHub v2 right-docked panel) REMOVED — it and the /ai page's
+// history-drawer toggle shared the same context field (sidebarCollapsed), so
+// opening the drawer on /ai also popped this second, separate chat panel open.
+// The chat experience is now a single surface: /ai (desktop) and MobileChatSheet
+// (mobile), both rendering the same ModernChatbot component.
 function AuthenticatedWidgets() {
   const { status } = useSession()
   if (status !== 'authenticated') return null
@@ -151,11 +167,11 @@ function AuthenticatedWidgets() {
       <CommandPalette />
       <ContextHub />
       <PomodoroWidget />
-      <ChatbotSidebar />
       <NotificationCenter />
       <SettingsModal />
       <GeminiLiveOrb />
       <FloatingMusicWidget />
+      <TwinInsightToast />
     </>
   )
 }
@@ -240,8 +256,9 @@ export default function ClientLayout({
       <OfflineIndicator />
       <SyncQueueInit />
       <NetworkStatus />
-      <SileoToaster position="top-right" theme="system" offset={{ top: 60 }} />
-      <NovoToaster />
+      {/* No standalone Toaster mount — all sileo.* calls route through
+          lib/sileo-bell.ts into the notification bell's physical morph
+          (see components/notification-center.tsx) */}
     </AppProviders>
   )
 }

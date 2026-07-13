@@ -122,16 +122,17 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
 
   function startProgressSync() {
     if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
-    
     syncIntervalRef.current = setInterval(() => {
-      if (playerRef.current?.getCurrentTime && isPlaying) {
-        const currentTime = playerRef.current.getCurrentTime()
-        // YT returns seconds, setProgress expects milliseconds
-        if (currentTime > 0) {
-          setProgress(Math.floor(currentTime * 1000))
-        }
-      }
+      const currentTime = playerRef.current?.getCurrentTime?.()
+      if (currentTime > 0) setProgress(Math.floor(currentTime * 1000))
     }, 1000)
+  }
+
+  function stopProgressSync() {
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current)
+      syncIntervalRef.current = null
+    }
   }
 
   function onPlayerStateChange(event: any) {
@@ -234,8 +235,10 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
 
             if (isPlaying && playerState !== YT_PLAYING) {
                 playerRef.current.playVideo?.();
+                startProgressSync()
             } else if (!isPlaying && playerState === YT_PLAYING) {
                 playerRef.current.pauseVideo?.();
+                stopProgressSync()
             }
         }
     } else {

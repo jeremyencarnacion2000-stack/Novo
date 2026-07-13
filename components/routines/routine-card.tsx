@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Edit, Trash2, Clock, CalendarDays, Dumbbell, Activity, Play } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { cn } from '@/lib/utils'
-import { blendy } from '@/lib/blendy'
+import { modalFlip } from '@/lib/modal-flip'
 
 interface RoutineCardProps {
     routine: Routine
@@ -20,22 +20,22 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
     const isStructured = routine.days && routine.days.length > 0
 
     const handleViewClick = () => {
-        blendy.toggle(`routine-${routine.id}`)
+        modalFlip.toggle(`routine-${routine.id}`)
         onView(routine)
     }
 
     return (
         <Card
-            className="liquid-glass-elevated transition-all hover:shadow-md cursor-pointer flex flex-col h-full"
+            className="liquid-glass-hover transition-all hover:shadow-md cursor-pointer flex flex-col h-full"
             onClick={handleViewClick}
             onMouseEnter={() => setIsCardHovered(true)}
             onMouseLeave={() => setIsCardHovered(false)}
-            data-blendy-from={`routine-${routine.id}`}
+            data-flip-from={`routine-${routine.id}`}
         >
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0 space-y-1">
-                        <CardTitle className="text-lg leading-tight line-clamp-2" title={routine.name}>
+                        <CardTitle data-shared-item="text" className="text-lg leading-tight line-clamp-2" title={routine.name}>
                             {routine.name}
                         </CardTitle>
                         <CardDescription className="text-xs line-clamp-2 break-words">

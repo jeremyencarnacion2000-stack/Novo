@@ -65,7 +65,7 @@ export function CognitiveOutfitSuggestions() {
 
   if (loading) {
     return (
-      <Card className="border-white/[0.08] bg-white/[0.01] backdrop-blur-xl animate-pulse">
+      <Card className="border-foreground/[0.08] bg-foreground/[0.01] backdrop-blur-xl animate-pulse">
         <div className="h-48 rounded-3xl" />
       </Card>
     );
@@ -96,11 +96,11 @@ export function CognitiveOutfitSuggestions() {
 
       <CardContent className="space-y-5 relative z-10">
         {/* State Banner */}
-        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.01] backdrop-blur-sm">
+        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-foreground/[0.06] bg-foreground/[0.01] backdrop-blur-sm">
           <Cpu className="w-5 h-5 text-primary animate-pulse" />
           <div className="flex-1">
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">Cognitive State Sync</p>
-            <p className="text-xs text-white/80 font-bold">
+            <p className="text-[10px] font-black text-foreground/30 uppercase tracking-widest">Cognitive State Sync</p>
+            <p className="text-xs text-foreground/80 font-bold">
               Focus Score: <span className="text-primary">{cognitive?.focusScore}/100</span> · Fatigue Level: <span className="capitalize">{cognitive?.fatigueEstimate}</span>
             </p>
           </div>
@@ -110,23 +110,23 @@ export function CognitiveOutfitSuggestions() {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] space-y-3.5 relative"
+          className="p-4 rounded-2xl border border-foreground/[0.08] bg-foreground/[0.02] space-y-3.5 relative"
         >
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">Recomendación de Vestuario</h4>
           </div>
 
-          <p className="text-sm font-semibold text-white/95 leading-relaxed">
+          <p className="text-sm font-semibold text-foreground/95 leading-relaxed">
             {cognitive?.recommendation?.outfit}
           </p>
 
-          <div className="pt-2.5 border-t border-white/[0.04] space-y-1">
-            <div className="flex items-center gap-1.5 text-white/40">
+          <div className="pt-2.5 border-t border-foreground/[0.04] space-y-1">
+            <div className="flex items-center gap-1.5 text-foreground/40">
               <Heart className="w-3.5 h-3.5 text-primary" />
               <span className="text-[9px] font-black uppercase tracking-widest">Psicología de Estilo</span>
             </div>
-            <p className="text-xs text-white/50 leading-relaxed">
+            <p className="text-xs text-foreground/50 leading-relaxed">
               {cognitive?.recommendation?.psychology}
             </p>
           </div>
@@ -134,13 +134,13 @@ export function CognitiveOutfitSuggestions() {
 
         {/* Tips list */}
         <div className="space-y-2.5">
-          <h5 className="text-[10px] font-black uppercase tracking-widest text-white/20">System Principles</h5>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-white/60">
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.01] border border-white/[0.04]">
+          <h5 className="text-[10px] font-black uppercase tracking-widest text-foreground/20">System Principles</h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-foreground/60">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-foreground/[0.01] border border-foreground/[0.04]">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               <span>Zapatillas cómodas para reducir fatiga física.</span>
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.01] border border-white/[0.04]">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-foreground/[0.01] border border-foreground/[0.04]">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               <span>Materiales orgánicos transpirables (lino, lana, algodón).</span>
             </div>

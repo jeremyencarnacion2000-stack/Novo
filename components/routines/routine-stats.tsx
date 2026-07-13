@@ -21,7 +21,7 @@ export function RoutineStatsCard() {
         return (
             <div className="grid gap-4 md:grid-cols-4">
                 {[...Array(4)].map((_, i) => (
-                    <Card key={i} className="bg-card border-border">
+                    <Card key={i} className="liquid-glass">
                         <CardContent className="p-5">
                             <div className="animate-pulse h-20 bg-muted rounded" />
                         </CardContent>
@@ -72,7 +72,7 @@ export function RoutineStatsCard() {
                 {statCards.map((stat) => (
                     <div
                         key={stat.label}
-                        className="relative overflow-hidden rounded-2xl border border-white/[0.07] hover:border-white/[0.11] transition-all duration-400 p-5 cursor-default group"
+                        className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-5 cursor-default group"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
                             backdropFilter: 'blur(12px)',
@@ -80,14 +80,14 @@ export function RoutineStatsCard() {
                         }}
                     >
                         <div className="flex items-center justify-between mb-4">
-                            <span className="text-[10px] font-black tracking-widest uppercase text-white/40 group-hover:text-white/60 transition-colors">{stat.label}</span>
-                            <stat.icon className="h-4 w-4 text-white/40 group-hover:text-white/60 transition-colors" />
+                            <span className="text-[10px] font-black tracking-widest uppercase text-foreground/40 group-hover:text-foreground/60 transition-colors">{stat.label}</span>
+                            <stat.icon className="h-4 w-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" />
                         </div>
                         <div className="space-y-3">
-                            <span className="text-3xl font-black tracking-tight text-white">{stat.value}</span>
+                            <span className="text-3xl font-black tracking-tight text-foreground">{stat.value}</span>
                             <div className="space-y-1.5">
                                 <div className={`h-1 w-full rounded-full ${stat.accentColor}`} />
-                                <p className="text-[10px] text-white/30 font-medium">{stat.subtext}</p>
+                                <p className="text-[10px] text-foreground/30 font-medium">{stat.subtext}</p>
                             </div>
                         </div>
                     </div>
@@ -96,7 +96,7 @@ export function RoutineStatsCard() {
 
             {/* Compression Row */}
             <div
-                className="relative overflow-hidden rounded-2xl border border-white/[0.07] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3"
+                className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3"
                 style={{
                     background: 'rgba(255,255,255,0.01)',
                     backdropFilter: 'blur(12px)',
@@ -105,7 +105,7 @@ export function RoutineStatsCard() {
             >
                 <div className="flex items-center gap-3">
                     <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse flex-shrink-0" />
-                    <span className="text-xs text-white/70">
+                    <span className="text-xs text-foreground/70">
                         {stats.completionRate >= 70
                             ? `Execution fidelity is high (${stats.completionRate}%). Your afternoon alignment shows optimal consistency momentum.`
                             : `Consistency momentum dropped — completion rate is at ${stats.completionRate}%. Afternoon slots present the primary gap.`

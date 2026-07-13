@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, Loader2, Wand2 } from 'lucide-react'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +19,13 @@ export function QuickCapture() {
     const [color, setColor] = useState('bg-background')
     const { toast } = useToast()
     const router = useRouter()
+
+    const closeFlip = useModalFlip('btn-quick-note', open)
+
+    const handleOpenChange = (o: boolean) => {
+        if (!o) closeFlip(() => setOpen(false))
+        else setOpen(true)
+    }
 
     const handleCategorize = async () => {
         if (!content.trim()) return
@@ -72,7 +80,7 @@ export function QuickCapture() {
             setContent('')
             setTags([])
             setColor('bg-background')
-            setOpen(false)
+            handleOpenChange(false)
             router.refresh()
         } catch (error) {
             toast({
@@ -86,16 +94,19 @@ export function QuickCapture() {
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Quick Note
+                <Button className="gap-2" data-flip-from="btn-quick-note">
+                    <Plus data-shared-item="icon" className="h-4 w-4" />
+                    <span data-shared-item="text">Quick Note</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className={`sm:max-w-[425px] transition-colors duration-300 ${color}`}>
+            <DialogContent data-flip-to="btn-quick-note" flipAnchored className={`sm:max-w-[380px] transition-colors duration-300 ${color}`}>
                 <DialogHeader>
-                    <DialogTitle>Quick Capture</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Plus data-shared-item="icon" className="h-5 w-5" />
+                        <span data-shared-item="text">Quick Note</span>
+                    </DialogTitle>
                     <DialogDescription>
                         Jot down a thought, idea, or reminder.
                     </DialogDescription>

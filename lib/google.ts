@@ -1,6 +1,32 @@
 import { google } from 'googleapis';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+
+/**
+ * Resolve a usable Google OAuth access token for a user — the session's
+ * token if present, else the DB Account record (with expiry check). Shared
+ * by any route that wants to call a Google API but must gracefully fall
+ * back to non-Google data when the user hasn't connected (or their token
+ * has expired) — most users sign in with credentials, not Google.
+ */
+export async function getGoogleAccessToken(userId: string, sessionToken?: string): Promise<string | null> {
+    if (sessionToken) return sessionToken;
+
+    try {
+        const account = await prisma.account.findFirst({
+            where: { userId, provider: 'google' },
+            select: { access_token: true, expires_at: true },
+        });
+
+        if (!account?.access_token) return null;
+        if (account.expires_at && account.expires_at < Math.floor(Date.now() / 1000) + 60) return null;
+
+        return account.access_token;
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Initializes a Google API client with the user's access token from the session.
@@ -95,13 +121,14 @@ export const gmailService = {
  * Calendar Service
  */
 export const calendarService = {
-    listEvents: async (timeMin = new Date().toISOString(), maxResults = 10) => {
+    listEvents: async (timeMin = new Date().toISOString(), maxResults = 10, timeMax?: string) => {
         const auth = await getGoogleAuthClient();
         const calendar = google.calendar({ version: 'v3', auth });
 
         const res = await calendar.events.list({
             calendarId: 'primary',
             timeMin,
+            ...(timeMax ? { timeMax } : {}),
             maxResults,
             singleEvents: true,
             orderBy: 'startTime',

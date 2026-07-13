@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { DollarSign, Plus, Trash2, ArrowRight } from 'lucide-react'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface Deal {
     id: string
@@ -69,6 +70,13 @@ export function DealsPipeline() {
         fetchClients()
     }, [])
 
+    const closeDealFlip = useModalFlip('btn-new-deal', dialogOpen)
+
+    const handleDialogChange = (o: boolean) => {
+        if (!o) closeDealFlip(() => setDialogOpen(false))
+        else setDialogOpen(true)
+    }
+
     const fetchDeals = async () => {
         try {
             const response = await fetch('/api/business/deals')
@@ -105,7 +113,7 @@ export function DealsPipeline() {
             if (response.ok) {
                 fetchDeals()
                 setNewDeal({ title: '', value: '', stage: 'lead', probability: 50, clientId: '' })
-                setDialogOpen(false)
+                handleDialogChange(false)
             }
         } catch (error) {
             console.error('Error adding deal:', error)
@@ -145,15 +153,15 @@ export function DealsPipeline() {
     const getDealsByStage = (stage: string) => deals.filter(d => d.stage === stage)
 
     return (
-        <Card>
+        <Card className="liquid-glass">
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
                     Deals Pipeline
                 </CardTitle>
-                <Button size="sm" onClick={() => setDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Deal
+                <Button size="sm" data-flip-from="btn-new-deal" onClick={() => setDialogOpen(true)}>
+                    <Plus data-shared-item="icon" className="h-4 w-4 mr-1" />
+                    <span data-shared-item="text">New Deal</span>
                 </Button>
             </CardHeader>
             <CardContent>
@@ -172,7 +180,7 @@ export function DealsPipeline() {
                                     {getDealsByStage(stage.id).map((deal) => (
                                         <div
                                             key={deal.id}
-                                            className="p-3 border rounded-lg bg-card hover:shadow-md transition-shadow"
+                                            className="p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"
                                         >
                                             <div className="flex items-start justify-between mb-2">
                                                 <p className="font-medium text-sm truncate flex-1">{deal.title}</p>
@@ -213,10 +221,13 @@ export function DealsPipeline() {
                 </div>
             </CardContent>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent>
+            <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+                <DialogContent data-flip-to="btn-new-deal" flipAnchored className="sm:max-w-[400px]">
                     <DialogHeader>
-                        <DialogTitle>New Deal</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Plus data-shared-item="icon" className="h-5 w-5" />
+                            <span data-shared-item="text">New Deal</span>
+                        </DialogTitle>
                         <DialogDescription>Add a new deal to your pipeline</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -275,7 +286,7 @@ export function DealsPipeline() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => handleDialogChange(false)}>
                             Cancel
                         </Button>
                         <Button onClick={handleAddDeal}>Add Deal</Button>

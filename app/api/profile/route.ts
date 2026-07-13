@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/profile - Get user profile with stats
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -56,9 +57,8 @@ export async function GET(request: NextRequest) {
             console.error('Error fetching stats:', e);
         }
 
-        // Use current date
-        const memberSince = new Date();
-        const daysSinceMember = 0;
+        const memberSince = user.createdAt;
+        const daysSinceMember = Math.floor((Date.now() - user.createdAt.getTime()) / (24 * 60 * 60 * 1000));
 
         return NextResponse.json({
             profile: {

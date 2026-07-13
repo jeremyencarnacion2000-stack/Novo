@@ -196,16 +196,16 @@ export function SettingsAdvanced() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Section title="Local backups & restoring">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="space-y-2">
-            <p className="text-xs text-white/40 mb-2">Sync or restore from automatic database snapshots.</p>
+            <p className="text-xs text-foreground/40 mb-2">Sync or restore from automatic database snapshots.</p>
             {availableBackups.length > 0 ? (
               <div className="space-y-2">
                 {availableBackups.slice(0, 5).map(backup => (
-                  <div key={backup.date} className="flex items-center justify-between p-3 border border-white/5 rounded-xl bg-white/[0.005]">
+                  <div key={backup.date} className="flex items-center justify-between p-3 border border-foreground/5 rounded-xl bg-foreground/[0.005]">
                     <div>
-                      <p className="text-sm font-semibold text-white/80">{new Date(backup.date).toLocaleString()}</p>
-                      <p className="text-xs text-white/35">
+                      <p className="text-sm font-semibold text-foreground/80">{new Date(backup.date).toLocaleString()}</p>
+                      <p className="text-xs text-foreground/35">
                         {backup.data.checklist?.length || 0} tasks, {backup.data.routines?.length || 0} habits, {backup.data.projects?.length || 0} pipelines
                       </p>
                     </div>
@@ -213,7 +213,7 @@ export function SettingsAdvanced() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleRestoreFromBackup(backup.date)}
-                      className="border-white/10 hover:bg-white/5"
+                      className="border-foreground/10 hover:bg-foreground/5"
                     >
                       <RefreshCw className="h-3.5 h-3.5" />
                     </Button>
@@ -221,25 +221,25 @@ export function SettingsAdvanced() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-white/30 italic">No automated backups available.</p>
+              <p className="text-xs text-foreground/30 italic">No automated backups available.</p>
             )}
           </div>
         </div>
       </Section>
 
       <Section title="Import / Export Data">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="space-y-2">
             <Label>{t('settings.export.label')}</Label>
-            <p className="text-xs text-white/35 mb-2">{t('settings.export.desc')}</p>
+            <p className="text-xs text-foreground/35 mb-2">{t('settings.export.desc')}</p>
             <SafeAction icon={Download} label="Export Backup" description="Download all user data as JSON." onClick={handleExport} loading={isExporting} />
           </div>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <div className="space-y-2">
             <Label>{t('settings.import.label')}</Label>
-            <p className="text-xs text-white/35 mb-2">{t('settings.import.desc')}</p>
+            <p className="text-xs text-foreground/35 mb-2">{t('settings.import.desc')}</p>
             <input
               type="file"
               ref={fileInputRef}
@@ -259,7 +259,7 @@ export function SettingsAdvanced() {
       </Section>
 
       <Section title="System Diagnostics">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-2">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-2">
           <SafeAction icon={Wifi} label="Run Sync Diagnostics" description="Verify client-server replication endpoints." onClick={handleSyncDiagnostics} />
           <SafeAction icon={Database} label="Clear Local cache" description="Force reload state by clearing localStorage." onClick={handleClearCache} />
           <SafeAction icon={RotateCcw} label="Recalibrate Twin" description="Force profile alignment from cognitive metrics." onClick={() => toast({ title: 'Recalibration queued', description: 'Recalibrating profile over active chronotype cycles.' })} />
@@ -275,7 +275,7 @@ export function SettingsAdvanced() {
       </Section>
 
       <Section title="Session Actions">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5">
           <Button
             variant="destructive"
             className="w-full"

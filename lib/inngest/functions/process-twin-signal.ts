@@ -39,11 +39,17 @@ function hourToTime(h: number): string {
   return `${String(h).padStart(2, '0')}:00`
 }
 
-// ─── Main Inngest Function ───────────────────────────────────────────────────
-export const processTwinSignal = inngest.createFunction(
-  { id: 'process-twin-signal', concurrency: { key: 'event.data.userId', limit: 1 } },
-  { event: 'twin.signal' },
-  async ({ event, step }) => {
+// ─── Step shim ───────────────────────────────────────────────────────────────
+// Inngest's `step.run(name, fn)` just checkpoints `await fn()`. This minimal
+// shape lets the same handler run either under real Inngest OR inline (see
+// lib/twin-signal.ts) — the free tier has no Inngest keys, so signals are
+// processed inline instead of enqueued to a queue that never drains.
+type StepLike = { run: <T>(name: string, fn: () => Promise<T> | T) => Promise<T> }
+
+// ─── Handler (extracted so it can run inline, not only via Inngest) ──────────
+export async function processTwinSignalHandler(
+  { event, step }: { event: { data: any }; step: StepLike }
+) {
     const { userId, signal, hour, duration, quality } = event.data as {
       userId: string
       signal: SignalType
@@ -78,14 +84,18 @@ export const processTwinSignal = inngest.createFunction(
     })
 
     // ── Step 3: Load 14-day signal window for inference ──────────────────────
+    // Inngest checkpoints step results as JSON, so occurredAt comes back as a
+    // string, not a Date — re-hydrate once here rather than at each of the
+    // rules below that compare it against a real Date with `>=`/`<`.
     const recentSignals = await step.run('load-signals', async () => {
       const since = new Date()
       since.setDate(since.getDate() - 14)
-      return prisma.behavioralSignal.findMany({
+      const signals = await prisma.behavioralSignal.findMany({
         where: { userId, occurredAt: { gte: since } },
         orderBy: { occurredAt: 'asc' },
       })
-    })
+      return signals.map(s => ({ ...s, occurredAt: s.occurredAt.toISOString() }))
+    }).then(signals => signals.map(s => ({ ...s, occurredAt: new Date(s.occurredAt) })))
 
     // ── Step 4: Run Inference Rules ──────────────────────────────────────────
     const changes = await step.run('run-inference-rules', async () => {
@@ -421,6 +431,35 @@ export const processTwinSignal = inngest.createFunction(
       }
     })
 
+    // ── Step 8: Push real-time SSE event to connected client ─────────────────
+    // Non-critical — fire and forget. Works on single-instance deployments.
+    // On multi-instance (Vercel serverless), use Redis pub/sub instead.
+    await step.run('push-realtime-event', async () => {
+      const webhookSecret = process.env.EVENTS_WEBHOOK_SECRET
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      if (!webhookSecret) return
+
+      try {
+        await fetch(`${baseUrl}/api/events/push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-webhook-secret': webhookSecret,
+          },
+          body: JSON.stringify({
+            userId,
+            type: 'twin.updated',
+            payload: {
+              signal,
+              confidenceScore: newConfidence,
+              trustLevel: newTrustLevel,
+              patternsDetected: changes.logs.length,
+            },
+          }),
+        })
+      } catch { /* non-critical */ }
+    })
+
     return {
       success: true,
       signal,
@@ -428,5 +467,11 @@ export const processTwinSignal = inngest.createFunction(
       newTrustLevel,
       patternsDetected: changes.logs.length,
     }
-  }
+}
+
+// ─── Inngest registration (used only if INNGEST_* keys are configured) ───────
+export const processTwinSignal = inngest.createFunction(
+  { id: 'process-twin-signal', concurrency: { key: 'event.data.userId', limit: 1 } },
+  { event: 'twin.signal' },
+  processTwinSignalHandler
 )

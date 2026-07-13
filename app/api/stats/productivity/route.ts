@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/stats/productivity - Get comprehensive productivity statistics
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -231,8 +232,10 @@ export async function GET(request: NextRequest) {
 }
 
 async function calculateCurrentStreak(userId: string): Promise<number> {
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - 366);
     const tasks = await prisma.checklistItem.findMany({
-        where: { userId, completed: true },
+        where: { userId, completed: true, updatedAt: { gte: windowStart } },
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
     });

@@ -47,9 +47,11 @@ export function PomodoroWidget() {
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className={cn(
-                    "fixed z-50 shadow-2xl border-white/10",
+                    // z-[55]: above other floating z-50 surfaces — an active
+                    // countdown stays visible instead of getting covered.
+                    "fixed z-[55] shadow-2xl border-white/10",
                     isFocusPage
-                        ? "bottom-20 left-1/2 -translate-x-1/2 w-[400px] h-16 rounded-full flex items-center px-6 justify-between bg-black/40 border border-white/20"
+                        ? "bottom-20 left-1/2 -translate-x-1/2 w-[calc(100vw-1.5rem)] max-w-[400px] h-16 rounded-full flex items-center px-6 justify-between bg-black/40 border border-white/20"
                         // right-16 keeps clearance from ContextHub capsule (46px) on the right edge
                         : "top-6 right-16 w-[160px] p-4 rounded-3xl bg-black/40 border-white/10 flex flex-col items-center gap-3"
                 )}

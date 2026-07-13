@@ -292,16 +292,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
 
       if (settings.autoThemeMode === 'time' || settings.autoThemeMode === 'both') {
-        // Check every minute for time changes
-        const timeInterval = setInterval(() => {
+        // Check every minute for time changes, pausing while the tab is hidden
+        const applyTimeTheme = () => {
           let newIsDark = !isDaytime()
           if (settings.autoThemeMode === 'both') {
             const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
             newIsDark = systemDark || newIsDark
           }
           root.classList.toggle('dark', newIsDark)
-        }, 60000) // Check every minute
-        listeners.push(() => clearInterval(timeInterval))
+        }
+        let timeInterval: ReturnType<typeof setInterval> | null = setInterval(applyTimeTheme, 60000)
+        const onVisibility = () => {
+          if (document.visibilityState === 'visible') {
+            applyTimeTheme()
+            if (!timeInterval) timeInterval = setInterval(applyTimeTheme, 60000)
+          } else if (timeInterval) {
+            clearInterval(timeInterval)
+            timeInterval = null
+          }
+        }
+        document.addEventListener('visibilitychange', onVisibility)
+        listeners.push(() => {
+          if (timeInterval) clearInterval(timeInterval)
+          document.removeEventListener('visibilitychange', onVisibility)
+        })
       }
 
       return () => listeners.forEach(cleanup => cleanup())

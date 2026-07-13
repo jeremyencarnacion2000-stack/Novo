@@ -120,7 +120,7 @@ export function SettingsAiModels() {
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Custom Models Uploader */}
       <Section title="Upload Custom AI Model">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="modelName">Model Label</Label>
@@ -129,7 +129,7 @@ export function SettingsAiModels() {
                 value={newModelName}
                 onChange={(e) => setNewModelName(e.target.value)}
                 placeholder="LoRA model title..."
-                className="bg-white/5 border-white/10"
+                className="bg-foreground/5 border-foreground/10"
               />
             </div>
             <div className="space-y-2">
@@ -154,7 +154,7 @@ export function SettingsAiModels() {
                 value={newModelBase}
                 onChange={(e) => setNewModelBase(e.target.value)}
                 placeholder="e.g., microsoft/DialoGPT-medium"
-                className="bg-white/5 border-white/10"
+                className="bg-foreground/5 border-foreground/10"
               />
             </div>
           )}
@@ -169,7 +169,7 @@ export function SettingsAiModels() {
 
           <Button
             variant="outline"
-            className="w-full border-white/10 hover:bg-white/5"
+            className="w-full border-foreground/10 hover:bg-foreground/5"
             onClick={() => modelFileInputRef.current?.click()}
             disabled={!newModelName.trim() || isUploadingModel}
           >
@@ -195,24 +195,24 @@ export function SettingsAiModels() {
           {models.map(model => (
             <div
               key={model.id}
-              className="flex items-center justify-between p-3.5 border border-white/5 bg-white/[0.01] rounded-2xl hover:bg-white/[0.02] transition-colors"
+              className="flex items-center justify-between p-3.5 border border-foreground/5 bg-foreground/[0.01] rounded-2xl hover:bg-foreground/[0.02] transition-colors"
             >
               <div className="flex items-center gap-3">
                 {model.isActive ? (
                   <CheckCircle className="h-5 w-5 text-green-500" />
                 ) : (
-                  <div className="h-5 w-5 rounded-full border border-white/20" />
+                  <div className="h-5 w-5 rounded-full border border-foreground/20" />
                 )}
                 <div>
-                  <p className="font-semibold text-sm text-white/90">{model.name}</p>
-                  <p className="text-xs text-white/35">
+                  <p className="font-semibold text-sm text-foreground/90">{model.name}</p>
+                  <p className="text-xs text-foreground/35">
                     {model.type === 'lora' ? `LoRA (${model.baseModel})` : 'Base Model'} • {(model.size / (1024 * 1024)).toFixed(1)} MB • {new Date(model.uploadedAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {!model.isActive && model.id !== 'default' && (
-                  <Button variant="outline" size="sm" onClick={() => handleSetActiveModel(model.id)} className="border-white/10 hover:bg-white/5 text-xs">
+                  <Button variant="outline" size="sm" onClick={() => handleSetActiveModel(model.id)} className="border-foreground/10 hover:bg-foreground/5 text-xs">
                     Activate
                   </Button>
                 )}

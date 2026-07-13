@@ -25,10 +25,11 @@ export function CalendarSidebar({
         <div className="w-full lg:w-[280px] flex flex-col gap-6 shrink-0">
             {/* Create Event Button */}
             <Button
+                data-flip-from="btn-create-event"
                 onClick={onCreateEvent}
                 className="w-full h-12 rounded-2xl shadow-lg shadow-primary/20 text-base font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-                <Plus className="mr-2 h-5 w-5" /> Create Event
+                <Plus data-shared-item="icon" className="mr-2 h-5 w-5" /> <span data-shared-item="text">Create Event</span>
             </Button>
 
             {/* Mini Calendar */}

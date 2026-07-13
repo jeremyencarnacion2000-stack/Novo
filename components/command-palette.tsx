@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Calculator, Calendar, CreditCard, Settings, Smile, User, LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Search, Timer } from 'lucide-react'
+import { Calculator, Calendar, CreditCard, Settings, Smile, User, LayoutDashboard, ListChecks, CheckSquare, KanbanSquare, TrendingUp, GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Timer } from 'lucide-react'
 
 import {
   CommandDialog,
@@ -28,9 +28,20 @@ export function CommandPalette() {
         setOpen((open) => !open)
       }
     }
+    // Mobile has no keyboard for Cmd/Ctrl+K — reachable instead via a
+    // "Buscar" button in the mobile section drawer's footer (same
+    // dispatch-a-custom-event pattern mobile-nav.tsx already uses for
+    // "open-notifications"). A floating FAB kept losing this fight to
+    // whatever else was rendering in the same mobile corner (mobile-nav's
+    // own FAB, then GeminiLiveOrb) — not worth relitigating per screen size.
+    const openFromEvent = () => setOpen(true)
 
     document.addEventListener('keydown', down)
-    return () => document.removeEventListener('keydown', down)
+    window.addEventListener('open-command-palette', openFromEvent)
+    return () => {
+      document.removeEventListener('keydown', down)
+      window.removeEventListener('open-command-palette', openFromEvent)
+    }
   }, [])
 
   const runCommand = React.useCallback((command: () => unknown) => {
@@ -40,12 +51,6 @@ export function CommandPalette() {
 
   return (
     <>
-      <div 
-        className="fixed bottom-4 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:hidden"
-        onClick={() => setOpen(true)}
-      >
-        <Search className="h-5 w-5" />
-      </div>
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>

@@ -132,7 +132,7 @@ export default function SpiritualPage() {
       const response = await fetch(`/api/goals/${goal.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...goal, completed: !goal.completed }),
+        body: JSON.stringify({ ...goal, status: goal.status === 'completed' ? 'active' : 'completed' }),
       })
       if (response.ok) {
         mutateGoals()
@@ -186,64 +186,73 @@ export default function SpiritualPage() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Gratitude Journal</CardTitle>
-          <CardDescription>What are you thankful for today?</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="I'm grateful for..."
-              value={newGratitude}
-              onChange={(e) => setNewGratitude(e.target.value)}
-            />
-            <Button onClick={handleAddGratitude}>Add Gratitude</Button>
-          </div>
-          <div className="mt-6 space-y-2">
-            {gratitudes?.map((g) => (
-              <div key={g.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                <p className="text-sm">{g.content}</p>
-                <Button variant="ghost" size="icon" onClick={() => handleDeleteGratitude(g.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Spiritual Goals</CardTitle>
-          <CardDescription>Set and track your spiritual aspirations.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Input
-              placeholder="e.g., Meditate for 10 minutes"
-              value={newGoal}
-              onChange={(e) => setNewGoal(e.target.value)}
-            />
-            <Button onClick={handleAddGoal}>Add Goal</Button>
-          </div>
-          <div className="mt-6 space-y-2">
-            {goals?.map((g) => (
-              <div key={g.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                <span
-                  className={`cursor-pointer ${g.completed ? 'text-muted-foreground line-through' : ''}`}
-                  onClick={() => handleToggleGoal(g)}
-                >
-                  {g.title}
-                </span>
-                <Button variant="ghost" size="icon" onClick={() => handleDeleteGoal(g.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Spiritual</h1>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          Gratitude journaling and personal aspirations
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="liquid-glass">
+          <CardHeader>
+            <CardTitle>Gratitude Journal</CardTitle>
+            <CardDescription>What are you thankful for today?</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Textarea
+                placeholder="I'm grateful for..."
+                value={newGratitude}
+                onChange={(e) => setNewGratitude(e.target.value)}
+              />
+              <Button onClick={handleAddGratitude}>Add Gratitude</Button>
+            </div>
+            <div className="mt-6 space-y-3">
+              {gratitudes?.map((g) => (
+                <div key={g.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">
+                  <p className="text-sm">{g.content}</p>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteGratitude(g.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="liquid-glass">
+          <CardHeader>
+            <CardTitle>Spiritual Goals</CardTitle>
+            <CardDescription>Set and track your spiritual aspirations.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Input
+                placeholder="e.g., Meditate for 10 minutes"
+                value={newGoal}
+                onChange={(e) => setNewGoal(e.target.value)}
+              />
+              <Button onClick={handleAddGoal}>Add Goal</Button>
+            </div>
+            <div className="mt-6 space-y-3">
+              {goals?.map((g) => (
+                <div key={g.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">
+                  <span
+                    className={`cursor-pointer text-sm ${g.status === 'completed' ? 'text-muted-foreground line-through' : ''}`}
+                    onClick={() => handleToggleGoal(g)}
+                  >
+                    {g.title}
+                  </span>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteGoal(g.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

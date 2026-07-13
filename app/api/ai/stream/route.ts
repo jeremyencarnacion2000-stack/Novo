@@ -59,7 +59,7 @@ function selectModelForIntent(
     // TWO-MODEL REPLICATION PIPELINE (flagged for special handling)
     if (hasImages && (wantsReplication || ['CODE', 'DESIGN'].includes(intentType))) {
         return {
-            model: 'qwen-2.5-coder-32b',              // Code gen model (Step 2)
+            model: 'qwen/qwen3-32b',              // Code gen model (Step 2)
             prompt: REPLICATION_CODE_PROMPT,
             label: '🔬 Design Replicator',
             isReplication: true                         // Flag for two-model pipeline
@@ -78,19 +78,19 @@ function selectModelForIntent(
     switch (intentType) {
         case 'CODE':
             return {
-                model: 'qwen-2.5-coder-32b',
+                model: 'qwen/qwen3-32b',
                 prompt: CODE_SPECIALIST_PROMPT,
                 label: '🧠 Code Engine'
             };
         case 'QUIZ':
             return {
-                model: 'qwen-2.5-coder-32b',
+                model: 'qwen/qwen3-32b',
                 prompt: QUIZ_SPECIALIST_PROMPT,
                 label: '🎯 Quiz Engine'
             };
         case 'DESIGN':
             return {
-                model: 'qwen-2.5-coder-32b',
+                model: 'qwen/qwen3-32b',
                 prompt: DESIGN_SPECIALIST_PROMPT,
                 label: '🎨 Design Engine'
             };
@@ -109,10 +109,12 @@ export async function POST(request: NextRequest) {
         const userId = session?.user?.id || 'demo-user-id';
         let { message, history, attachments, webSearchEnabled, model: requestedModel } = await request.json();
 
-        // Sanitize requestedModel to prevent obsolete model names causing Groq errors
+        // Sanitize requestedModel to prevent obsolete model names causing Groq errors.
+        // qwen-2.5-coder-32b was decommissioned by Groq; qwen/qwen3-32b is the current
+        // replacement (already used successfully elsewhere in this codebase).
         if (requestedModel) {
-            if (requestedModel === 'qwen/qwen3-32b' || requestedModel === 'qwen3-32b' || requestedModel === 'openai/gpt-oss-120b') {
-                requestedModel = 'qwen-2.5-coder-32b';
+            if (requestedModel === 'qwen-2.5-coder-32b' || requestedModel === 'qwen3-32b' || requestedModel === 'openai/gpt-oss-120b') {
+                requestedModel = 'qwen/qwen3-32b';
             } else if (requestedModel === 'meta-llama/llama-4-scout-17b-16e-instruct') {
                 requestedModel = 'llama-3.2-11b-vision-preview';
             }
@@ -209,9 +211,9 @@ export async function POST(request: NextRequest) {
         // Step 1: Llama 3.2 Vision analyzes the image visually (non-streaming)
         // Step 2: Qwen 2.5 Coder generates code from the analysis (streaming)
         // =====================================================================
-        let apiKey = process.env.GROQ_API_KEY;
-        if (!apiKey || !apiKey.startsWith('gsk_')) {
-            apiKey = '***REMOVED***';
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), { status: 503 });
         }
 
         let visualAnalysis = '';
@@ -320,11 +322,11 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             })
         });
 
-        if (!groqResponse.ok && finalModel !== 'qwen-2.5-coder-32b') {
+        if (!groqResponse.ok && finalModel !== 'llama-3.3-70b-versatile') {
             originalErrorMsg = await groqResponse.text();
-            console.warn(`[Novo Brain] Primary model ${finalModel} failed: ${originalErrorMsg}. Retrying with Qwen 2.5 Coder fallback...`);
-            
-            finalModel = 'qwen-2.5-coder-32b';
+            console.warn(`[Novo Brain] Primary model ${finalModel} failed: ${originalErrorMsg}. Retrying with Llama 3.3 70B fallback...`);
+
+            finalModel = 'llama-3.3-70b-versatile';
             isFallbackUsed = true;
             
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -364,15 +366,49 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             });
         }
 
-        // OpenRouter Rescue Fallback: If all Groq attempts are throttled/failed,
-        // activate the free, highly available Gemini 2.0 model on OpenRouter as a fail-safe.
+        // Gemini Direct Rescue: Groq's free tier shares one account-level daily
+        // quota across ALL its models, so once it's exhausted every Groq fallback
+        // above fails together. Gemini (Google AI) is a fully independent quota
+        // pool with a far more generous free tier (15 RPM / 1500 RPD), reached
+        // here via Google's OpenAI-compatible endpoint so the exact same SSE
+        // streaming path below works unchanged.
         if (!groqResponse.ok) {
-            const openRouterKey = process.env.OPENROUTER_API_KEY || '0430f0372eff754ff338a98976ec4b09d740657e44b7993dcae10d2d6ae';
+            const geminiKey = process.env.GEMINI_API_KEY;
+            if (geminiKey) {
+                console.warn('[Novo Brain] Groq exhausted. Activating Gemini direct rescue...');
+                finalModel = 'gemini-2.0-flash';
+                isFallbackUsed = true;
+                modelLabel = '✨ Gemini (Rescate)';
+
+                groqResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${geminiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: finalModel,
+                        messages,
+                        temperature: 0.6,
+                        stream: true
+                    })
+                });
+            }
+        }
+
+        // OpenRouter Rescue Fallback: If all Groq attempts are throttled/failed,
+        // activate a cheap, always-available OpenRouter model as a last-resort
+        // fail-safe. Deliberately NOT a ":free" tier slug — OpenRouter rotates
+        // and deprecates those free model IDs frequently (this exact tier broke
+        // in production when "google/gemini-2.0-flash-lite:free" was retired),
+        // so the last-resort tier needs a stable paid model instead.
+        if (!groqResponse.ok) {
+            const openRouterKey = process.env.OPENROUTER_API_KEY;
             if (openRouterKey) {
                 console.warn('[Novo Brain] Groq completely throttled/failed. Activating OpenRouter rescue fallback...');
-                finalModel = 'google/gemini-2.0-flash-lite:free';
+                finalModel = 'openai/gpt-4o-mini';
                 isFallbackUsed = true;
-                modelLabel = '⚡ Gemini 2.0 (Rescate)';
+                modelLabel = '⚡ GPT-4o mini (Rescate)';
                 
                 groqResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
@@ -433,7 +469,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 let insideThink = false;
 
                 // Emit model metadata as first SSE event
-                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚠️ Llama 3.1 8B (Respaldo Estable)' : '⚠️ Qwen 2.5 Coder (Respaldo)') : modelLabel);
+                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚠️ Llama 3.1 8B (Respaldo Estable)' : '⚠️ Llama 3.3 70B (Respaldo)') : modelLabel);
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed } })}\n\n`));
 
                 if (isFallbackUsed) {
@@ -524,6 +560,13 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     }
                 } catch (error) {
                     console.error('[Novo Brain] Stream Error:', error);
+                    // Mirror the !groqResponse.ok branch above (line ~410) — without
+                    // this, a read error here (Groq connection drop, timeout, etc.)
+                    // closed the stream with meta already sent but zero content
+                    // chunks ever enqueued: the client saw a fully "successful"
+                    // empty stream and rendered nothing, with no error surfaced.
+                    const partial = cognitiveCoreResponse ? '\n\n' : '';
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `${partial}⚠️ La respuesta se interrumpió inesperadamente. Intenta de nuevo.` })}\n\n`));
                 } finally {
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
@@ -541,6 +584,6 @@ Generate the complete HTML/CSS code that matches this visual specification exact
 
     } catch (error) {
         console.error('[Novo Brain] POST Error:', error);
-        return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500 });
+        return new Response(JSON.stringify({ error: 'El asistente no está disponible en este momento' }), { status: 500 });
     }
 }

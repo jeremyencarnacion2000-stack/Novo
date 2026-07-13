@@ -40,29 +40,29 @@ export default function ProfilePage() {
 
     // Fetch stats from profile API (includes streak calculation)
     const fetchStats = async () => {
-      try {
-        const [profileRes, goalsRes] = await Promise.all([
-          fetch('/api/profile'),
-          fetch('/api/goals'),
-        ])
+      const [profileResult, goalsResult] = await Promise.allSettled([
+        fetch('/api/profile'),
+        fetch('/api/goals'),
+      ])
 
-        if (profileRes.ok) {
-          const data = await profileRes.json()
+      if (profileResult.status === 'fulfilled' && profileResult.value.ok) {
+        try {
+          const data = await profileResult.value.json()
           setStats(prev => ({
             ...prev,
             tasksCompleted: data.stats?.tasksCompleted || 0,
             currentStreak: data.stats?.currentStreak || 0,
             focusHours: data.stats?.focusHours || 0,
           }))
-        }
+        } catch { /* malformed response */ }
+      }
 
-        if (goalsRes.ok) {
-          const goals = await goalsRes.json()
+      if (goalsResult.status === 'fulfilled' && goalsResult.value.ok) {
+        try {
+          const goals = await goalsResult.value.json()
           const achieved = Array.isArray(goals) ? goals.filter((g: any) => g.status === 'completed').length : 0
           setStats(prev => ({ ...prev, goalsAchieved: achieved }))
-        }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error)
+        } catch { /* malformed response */ }
       }
     }
 
@@ -95,7 +95,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-3xl font-bold tracking-tight">Profile & Goals</h2>
         <Button
           variant="destructive"

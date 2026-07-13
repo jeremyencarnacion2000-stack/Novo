@@ -2,6 +2,13 @@
 // Queues failed mutations (POST/PUT/DELETE) when offline and replays them when back online
 
 const QUEUE_KEY = 'novo_sync_queue'
+export const SYNC_QUEUE_CHANGE_EVENT = 'novo:sync-queue-change'
+
+function notifyQueueChange(): void {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(SYNC_QUEUE_CHANGE_EVENT))
+    }
+}
 
 export interface QueuedRequest {
     id: string
@@ -37,17 +44,20 @@ export function enqueue(request: Omit<QueuedRequest, 'id' | 'timestamp'>): void 
     })
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
     console.log(`[SyncQueue] Queued ${request.method} ${request.url} (${queue.length} pending)`)
+    notifyQueueChange()
 }
 
 // Remove a single item by id
 function dequeue(id: string): void {
     const queue = getQueue().filter((item) => item.id !== id)
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
+    notifyQueueChange()
 }
 
 // Clear the entire queue
 export function clearQueue(): void {
     localStorage.removeItem(QUEUE_KEY)
+    notifyQueueChange()
 }
 
 // Replay all queued requests

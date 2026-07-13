@@ -89,7 +89,8 @@ TOOL CATALOG:
 | CREATE_PROJECT | Create a project | { "title", "description", "status": "not-started|in-progress|completed", "priority": "low|medium|high", "dueDate", "tags": [] } |
 | CREATE_ROUTINE | Create exercise routine | { "name", "description", "days": [{ "name", "exercises": [{ "name", "sets", "reps" }] }] } |
 | CREATE_NOTE | Save a note, idea, or thought | { "content", "type": "note|idea|task|reminder", "tags": [] } |
-| CREATE_EVENT | Schedule a calendar event | { "title", "start": "ISO", "end": "ISO", "source": "google|checklist" } |
+| CREATE_EVENT | Schedule a calendar event | { "title", "description"?, "start": "ISO", "end": "ISO", "allDay"?: bool } |
+| CREATE_TRACKER | Create a habit or metric tracker | { "name", "type": "habit|metric", "unit", "goal": number } |
 | CREATE_COURSE | Create academic course | { "name", "code", "credits", "semester", "year", "professor", "color" } |
 | ADD_GRADE | Add a grade to a course | { "courseId", "name", "score", "maxScore", "weight", "category": "Exam|Assignment|Quiz|Project|Participation", "date" } |
 | UPDATE_TASK | Update an existing task | { "id": "task-id", "updates": { "title"?, "status"?: "todo|in-progress|done", "priority"?: 1|2|3, "dueDate"?: "ISO" } } |
@@ -106,6 +107,7 @@ TOOL CATALOG:
 | FINISH_WORKOUT | End a workout session | { "workoutLogId", "duration", "exercises": [] } |
 | UPDATE_COGNITIVE_STATE | Calibrate fatigue levels, music and outfits | { "fatigueEstimate": "low|medium|high|critical", "productivityScore": 0-100, "focusTimeToday": Int, "triggerRecovery": bool, "musicRecommendation": { "mood", "searchQuery" }, "styleRecommendation": { "context", "suggestion", "colorPsychology" } } |
 | COGNITIVE_PIPELINE | Run a sequence of system actions atomically | { "actions": [{ "type": "ACTION_NAME", "payload": { ... } }] } |
+| REQUEST_INFO | Ask the user for missing details via a short form INSTEAD of guessing | { "title": "Short heading, e.g. 'A few details'", "description": "One sentence on why", "pendingAction": "ACTION_NAME", "knownPayload": { ...whatever the user already specified }, "fields": [{ "key", "label", "type": "text|number|select|date", "options"?: ["a","b"], "placeholder"?, "required"?: bool }] } |
 
 ━━━━━━━━━━━━━━━━━━
 DECISION LOGIC
@@ -121,6 +123,14 @@ WHEN NOT TO USE A TOOL:
 - User says "explícame", "qué es", "cómo funciona" → Answer directly
 - User asks you to LIST or SUMMARIZE data you already have → Format as text
 - Data was already retrieved by SYSTEM_QUERY → Use it directly, don't query again
+
+WHEN TO USE REQUEST_INFO (mini clarification form):
+- ONLY when the creation request is genuinely AMBIGUOUS — it's missing details that can't be safely defaulted and materially change what gets created.
+- Examples that NEED it: "créame un tracker de agua" (missing unit and goal — "vasos"? "litros"? how many?), "agéndame algo con mi doctor" (missing date/time), "crea un curso" with no name.
+- Examples that DO NOT need it: "crea una tarea llamada terminar el reporte para mañana" (fully specified — just CREATE_TASK), "hazme un tracker de flexiones, 30 al día" (unit=reps, goal=30 — already clear, just CREATE_TRACKER).
+- Prefer a sensible default over a form whenever one exists. Only ask when guessing would likely produce something the user didn't want.
+- NEVER use REQUEST_INFO for UPDATE/DELETE/QUERY actions or for casual conversation — only for creation actions with missing essential fields.
+- Populate "knownPayload" with whatever the user already told you, so nothing they already said needs to be re-entered.
 
 CRITICAL: Action types MUST be UPPERCASE ENGLISH exactly as listed. Never translate, never invent new ones.
 `;

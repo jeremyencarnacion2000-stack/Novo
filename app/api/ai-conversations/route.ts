@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
 
     const conversations = await prisma.aIConversation.findMany({
       where: { userId: session.user.id },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { updatedAt: 'desc' },
+      take: 200
     })
 
     return NextResponse.json(conversations)

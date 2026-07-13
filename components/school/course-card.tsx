@@ -26,7 +26,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
 
     return (
         <Card
-            className="liquid-glass hover:shadow-md transition-shadow cursor-pointer"
+            className="liquid-glass-hover hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => onClick?.(course)}
         >
             <CardHeader className="pb-3">
@@ -57,7 +57,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                     </div>
                     <div className="flex items-center gap-1">
                         <Button
-                            data-blendy-from={`grade-${course.id}`}
+                            data-flip-from={`grade-${course.id}`}
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {
@@ -68,7 +68,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                             <Plus className="h-4 w-4" />
                         </Button>
                         <Button
-                            data-blendy-from={`course-${course.id}`}
+                            data-flip-from={`course-${course.id}`}
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {

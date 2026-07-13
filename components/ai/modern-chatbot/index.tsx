@@ -1,34 +1,61 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { ChatbotProvider, useChatbot } from './context';
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useChatbot } from './context';
 import { Sidebar } from './sidebar';
 import { ChatArea } from './chat-area';
-import { DesktopHero, VoiceListeningOverlay } from './welcome-hero';
+import { ChatInput } from './chat-input';
+import { DesktopHero, MobileHero, VoiceListeningOverlay } from './welcome-hero';
 import {
-  Sparkles, Maximize2, Minimize2, Plus, MessageSquare,
+  Maximize2, Minimize2, Plus,
   X, Home, PanelLeft, Brain
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 
-export function ModernChatbot() {
-    return (
-        <ChatbotProvider>
-            <ChatbotContent />
-        </ChatbotProvider>
-    );
+interface ModernChatbotProps {
+    // Provided when this is rendered inside the mobile fullscreen chat sheet
+    // (components/mobile-nav.tsx) instead of the /ai desktop page — the
+    // "back" affordance should close that sheet, not navigate to "/".
+    onMobileClose?: () => void;
 }
 
-function ChatbotContent() {
-    const { createConversation, messages, streamingMessage } = useChatbot();
+// No <ChatbotProvider> here on purpose — one already wraps the whole app in
+// app/client-layout.tsx's AppProviders. This used to nest a second, isolated
+// provider instance, which silently disconnected /ai's conversation state
+// from other useChatbot() consumers. Relying on the single app-root provider
+// is what lets the mobile chat sheet below share real state with the rest of
+// the app.
+export function ModernChatbot({ onMobileClose }: ModernChatbotProps = {}) {
+    return <ChatbotContent onMobileClose={onMobileClose} />;
+}
+
+function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
+    const { createConversation, sendMessage, messages, streamingMessage } = useChatbot();
     const containerRef = useRef<HTMLDivElement>(null)
+    const composerRef = useRef<HTMLDivElement>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [isVoiceListening, setIsVoiceListening] = useState(false)
 
     const isChatActive = messages.length > 0 || streamingMessage !== null
+
+    // The composer is one persistent element regardless of hero/chat state
+    // (matching the PulseChat reference — a single floating input, not a
+    // different-looking one embedded in the hero). ChatArea's own scroll
+    // container reads --composer-h to size its bottom safe-area padding;
+    // setting it here on containerRef works because CSS custom properties
+    // inherit down through descendants regardless of component boundaries.
+    useLayoutEffect(() => {
+        const composer = composerRef.current
+        const container = containerRef.current
+        if (!composer || !container) return
+        const apply = () => container.style.setProperty('--composer-h', `${composer.offsetHeight}px`)
+        apply()
+        const ro = new ResizeObserver(apply)
+        ro.observe(composer)
+        return () => ro.disconnect()
+    }, [])
 
     const toggleFullscreen = useCallback(async () => {
         if (!containerRef.current) return
@@ -50,11 +77,23 @@ function ChatbotContent() {
         window.dispatchEvent(new CustomEvent('toggle-gemini-live'))
     }, [])
 
+    // Sync with the real orb state instead of trusting the local toggle to
+    // stay correct on its own (same pattern chat-area.tsx already uses) — if
+    // the real connection fails (denied mic permission, etc.) the hero's
+    // voice CTA should fall back to idle, not stay stuck on "listening".
+    useEffect(() => {
+        const handleStateChange = (e: any) => {
+            const state = e.detail?.state || 'idle'
+            setIsVoiceListening(state === 'listening' || state === 'speaking')
+        }
+        window.addEventListener('gemini-live-state-change', handleStateChange)
+        return () => window.removeEventListener('gemini-live-state-change', handleStateChange)
+    }, [])
+
     return (
-        <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[#060608]">
-            {/* Ambient glows */}
-            <div className="absolute top-[-10%] left-[-15%] w-[50%] h-[50%] rounded-full bg-primary/8 blur-[130px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '10s' }} />
-            <div className="absolute bottom-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full bg-violet-500/5 blur-[120px] pointer-events-none z-0" />
+        <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-black">
+            {/* PulseChat's ambient bottom glow — the dominant background cue */}
+            <div className="absolute bottom-0 left-0 right-0 h-[65vh] bg-gradient-to-t from-[#1b4b8a] via-[#0b1b36] to-transparent pointer-events-none -z-0 opacity-80" />
 
             {/* Voice Overlay */}
             <AnimatePresence>
@@ -116,21 +155,29 @@ function ChatbotContent() {
                 {/* ── Main area ─────────────────────────────────────────── */}
                 <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
 
-                    {/* Header bar */}
-                    <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#060608]/90 backdrop-blur-xl z-30">
+                    {/* Header — no bar/divider, just the floating buttons over
+                        the same gradient background as the rest of the page */}
+                    <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 z-30">
                         <div className="flex items-center gap-2.5">
                             {/* Drawer toggle */}
                             <button
                                 onClick={() => setIsDrawerOpen(true)}
                                 className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/[0.05] transition-all duration-200"
-                                title="Open history"
+                                title="Ver historial"
                             >
                                 <PanelLeft className="w-4 h-4" />
                             </button>
-                            {/* Back on mobile */}
-                            <Link href="/" className="md:hidden p-1.5 text-white/30 hover:text-white transition-colors">
-                                <Home className="w-4 h-4" />
-                            </Link>
+                            {/* Back on mobile — closes the flip sheet if we're inside
+                                one, otherwise (direct /ai visit) navigates home */}
+                            {onMobileClose ? (
+                                <button onClick={onMobileClose} className="md:hidden p-1.5 text-white/30 hover:text-white transition-colors">
+                                    <Home className="w-4 h-4" />
+                                </button>
+                            ) : (
+                                <Link href="/" className="md:hidden p-1.5 text-white/30 hover:text-white transition-colors">
+                                    <Home className="w-4 h-4" />
+                                </Link>
+                            )}
                             <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center">
                                     <Brain className="w-3.5 h-3.5 text-primary" />
@@ -146,12 +193,12 @@ function ChatbotContent() {
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white/50 hover:text-white hover:bg-white/[0.07] hover:border-white/15 text-xs font-medium transition-all duration-200"
                             >
                                 <Plus className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">New chat</span>
+                                <span className="hidden sm:inline">Nuevo chat</span>
                             </button>
                             {/* Cognitive mode pill */}
                             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/5 border border-primary/10">
                                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                                <span className="text-[10px] font-bold tracking-tight text-primary uppercase">Cognitive Mode</span>
+                                <span className="text-[10px] font-bold tracking-tight text-primary uppercase">Modo Cognitivo</span>
                             </div>
                             {/* Fullscreen */}
                             <button
@@ -166,7 +213,28 @@ function ChatbotContent() {
                     {/* Hero or Chat */}
                     <AnimatePresence mode="wait">
                         {!isChatActive ? (
-                            <DesktopHero key="hero" />
+                            // Two heroes, gated by CSS breakpoint (not a JS width
+                            // check, to avoid hydration mismatch) — previously
+                            // DesktopHero rendered unconditionally here regardless
+                            // of viewport, and MobileHero lived unreachably inside
+                            // ChatArea (which only mounts once isChatActive is
+                            // already true, so its own !isChatActive branch could
+                            // never fire). Real mobile users never saw MobileHero.
+                            <div key="hero" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                                <div className="md:hidden flex-1 flex flex-col min-h-0">
+                                    <MobileHero
+                                        onChipClick={(text) => {
+                                            createConversation();
+                                            setTimeout(() => sendMessage(text), 80);
+                                        }}
+                                        onVoiceClick={toggleVoice}
+                                        isVoiceListening={isVoiceListening}
+                                    />
+                                </div>
+                                <div className="hidden md:flex flex-1 flex-col min-h-0">
+                                    <DesktopHero />
+                                </div>
+                            </div>
                         ) : (
                             <motion.div
                                 key="chat"
@@ -179,6 +247,17 @@ function ChatbotContent() {
                             </motion.div>
                         )}
                     </AnimatePresence>
+
+                    {/* Persistent composer — one input surface for both the hero
+                        and active-chat states, docked at the bottom always. */}
+                    <div ref={composerRef} className="flex-shrink-0 z-20">
+                        <div
+                            className="p-3 pb-6 md:pb-3 bg-gradient-to-t from-black via-black/95 to-transparent border-t border-white/5"
+                            style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
+                        >
+                            <ChatInput variant="bottom" />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

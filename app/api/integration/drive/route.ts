@@ -107,17 +107,17 @@ export async function POST(req: NextRequest) {
         // Export to Google Drive
         const uploadResult = await driveService.exportWorkspaceBackup(backupPayload);
 
-        // Record activity history (if table exists) or log
+        // Record activity history
         try {
-            await prisma.activityHistory?.create({
+            await prisma.activityHistory.create({
                 data: {
                     userId: session.user.id,
-                    action: 'backup_drive',
-                    details: `Saved backup to Google Drive: ${uploadResult.name}`,
+                    activity: `Saved backup to Google Drive: ${uploadResult.name}`,
+                    date: new Date().toISOString(),
                 }
             });
         } catch {
-            // Table might not support it, ignore
+            // Non-critical — the backup itself already succeeded
         }
 
         return NextResponse.json({

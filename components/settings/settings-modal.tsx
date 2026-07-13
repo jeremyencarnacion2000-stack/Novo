@@ -23,7 +23,7 @@ export function SettingsModal() {
                 style={{ viewTransitionName: 'settings-window' } as React.CSSProperties}
                 className={cn(
                 "max-w-4xl md:max-w-5xl w-full md:w-[94vw] h-[100dvh] md:h-[85vh] p-0 shadow-2xl outline-none",
-                "!flex flex-col overflow-hidden rounded-none md:rounded-[32px]",
+                "!flex flex-col overflow-hidden rounded-none md:rounded-[34px]",
                 "!bg-black/95 md:!bg-black/80 dark:!bg-black/95 md:dark:!bg-black/80 backdrop-blur-2xl border-0 md:border md:border-white/10 liquid-glass-premium"
             )}>
                 {/* Content Layer (Sharp) */}

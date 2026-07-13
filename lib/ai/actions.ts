@@ -24,6 +24,8 @@ export type AIActionType =
     | 'DELETE_GRADE'
     | 'CREATE_CHECKLIST'
     | 'CREATE_HABIT'
+    | 'CREATE_EVENT'
+    | 'CREATE_TRACKER'
     | 'GENERATE_FILE'
     | 'UPDATE_COGNITIVE_STATE'
     | 'COGNITIVE_PIPELINE';
@@ -147,6 +149,27 @@ export interface CreateNoteAction extends BaseAction {
         title: string;
         content: string;
         tags: string[];
+    };
+}
+
+export interface CreateEventAction extends BaseAction {
+    type: 'CREATE_EVENT';
+    payload: {
+        title: string;
+        description?: string;
+        start: string; // ISO
+        end: string; // ISO
+        allDay?: boolean;
+    };
+}
+
+export interface CreateTrackerAction extends BaseAction {
+    type: 'CREATE_TRACKER';
+    payload: {
+        name: string;
+        type: 'habit' | 'metric';
+        unit: string;
+        goal: number;
     };
 }
 
@@ -340,6 +363,8 @@ export type AIAction =
     | DeleteAllTasksAction
     | CreateNoteAction
     | UpdateNoteAction
+    | CreateEventAction
+    | CreateTrackerAction
     | AnalyzeProgressAction
     | SystemQueryAction
     | CreateProjectAction

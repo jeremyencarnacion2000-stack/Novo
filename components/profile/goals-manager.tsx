@@ -101,7 +101,7 @@ export function GoalsManager() {
 
                 <div className="space-y-2">
                     {filteredGoals.map(goal => (
-                        <div key={goal.id} className="flex items-center gap-3 p-3 bg-card border rounded-lg group">
+                        <div key={goal.id} className="flex items-center gap-3 p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300 group">
                             <button onClick={() => toggleStatus(goal)}>
                                 {goal.status === 'completed' ? (
                                     <CheckCircle className="h-5 w-5 text-green-500" />

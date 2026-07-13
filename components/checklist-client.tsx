@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Trash2, Calendar, RefreshCw, Briefcase, GraduationCap, ListChecks, CheckSquare } from "lucide-react"
 import type { ChecklistItem } from "@/types/checklist"
 import { DataIntegrator, type IntegratedTask } from "@/lib/data-integrator"
-import { novoToast } from "@/components/ui/novo-toast"
+import { sileo } from "@/lib/sileo-bell"
 import { TiltCard } from "@/components/ui/tilt-card"
 
 export default function ChecklistClient() {
@@ -88,7 +88,7 @@ export default function ChecklistClient() {
       const previousItems = items
       setItems(prev => [...prev, optimisticTask])
       setNewItemText("")
-      novoToast.success({ title: "Task Added", description: "Task successfully registered to your daily queue." })
+      sileo.success({ title: "Task Added", description: "Task successfully registered to your daily queue." })
 
       try {
         const createdTask = await DataIntegrator.createManualTask(session.user.id, {
@@ -105,7 +105,7 @@ export default function ChecklistClient() {
       } catch (error) {
         console.error('Error adding task:', error)
         setItems(previousItems)
-        novoToast.warning({ title: "Error", description: "Failed to add task." })
+        sileo.warning({ title: "Error", description: "Failed to add task." })
       }
     }
   }
@@ -123,9 +123,8 @@ export default function ChecklistClient() {
       window.dispatchEvent(new CustomEvent('cognitive:task-completed', {
         detail: { taskId: task.id, text: task.text }
       }));
-      novoToast.cognitive({
-        title: "Execution Momentum Increased",
-        badge: "+12%",
+      sileo.action({
+        title: "Execution Momentum Increased (+12%)",
         description: "Three consecutive priority tasks completed. Recommendation: Maintain your current focus window for another 18 minutes.",
         duration: 8000,
       });
@@ -148,17 +147,17 @@ export default function ChecklistClient() {
       const previousItems = items
       // Optimistic delete
       setItems(prev => prev.filter(item => item.id !== id))
-      novoToast.info({ title: "Task Deleted", description: "Task successfully deleted." })
+      sileo.info({ title: "Task Deleted", description: "Task successfully deleted." })
 
       try {
         await DataIntegrator.deleteManualTask(session.user.id, id)
       } catch (error) {
         console.error('Error deleting task:', error)
         setItems(previousItems)
-        novoToast.warning({ title: "Error", description: "Failed to delete task." })
+        sileo.warning({ title: "Error", description: "Failed to delete task." })
       }
     } else {
-      novoToast.info({ title: "Note", description: "Can't delete integrated tasks here. Manage them in their respective modules." })
+      sileo.info({ title: "Note", description: "Can't delete integrated tasks here. Manage them in their respective modules." })
     }
   }
 
@@ -305,7 +304,7 @@ export default function ChecklistClient() {
             {items.map(item => (
               <TiltCard
                 key={item.id}
-                className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"
               >
                 <div className="flex items-center gap-3">
                   <Checkbox

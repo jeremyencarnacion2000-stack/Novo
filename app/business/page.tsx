@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { GoogleContacts } from '@/components/business/google-contacts'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 import { DealsPipeline } from '@/components/business/deals-pipeline'
 import { BusinessStats } from '@/components/business/business-stats'
 
@@ -48,6 +49,19 @@ export default function BusinessPage() {
   const [contentIdeas, setContentIdeas] = useState<BusinessContentIdea[]>([])
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
   const [contentDialogOpen, setContentDialogOpen] = useState(false)
+
+  const closeClientFlip = useModalFlip('btn-add-client', clientDialogOpen)
+  const closeContentFlip = useModalFlip('btn-add-content', contentDialogOpen)
+
+  const handleClientDialogChange = (o: boolean) => {
+    if (!o) closeClientFlip(() => setClientDialogOpen(false))
+    else setClientDialogOpen(true)
+  }
+
+  const handleContentDialogChange = (o: boolean) => {
+    if (!o) closeContentFlip(() => setContentDialogOpen(false))
+    else setContentDialogOpen(true)
+  }
   const [newClientName, setNewClientName] = useState('')
   const [newClientStatus, setNewClientStatus] = useState<'active' | 'proposal' | 'inactive'>('proposal')
   const [newContentTitle, setNewContentTitle] = useState('')
@@ -97,7 +111,7 @@ export default function BusinessPage() {
         const newClient = await response.json()
         setClients(prev => [newClient, ...prev])
         setNewClientName('')
-        setClientDialogOpen(false)
+        handleClientDialogChange(false)
       }
     } catch (error) {
       console.error('Error adding client:', error)
@@ -122,7 +136,7 @@ export default function BusinessPage() {
         const newContent = await response.json()
         setContentIdeas(prev => [newContent, ...prev])
         setNewContentTitle('')
-        setContentDialogOpen(false)
+        handleContentDialogChange(false)
       }
     } catch (error) {
       console.error('Error adding content:', error)
@@ -177,13 +191,13 @@ export default function BusinessPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setClientDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
-            <Users className="h-4 w-4 mr-2" />
-            Add Client
+          <Button data-flip-from="btn-add-client" onClick={() => setClientDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
+            <Users data-shared-item="icon" className="h-4 w-4 mr-2" />
+            <span data-shared-item="text">Add Client</span>
           </Button>
-          <Button onClick={() => setContentDialogOpen(true)} className="w-full sm:w-auto">
-            <FileText className="h-4 w-4 mr-2" />
-            Add Content
+          <Button data-flip-from="btn-add-content" onClick={() => setContentDialogOpen(true)} className="w-full sm:w-auto">
+            <FileText data-shared-item="icon" className="h-4 w-4 mr-2" />
+            <span data-shared-item="text">Add Content</span>
           </Button>
         </div>
       </div>
@@ -209,7 +223,7 @@ export default function BusinessPage() {
                 <p className="text-muted-foreground text-center py-8">No clients yet</p>
               ) : (
                 clients.map((client) => (
-                  <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={client.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">
                     <div className="flex items-center gap-3">
                       <div className={`h-3 w-3 rounded-full ${getStatusColor(client.status)}`} />
                       <div>
@@ -247,7 +261,7 @@ export default function BusinessPage() {
                 <p className="text-muted-foreground text-center py-8">No content ideas yet</p>
               ) : (
                 contentIdeas.map((content) => (
-                  <div key={content.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={content.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">
                     <div className="flex items-center gap-3">
                       <div className={`h-3 w-3 rounded-full ${getStatusColor(content.status)}`} />
                       <div>
@@ -274,10 +288,13 @@ export default function BusinessPage() {
 
       <GoogleContacts />
 
-      <Dialog open={clientDialogOpen} onOpenChange={setClientDialogOpen}>
-        <DialogContent>
+      <Dialog open={clientDialogOpen} onOpenChange={handleClientDialogChange}>
+        <DialogContent data-flip-to="btn-add-client">
           <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Users data-shared-item="icon" className="h-5 w-5" />
+              <span data-shared-item="text">Add Client</span>
+            </DialogTitle>
             <DialogDescription>Add a new business client to track</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -305,7 +322,7 @@ export default function BusinessPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClientDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleClientDialogChange(false)}>
               Cancel
             </Button>
             <Button onClick={handleAddClient}>Add Client</Button>
@@ -313,10 +330,13 @@ export default function BusinessPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={contentDialogOpen} onOpenChange={setContentDialogOpen}>
-        <DialogContent>
+      <Dialog open={contentDialogOpen} onOpenChange={handleContentDialogChange}>
+        <DialogContent data-flip-to="btn-add-content">
           <DialogHeader>
-            <DialogTitle>Add Content Idea</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText data-shared-item="icon" className="h-5 w-5" />
+              <span data-shared-item="text">Add Content</span>
+            </DialogTitle>
             <DialogDescription>Add a new content creation idea</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -353,7 +373,7 @@ export default function BusinessPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setContentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleContentDialogChange(false)}>
               Cancel
             </Button>
             <Button onClick={handleAddContent}>Add Content</Button>

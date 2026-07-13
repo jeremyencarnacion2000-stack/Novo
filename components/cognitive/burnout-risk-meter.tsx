@@ -40,9 +40,16 @@ const FACTORS = [
   { key: 'overduePressure', label: 'Overdue Pressure', desc: 'Unresolved deadline count' },
 ];
 
+const clampPct = (n: number) => Math.min(100, Math.max(0, n));
+
 export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, overduePressure }: BurnoutRiskMeterProps) {
+  risk = clampPct(risk);
   const level = getRiskLevel(risk);
-  const factors = { workloadDensity, focusFragmentation, overduePressure };
+  const factors = {
+    workloadDensity: clampPct(workloadDensity),
+    focusFragmentation: clampPct(focusFragmentation),
+    overduePressure: clampPct(overduePressure),
+  };
 
   return (
     <motion.div
@@ -53,8 +60,8 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-white/50">Burnout Risk</h3>
-          <p className="text-[10px] text-white/25 mt-0.5 tracking-wide">workload · fragmentation · pressure</p>
+          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-foreground/50">Burnout Risk</h3>
+          <p className="text-[10px] text-foreground/25 mt-0.5 tracking-wide">workload · fragmentation · pressure</p>
         </div>
         <div className="flex items-center gap-2.5">
           <span
@@ -74,7 +81,7 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
 
       {/* Main gauge bar — glass panel with neon fill */}
       <div
-        className="relative h-3.5 rounded-full overflow-hidden mb-1.5 border border-white/[0.06]"
+        className="relative h-3.5 rounded-full overflow-hidden mb-1.5 border border-foreground/[0.06]"
         style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}
       >
         {/* Zone gradient track */}
@@ -85,27 +92,29 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
           }}
         />
 
-        {/* Animated neon fill */}
+        {/* Animated neon fill — scaleX (GPU-only) instead of width (layout) */}
         <motion.div
-          className={cn('absolute inset-y-0 left-0 rounded-full', level.bg)}
-          initial={{ width: 0 }}
-          animate={{ width: `${risk}%` }}
+          className={cn('absolute inset-y-0 left-0 w-full rounded-full', level.bg)}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: risk / 100 }}
           transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1], delay: 0.6 }}
-          style={{ boxShadow: `0 0 12px ${level.glow}, 0 0 20px ${level.glow}` }}
+          style={{ transformOrigin: 'left', boxShadow: `0 0 12px ${level.glow}, 0 0 20px ${level.glow}` }}
         />
 
-        {/* Glowing tip marker */}
+        {/* Glowing tip marker — translateX (GPU-only) instead of left (layout).
+            y stays inside Framer's own transform (not the Tailwind -translate-y-1/2
+            class) because Framer's inline transform would otherwise clobber it. */}
         <motion.div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 shadow-lg"
+          className="absolute top-1/2 left-0 w-4 h-4 rounded-full bg-white border-2 shadow-lg"
           style={{ borderColor: level.color, boxShadow: `0 0 10px ${level.glow}` }}
-          initial={{ left: '0%' }}
-          animate={{ left: `calc(${risk}% - 8px)` }}
+          initial={{ x: 0, y: '-50%' }}
+          animate={{ x: `calc(${risk}% - 8px)`, y: '-50%' }}
           transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1], delay: 0.6 }}
         />
       </div>
 
       {/* Zone labels */}
-      <div className="flex justify-between text-[8px] text-white/20 font-bold tracking-wider mb-5 px-0.5">
+      <div className="flex justify-between text-[8px] text-foreground/20 font-bold tracking-wider mb-5 px-0.5">
         <span>SAFE</span><span>MODERATE</span><span>WARNING</span><span>CRITICAL</span>
       </div>
 
@@ -117,14 +126,14 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
           return (
             <div key={key} className="flex items-center gap-3 group">
               <div className="w-28 flex-shrink-0">
-                <p className="text-[9px] font-bold text-white/40 uppercase tracking-wide truncate group-hover:text-white/60 transition-colors">
+                <p className="text-[9px] font-bold text-foreground/40 uppercase tracking-wide truncate group-hover:text-foreground/60 transition-colors">
                   {label}
                 </p>
               </div>
 
               {/* Glass bar track */}
               <div
-                className="flex-1 h-2 rounded-full overflow-hidden border border-white/[0.05]"
+                className="flex-1 h-2 rounded-full overflow-hidden border border-foreground/[0.05]"
                 style={{ background: 'rgba(255,255,255,0.02)' }}
               >
                 <motion.div

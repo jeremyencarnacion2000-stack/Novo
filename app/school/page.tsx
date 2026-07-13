@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { blendy } from '@/lib/blendy';
+import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -10,8 +10,12 @@ import { CourseCard } from '@/components/school/course-card';
 import { CourseDialog } from '@/components/school/course-dialog';
 import { GradeDialog } from '@/components/school/grade-dialog';
 import { GPADisplay } from '@/components/school/gpa-display';
-import { SchoolAnalytics } from '@/components/school/school-analytics';
 import { useToast } from '@/hooks/use-toast';
+
+const SchoolAnalytics = dynamic(
+  () => import('@/components/school/school-analytics').then((mod) => mod.SchoolAnalytics),
+  { ssr: false }
+);
 import { calculateGPA } from '@/lib/gpa-calculator';
 
 import { Course, Grade } from '@/types/school';
@@ -28,6 +32,7 @@ export default function SchoolPage() {
   const [editingCourse, setEditingCourse] = useState<Course | undefined>();
   const [selectedCourse, setSelectedCourse] = useState<Course | undefined>();
   const [educationFilter, setEducationFilter] = useState<string>('all');
+  const [schoolTab, setSchoolTab] = useState<string>('courses');
 
   // Fetch courses
   const fetchCourses = async () => {
@@ -151,41 +156,35 @@ export default function SchoolPage() {
     setEditingCourse(undefined);
   };
 
+  // The dialogs fire their own modalFlip.toggle() once mounted (calling it
+  // here raced the render: the flip target didn't exist yet, so it always
+  // fell back to a plain reveal with no animation).
   const handleEditCourse = (course: Course) => {
     setEditingCourse(course);
-    blendy.toggle(`course-${course.id}`);
     setCourseDialogOpen(true);
   };
 
   const handleOpenNewCourse = () => {
     setEditingCourse(undefined);
-    blendy.toggle('btn-add-course');
     setCourseDialogOpen(true);
   };
 
   const handleAddGradeClick = (course: Course) => {
     setSelectedCourse(course);
-    blendy.toggle(`grade-${course.id}`);
     setGradeDialogOpen(true);
   };
 
+  // CourseDialog/GradeDialog already play their own return flight before
+  // calling these (via useModalFlip) — wrapping again here would
+  // double-untoggle and delay the unmount by a second, redundant animation.
   const handleCloseCourseDialog = () => {
-    const key = editingCourse ? `course-${editingCourse.id}` : 'btn-add-course';
-    blendy.untoggle(key, () => {
-      setCourseDialogOpen(false);
-      setEditingCourse(undefined);
-    });
+    setCourseDialogOpen(false);
+    setEditingCourse(undefined);
   };
 
   const handleCloseGradeDialog = () => {
-    if (selectedCourse) {
-      blendy.untoggle(`grade-${selectedCourse.id}`, () => {
-        setGradeDialogOpen(false);
-        setSelectedCourse(undefined);
-      });
-    } else {
-      setGradeDialogOpen(false);
-    }
+    setGradeDialogOpen(false);
+    setSelectedCourse(undefined);
   };
 
   // Calculate GPAs
@@ -238,28 +237,67 @@ export default function SchoolPage() {
       </ScrollReveal>
 
       {/* Tabs */}
-      <Tabs defaultValue="courses" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-full sm:max-w-[400px]">
-          <TabsTrigger value="courses">Courses</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+      <Tabs value={schoolTab} onValueChange={setSchoolTab} className="w-full">
+        <TabsList className="relative grid w-full grid-cols-2 max-w-full sm:max-w-[400px] bg-foreground/5 border border-foreground/5 rounded-full p-1 h-11">
+          <TabsTrigger
+            value="courses"
+            className="relative h-9 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
+          >
+            {schoolTab === 'courses' && (
+              <motion.div
+                layoutId="active-school-tab"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
+                transition={springConfig.smooth}
+              />
+            )}
+            <span className="relative z-10">Courses</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="analytics"
+            className="relative h-9 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
+          >
+            {schoolTab === 'analytics' && (
+              <motion.div
+                layoutId="active-school-tab"
+                className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
+                transition={springConfig.smooth}
+              />
+            )}
+            <span className="relative z-10">Analytics</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Courses Tab */}
         <TabsContent value="courses" className="space-y-4">
           <div className="flex flex-col md:flex-row justify-between gap-4">
             <Tabs value={educationFilter} onValueChange={setEducationFilter} className="w-full md:w-auto">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="university">University</TabsTrigger>
-                <TabsTrigger value="high_school">High School</TabsTrigger>
+              <TabsList className="relative bg-foreground/5 border border-foreground/5 rounded-full p-1 h-11">
+                {(['all', 'university', 'high_school'] as const).map((val) => (
+                  <TabsTrigger
+                    key={val}
+                    value={val}
+                    className="relative h-9 px-4 rounded-full text-xs font-semibold data-[state=active]:bg-transparent data-[state=active]:text-foreground transition-colors duration-300"
+                  >
+                    {educationFilter === val && (
+                      <motion.div
+                        layoutId="active-education-filter-tab"
+                        className="absolute inset-0 bg-foreground/10 border border-foreground/10 rounded-full z-0"
+                        transition={springConfig.smooth}
+                      />
+                    )}
+                    <span className="relative z-10">
+                      {val === 'all' ? 'All' : val === 'university' ? 'University' : 'High School'}
+                    </span>
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
             <Button
-              data-blendy-from="btn-add-course"
+              data-flip-from="btn-add-course"
               onClick={handleOpenNewCourse}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Course
+              <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
+              <span data-shared-item="text">Add Course</span>
             </Button>
           </div>
 

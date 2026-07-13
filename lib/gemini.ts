@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { ConversationMessage } from '@/types/ai';
 
-// Use the key provided by the user
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY env var is not set')
 
 export interface GeminiFunctionCall {
   name: string;

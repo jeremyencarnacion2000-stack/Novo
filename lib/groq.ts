@@ -8,6 +8,11 @@ export interface GroqAPIResponse {
         };
         finish_reason: string;
     }>;
+    usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+    };
 }
 
 export class GroqAPIClient {
@@ -28,9 +33,9 @@ export class GroqAPIClient {
         context: string,
         history: ConversationMessage[] = [],
         systemPrompt?: string,
-        model: string = 'qwen-2.5-coder-32b',
+        model: string = 'qwen/qwen3-32b',
         temperature: number = 0.7
-    ): Promise<{ content: string }> {
+    ): Promise<{ content: string; tokensIn?: number; tokensOut?: number }> {
         const apiKey = process.env.GROQ_API_KEY;
 
         console.log('Groq API: Key present:', !!apiKey);
@@ -106,7 +111,11 @@ export class GroqAPIClient {
 
             console.log('Groq API: Response received, length:', content.length);
 
-            return { content };
+            return {
+                content,
+                tokensIn: data.usage?.prompt_tokens,
+                tokensOut: data.usage?.completion_tokens,
+            };
         } catch (error) {
             console.error('Groq API error:', error);
             throw error;

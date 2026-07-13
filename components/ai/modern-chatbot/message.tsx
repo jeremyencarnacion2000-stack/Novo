@@ -1,11 +1,22 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { Bot, User, Copy, Check, Download, Eye, EyeOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+
+const SyntaxHighlighter = dynamic(
+    () => Promise.all([
+        import('react-syntax-highlighter'),
+        import('react-syntax-highlighter/dist/esm/styles/prism'),
+    ]).then(([{ Prism }, { oneDark }]) => {
+        return function HighlighterWithStyle(props: any) {
+            return <Prism {...props} style={oneDark} />;
+        };
+    }),
+    { ssr: false, loading: () => <div className="animate-pulse bg-white/[0.03] rounded-lg h-24 m-4" /> }
+);
 import type { Message as MessageType } from './types';
 import { MessageActions } from './message-actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,6 +25,7 @@ import { useSession } from 'next-auth/react';
 import { AnalysisBlock } from './blocks/analysis-block';
 import { PlanBlock } from './blocks/plan-block';
 import { ConfirmationBlock } from './blocks/confirmation-block';
+import { ClarificationFormBlock } from './blocks/clarification-form-block';
 import { ResultBlock } from './blocks/result-block';
 import { DocumentViewer } from './blocks/document-viewer';
 import { CognitiveUpdateCard } from './blocks/cognitive-update-card';
@@ -121,7 +133,6 @@ const CodeBlock = ({ language, value }: { language: string; value: string }) => 
             {/* Code body — this is the critical overflow container */}
             <div className="overflow-x-auto overflow-y-hidden max-w-full">
                 <SyntaxHighlighter
-                    style={oneDark}
                     language={language}
                     PreTag="div"
                     className="!bg-transparent !m-0 !p-4 !text-[13px] !leading-relaxed"
@@ -168,7 +179,7 @@ const MarkdownComponents = {
     p({ children }: any) {
         return (
             <p
-                className="mb-4 last:mb-0 leading-[1.8] text-white/90 text-[14px]"
+                className="mb-4 last:mb-0 leading-[1.8] text-white/90 text-[14px] font-light"
                 style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
             >
                 {children}
@@ -250,7 +261,7 @@ const MarkdownComponents = {
 
 export function Message({ message, onCopy, onRetry, onLike, onDislike }: MessageProps) {
     const isUser = message.role === 'user';
-    const { confirmAction, cancelAction, editMessage, likeMessage, dislikeMessage, retryMessage } = useChatbot();
+    const { confirmAction, cancelAction, submitClarification, editMessage, likeMessage, dislikeMessage, retryMessage } = useChatbot();
     const { data: session } = useSession();
     const { toast } = useToast();
 
@@ -299,10 +310,7 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
 
     return (
         <div
-            className={`group flex gap-3 sm:gap-4 px-4 sm:px-6 py-5 transition-all duration-300 w-full max-w-full overflow-hidden ${isUser
-                ? 'bg-transparent'
-                : 'bg-white/[0.015]'
-                }`}
+            className="group flex gap-3 sm:gap-4 px-4 sm:px-6 py-5 transition-all duration-300 w-full max-w-full overflow-hidden bg-transparent"
         >
             {/* Avatar */}
             <div className="flex-shrink-0 pt-0.5">
@@ -397,6 +405,15 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                             action={block.content}
                                             onConfirm={() => confirmAction(message.id, block.id)}
                                             onCancel={() => cancelAction(message.id, block.id)}
+                                        />
+                                    );
+                                case 'clarification_form':
+                                    return (
+                                        <ClarificationFormBlock
+                                            key={block.id}
+                                            status={block.status as any}
+                                            request={block.content}
+                                            onSubmit={(values) => submitClarification(message.id, block.id, values)}
                                         />
                                     );
                                 case 'result':

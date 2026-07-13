@@ -9,6 +9,7 @@ import { Tracker } from '@/types/tracker';
 import { useNotifications } from '@/lib/notification-context';
 import { useNotificationScheduler } from '@/lib/notification-scheduler';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sileo } from '@/lib/sileo-bell';
 
 interface HabitTrackersProps {
   trackers: Tracker[];
@@ -52,6 +53,14 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
     // Log the entry
     onLogEntry(trackerId, value);
 
+    if (value === 1 && !wasCompletedToday) {
+      sileo.success({
+        title: 'Habit Completed',
+        description: `${tracker.name} marked as done for today.`,
+        duration: 4000,
+      })
+    }
+
     // Check for achievements if this is a new completion
     if (value === 1 && !wasCompletedToday && notificationSettings.progressAchievements) {
       const progress = getWeeklyProgress(tracker);
@@ -81,9 +90,9 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
 
   if (trackers.length === 0) {
     return (
-      <Card className="border border-white/5 bg-black/20 backdrop-blur-xl">
+      <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <p className="text-white/40 text-center text-sm font-medium">
+          <p className="text-foreground/40 text-center text-sm font-medium">
             No habit trackers yet. Create one to start building consistency.
           </p>
         </CardContent>
@@ -161,7 +170,7 @@ function HabitCard({
   };
 
   return (
-    <Card className="relative overflow-hidden border border-white/5 bg-white/[0.02] backdrop-blur-2xl transition-all duration-300 hover:border-white/10 hover:bg-white/[0.03]">
+    <Card className="relative overflow-hidden border border-foreground/5 bg-foreground/[0.02] backdrop-blur-2xl transition-all duration-300 hover:border-foreground/10 hover:bg-foreground/[0.03]">
       {/* Dynamic Crystal Particles Container */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
         <AnimatePresence>
@@ -186,7 +195,7 @@ function HabitCard({
 
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <CardTitle className="text-base font-bold tracking-tight text-white/90">
+          <CardTitle className="text-base font-bold tracking-tight text-foreground/90">
             {tracker.name}
           </CardTitle>
 
@@ -201,7 +210,7 @@ function HabitCard({
               damping: 15,
             }}
           >
-            <Badge className="bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 font-mono tracking-wide text-xs">
+            <Badge className="bg-foreground/5 hover:bg-foreground/10 text-foreground/80 border border-foreground/10 font-mono tracking-wide text-xs">
               {progress.completed}/{progress.total}
             </Badge>
           </motion.div>
@@ -238,7 +247,7 @@ function HabitCard({
               flex-1 h-9 rounded-xl flex items-center justify-center font-black uppercase text-[10px] tracking-wider transition-all duration-300 select-none cursor-pointer
               ${
                 todayEntry
-                  ? 'bg-white/10 hover:bg-white/15 text-white/95 border border-white/10'
+                  ? 'bg-foreground/10 hover:bg-foreground/15 text-foreground/95 border border-foreground/10'
                   : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white hover:brightness-110'
               }
             `}
@@ -250,7 +259,7 @@ function HabitCard({
               </>
             ) : (
               <>
-                <Circle className="h-3.5 w-3.5 mr-2 text-white/70" />
+                <Circle className="h-3.5 w-3.5 mr-2 text-foreground/70" />
                 Mark Complete
               </>
             )}
@@ -259,16 +268,17 @@ function HabitCard({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 w-9 rounded-xl border border-white/5 bg-white/5 p-0 hover:bg-white/10"
+            className="h-9 w-9 rounded-xl border border-foreground/5 bg-foreground/5 p-0 hover:bg-foreground/10"
+            data-flip-from={`tracker-${tracker.id}`}
             onClick={() => onEdit(tracker)}
           >
-            <Edit className="h-3.5 w-3.5 text-white/60" />
+            <Edit className="h-3.5 w-3.5 text-foreground/60" />
           </Button>
 
           <Button
             variant="outline"
             size="sm"
-            className="h-9 w-9 rounded-xl border border-white/5 bg-white/5 p-0 hover:bg-white/10"
+            className="h-9 w-9 rounded-xl border border-foreground/5 bg-foreground/5 p-0 hover:bg-foreground/10"
             onClick={() => onDelete(tracker.id)}
           >
             <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
@@ -324,7 +334,7 @@ function HabitDaySquare({
           ${
             hasEntry
               ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
-              : 'bg-white/[0.03] border border-white/[0.04] hover:bg-white/[0.08] hover:border-white/10'
+              : 'bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.08] hover:border-foreground/10'
           }
           ${isToday ? 'ring-1.5 ring-indigo-500/50 border-indigo-500/20' : ''}
         `}
@@ -351,11 +361,11 @@ function HabitDaySquare({
             <CheckCircle2 className="h-3.5 w-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]" />
           </motion.div>
         ) : (
-          <Circle className="h-3 w-3 text-white/20 group-hover:text-white/40" />
+          <Circle className="h-3 w-3 text-foreground/20 group-hover:text-foreground/40" />
         )}
       </motion.button>
 
-      <span className="text-[10px] font-bold text-white/40 tracking-wider">
+      <span className="text-[10px] font-bold text-foreground/40 tracking-wider">
         {weekdayLabel}
       </span>
     </div>

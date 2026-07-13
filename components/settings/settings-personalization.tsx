@@ -104,7 +104,7 @@ export function SettingsPersonalization() {
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Theme & Toggles */}
       <Section title="Theme Preferences">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <Row label={t('settings.theme.label')} description={t('settings.theme.desc')}>
             <Select value={settings.theme} onValueChange={(value: any) => updateSettings({ theme: value })}>
               <SelectTrigger className="w-[180px]">
@@ -134,13 +134,13 @@ export function SettingsPersonalization() {
             </Row>
           )}
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.compact.label')} description={t('settings.compact.desc')}>
             <LiquidSwitch checked={settings.compactMode} onCheckedChange={(checked) => updateSettings({ compactMode: checked })} />
           </Row>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label={t('settings.animations.label')} description={t('settings.animations.desc')}>
             <LiquidSwitch checked={settings.showAnimations} onCheckedChange={(checked) => updateSettings({ showAnimations: checked })} />
@@ -150,8 +150,8 @@ export function SettingsPersonalization() {
 
       {/* Accent Color picker */}
       <Section title="Accent Color Picker">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-2">
-          <p className="text-xs text-white/40 mb-3">Select your system-wide interactive highlight color.</p>
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-2">
+          <p className="text-xs text-foreground/40 mb-3">Select your system-wide interactive highlight color.</p>
           <div className="flex flex-wrap gap-3">
             {[
               { id: 'indigo', color: '#6366f1' },
@@ -188,7 +188,7 @@ export function SettingsPersonalization() {
 
       {/* Background Wallpapers */}
       <Section title="Workspace Background Wallpaper">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-4">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="flex items-center gap-3">
             <input
               type="file"
@@ -201,7 +201,7 @@ export function SettingsPersonalization() {
               variant="outline"
               onClick={() => bgInputRef.current?.click()}
               disabled={isUploadingBg}
-              className="border-white/10 hover:bg-white/5"
+              className="border-foreground/10 hover:bg-foreground/5"
             >
               <Upload className="mr-2 h-4 w-4" />
               {isUploadingBg ? 'Optimizing...' : 'Upload Image'}
@@ -220,7 +220,7 @@ export function SettingsPersonalization() {
 
           {settings.backgroundHistory && settings.backgroundHistory.length > 0 && (
             <div className="space-y-2 pt-2">
-              <p className="text-xs font-semibold text-white/40">Recent wallpapers</p>
+              <p className="text-xs font-semibold text-foreground/40">Recent wallpapers</p>
               <div className="grid grid-cols-4 gap-2">
                 {settings.backgroundHistory.map((img, i) => (
                   <div
@@ -229,7 +229,7 @@ export function SettingsPersonalization() {
                       'relative group cursor-pointer rounded-lg overflow-hidden border transition-all aspect-video',
                       settings.backgroundImage === img
                         ? 'border-primary ring-2 ring-primary/20 scale-[1.02]'
-                        : 'border-white/10 hover:border-white/30'
+                        : 'border-foreground/10 hover:border-foreground/30'
                     )}
                     onClick={() => updateSettings({ backgroundImage: img })}
                   >
@@ -265,7 +265,7 @@ export function SettingsPersonalization() {
 
       {/* Crystalline Material Sliders */}
       <Section title="Crystalline Material controls">
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 space-y-6">
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-6">
           {/* Sliders Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -273,9 +273,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Background Dimness</Label>
-                <span className="text-xs text-white/40">{settings.backgroundDimness}%</span>
+                <span className="text-xs text-foreground/40">{settings.backgroundDimness}%</span>
               </div>
-              <Progress value={settings.backgroundDimness} className="h-1.5 bg-white/5" />
+              <Progress value={settings.backgroundDimness} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -290,9 +290,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Background Blur</Label>
-                <span className="text-xs text-white/40">{settings.backgroundBlur}px</span>
+                <span className="text-xs text-foreground/40">{settings.backgroundBlur}px</span>
               </div>
-              <Progress value={(settings.backgroundBlur / 50) * 100} className="h-1.5 bg-white/5" />
+              <Progress value={(settings.backgroundBlur / 50) * 100} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -307,9 +307,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Sidebar Opacity</Label>
-                <span className="text-xs text-white/40">{settings.glassOpacity}%</span>
+                <span className="text-xs text-foreground/40">{settings.glassOpacity}%</span>
               </div>
-              <Progress value={settings.glassOpacity} className="h-1.5 bg-white/5" />
+              <Progress value={settings.glassOpacity} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -325,9 +325,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Sidebar Glass Blur</Label>
-                <span className="text-xs text-white/40">{settings.glassBlur}px</span>
+                <span className="text-xs text-foreground/40">{settings.glassBlur}px</span>
               </div>
-              <Progress value={(settings.glassBlur / 50) * 100} className="h-1.5 bg-white/5" />
+              <Progress value={(settings.glassBlur / 50) * 100} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -342,9 +342,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Dashboard Card Glass Opacity</Label>
-                <span className="text-xs text-white/40">{settings.cardOpacity}%</span>
+                <span className="text-xs text-foreground/40">{settings.cardOpacity}%</span>
               </div>
-              <Progress value={settings.cardOpacity} className="h-1.5 bg-white/5" />
+              <Progress value={settings.cardOpacity} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -360,9 +360,9 @@ export function SettingsPersonalization() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <Label>Dashboard Card Refraction Blur</Label>
-                <span className="text-xs text-white/40">{settings.cardLiquidIntensity}px</span>
+                <span className="text-xs text-foreground/40">{settings.cardLiquidIntensity}px</span>
               </div>
-              <Progress value={(settings.cardLiquidIntensity / 50) * 100} className="h-1.5 bg-white/5" />
+              <Progress value={(settings.cardLiquidIntensity / 50) * 100} className="h-1.5 bg-foreground/5" />
               <input
                 type="range"
                 min="0"
@@ -374,7 +374,7 @@ export function SettingsPersonalization() {
             </div>
           </div>
 
-          <Separator className="bg-white/[0.05]" />
+          <Separator className="bg-foreground/[0.05]" />
 
           <Row label="Auto Contrast" description="Automatically adjust wallpaper contrast depending on time of day">
             <LiquidSwitch checked={settings.autoContrast} onCheckedChange={(checked) => updateSettings({ autoContrast: checked })} />

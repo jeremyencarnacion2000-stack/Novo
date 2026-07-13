@@ -5,11 +5,37 @@ import * as SelectPrimitive from '@radix-ui/react-select'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { selectFlip } from '@/lib/select-flip'
+
+// Bridges an id between Trigger and Content (rendered into a portal, so it's
+// not a DOM sibling of Trigger) so lib/select-flip.ts can find both halves
+// of one Select instance without every call site wiring anything up.
+const SelectFlipIdContext = React.createContext<string | null>(null)
 
 function Select({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const flipId = React.useId()
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (open) {
+        requestAnimationFrame(() => selectFlip.open(flipId))
+      } else {
+        // The popover is already unmounted by now (Radix closes synchronously
+        // from the item's pointerup) — close() plays a clone that open()
+        // armed at pointerdown, while the item was still on screen.
+        selectFlip.close(flipId)
+      }
+      onOpenChange?.(open)
+    },
+    [flipId, onOpenChange],
+  )
+  return (
+    <SelectFlipIdContext.Provider value={flipId}>
+      <SelectPrimitive.Root data-slot="select" onOpenChange={handleOpenChange} {...props} />
+    </SelectFlipIdContext.Provider>
+  )
 }
 
 function SelectGroup({
@@ -32,9 +58,11 @@ function SelectTrigger({
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default'
 }) {
+  const flipId = React.useContext(SelectFlipIdContext)
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
+      data-select-flip-id={flipId ?? undefined}
       data-size={size}
       className={cn(
         "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -56,10 +84,12 @@ function SelectContent({
   position = 'popper',
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  const flipId = React.useContext(SelectFlipIdContext)
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
+        data-select-flip-id={flipId ?? undefined}
         className={cn(
           'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-[9999] max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md',
           position === 'popper' &&
@@ -117,7 +147,7 @@ function SelectItem({
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText data-slot="select-item-text">{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   )
 }

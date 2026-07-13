@@ -18,6 +18,8 @@ import {
     CreateProjectAction,
     UpdateProjectAction,
     DeleteProjectAction,
+    CreateEventAction,
+    CreateTrackerAction,
     CreateCourseAction,
     UpdateCourseAction,
     DeleteCourseAction,
@@ -182,26 +184,94 @@ export async function executeAIAction(
         // const requiredPermissions = ACTION_PERMISSIONS[action.type];
         // if (requiredPermissions) { ... check permissions ... }
 
+        const gateError = await checkFreePlanLimit(prismaClient, userId);
+        if (gateError) return gateError;
+
         const result = await handler(action, context);
         console.log(`[AI Executor] Handler Result:`, JSON.stringify(result, null, 2));
+
+        const executionTime = Date.now() - startTime;
+        await logAiAction(prismaClient, userId, actionType, action.payload, result.success, undefined, executionTime);
 
         return {
             ...result,
             metadata: {
                 ...result.metadata,
-                executionTime: Date.now() - startTime,
+                executionTime,
             },
         };
     } catch (error) {
         console.error(`[AI Executor] Error executing ${action.type}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown execution error';
+        const executionTime = Date.now() - startTime;
+        await logAiAction(prismaClient, userId, action.type, action.payload, false, errorMessage, executionTime);
+
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown execution error',
+            error: errorMessage,
             metadata: {
-                executionTime: Date.now() - startTime,
+                executionTime,
             },
         };
     }
+}
+
+// Best-effort audit write — a logging failure must never mask the real
+// action result, so errors here are swallowed after a console warning.
+async function logAiAction(
+    prismaClient: typeof prisma,
+    userId: string,
+    actionType: string,
+    payload: unknown,
+    success: boolean,
+    errorMessage: string | undefined,
+    executionTimeMs: number
+) {
+    try {
+        await prismaClient.aiActionLog.create({
+            data: {
+                userId,
+                actionType,
+                payload: JSON.stringify(payload ?? {}),
+                success,
+                errorMessage,
+                executionTimeMs,
+            },
+        });
+    } catch (logError) {
+        console.warn('[AI Executor] Failed to write AiActionLog:', logError);
+    }
+}
+
+export const FREE_PLAN_MONTHLY_ACTION_LIMIT = 20;
+
+// Free-plan gate: Pro is unlimited, Free is capped at N autonomous AI actions
+// per calendar month, counted from the same AiActionLog this executor writes.
+async function checkFreePlanLimit(
+    prismaClient: typeof prisma,
+    userId: string
+): Promise<AIActionResult | null> {
+    const user = await prismaClient.user.findUnique({
+        where: { id: userId },
+        select: { plan: true },
+    });
+    if (user?.plan !== 'free') return null;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const count = await prismaClient.aiActionLog.count({
+        where: { userId, createdAt: { gte: startOfMonth } },
+    });
+
+    if (count < FREE_PLAN_MONTHLY_ACTION_LIMIT) return null;
+
+    return {
+        success: false,
+        error: 'Free plan monthly AI action limit reached',
+        message: `Alcanzaste el límite de ${FREE_PLAN_MONTHLY_ACTION_LIMIT} acciones de IA este mes en el plan Free. Actualiza a Pro para acciones ilimitadas.`,
+    };
 }
 
 // --- Handlers Implementation ---
@@ -510,6 +580,59 @@ registerActionHandler<DeleteProjectAction>('DELETE_PROJECT', async (action, ctx)
         success: true, 
         data: project, 
         message: `El proyecto "${project.title}" ha sido eliminado correctamente.` 
+    };
+});
+
+// Calendar
+registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => {
+    const { title, description, start, end, allDay } = action.payload;
+    if (!title) throw new Error("Event title is required");
+    if (!start || !end) throw new Error("Event start and end times are required");
+
+    const event = await ctx.prisma.calendarEvent.create({
+        data: {
+            title,
+            description: description || null,
+            start: new Date(start),
+            end: new Date(end),
+            allDay: !!allDay,
+            source: 'ai',
+            userId: ctx.userId,
+        },
+    });
+    return {
+        success: true,
+        data: event,
+        message: `Evento "${event.title}" agendado en tu calendario.`,
+        metadata: {
+            sectionName: 'Calendario',
+            redirectPath: '/calendar'
+        }
+    };
+});
+
+// Trackers
+registerActionHandler<CreateTrackerAction>('CREATE_TRACKER', async (action, ctx) => {
+    const { name, type, unit, goal } = action.payload;
+    if (!name) throw new Error("Tracker name is required");
+
+    const tracker = await ctx.prisma.tracker.create({
+        data: {
+            name,
+            type: type === 'metric' ? 'metric' : 'habit',
+            unit: unit || 'veces',
+            goal: goal ?? 1,
+            userId: ctx.userId,
+        },
+    });
+    return {
+        success: true,
+        data: tracker,
+        message: `Tracker "${tracker.name}" creado. Meta: ${tracker.goal} ${tracker.unit}.`,
+        metadata: {
+            sectionName: 'Trackers',
+            redirectPath: '/trackers'
+        }
     };
 });
 
@@ -850,10 +973,9 @@ registerActionHandler('UPDATE_COGNITIVE_STATE', async (action: any, ctx) => {
             data: {
                 userId: ctx.userId,
                 title: '💆 Sesión de Recuperación Cognitiva (Novo)',
-                description: 'Bloque de 30 minutos sugerido por el Asistente Novo para bajar la fatiga acumulada.',
                 status: 'todo',
                 priority: 'high',
-                category: 'routine',
+                tags: JSON.stringify(['routine']),
                 dueDate: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
             }
         });

@@ -63,4 +63,10 @@ export interface CognitiveEngineResponse {
   report: CognitiveReport;
   signals: CognitiveSignals;
   generatedAt: string;
+  // Which provider actually generated this report — 'gemini' | 'groq' |
+  // 'local-fallback' — replaces a static "Powered by Gemini" footer claim.
+  modelUsed?: string | null;
+  // The twin's real, currently-learned confidence/trust (process-twin-signal.ts),
+  // not derived from this engine — surfaced so /cognitive can show it.
+  twin?: { confidenceScore: number; trustLevel: string } | null;
 }

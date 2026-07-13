@@ -29,8 +29,8 @@ export function NovoEmptyState({
       exit={{ opacity: 0, y: -10, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 120, damping: 18 }}
       className={cn(
-        "relative rounded-2xl border border-white/[0.05] p-8 text-center flex flex-col items-center justify-center gap-4 overflow-hidden transition-all duration-700",
-        "bg-gradient-to-b from-white/[0.01] to-transparent backdrop-blur-md",
+        "relative rounded-2xl border border-foreground/[0.05] p-8 text-center flex flex-col items-center justify-center gap-4 overflow-hidden transition-all duration-700",
+        "bg-gradient-to-b from-foreground/[0.01] to-transparent backdrop-blur-md",
         className
       )}
       style={{
@@ -61,7 +61,7 @@ export function NovoEmptyState({
       )}
 
       {/* Atmospheric Icon */}
-      <div className="relative z-10 flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.02] border border-white/[0.05] text-zinc-500 mb-1">
+      <div className="relative z-10 flex items-center justify-center w-10 h-10 rounded-xl bg-foreground/[0.02] border border-foreground/[0.05] text-zinc-500 mb-1">
         {icon || <Sparkles className="w-4.5 h-4.5 stroke-[1.2] text-zinc-400/70" strokeWidth={1.2} />}
       </div>
 
@@ -80,7 +80,7 @@ export function NovoEmptyState({
           "relative z-10 mt-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border transition-all duration-500",
           isHovered
             ? "bg-violet-500/15 border-violet-500/30 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.2)]"
-            : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white"
+            : "bg-foreground/[0.03] border-foreground/10 text-zinc-400 hover:text-foreground"
         )}
       >
         {actionLabel}

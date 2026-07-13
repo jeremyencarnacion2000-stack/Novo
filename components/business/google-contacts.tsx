@@ -41,7 +41,7 @@ export function GoogleContacts() {
 
     if (loading) {
         return (
-            <Card>
+            <Card className="liquid-glass">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-blue-500" />
@@ -57,7 +57,7 @@ export function GoogleContacts() {
     }
 
     return (
-        <Card>
+        <Card className="liquid-glass">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />
@@ -78,7 +78,7 @@ export function GoogleContacts() {
                             {contacts.map((contact, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                                    className="flex items-center gap-3 p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"
                                 >
                                     <Avatar className="h-10 w-10">
                                         <AvatarImage src={contact.photo} alt={contact.name || 'Contact'} />

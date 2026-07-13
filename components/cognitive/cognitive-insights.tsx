@@ -49,11 +49,11 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-xs font-black tracking-[0.25em] uppercase text-white/50">
+        <h3 className="text-xs font-black tracking-[0.25em] uppercase text-foreground/50">
           Detected Signals
         </h3>
         <span 
-          className="text-[9px] font-black px-2 py-0.5 rounded-full border text-white/40 tracking-widest bg-white/[0.02] border-white/10"
+          className="text-[9px] font-black px-2 py-0.5 rounded-full border text-foreground/40 tracking-widest bg-foreground/[0.02] border-foreground/10"
           style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}
         >
           {insights.length} ACTIVE
@@ -71,7 +71,7 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
             transition={{ ...springConfig.smooth, delay: 0.1 + i * 0.08 }}
             className={cn(
               'flex items-start gap-4 p-4 rounded-2xl border transition-all duration-500 cursor-default relative overflow-hidden',
-              'glass-card group hover:scale-[1.02]',
+              'glass-card-list group hover:scale-[1.02]',
               styles.border, styles.bg, styles.glow
             )}
             style={{
@@ -97,7 +97,7 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[13px] font-bold text-white/90 truncate transition-colors group-hover:text-white">
+                <span className="text-[13px] font-bold text-foreground/90 truncate transition-colors group-hover:text-foreground">
                   {insight.headline}
                 </span>
                 <span className={cn(
@@ -107,13 +107,13 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
                   {SEVERITY_LABELS[insight.severity]}
                 </span>
               </div>
-              <p className="text-[11px] text-white/45 leading-relaxed font-normal">{insight.detail}</p>
+              <p className="text-[11px] text-foreground/45 leading-relaxed font-normal">{insight.detail}</p>
               {insight.action && (
                 <div className="mt-3 flex">
                   <span className={cn(
                     'text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full border transition-all duration-300',
                     styles.badge,
-                    'bg-white/[0.02] hover:bg-white/[0.08] cursor-pointer'
+                    'bg-foreground/[0.02] hover:bg-foreground/[0.08] cursor-pointer'
                   )}>
                     → {insight.action}
                   </span>
@@ -134,7 +134,7 @@ export function CognitiveInsights({ insights }: CognitiveInsightsProps) {
       })}
 
       {insights.length === 0 && (
-        <div className="text-center py-8 text-white/25 text-xs font-medium border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+        <div className="text-center py-8 text-foreground/25 text-xs font-medium border border-dashed border-foreground/10 rounded-2xl bg-foreground/[0.01]">
           No active cognitive alerts detected · All channels nominal
         </div>
       )}

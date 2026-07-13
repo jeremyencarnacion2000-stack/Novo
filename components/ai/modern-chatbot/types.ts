@@ -5,6 +5,11 @@ export interface Message {
     content: string;
     timestamp: string;
     model?: string;
+    // Populated from the real `meta` SSE event /api/ai/stream emits (see
+    // lib/ai/classifier.ts) — which intent/model actually handled this
+    // message, not a client-side guess. Drives thinking-steps.tsx.
+    intent?: string;
+    fallback?: boolean;
     liked?: boolean;
     disliked?: boolean;
     artifacts?: Artifact[];
@@ -21,7 +26,24 @@ export interface Attachment {
     size?: number;
 }
 
-export type BlockType = 'text' | 'markdown' | 'analysis' | 'plan' | 'confirmation' | 'result' | 'preview' | 'cognitive_update' | 'music_recommendation' | 'outfit_recommendation';
+export type BlockType = 'text' | 'markdown' | 'analysis' | 'plan' | 'confirmation' | 'result' | 'preview' | 'cognitive_update' | 'music_recommendation' | 'outfit_recommendation' | 'clarification_form';
+
+export interface ClarificationField {
+    key: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'date';
+    options?: string[];
+    placeholder?: string;
+    required?: boolean;
+}
+
+export interface ClarificationRequest {
+    title: string;
+    description?: string;
+    pendingAction: string;
+    knownPayload?: Record<string, any>;
+    fields: ClarificationField[];
+}
 
 export interface MessageBlock {
     id: string;
@@ -90,6 +112,7 @@ export interface ChatbotContextType {
     dislikeMessage: (messageId: string) => void;
     confirmAction: (messageId: string, blockId: string) => void;
     cancelAction: (messageId: string, blockId: string) => void;
+    submitClarification: (messageId: string, blockId: string, values: Record<string, any>) => void;
 
     // UI State
     sidebarCollapsed: boolean;

@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Star, Trash2, Save, BookOpen, ExternalLink, Smartphone, BookMarked, Headphones } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface BookDetailsDialogProps {
     book: any
@@ -36,6 +37,10 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
 
     const pageInputRef = useRef<HTMLInputElement>(null)
     const noteInputRef = useRef<HTMLInputElement>(null)
+
+    const flipKey = `book-${book?.id}`
+    const closeFlip = useModalFlip(flipKey, isOpen && !!book)
+    const handleClose = () => closeFlip(onClose)
 
     useEffect(() => {
         if (book) {
@@ -148,8 +153,8 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
     const FormatIcon = format === 'physical' ? BookMarked : format === 'audiobook' ? Headphones : Smartphone
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+            <DialogContent data-flip-to={flipKey} className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight">Book Details</DialogTitle>
                 </DialogHeader>
@@ -160,6 +165,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
                         <div className="aspect-[2/3] relative bg-muted/50 rounded-xl overflow-hidden shadow-lg border border-border/50">
                             {book.coverUrl ? (
                                 <img
+                                    data-shared-item="cover"
                                     src={book.coverUrl}
                                     alt={book.title}
                                     className="object-cover w-full h-full"
@@ -234,7 +240,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
                     {/* Right Column: Details & Tabs */}
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <div className="mb-4">
-                            <h2 className="text-2xl font-bold mb-1 tracking-tight">{book.title}</h2>
+                            <h2 data-shared-item="title" className="text-2xl font-bold mb-1 tracking-tight">{book.title}</h2>
                             <p className="text-lg text-muted-foreground">{book.author}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
                                 {book.totalPages && (

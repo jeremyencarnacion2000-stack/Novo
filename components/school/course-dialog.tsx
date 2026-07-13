@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { Course } from '@/types/school';
+import { Plus } from 'lucide-react';
+import { useModalFlip } from '@/hooks/use-modal-flip';
 
 interface CourseDialogProps {
     open: boolean;
@@ -65,17 +67,24 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
         }
     }, [course, currentYear, open]);
 
+    const flipKey = course ? `course-${course.id}` : 'btn-add-course';
+    const closeFlip = useModalFlip(flipKey, open);
+    const handleClose = () => closeFlip(onClose);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSave(formData as Course);
-        onClose();
+        handleClose();
     };
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
+        <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+            <DialogContent data-flip-to={flipKey} className="sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle>{course ? 'Edit Course' : 'Add New Course'}</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        {!course && <Plus data-shared-item="icon" className="h-5 w-5" />}
+                        <span data-shared-item="text">{course ? 'Edit Course' : 'Add Course'}</span>
+                    </DialogTitle>
                     <DialogDescription>
                         {course ? 'Update course information' : 'Create a new course to track'}
                     </DialogDescription>
@@ -211,7 +220,7 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button type="button" variant="outline" onClick={handleClose}>
                             Cancel
                         </Button>
                         <Button type="submit">

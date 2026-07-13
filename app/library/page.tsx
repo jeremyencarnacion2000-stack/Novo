@@ -139,18 +139,18 @@ export default function LibraryPage() {
               variant={view === 'search' ? 'secondary' : 'ghost'}
               onClick={() => setView('search')}
               size="sm"
-              className={`rounded-lg transition-all text-xs ${view === 'search' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
+              className={`group rounded-lg transition-all text-xs ${view === 'search' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
             >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              <Plus className="mr-1.5 h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
               Add Book
             </Button>
             <Button
               variant={view === 'discover' ? 'secondary' : 'ghost'}
               onClick={() => setView('discover')}
               size="sm"
-              className={`rounded-lg transition-all text-xs ${view === 'discover' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
+              className={`group rounded-lg transition-all text-xs ${view === 'discover' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
             >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              <Sparkles className="mr-1.5 h-3.5 w-3.5 transition-transform duration-300 group-hover:scale-125" />
               Discover
             </Button>
           </div>
@@ -160,13 +160,13 @@ export default function LibraryPage() {
         {/* Filter bar for My Books */}
         {view === 'library' && (
           <div className="flex flex-col sm:flex-row gap-2 px-1 flex-shrink-0">
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative w-64 focus-within:w-80 max-w-full transition-all duration-300 ease-out">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Filter by title, author, or genre..."
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                className="pl-9 pr-8 h-9 bg-background/50 backdrop-blur-sm border-border/50 rounded-xl focus-visible:ring-primary/50 text-sm"
+                className="pl-9 pr-8 h-9 bg-background/50 backdrop-blur-sm border-border/50 rounded-xl focus-visible:ring-primary/50 focus:bg-foreground/10 text-sm w-full"
               />
               {filterQuery && (
                 <button
