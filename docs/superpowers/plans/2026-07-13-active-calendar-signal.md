@@ -779,11 +779,6 @@ Immediately after its closing `}`, add:
     // fetching Google Calendar twice in the same request. The connector
     // exists as the proven, reusable pattern for the *next* platform that
     // doesn't already have this data sitting in scope.
-
-```ts
-    // New scheduling problems worth surfacing get written to TwinEvolutionLog —
-    // the same mechanism already powering the Bitácora and Twin Insight Toast.
-    // persistNewCalendarSignals dedupes per changeType per day on its own.
     if (twinRecord && calendarSignal.connected) {
       try {
         const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
