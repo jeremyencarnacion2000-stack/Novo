@@ -8,7 +8,7 @@ import { logAICall } from '@/lib/ai-call-log';
 import { calendarService, getGoogleAccessToken } from '@/lib/google';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
-import { computeCalendarSignal, evaluateCalendarThresholds, persistNewCalendarSignals, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
+import { computeCalendarSignal, evaluateCalendarThresholds, persistNewCalendarSignals, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
 import type { BiometricPayload } from '@/types/biometrics';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
