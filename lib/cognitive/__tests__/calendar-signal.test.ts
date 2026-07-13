@@ -1,4 +1,15 @@
 /// <reference types="jest" />
+import { prisma } from '@/lib/prisma';
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    twinEvolutionLog: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+  },
+}));
+
 import { computeCalendarSignal } from '../calendar-signal';
 
 describe('computeCalendarSignal', () => {
@@ -101,5 +112,45 @@ describe('evaluateCalendarThresholds', () => {
     const signal = { connected: true, meetingCount: 1, meetingMinutesToday: 30, largestFreeGapMinutes: 600 };
     const result = evaluateCalendarThresholds(events, signal, '09:00', '11:00', now);
     expect(result.find(s => s.type === 'calendar_peak_conflict')).toBeUndefined();
+  });
+});
+
+import { persistNewCalendarSignals } from '../calendar-signal';
+
+describe('persistNewCalendarSignals', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('writes a new TwinEvolutionLog row when none exists today for that changeType', async () => {
+    (prisma.twinEvolutionLog.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await persistNewCalendarSignals('twin-1', 'user-1', [
+      { type: 'calendar_meeting_overload', headline: '3 reuniones seguidas', detail: 'detalle', severity: 'warning' },
+    ]);
+
+    expect(prisma.twinEvolutionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        twinId: 'twin-1',
+        userId: 'user-1',
+        changeType: 'calendar_meeting_overload',
+      }),
+    });
+  });
+
+  it('does not write a duplicate row when one already exists today for that changeType', async () => {
+    (prisma.twinEvolutionLog.findFirst as jest.Mock).mockResolvedValue({ id: 'existing-row' });
+
+    await persistNewCalendarSignals('twin-1', 'user-1', [
+      { type: 'calendar_meeting_overload', headline: '3 reuniones seguidas', detail: 'detalle', severity: 'warning' },
+    ]);
+
+    expect(prisma.twinEvolutionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when there are no signals', async () => {
+    await persistNewCalendarSignals('twin-1', 'user-1', []);
+    expect(prisma.twinEvolutionLog.findFirst).not.toHaveBeenCalled();
+    expect(prisma.twinEvolutionLog.create).not.toHaveBeenCalled();
   });
 });

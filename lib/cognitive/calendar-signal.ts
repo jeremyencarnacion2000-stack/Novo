@@ -4,6 +4,7 @@
 // lib/platform-connectors/) can share one implementation instead of two.
 
 import type { PlatformSignal } from '@/lib/platform-connectors/types';
+import { prisma } from '@/lib/prisma';
 
 export interface CalendarSignal {
   connected: boolean;
@@ -114,4 +115,34 @@ export function evaluateCalendarThresholds(
   }
 
   return results;
+}
+
+// Writes newly-detected calendar signals to TwinEvolutionLog (the same table
+// powering the Bitácora feed and Twin Insight Toast), deduped so at most one
+// row per changeType gets written per calendar day.
+export async function persistNewCalendarSignals(
+  twinId: string,
+  userId: string,
+  signals: PlatformSignal[]
+): Promise<void> {
+  if (signals.length === 0) return;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  for (const signal of signals) {
+    const existing = await prisma.twinEvolutionLog.findFirst({
+      where: { twinId, changeType: signal.type, createdAt: { gte: todayStart } },
+    });
+    if (existing) continue;
+
+    await prisma.twinEvolutionLog.create({
+      data: {
+        twinId,
+        userId,
+        changeType: signal.type,
+        description: `${signal.headline} — ${signal.detail}`,
+      },
+    });
+  }
 }

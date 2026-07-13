@@ -8,7 +8,7 @@ import { logAICall } from '@/lib/ai-call-log';
 import { calendarService, getGoogleAccessToken } from '@/lib/google';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
-import { computeCalendarSignal, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
+import { computeCalendarSignal, evaluateCalendarThresholds, persistNewCalendarSignals, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
 import type { BiometricPayload } from '@/types/biometrics';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -131,6 +131,33 @@ export async function GET(req: NextRequest) {
       calendarSignal = computeCalendarSignal(events as any, now);
     } catch {
       // Not connected, or the Google API call failed — no calendar signal this run.
+    }
+
+    // New scheduling problems worth surfacing get written to TwinEvolutionLog —
+    // the same mechanism already powering the Bitácora and Twin Insight Toast.
+    // persistNewCalendarSignals dedupes per changeType per day on its own.
+    //
+    // This re-fetches events and re-derives the signal via its own try/catch
+    // rather than reusing the `events`/`calendarSignal` locals above, so a
+    // failure here can never affect the prompt-generation path above it.
+    // GoogleCalendarConnector (Task 3) is not called from here directly —
+    // this route already has the raw calendarService/computeCalendarSignal
+    // building blocks in scope, so calling the connector wrapper would mean
+    // fetching Google Calendar twice in the same request. The connector
+    // exists as the proven, reusable pattern for the *next* platform that
+    // doesn't already have this data sitting in scope.
+    if (twinRecord && calendarSignal.connected) {
+      try {
+        const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
+        const events = await calendarService.listEvents(todayStart.toISOString(), 50, dayEndIso);
+        const energyCurve = (twinRecord.energyCurve as any) || {};
+        const peakStart = energyCurve.peakFocusStart || '09:00';
+        const peakEnd = energyCurve.peakFocusEnd || '11:00';
+        const thresholdSignals = evaluateCalendarThresholds(events as any, calendarSignal, peakStart, peakEnd, now);
+        await persistNewCalendarSignals(twinRecord.id, userId, thresholdSignals);
+      } catch {
+        // Non-critical — the report itself doesn't depend on this succeeding.
+      }
     }
 
     // Real sleep/stress signal — Google Fit when connected, otherwise the
