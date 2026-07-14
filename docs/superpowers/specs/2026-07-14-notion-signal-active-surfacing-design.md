@@ -19,20 +19,22 @@ and a manually-triggered sync (`app/api/integration/notion/route.ts`, `POST
 (`source: 'notion'`). Nobody has built the active layer on top of it.
 
 This phase adds that active layer for Notion, and — per user decision during
-design review — also builds the two UI surfaces ("ambient toast" and
+design review — also covers the two UI surfaces ("ambient toast" and
 "in-chat, when asked") that were chosen for Active Calendar Signal but never
-built in that phase. Both platforms get these surfaces at once, since the
-work is shared infrastructure, not platform-specific.
+built in that phase. One of those two, the toast, turned out to already
+exist (see below) — only the chat surface is new work. Both apply to both
+platforms at once, since it's shared infrastructure, not platform-specific.
 
 ## Goal
 
 1. Detect three behavioral patterns in a user's synced Notion tasks and
    surface them the same way Calendar Signal surfaces its patterns.
 2. Establish one shared, single source of truth for "what's the one active
-   signal right now" across platforms, so the hero card, the toast, and the
-   chat can never disagree.
-3. Ship the ambient toast and in-chat-context surfaces that Active Calendar
-   Signal's design called for but didn't build.
+   signal right now" across platforms, so the hero card and the chat can
+   never disagree (the toast doesn't need this — see below).
+3. Ship the in-chat-context surface that Active Calendar Signal's design
+   called for but didn't build. (The ambient toast turned out to already
+   exist and needs no new code.)
 
 ## Notion Signal Detection
 
@@ -96,18 +98,18 @@ compute or know about tasks.
 inline "only checks calendar" logic, keeping its existing render/priority
 structure (`isUrgentTask` check first, then this function's result).
 
-## Ambient Toast
+## Ambient Toast — already exists, no new work
 
-- **New endpoint**: `GET /api/cognitive/active-signal` — thin wrapper
-  returning `{ signal: ActiveSignal | null }` from `getActiveSignal`.
-- **New file**: `components/signals/active-signal-toast.tsx` — a client
-  component mounted once in `app/client-layout.tsx` alongside the existing
-  `Toaster`. On mount, calls the endpoint; if there's a signal whose
-  `{date, changeType}` isn't already recorded in `localStorage`, fires
-  `toast()` (existing `sonner` infra) with the signal's message, then
-  records it — so it shows once per new signal per day, never re-firing on
-  navigation within the same day. No polling; checked once per full page
-  load.
+Discovered while preparing the implementation plan: `components/cognitive/
+twin-insight-toast.tsx` (`TwinInsightToast`, mounted in `app/client-layout.tsx`)
+already polls `/api/cognitive/decisions` every 30s and toasts any new
+`TwinEvolutionLog` entry (excluding `ai_action` rows), deduped via
+`localStorage`. It doesn't filter by signal type — so the moment
+`persistNewNotionSignals()` writes a new row, this existing component surfaces
+it automatically. **No new endpoint, no new component, no new code** for this
+surface. `getActiveSignal()` (below) is still needed — not for the toast, but
+because `now-hero.tsx` and the chat context each need exactly *one* signal
+chosen by priority, not the toast's "surface whatever's newest" behavior.
 
 ## In-Chat Signal Context
 
@@ -132,10 +134,11 @@ structure (`isUrgentTask` check first, then this function's result).
   present → Notion wins; only Calendar signal present → Calendar wins;
   neither present → `null`; a signal exists but not for today → not
   returned.
-- Manual verification: toast fires once on load when a signal exists, does
-  not re-fire on subsequent navigation same day; chat context — ask an
-  unrelated question and confirm the Twin doesn't mention the signal, ask a
-  relevant one and confirm it does.
+- Manual verification: trigger a Notion signal, confirm the existing
+  `TwinInsightToast` surfaces it (no code change needed there, just
+  confirming the assumption holds); chat context — ask an unrelated question
+  and confirm the Twin doesn't mention the signal, ask a relevant one and
+  confirm it does.
 
 ## Rollout
 
