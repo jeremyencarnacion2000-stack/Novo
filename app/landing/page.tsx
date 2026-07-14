@@ -201,17 +201,17 @@ export default function LandingPage() {
       {/* ── Product proof — the real UI, not a mockup ──────────────────── */}
       <section className="max-w-6xl mx-auto px-6 pb-16 md:pb-24">
         <ScrollReveal>
-          <p className="text-[10px] font-black tracking-[0.25em] uppercase text-white/30 mb-4 text-center">Esto es Novo, no un concepto</p>
+          <p className="text-[10px] font-black tracking-[0.25em] uppercase text-[#241F19]/35 mb-4 text-center">Esto es Novo, no un concepto</p>
           <motion.div
-            className="rounded-3xl border border-white/10 overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.5)]"
+            className="rounded-3xl border border-[#241F19]/10 overflow-hidden shadow-[0_40px_120px_rgba(36,31,25,0.18)]"
             whileHover={{ transform: 'scale(1.01)', borderColor: 'rgba(99,102,241,0.35)' }}
             transition={{ duration: 0.4 }}
           >
-            <div className="flex items-center gap-1.5 px-4 py-3 bg-[#0a0a0a] border-b border-white/[0.06]">
-              <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
-              <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
-              <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
-              <span className="ml-3 text-[10px] text-white/25 font-medium">productivitynovo.vercel.app/ai</span>
+            <div className="flex items-center gap-1.5 px-4 py-3 bg-[#241F19]/[0.04] border-b border-[#241F19]/[0.08]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#241F19]/15" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#241F19]/15" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#241F19]/15" />
+              <span className="ml-3 text-[10px] text-[#241F19]/40 font-medium">productivitynovo.vercel.app/ai</span>
             </div>
             <Image
               src="/landing/product-ai.png"
@@ -230,12 +230,12 @@ export default function LandingPage() {
         <ScrollReveal>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <motion.div
-              className="rounded-3xl p-8 border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl"
-              whileHover={{ transform: 'translateY(-4px)', borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.045)' }}
+              className="rounded-3xl p-8 border border-[#241F19]/[0.08] bg-[#241F19]/[0.03] backdrop-blur-xl"
+              whileHover={{ transform: 'translateY(-4px)', borderColor: 'rgba(36,31,25,0.18)', backgroundColor: 'rgba(36,31,25,0.045)' }}
               transition={{ duration: 0.3 }}
             >
-              <span className="text-[10px] font-black tracking-[0.25em] uppercase text-white/45">Antes</span>
-              <p className="text-xl text-white/70 font-light mt-3 leading-relaxed">
+              <span className="text-[10px] font-black tracking-[0.25em] uppercase text-[#241F19]/50">Antes</span>
+              <p className="text-xl text-[#241F19]/70 font-light mt-3 leading-relaxed">
                 Una lista de tareas que no sabe si estás agotado, disperso o en tu mejor momento del día —
                 y aun así te pide que decidas tú qué hacer primero.
               </p>
@@ -246,10 +246,10 @@ export default function LandingPage() {
               transition={{ duration: 0.3 }}
             >
               <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-primary/25 blur-[60px] pointer-events-none" />
-              <span className="relative text-[10px] font-black tracking-[0.25em] uppercase text-indigo-300">Con Novo</span>
-              <p className="relative text-xl text-white font-light mt-3 leading-relaxed">
+              <span className="relative text-[10px] font-black tracking-[0.25em] uppercase text-indigo-700">Con Novo</span>
+              <p className="relative text-xl text-[#241F19] font-light mt-3 leading-relaxed">
                 Un sistema que interpreta tu energía y tus patrones reales, y te da{' '}
-                <span className="font-semibold text-white">una directiva clara</span> en vez de una lista infinita.
+                <span className="font-semibold text-[#241F19]">una directiva clara</span> en vez de una lista infinita.
               </p>
             </motion.div>
           </div>
@@ -261,7 +261,7 @@ export default function LandingPage() {
         <ScrollReveal>
           <p className="text-[10px] font-black tracking-[0.25em] uppercase text-primary mb-3 text-center">Cómo funciona</p>
           <h2 className="text-3xl md:text-4xl font-semibold text-center mb-4">El motor detrás del Twin</h2>
-          <p className="text-white/55 text-center max-w-xl mx-auto mb-14">
+          <p className="text-[#241F19]/60 text-center max-w-xl mx-auto mb-14">
             Cinco etapas que corren en segundo plano cada vez que usas Novo.
           </p>
         </ScrollReveal>
@@ -270,15 +270,15 @@ export default function LandingPage() {
           {PIPELINE.map((stage, i) => (
             <ScrollReveal key={stage.label} delay={i * 0.06}>
               <motion.div
-                className="rounded-2xl p-5 h-full border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl flex flex-col gap-3"
+                className="rounded-2xl p-5 h-full border border-[#241F19]/[0.08] bg-[#241F19]/[0.03] backdrop-blur-xl flex flex-col gap-3"
                 whileHover={{ transform: 'translateY(-6px)', borderColor: 'rgba(99,102,241,0.4)', boxShadow: '0 20px 50px rgba(99,102,241,0.15)' }}
                 transition={{ duration: 0.3 }}
               >
                 <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <stage.icon className="w-4 h-4 text-primary" />
                 </div>
-                <p className="text-sm font-bold tracking-wide uppercase text-white/90">{stage.label}</p>
-                <p className="text-xs text-white/55 leading-relaxed">{stage.detail}</p>
+                <p className="text-sm font-bold tracking-wide uppercase text-[#241F19]/90">{stage.label}</p>
+                <p className="text-xs text-[#241F19]/60 leading-relaxed">{stage.detail}</p>
               </motion.div>
             </ScrollReveal>
           ))}
@@ -296,15 +296,15 @@ export default function LandingPage() {
           {DIFFERENTIATORS.map((d, i) => (
             <ScrollReveal key={d.title} delay={i * 0.08}>
               <motion.div
-                className="rounded-3xl p-7 h-full border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl"
+                className="rounded-3xl p-7 h-full border border-[#241F19]/[0.08] bg-[#241F19]/[0.03] backdrop-blur-xl"
                 whileHover={{ transform: 'translateY(-6px)', borderColor: 'rgba(99,102,241,0.4)', boxShadow: '0 20px 50px rgba(99,102,241,0.15)' }}
                 transition={{ duration: 0.3 }}
               >
                 <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
                   <Check className="w-4 h-4 text-primary" />
                 </div>
-                <p className="font-semibold text-white mb-2">{d.title}</p>
-                <p className="text-sm text-white/55 leading-relaxed">{d.detail}</p>
+                <p className="font-semibold text-[#241F19] mb-2">{d.title}</p>
+                <p className="text-sm text-[#241F19]/60 leading-relaxed">{d.detail}</p>
               </motion.div>
             </ScrollReveal>
           ))}
