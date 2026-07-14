@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
+import { motion, useScroll, useMotionValueEvent, useReducedMotion } from 'framer-motion'
 import {
   Brain, Eye, Radar, Compass, Sparkles,
   ArrowRight, Check,
@@ -34,6 +34,28 @@ const DIFFERENTIATORS = [
     detail: 'El objetivo no es mostrarte más datos. Es responder una pregunta: ¿qué deberías hacer ahora mismo?',
   },
 ] as const
+
+function HeroVisual() {
+  const reduceMotion = useReducedMotion()
+
+  return (
+    <motion.div
+      className="relative flex flex-col items-center justify-center py-4"
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={reduceMotion ? { duration: 0 } : { ...springConfig.gentle, delay: 0.1 }}
+    >
+      {/* Placeholder visual — no real screenshot/illustration asset available
+          yet (see Task 1's status note in the plan). Warm gradient field,
+          same mechanism as the indigo glows elsewhere on this page, just
+          recolored. Swap for a real product shot when one exists. */}
+      <div className="relative w-full max-w-2xl aspect-[16/10] mx-auto rounded-[2rem] overflow-hidden border border-[#241F19]/[0.08] bg-[#FBF6EF]/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(36,31,25,0.15)]">
+        <div className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 rounded-full opacity-30 blur-[80px]" style={{ background: 'radial-gradient(circle, #E2703F 0%, transparent 70%)' }} />
+        <div className="absolute -bottom-1/4 -right-1/4 w-3/4 h-3/4 rounded-full opacity-25 blur-[90px]" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
+      </div>
+    </motion.div>
+  )
+}
 
 function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) {
   const [scrolled, setScrolled] = useState(false)
@@ -101,47 +123,31 @@ export default function LandingPage() {
     >
       <FloatingNav scrollRef={scrollRef} />
 
-      {/* ── Hero — oversized typographic identity + the 3D twin dead center,
-            editorial "spec sheet" chrome around the edges (sequence tag,
-            pipeline chips, live status) instead of a centered SaaS block ── */}
       <section className="relative overflow-hidden">
-        {/* Ghosted background wordmark — pure texture, never competes with the real headline */}
+        {/* Ghosted background wordmark — warm, barely-there texture */}
         <div className="absolute inset-x-0 top-[6%] flex justify-center pointer-events-none select-none z-0">
-          <span className="text-[20vw] leading-none font-black tracking-tighter text-white/[0.035] whitespace-nowrap">
+          <span className="text-[20vw] leading-none font-black tracking-tighter text-[#241F19]/[0.04] whitespace-nowrap">
             COGNITIVE
           </span>
         </div>
-        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] rounded-full opacity-25 blur-[160px] pointer-events-none" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] rounded-full opacity-10 blur-[160px] pointer-events-none" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
 
         <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-16">
           {/* Spec-sheet top row */}
-          <div className="flex items-start justify-between text-[10px] font-bold tracking-[0.2em] uppercase text-white/30 mb-8">
+          <div className="flex items-start justify-between text-[10px] font-bold tracking-[0.2em] uppercase text-[#241F19]/40 mb-8">
             <div className="space-y-0.5">
               <div>SEQ.001 / TWIN&nbsp;ONLINE</div>
-              <div className="text-white/15">República Dominicana · GMT-4</div>
+              <div className="text-[#241F19]/20">República Dominicana · GMT-4</div>
             </div>
             <div className="text-right space-y-0.5">
               <div className="text-primary/70">OBSERVE → INTERPRET → PREDICT → GUIDE → LEARN</div>
-              <div className="text-white/15">Ciclo continuo, no una foto fija</div>
+              <div className="text-[#241F19]/20">Ciclo continuo, no una foto fija</div>
             </div>
           </div>
 
-          {/* Dominant visual, its own breathing room — then the copy sits
-              BELOW it, never overlapping. Stacking them (like Omnicore's
-              product-cube-above-headline pattern) instead of layering text
-              directly over the graph — a dark, multi-color constellation
-              behind body copy killed legibility when tried overlapped. */}
-          <motion.div
-            className="relative flex flex-col items-center justify-center py-4"
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ ...springConfig.gentle, delay: 0.1 }}
-          >
-            <div className="w-full max-w-[440px] aspect-square mx-auto" />
-            <span className="mt-3 text-[10px] font-bold tracking-[0.2em] uppercase text-white/20 select-none">
-              Arrastra el Twin — reacciona a ti
-            </span>
-          </motion.div>
+          {/* Dominant visual: real product screenshot floating over a soft
+              AI-generated illustration, not the old 3D graph. */}
+          <HeroVisual />
 
           <motion.div
             className="relative z-10 text-center px-4 max-w-3xl mx-auto"
@@ -157,8 +163,8 @@ export default function LandingPage() {
               Deja de organizar tareas.<br />
               <span className="not-italic font-semibold">Empieza a ejecutar con tu energía real.</span>
             </h1>
-            <p className="text-base md:text-lg text-white/70 max-w-xl mx-auto mb-8 leading-relaxed">
-              Novo construye un <strong className="text-white font-semibold">Gemelo Cognitivo</strong> a partir de tu comportamiento real
+            <p className="text-base md:text-lg text-[#241F19]/70 max-w-xl mx-auto mb-8 leading-relaxed">
+              Novo construye un <strong className="text-[#241F19] font-semibold">Gemelo Cognitivo</strong> a partir de tu comportamiento real
               para responder una sola pregunta: ¿qué deberías hacer ahora mismo?
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -171,14 +177,14 @@ export default function LandingPage() {
                   Empezar gratis <ArrowRight className="w-4 h-4" />
                 </Link>
               </Button>
-              <a href="#como-funciona" className="text-sm font-medium text-white/60 hover:text-white transition-colors">
+              <a href="#como-funciona" className="text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors">
                 Ver cómo funciona ↓
               </a>
             </div>
           </motion.div>
 
-          {/* Spec-sheet bottom row: pipeline tags (the "tech stack" equivalent) + live status */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-8 pt-6 border-t border-white/[0.06] text-[10px] font-bold tracking-[0.15em] uppercase text-white/25">
+          {/* Spec-sheet bottom row: pipeline tags + live status */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-8 pt-6 border-t border-[#241F19]/[0.08] text-[10px] font-bold tracking-[0.15em] uppercase text-[#241F19]/35">
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {PIPELINE.map((p) => (
                 <span key={p.label}>+ {p.label}</span>
@@ -186,7 +192,7 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400/80">Tu Twin empieza a aprender desde hoy</span>
+              <span className="text-emerald-600/80">Tu Twin empieza a aprender desde hoy</span>
             </div>
           </div>
         </div>
