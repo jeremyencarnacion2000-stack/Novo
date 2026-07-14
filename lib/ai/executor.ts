@@ -32,6 +32,20 @@ import { ACTION_PERMISSIONS, AIPermission } from './permissions';
 
 // --- Interfaces ---
 
+// Post-execution result is always authoritative over the model's own
+// pre-execution "confirmation" text — the model writes that message before
+// the real execution happens (e.g. before GENERATE_FILE's filename fallback
+// logic runs), so it can reference values that were still unresolved
+// (surfaced in production as a chat bubble literally saying
+// `El archivo "undefined" se ha generado correctamente`).
+export function pickResultMessage(
+    execResult: { message?: string },
+    modelMessage?: string,
+    fallback: string = ''
+): string {
+    return execResult.message || modelMessage || fallback;
+}
+
 export interface AIActionResult<T = any> {
     success: boolean;
     data?: T;

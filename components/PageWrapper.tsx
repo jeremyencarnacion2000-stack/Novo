@@ -117,7 +117,13 @@ export function PageWrapper({ children, className, isFullScreen = false }: PageW
           </div>
         ) : (
           <SmoothScrollProvider scrollElement={scrollRef.current}>
-            <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-24 md:pb-8 flex-1 w-full">
+            {/* pb-40 (not pb-24): GeminiLiveOrb (components/ai/GeminiLiveOrb.tsx)
+                floats fixed at bottom:5rem with a 56px button — its top edge
+                sits ~136px above the viewport bottom, which pb-24 (96px)
+                doesn't clear, so it overlapped the last visible content on
+                pages like /checklist and /business. md:pb-8 is unchanged —
+                the orb isn't a clearance problem at desktop's larger heights. */}
+            <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-40 md:pb-8 flex-1 w-full">
               {children}
             </div>
           </SmoothScrollProvider>

@@ -5,6 +5,7 @@ import { routeIntent, IntentType } from '@/lib/ai/router';
 import { buildUserContext } from '@/lib/ai/context-builder';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { pickResultMessage } from '@/lib/ai/executor';
 
 // =============================================================================
 // MODEL CONFIGURATION  
@@ -506,7 +507,7 @@ export async function POST(request: NextRequest) {
           const { executeAIAction } = await import('@/lib/ai/executor');
           const execResult = await executeAIAction(parsed.action, userId);
           return NextResponse.json({
-            content: parsed.message || execResult.message || 'He realizado los cambios en tu estado cognitivo.',
+            content: pickResultMessage(execResult, parsed.message, 'He realizado los cambios en tu estado cognitivo.'),
             blocks: [
               parsed.analysis ? { id: crypto.randomUUID(), type: 'analysis', content: parsed.analysis, isVisible: true } : null,
               {
