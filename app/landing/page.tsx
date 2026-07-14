@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import dynamic from 'next/dynamic'
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
 import {
   Brain, Eye, Radar, Compass, Sparkles,
@@ -12,31 +11,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
 import { springConfig } from '@/lib/design-tokens'
-
-// WebGL only for this one hero visual, lazy-loaded client-side — the rest
-// of the page (and its scroll animations) never waits on the 3D chunk.
-// HeroGraph (below) renders immediately as the loading/fallback state.
-// This is vanilla three.js (see components/landing/hero-graph-3d.tsx), not
-// @react-three/fiber — an earlier fiber-based version broke production
-// app-wide via a React module-singleton conflict; vanilla three.js has no
-// react-reconciler in its dependency graph, which removes that failure
-// mode at the root.
-const HeroGraph3D = dynamic(() => import('@/components/landing/hero-graph-3d'), {
-  ssr: false,
-  loading: () => <HeroGraph />,
-})
-
-// Same palette the real in-app Twin graph uses (components/cognitive/
-// cognitive-graph-view.tsx KIND_COLOR) — the hero visual below is a lighter,
-// non-data-bound preview of the actual graph a signed-in user sees, not a
-// generic stock illustration. What you see here is what the product does.
-const NODE_COLOR = {
-  identity: '#818cf8',
-  energy: '#fbbf24',
-  bottleneck: '#fb7185',
-  signal: '#34d399',
-  metric: '#60a5fa',
-} as const
 
 const PIPELINE = [
   { icon: Eye, label: 'Observe', detail: 'Lee señales reales: tareas, foco, rutinas, horarios — no encuestas.' },
@@ -60,68 +34,6 @@ const DIFFERENTIATORS = [
     detail: 'El objetivo no es mostrarte más datos. Es responder una pregunta: ¿qué deberías hacer ahora mismo?',
   },
 ] as const
-
-function HeroGraph() {
-  // Fixed layout (no physics sim needed for a marketing preview) — same
-  // node/edge visual language as the real force-directed graph, at rest.
-  const nodes = [
-    { id: 'root', x: 160, y: 140, r: 20, color: '#ffffff', label: 'Tú' },
-    { id: 'identity', x: 60, y: 60, r: 12, color: NODE_COLOR.identity, label: 'Founder' },
-    { id: 'energy', x: 260, y: 55, r: 12, color: NODE_COLOR.energy, label: 'Night Owl' },
-    { id: 'signal', x: 40, y: 210, r: 10, color: NODE_COLOR.signal, label: 'Deep Work' },
-    { id: 'bottleneck', x: 270, y: 215, r: 11, color: NODE_COLOR.bottleneck, label: 'Context Switch' },
-    { id: 'metric', x: 160, y: 250, r: 9, color: NODE_COLOR.metric, label: '82%' },
-  ]
-  const edges: [string, string][] = [
-    ['root', 'identity'], ['root', 'energy'], ['root', 'signal'], ['root', 'bottleneck'], ['root', 'metric'],
-  ]
-  const byId = Object.fromEntries(nodes.map(n => [n.id, n]))
-
-  return (
-    <div className="relative w-full max-w-[440px] aspect-square mx-auto">
-      <div className="absolute inset-0 rounded-full blur-[80px] opacity-40" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
-      <svg viewBox="0 0 320 320" className="relative w-full h-full">
-        {edges.map(([a, b], i) => {
-          const na = byId[a], nb = byId[b]
-          return (
-            <motion.line
-              key={i}
-              x1={na.x} y1={na.y} x2={nb.x} y2={nb.y}
-              stroke="#ffffff2a" strokeWidth={1.25}
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.3 + i * 0.1, ease: 'easeOut' }}
-            />
-          )
-        })}
-        {nodes.map((n, i) => (
-          <motion.g
-            key={n.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ ...springConfig.gentle, delay: 0.2 + i * 0.08 }}
-          >
-            <motion.circle
-              cx={n.x} cy={n.y} r={n.r}
-              fill={n.color}
-              style={{ filter: `drop-shadow(0 0 ${n.r * 1.6}px ${n.color}aa)` }}
-              animate={{ scale: [1, 1.06, 1] }}
-              transition={{ duration: 4, repeat: Infinity, delay: i * 0.4, ease: 'easeInOut' }}
-            />
-            <text
-              x={n.x} y={n.y + n.r + 13}
-              textAnchor="middle"
-              className="select-none font-bold"
-              style={{ fontSize: n.id === 'root' ? 11 : 9, fill: '#ffffffcc' }}
-            >
-              {n.label}
-            </text>
-          </motion.g>
-        ))}
-      </svg>
-    </div>
-  )
-}
 
 function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) {
   const [scrolled, setScrolled] = useState(false)
@@ -225,7 +137,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ ...springConfig.gentle, delay: 0.1 }}
           >
-            <HeroGraph3D />
+            <div className="w-full max-w-[440px] aspect-square mx-auto" />
             <span className="mt-3 text-[10px] font-bold tracking-[0.2em] uppercase text-white/20 select-none">
               Arrastra el Twin — reacciona a ti
             </span>
