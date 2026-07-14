@@ -9,6 +9,7 @@ import { calendarService, getGoogleAccessToken } from '@/lib/google';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
 import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
+import { evaluateNotionThresholds } from '@/lib/cognitive/notion-signal';
 import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
 import type { BiometricPayload } from '@/types/biometrics';
 
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest) {
 
     // New scheduling problems worth surfacing get written to TwinEvolutionLog —
     // the same mechanism already powering the Bitácora and Twin Insight Toast.
-    // persistNewCalendarSignals dedupes per changeType per day on its own.
+    // persistNewPlatformSignals dedupes per changeType per day on its own.
     //
     // This re-fetches events and re-derives the signal via its own try/catch
     // rather than reusing the `events`/`calendarSignal` locals above, so a
@@ -156,6 +157,20 @@ export async function GET(req: NextRequest) {
         const peakEnd = energyCurve.peakFocusEnd || '11:00';
         const thresholdSignals = evaluateCalendarThresholds(events as any, calendarSignal, peakStart, peakEnd, now);
         await persistNewPlatformSignals(twinRecord.id, userId, thresholdSignals);
+      } catch {
+        // Non-critical — the report itself doesn't depend on this succeeding.
+      }
+    }
+
+    // Notion: same TwinEvolutionLog persistence path as Calendar above, but
+    // no re-fetch needed — notionItems (fetched earlier in this route for
+    // the task-list build) is already the exact shape evaluateNotionThresholds
+    // needs, and it's pure computation over already-fetched data, not a
+    // second network/API call the way Calendar's re-fetch is.
+    if (twinRecord) {
+      try {
+        const notionThresholdSignals = evaluateNotionThresholds(notionItems, now);
+        await persistNewPlatformSignals(twinRecord.id, userId, notionThresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
       }
