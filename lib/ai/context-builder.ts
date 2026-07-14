@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { User, UserSettings, UserCognitiveSnapshot } from '@prisma/client';
 import { CalendarAggregator } from '@/lib/calendar-aggregator';
 import { startOfDay, endOfDay } from 'date-fns';
+import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
 
 export interface CognitiveContext {
     system: {
@@ -36,6 +37,7 @@ export interface CognitiveContext {
         theme: string;
         compactMode: boolean;
     };
+    activeSignal: ActiveSignal | null;
 }
 
 export interface UserContext {
@@ -59,7 +61,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
             todayEvents,
             tasksList,
             routinesList,
-            projectsList
+            projectsList,
+            activeSignal
         ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
             // @ts-ignore
@@ -97,7 +100,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
                 where: { userId, status: 'in-progress' },
                 orderBy: { updatedAt: 'desc' },
                 take: 10
-            })
+            }),
+            getActiveSignal(userId)
         ]);
 
         const structuredContext: CognitiveContext = {
@@ -129,7 +133,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
                 language: settings?.language || 'en',
                 theme: settings?.theme || 'system',
                 compactMode: settings?.compactMode || false,
-            }
+            },
+            activeSignal
         };
 
         const summary = JSON.stringify(structuredContext, null, 2);
@@ -147,7 +152,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
             todaySchedule: [],
             metrics: { focusTimeToday: 0, productivityScore: 0, fatigueEstimate: 'low' },
             state: { overdueTasks: 0, activeTasks: 0, activeRoutines: 0, activeProjects: 0 },
-            preferences: { language: 'en', theme: 'system', compactMode: false }
+            preferences: { language: 'en', theme: 'system', compactMode: false },
+            activeSignal: null,
         };
 
         return {

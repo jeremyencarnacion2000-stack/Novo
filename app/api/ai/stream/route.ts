@@ -264,7 +264,11 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}`;
+        const activeSignalContext = context.structured.activeSignal
+            ? `\n\nSEÑAL ACTIVA HOY: ${context.structured.activeSignal.description}\nMenciónala solo si es relevante para lo que el usuario te está preguntando ahora mismo — no la saques a colación si no viene al caso en esta conversación.`
+            : '';
+
+        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}`;
 
         const cleanHistory = normalizeHistory(history || []);
 
