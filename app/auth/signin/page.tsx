@@ -237,6 +237,19 @@ function SlideToSignIn({ isLoading, enabled, onSwipeComplete }: SlideToSignInPro
     }
   }
 
+  // Keyboard equivalent for the drag gesture — a pointer-only "slide to sign
+  // in" control has no way to submit for keyboard/screen-reader users. Enter
+  // or Space acts exactly like a completed drag; no visual change for
+  // pointer users.
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (!enabled || isLoading) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      x.set(maxDrag)
+      onSwipeComplete()
+    }
+  }
+
   return (
     <div
       ref={(node) => {
@@ -261,18 +274,23 @@ function SlideToSignIn({ isLoading, enabled, onSwipeComplete }: SlideToSignInPro
         </span>
       </motion.div>
 
-      {/* Draggable Thumb */}
+      {/* Draggable Thumb — also a keyboard-operable button (Tab + Enter/Space) */}
       <motion.div
         ref={(node) => {
           if (node) setThumbWidth(node.getBoundingClientRect().width)
         }}
+        role="button"
+        tabIndex={enabled && !isLoading ? 0 : -1}
+        aria-label="Sign in"
+        aria-disabled={!enabled || isLoading}
+        onKeyDown={handleKeyDown}
         drag={enabled && !isLoading ? "x" : false}
         dragConstraints={{ left: 0, right: maxDrag }}
         dragElastic={0.05}
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        className={`h-10 w-10 rounded-lg bg-foreground text-background flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-colors select-none z-10 ${
+        className={`h-10 w-10 rounded-lg bg-foreground text-background flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-colors select-none z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           isLoading ? 'cursor-default' : ''
         }`}
       >

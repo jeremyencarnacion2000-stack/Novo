@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(endDate.getDate() - days)
 
-    const [dailyData, events] = await Promise.all([
+    const [dailyData, events, focusSessions] = await Promise.all([
       prisma.dailyAnalytics.findMany({
         where: {
           userId: userId,
@@ -41,7 +41,29 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { timestamp: 'desc' },
       }),
+      // DailyAnalytics.totalTime tracks generic app-session (tab-open) time,
+      // not dedicated focus work — using it for the "Focus Time" stat showed
+      // real elapsed session time as if it were focused work. FocusSession
+      // is the real source (the actual Pomodoro/focus-timer feature).
+      prisma.focusSession.findMany({
+        where: {
+          userId: userId,
+          sessionType: 'work',
+          startTime: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+      }),
     ])
+
+    // Real focus minutes per day (seconds, to match totalTime's existing unit)
+    const focusSecondsByDay = focusSessions.reduce((acc, s) => {
+      const dateStr = s.startTime.toISOString().split('T')[0]
+      const minutes = s.actualDuration ?? s.duration
+      acc[dateStr] = (acc[dateStr] || 0) + minutes * 60
+      return acc
+    }, {} as Record<string, number>)
 
     // Process events to get daily breakdowns
     const dailyBreakdown = events.reduce((acc, event) => {
@@ -55,33 +77,39 @@ export async function GET(request: NextRequest) {
       return acc
     }, {} as Record<string, { tasks: number; routines: number; habits: number }>)
 
-    // Merge dailyData with breakdown
+    // Merge dailyData with breakdown — totalTime is overridden with real
+    // focus-session minutes (see focusSecondsByDay above) instead of the
+    // generic app-session time DailyAnalytics itself tracks.
     const enrichedDailyData = dailyData.map(day => {
       const dateStr = day.date.toISOString().split('T')[0]
       const breakdown = dailyBreakdown[dateStr] || { tasks: 0, routines: 0, habits: 0 }
       return {
         ...day,
+        totalTime: focusSecondsByDay[dateStr] || 0,
         tasksCompleted: breakdown.tasks,
         routinesCompleted: breakdown.routines,
         habitsCompleted: breakdown.habits,
       }
     })
 
-    // If there are days with events but no DailyAnalytics record, add them
-    Object.keys(dailyBreakdown).forEach(dateStr => {
+    // If there are days with events or real focus sessions but no
+    // DailyAnalytics record, add them
+    const extraDayKeys = new Set([...Object.keys(dailyBreakdown), ...Object.keys(focusSecondsByDay)])
+    extraDayKeys.forEach(dateStr => {
       const hasRecord = enrichedDailyData.some(d => d.date.toISOString().split('T')[0] === dateStr)
       if (!hasRecord) {
+        const breakdown = dailyBreakdown[dateStr] || { tasks: 0, routines: 0, habits: 0 }
         enrichedDailyData.push({
           id: `generated-${dateStr}`,
           userId,
           date: new Date(dateStr),
-          totalTime: 0,
+          totalTime: focusSecondsByDay[dateStr] || 0,
           modulesUsed: '[]',
           completions: 0,
           productivityScore: 0,
-          tasksCompleted: dailyBreakdown[dateStr].tasks,
-          routinesCompleted: dailyBreakdown[dateStr].routines,
-          habitsCompleted: dailyBreakdown[dateStr].habits,
+          tasksCompleted: breakdown.tasks,
+          routinesCompleted: breakdown.routines,
+          habitsCompleted: breakdown.habits,
         } as any)
       }
     })
