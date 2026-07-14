@@ -148,8 +148,8 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Dominant visual: real product screenshot floating over a soft
-                  AI-generated illustration, not the old 3D graph. */}
+              {/* Dominant visual: gradient placeholder replacing the old 3D
+                  graph — swap for a real product screenshot when available. */}
               <HeroVisual />
 
               <motion.div
