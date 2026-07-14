@@ -8,7 +8,8 @@ import { logAICall } from '@/lib/ai-call-log';
 import { calendarService, getGoogleAccessToken } from '@/lib/google';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
-import { computeCalendarSignal, evaluateCalendarThresholds, persistNewCalendarSignals, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
+import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
+import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
 import type { BiometricPayload } from '@/types/biometrics';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -154,7 +155,7 @@ export async function GET(req: NextRequest) {
         const peakStart = energyCurve.peakFocusStart || '09:00';
         const peakEnd = energyCurve.peakFocusEnd || '11:00';
         const thresholdSignals = evaluateCalendarThresholds(events as any, calendarSignal, peakStart, peakEnd, now);
-        await persistNewCalendarSignals(twinRecord.id, userId, thresholdSignals);
+        await persistNewPlatformSignals(twinRecord.id, userId, thresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
       }
