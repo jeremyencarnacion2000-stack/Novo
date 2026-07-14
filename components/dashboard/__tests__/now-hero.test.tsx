@@ -25,12 +25,12 @@ describe('NowHero calendar override', () => {
       if (url.includes('/api/tasks')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
-      if (url.includes('/api/cognitive/decisions')) {
+      if (url.includes('/api/cognitive/active-signal')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([
-            { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas sin respiro hoy — considera un buffer.', createdAt: new Date().toISOString() },
-          ]),
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas sin respiro hoy — considera un buffer.', createdAt: new Date().toISOString(), platform: 'calendar' },
+          }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
@@ -53,12 +53,12 @@ describe('NowHero calendar override', () => {
           ]),
         });
       }
-      if (url.includes('/api/cognitive/decisions')) {
+      if (url.includes('/api/cognitive/active-signal')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([
-            { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas.', createdAt: new Date().toISOString() },
-          ]),
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas.', createdAt: new Date().toISOString(), platform: 'calendar' },
+          }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
@@ -81,12 +81,12 @@ describe('NowHero calendar override', () => {
           ]),
         });
       }
-      if (url.includes('/api/cognitive/decisions')) {
+      if (url.includes('/api/cognitive/active-signal')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([
-            { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas sin respiro hoy — considera un buffer.', createdAt: new Date().toISOString() },
-          ]),
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'calendar_meeting_overload', description: '3 reuniones seguidas sin respiro hoy — considera un buffer.', createdAt: new Date().toISOString(), platform: 'calendar' },
+          }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });

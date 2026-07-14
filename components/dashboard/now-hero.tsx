@@ -15,11 +15,12 @@ interface TaskLite {
   dueDate: string | null
 }
 
-interface DecisionEntry {
+interface PlatformSignalEntry {
   id: string
   changeType: string
   description: string
   createdAt: string
+  platform: 'notion' | 'calendar'
 }
 
 const PHASE_COPY: Record<string, string> = {
@@ -36,12 +37,6 @@ const FRICTION_TIP: Record<string, string> = {
   lack_of_structure: 'Bloquea 25 minutos ahora mismo, sin más planeación.',
 }
 
-function isToday(iso: string): boolean {
-  const d = new Date(iso)
-  const now = new Date()
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-}
-
 // The single decision that replaces the old cold-start card, which fabricated
 // clinical-sounding claims ("Impaired Sleep Debt Detected") for brand-new
 // accounts with zero real signal. Priority order: an overdue or high-priority
@@ -53,15 +48,15 @@ export function NowHero() {
   const { twin } = useCognitiveTwin()
   const phase = useCognitivePhase()
   const [task, setTask] = useState<TaskLite | null>(null)
-  const [calendarSignal, setCalendarSignal] = useState<DecisionEntry | null>(null)
+  const [platformSignal, setPlatformSignal] = useState<PlatformSignalEntry | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       fetch('/api/tasks?status=todo').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/cognitive/decisions').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/cognitive/active-signal').then((r) => (r.ok ? r.json() : { signal: null })),
     ])
-      .then(([tasks, decisions]: [TaskLite[], DecisionEntry[]]) => {
+      .then(([tasks, activeSignalResponse]: [TaskLite[], { signal: PlatformSignalEntry | null }]) => {
         const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
         const now = Date.now()
         const sorted = [...tasks].sort((a, b) => {
@@ -77,8 +72,7 @@ export function NowHero() {
           (!!topTask.dueDate && new Date(topTask.dueDate).getTime() < now) || topTask.priority === 'high'
         )
         if (!isUrgentTask) {
-          const todaysCalendarSignal = decisions.find((d) => d.changeType.startsWith('calendar_') && isToday(d.createdAt))
-          setCalendarSignal(todaysCalendarSignal ?? null)
+          setPlatformSignal(activeSignalResponse.signal)
         }
       })
       .catch(() => {})
@@ -97,11 +91,15 @@ export function NowHero() {
     return <div className="h-48 rounded-[28px] bg-foreground/[0.03] animate-pulse" />
   }
 
-  // A calendar signal only preempts a task when that task isn't urgent — a non-urgent
+  // A platform signal only preempts a task when that task isn't urgent — a non-urgent
   // task with no competing signal still beats onboarding/generic fallback copy.
-  const showCalendarSignal = !isUrgentTask && !!calendarSignal
-  const showTask = !!task && !showCalendarSignal
-  const linkHref = showTask ? '/checklist' : showCalendarSignal ? '/calendar' : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
+  const showPlatformSignal = !isUrgentTask && !!platformSignal
+  const showTask = !!task && !showPlatformSignal
+  const linkHref = showTask
+    ? '/checklist'
+    : showPlatformSignal
+      ? (platformSignal!.platform === 'notion' ? '/checklist' : '/calendar')
+      : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
@@ -121,10 +119,10 @@ export function NowHero() {
                 {isOverdue && <span className="text-red-400 font-medium"> · vencida</span>}
               </p>
             </>
-          ) : showCalendarSignal ? (
+          ) : showPlatformSignal ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
-                {calendarSignal!.description}
+                {platformSignal!.description}
               </h2>
               <p className="relative text-sm md:text-base text-foreground/60">{phaseCopy}</p>
             </>
@@ -150,7 +148,7 @@ export function NowHero() {
           )}
 
           <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-            {showTask ? 'Ir a la tarea' : showCalendarSignal ? 'Ver calendario' : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+            {showTask ? 'Ir a la tarea' : showPlatformSignal ? (platformSignal!.platform === 'notion' ? 'Ver tareas' : 'Ver calendario') : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </div>
       </Link>
