@@ -142,8 +142,8 @@ function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement>
         transition={{ type: 'spring', stiffness: 300, damping: 32 }}
         className={
           scrolled
-            ? 'max-w-5xl border border-white/[0.09] bg-[#0a0a0a]/70 backdrop-blur-2xl shadow-[0_16px_50px_rgba(0,0,0,0.5)]'
-            : 'max-w-7xl border-b border-white/[0.06] bg-[#050505]/80 backdrop-blur-xl'
+            ? 'max-w-5xl border border-[#241F19]/[0.09] bg-[#FBF6EF]/80 backdrop-blur-2xl shadow-[0_16px_50px_rgba(36,31,25,0.12)]'
+            : 'max-w-7xl border-b border-[#241F19]/[0.08] bg-[#FBF6EF]/90 backdrop-blur-xl'
         }
       >
         <div className="w-full px-6 h-16 flex items-center justify-between">
@@ -154,10 +154,10 @@ function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement>
             <span className="text-sm font-black tracking-[0.2em] uppercase">Novo</span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="#precios" className="hidden sm:inline text-sm font-medium text-white/60 hover:text-white transition-colors">
+            <a href="#precios" className="hidden sm:inline text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors">
               Precios
             </a>
-            <Link href="/auth/signin" className="text-sm font-medium text-white/60 hover:text-white transition-colors">
+            <Link href="/auth/signin" className="text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors">
               Iniciar sesión
             </Link>
             <Button asChild size="sm" className="shadow-[0_0_20px_rgba(99,102,241,0.35)] hover:shadow-[0_0_28px_rgba(99,102,241,0.55)]">
@@ -176,7 +176,7 @@ export default function LandingPage() {
   return (
     <div
       ref={scrollRef}
-      className="h-dvh w-full bg-[#050505] text-white overflow-y-auto overflow-x-hidden custom-scrollbar"
+      className="h-dvh w-full bg-[#FBF6EF] text-[#241F19] overflow-y-auto overflow-x-hidden custom-scrollbar"
       // Landing is a fixed-brand marketing surface — pin --primary to the Novo
       // indigo so it never inherits the user's in-app accent (e.g. orange),
       // which SettingsProvider writes onto :root globally.
@@ -473,13 +473,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-white/[0.06]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between text-xs text-white/40">
+      <footer className="border-t border-[#241F19]/[0.08]">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between text-xs text-[#241F19]/50">
           <span>© {new Date().getFullYear()} Novo · Cognitive Operating System</span>
           <div className="flex items-center gap-5">
-            <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacidad</Link>
-            <Link href="/terms" className="hover:text-white/70 transition-colors">Condiciones</Link>
-            <Link href="/auth/signin" className="hover:text-white/70 transition-colors">Iniciar sesión</Link>
+            <Link href="/privacy" className="hover:text-[#241F19] transition-colors">Privacidad</Link>
+            <Link href="/terms" className="hover:text-[#241F19] transition-colors">Condiciones</Link>
+            <Link href="/auth/signin" className="hover:text-[#241F19] transition-colors">Iniciar sesión</Link>
           </div>
         </div>
       </footer>
