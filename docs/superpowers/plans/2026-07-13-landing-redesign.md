@@ -18,35 +18,13 @@
 
 ---
 
-### Task 1: Capture real screenshot + generate AI illustration (asset prep)
+### Task 1: SKIPPED — real screenshot + AI illustration deferred
 
-**Files:**
-- Create: `public/landing/hero-ahora.png` (real screenshot)
-- Create: `public/landing/hero-illustration.png` (AI-generated warm illustration)
+**Status: not executed.** Two real blockers came up when this was attempted directly:
+1. Google blocks OAuth sign-in from CDP-automated Chrome (bot detection) — a live production screenshot via `agent-browser` isn't reachable that way, and there's no separate dev database to create a throwaway demo account against locally (`DATABASE_URL` in both `.env` and `.env.local` points at the same production Neon instance) — a local-credentials-login attempt also hit an unrelated client-side redirect bug on an extremely slow local dev server (multi-minute cold compiles) and was abandoned by user decision.
+2. No image-generation tool is available in this environment to produce the AI illustration.
 
-**Interfaces:**
-- Produces: two image files at the paths above. Task 4 (hero rewrite) references both by these exact paths. No other task depends on this one's output except Task 4.
-- `hero-ahora.png` must be a clean crop of just the "Ahora →" hero card (`components/dashboard/now-hero.tsx`), not the full dashboard chrome around it — the hero section will present it as a floating card, not a full-screen screenshot.
-
-- [ ] **Step 1: Capture the real "Ahora →" screenshot**
-
-Use the `agent-browser` skill against this session's existing dogfooding login (same account used for the prior visual-audit dogfooding pass). Navigate to the authenticated dashboard, wait for the "Ahora →" hero card (`components/dashboard/now-hero.tsx`) to render with real data (not a loading skeleton), and capture a cropped screenshot of just that card at a clean size (target ~1200px wide, consistent 2:1–ish aspect ratio so it composes well in a hero layout). Save to `public/landing/hero-ahora.png`.
-
-- [ ] **Step 2: Generate the AI warm illustration**
-
-Generate a warm, calm illustration (a person in a focused/calm moment — soft light, muted warm tones matching `#FBF6EF` background / `#E2703F` accent) suitable as a subtle hero background element (it must work at low opacity behind foreground text and the product screenshot — avoid busy detail or high contrast that would compete with the product shot in front of it). Save to `public/landing/hero-illustration.png`.
-
-- [ ] **Step 3: Verify both files exist and are reasonable**
-
-Run: `ls -la public/landing/hero-ahora.png public/landing/hero-illustration.png`
-Expected: both files present, each under 500KB (optimize/compress if larger — Next.js `<Image>` will still process them, but a bloated source file slows the build).
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add public/landing/hero-ahora.png public/landing/hero-illustration.png
-git commit -m "assets: real Ahora screenshot + AI hero illustration for landing redesign"
-```
+**Resolution (user-approved):** Task 4 below uses a CSS/SVG warm gradient shape as a placeholder hero visual instead of the two planned raster images — same mechanism the page already uses for its indigo glows, just recolored. No files are created by this task. When a real screenshot and/or illustration become available later, swap them into `HeroVisual` (Task 4) as a follow-up — that is a small, isolated change to one function.
 
 ---
 
@@ -192,11 +170,12 @@ git commit -m "refactor(landing): retire 3D neural-graph hero component"
 
 **Files:**
 - Modify: `app/landing/page.tsx:192-281` (hero `<section>`)
-- Modify: `app/landing/page.tsx` imports (add `useReducedMotion` from `framer-motion`, add `Image` usage if not already imported — `Image` is already imported at line 5)
+- Modify: `app/landing/page.tsx` imports (add `useReducedMotion` from `framer-motion`)
 
 **Interfaces:**
-- Consumes: `public/landing/hero-ahora.png`, `public/landing/hero-illustration.png` from Task 1. Palette tokens from Task 2 (`#FBF6EF`, `#241F19`, indigo unchanged).
+- Consumes: palette tokens from Task 2 (`#FBF6EF`, `#241F19`, indigo unchanged, terracotta `#E2703F`).
 - Produces: nothing further downstream depends on hero internals — Task 5/6 only touch other sections.
+- Note: Task 1 (real screenshot + AI illustration) was skipped — see Task 1's status note. `HeroVisual` below is a CSS/SVG gradient placeholder, not the two-image version originally planned. No `next/image` usage in this task; the existing `Image` import at line 5 stays for the pricing/other sections that don't use it either — it's fine if it ends up unused after this task, a later task doesn't remove it since `product-ai.png` (Task 5) still uses `next/image`.
 
 - [ ] **Step 1: Replace the hero section**
 
@@ -296,35 +275,18 @@ function HeroVisual() {
       animate={{ opacity: 1, scale: 1 }}
       transition={reduceMotion ? { duration: 0 } : { ...springConfig.gentle, delay: 0.1 }}
     >
-      <div className="relative w-full max-w-2xl mx-auto">
-        <Image
-          src="/landing/hero-illustration.png"
-          alt=""
-          width={900}
-          height={900}
-          className="absolute inset-0 w-full h-full object-cover rounded-[2rem] opacity-25 pointer-events-none select-none"
-          priority={false}
-        />
-        <div className="relative rounded-3xl border border-[#241F19]/[0.08] bg-[#FBF6EF]/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(36,31,25,0.15)] overflow-hidden">
-          <Image
-            src="/landing/hero-ahora.png"
-            alt="La tarjeta 'Ahora →' de Novo, mostrando la decisión real para hoy"
-            width={1200}
-            height={600}
-            className="w-full h-auto"
-            priority
-          />
-        </div>
+      {/* Placeholder visual — no real screenshot/illustration asset available
+          yet (see Task 1's status note in the plan). Warm gradient field,
+          same mechanism as the indigo glows elsewhere on this page, just
+          recolored. Swap for a real product shot when one exists. */}
+      <div className="relative w-full max-w-2xl aspect-[16/10] mx-auto rounded-[2rem] overflow-hidden border border-[#241F19]/[0.08] bg-[#FBF6EF]/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(36,31,25,0.15)]">
+        <div className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 rounded-full opacity-30 blur-[80px]" style={{ background: 'radial-gradient(circle, #E2703F 0%, transparent 70%)' }} />
+        <div className="absolute -bottom-1/4 -right-1/4 w-3/4 h-3/4 rounded-full opacity-25 blur-[90px]" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
       </div>
-      <span className="mt-3 text-[10px] font-bold tracking-[0.2em] uppercase text-[#241F19]/25 select-none">
-        Esto es lo que ves cada mañana
-      </span>
     </motion.div>
   )
 }
 ```
-
-`alt=""` on the background illustration is deliberate — it's pure decoration behind a labeled foreground image, so it should be invisible to screen readers rather than described.
 
 - [ ] **Step 3: Add the `useReducedMotion` import**
 
@@ -509,7 +471,7 @@ Expected: build succeeds, `/landing` appears in the route list as before (static
 
 - [ ] **Step 3: agent-browser QA pass — desktop**
 
-Use `agent-browser` to load `/landing` at a desktop viewport (~1440×900). Confirm: no horizontal overflow/scrollbar, hero screenshot and illustration both load (no broken-image icons), all section text is legible (no white-on-cream invisible text), Lenis smooth scroll is active, `FloatingNav` shrinks correctly on scroll, all CTA buttons link to `/auth/signup` and `/auth/signin` as before.
+Use `agent-browser` to load `/landing` at a desktop viewport (~1440×900). Confirm: no horizontal overflow/scrollbar, the hero's gradient placeholder renders (no broken-image icons anywhere, including the real `product-ai.png` screenshot further down the page), all section text is legible (no white-on-cream invisible text), Lenis smooth scroll is active, `FloatingNav` shrinks correctly on scroll, all CTA buttons link to `/auth/signup` and `/auth/signin` as before.
 
 - [ ] **Step 4: agent-browser QA pass — mobile**
 
