@@ -6,6 +6,7 @@ import { User, UserSettings, UserCognitiveSnapshot } from '@prisma/client';
 import { CalendarAggregator } from '@/lib/calendar-aggregator';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
+import { buildTwinContextSummary, type TwinContextSummary } from '@/lib/cognitive/twin-context';
 
 export interface CognitiveContext {
     system: {
@@ -38,6 +39,7 @@ export interface CognitiveContext {
         compactMode: boolean;
     };
     activeSignal: ActiveSignal | null;
+    twinContext: TwinContextSummary | null;
 }
 
 export interface UserContext {
@@ -45,7 +47,7 @@ export interface UserContext {
     structured: CognitiveContext;
 }
 
-export async function buildUserContext(userId: string): Promise<UserContext> {
+export async function buildUserContext(userId: string, options?: { twinMode?: boolean }): Promise<UserContext> {
     try {
         const now = new Date();
         const start = startOfDay(now);
@@ -104,6 +106,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
             getActiveSignal(userId)
         ]);
 
+        const twinContext = options?.twinMode ? await buildTwinContextSummary(userId) : null;
+
         const structuredContext: CognitiveContext = {
             system: {
                 timestamp: now.toISOString(),
@@ -134,7 +138,8 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
                 theme: settings?.theme || 'system',
                 compactMode: settings?.compactMode || false,
             },
-            activeSignal
+            activeSignal,
+            twinContext
         };
 
         const summary = JSON.stringify(structuredContext, null, 2);
@@ -154,6 +159,7 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
             state: { overdueTasks: 0, activeTasks: 0, activeRoutines: 0, activeProjects: 0 },
             preferences: { language: 'en', theme: 'system', compactMode: false },
             activeSignal: null,
+            twinContext: null,
         };
 
         return {
