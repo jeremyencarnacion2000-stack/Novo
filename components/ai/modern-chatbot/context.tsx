@@ -16,6 +16,7 @@ export function useChatbot() {
 const STORAGE_KEY = 'modern-chatbot-conversations';
 const SIDEBAR_KEY = 'modern-chatbot-sidebar-collapsed';
 const MODEL_KEY = 'modern-chatbot-selected-model';
+const TWIN_MODE_KEY = 'modern-chatbot-twin-mode';
 
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -28,6 +29,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // intent — restores the server's per-message routing for users who never
     // touch the model picker (the vast majority).
     const [selectedModel, setSelectedModel] = useState('auto');
+    const [twinMode, setTwinMode] = useState(false);
+    const [twinModeAvailable, setTwinModeAvailable] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -131,6 +134,25 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             setSelectedModel(finalModel);
             localStorage.setItem(MODEL_KEY, finalModel);
         }
+
+        fetch('/api/billing/status')
+            .then(r => r.ok ? r.json() : null)
+            .then(status => {
+                const isPro = status?.plan === 'pro';
+                setTwinModeAvailable(isPro);
+
+                const storedTwinMode = localStorage.getItem(TWIN_MODE_KEY);
+                if (storedTwinMode !== null) {
+                    // Respect an explicit prior choice, but never let a
+                    // stale "true" survive a plan downgrade.
+                    setTwinMode(isPro && storedTwinMode === 'true');
+                } else {
+                    // First run: Pro defaults on (immediate value
+                    // demonstration), Free defaults off (locked anyway).
+                    setTwinMode(isPro);
+                }
+            })
+            .catch(() => {});
     }, []);
 
     // Track which conversations are currently being saved to avoid duplicates
@@ -203,6 +225,11 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         localStorage.setItem(MODEL_KEY, selectedModel);
     }, [selectedModel]);
+
+    // Save Twin Mode preference
+    useEffect(() => {
+        localStorage.setItem(TWIN_MODE_KEY, twinMode.toString());
+    }, [twinMode]);
 
     const currentConversation = conversations.find(c => c.id === currentConversationId);
     const messages = currentConversation?.messages || [];
@@ -415,7 +442,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     history: history.map(m => ({ role: m.role, content: m.content })),
                     attachments: messageAttachments,
                     webSearchEnabled,
-                    model: selectedModel
+                    model: selectedModel,
+                    twinMode
                 })
             });
 
@@ -816,7 +844,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             setIsTyping(false);
             setStatusMessage(null);
         }
-    }, [currentConversationId, selectedModel]);
+    }, [currentConversationId, selectedModel, twinMode]);
 
     const confirmAction = useCallback(async (messageId: string, blockId: string) => {
         const conversation = conversations.find(c => c.id === currentConversationId);
@@ -1250,6 +1278,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         selectedModel,
         setSelectedModel,
         availableModels,
+        twinMode,
+        setTwinMode,
+        twinModeAvailable,
         isLoading,
         isTyping,
         streamingMessage,

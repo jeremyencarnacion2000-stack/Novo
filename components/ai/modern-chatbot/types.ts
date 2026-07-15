@@ -125,6 +125,11 @@ export interface ChatbotContextType {
     setSelectedModel: (modelId: string) => void;
     availableModels: AIModel[];
 
+    // Twin Mode (Pro-only)
+    twinMode: boolean;
+    setTwinMode: (enabled: boolean) => void;
+    twinModeAvailable: boolean;
+
     // Loading states
     isLoading: boolean;
     isTyping: boolean;
