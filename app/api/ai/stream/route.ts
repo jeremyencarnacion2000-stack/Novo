@@ -10,6 +10,7 @@ import type { IntentType } from '@/lib/ai/classifier';
 import { buildUserContext } from '@/lib/ai/context-builder';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
@@ -107,7 +108,17 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
         const userId = session?.user?.id || 'demo-user-id';
-        let { message, history, attachments, webSearchEnabled, model: requestedModel } = await request.json();
+
+        // Twin Mode is Pro-only — re-verify server-side on every request,
+        // never trust the client's requested value directly.
+        let twinMode = false;
+
+        let { message, history, attachments, webSearchEnabled, model: requestedModel, twinMode: requestedTwinMode } = await request.json();
+
+        if (requestedTwinMode) {
+            const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+            twinMode = user?.plan === 'pro';
+        }
 
         // Sanitize requestedModel to prevent obsolete model names causing Groq errors.
         // qwen-2.5-coder-32b was decommissioned by Groq; qwen/qwen3-32b is the current
@@ -162,7 +173,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. MEMORY LAYER (3-Layer Context)
-        const context = await buildUserContext(userId);
+        const context = await buildUserContext(userId, { twinMode });
         const userContext = context.summary;
 
         // 4. MODEL ORCHESTRA — Route to the best model for the task
@@ -268,7 +279,11 @@ export async function POST(request: NextRequest) {
             ? `\n\nSEÑAL ACTIVA HOY: ${context.structured.activeSignal.description}\nMenciónala solo si es relevante para lo que el usuario te está preguntando ahora mismo — no la saques a colación si no viene al caso en esta conversación.`
             : '';
 
-        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}`;
+        const twinContextStr = context.structured.twinContext
+            ? `\n\nPERFIL COMPLETO DEL TWIN (Modo Twin activo):\n${JSON.stringify(context.structured.twinContext, null, 2)}`
+            : '';
+
+        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}`;
 
         const cleanHistory = normalizeHistory(history || []);
 
