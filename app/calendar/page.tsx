@@ -241,8 +241,13 @@ export default function CalendarPage() {
           <div className="flex-1 flex flex-col min-w-0 h-full">
 
             {/* Cognitive banner */}
+            {/* mt-12 on mobile: the globally-fixed NotificationCenter bell
+                (components/notification-center.tsx, fixed top-16 right-4,
+                ~104px footprint from viewport top) otherwise overlaps this
+                banner's first line, since nothing above it on mobile reserves
+                that much top clearance. */}
             {isFatigue && (
-              <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-orange-500/20 bg-orange-500/5 px-4 py-2.5 text-xs text-orange-300">
+              <div className="mt-12 md:mt-0 mb-3 flex items-center gap-2.5 rounded-2xl border border-orange-500/20 bg-orange-500/5 px-4 py-2.5 text-xs text-orange-300">
                 <Brain className="h-3.5 w-3.5 flex-shrink-0" />
                 <span>Synaptic fatigue detected — complex tasks are dimmed. Consider a {bioState.minutesToNextPhase}-min recovery break.</span>
               </div>

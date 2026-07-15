@@ -999,7 +999,10 @@ export default function MusicPage() {
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="px-4 sm:px-6 lg:px-8 pb-32">
+            {/* pb-40: clears GeminiLiveOrb (bottom:5rem + 56px ≈ 136px) and,
+                when a track is playing, FloatingMusicWidget (bottom-[84px] +
+                68px ≈ 152px) — pb-32 (128px) wasn't enough for either. */}
+            <div className="px-4 sm:px-6 lg:px-8 pb-40">
               {error && (
                 <div className="p-3 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-200 text-sm">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />

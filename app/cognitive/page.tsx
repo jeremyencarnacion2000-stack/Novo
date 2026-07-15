@@ -307,8 +307,12 @@ export default function CognitivePage() {
           )}
 
           {/* Main content — Control Panel Layout */}
+          {/* pb-40 on mobile: clears GeminiLiveOrb's fixed bottom-right
+              button (bottom:5rem + 56px ≈ 136px), which otherwise overlaps
+              this page's last visible content — same root cause as
+              PageWrapper.tsx's pb-24→pb-40 fix. */}
           {report && signals && !loading && (
-            <div className="p-4 lg:p-6 space-y-6">
+            <div className="p-4 pb-40 lg:p-6 space-y-6">
 
               {/* ── Row 1: Hero State (full width) ─────────────────────────── */}
               <ScrollReveal>

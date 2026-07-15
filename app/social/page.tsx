@@ -194,7 +194,10 @@ export default function SocialPage() {
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-3 custom-scrollbar" data-lenis-prevent>
+          {/* pb-40 on mobile: clears GeminiLiveOrb's fixed bottom-right
+              button (bottom:5rem + 56px ≈ 136px) — same fix as the other
+              full-screen pages (music/cognitive/ai). */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-40 md:pb-3 custom-scrollbar" data-lenis-prevent>
             <AnimatePresence mode="wait">
 
               {/* ── Friends list ── */}
