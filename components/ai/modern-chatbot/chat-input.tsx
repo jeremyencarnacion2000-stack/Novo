@@ -5,6 +5,7 @@ import { Send, Plus, Loader2, Camera, Image, FileText, X, Globe } from 'lucide-r
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 import { ModelSelector } from './model-selector';
+import { TwinModeToggle } from './twin-mode-toggle';
 import { GlowingOrb, type OrbState } from './glowing-orb';
 
 const SUGGESTIONS = [
@@ -256,6 +257,8 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                 <div className="animate-in fade-in duration-300">
                                     <ModelSelector />
                                 </div>
+
+                                <TwinModeToggle />
                             </div>
 
                             {/* Right Controls */}
