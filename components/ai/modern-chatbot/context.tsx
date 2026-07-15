@@ -135,17 +135,22 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem(MODEL_KEY, finalModel);
         }
 
+        // Read before the "Save Twin Mode preference" effect below can run —
+        // that effect fires synchronously on mount (twinMode starts false)
+        // and writes "false" to this same key, so reading it lazily inside
+        // this .then() always saw "false" instead of the true first-run
+        // null, meaning Pro's "default on" branch could never fire.
+        const storedTwinModeAtMount = localStorage.getItem(TWIN_MODE_KEY);
         fetch('/api/billing/status')
             .then(r => r.ok ? r.json() : null)
             .then(status => {
                 const isPro = status?.plan === 'pro';
                 setTwinModeAvailable(isPro);
 
-                const storedTwinMode = localStorage.getItem(TWIN_MODE_KEY);
-                if (storedTwinMode !== null) {
+                if (storedTwinModeAtMount !== null) {
                     // Respect an explicit prior choice, but never let a
                     // stale "true" survive a plan downgrade.
-                    setTwinMode(isPro && storedTwinMode === 'true');
+                    setTwinMode(isPro && storedTwinModeAtMount === 'true');
                 } else {
                     // First run: Pro defaults on (immediate value
                     // demonstration), Free defaults off (locked anyway).
