@@ -68,7 +68,7 @@ export const gmailService = {
               <p>Hello ${userName || 'User'},</p>
               <p>It's been a while since your last focus session. Consistency is the key to mastering your productivity.</p>
               <p>Your projects and tasks are waiting for you. Ready to get back into the flow?</p>
-              <a href="${process.env.APP_URL || 'https://novo-desktop-mvp.vercel.app'}" class="button">Return to Dashboard</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://productivitynovo.vercel.app'}" class="button">Return to Dashboard</a>
               <p style="margin-top: 40px; font-size: 12px; color: rgba(255, 255, 255, 0.45);">
                   Sent from Novo Productivity Hub
               </p>

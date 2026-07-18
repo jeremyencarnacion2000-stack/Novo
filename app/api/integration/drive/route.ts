@@ -44,7 +44,7 @@ export async function GET() {
         connected: true,
         hasScope: hasDriveScope,
         scopes,
-        updatedAt: googleAccount.updatedAt || new Date(),
+        updatedAt: (googleAccount as any).updatedAt || new Date(),
     });
 }
 

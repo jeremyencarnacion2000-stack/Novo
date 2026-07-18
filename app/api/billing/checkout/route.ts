@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { stripe, STRIPE_PRICE_IDS, BillingInterval } from '@/lib/stripe'
+import { createLemonSqueezyCheckout, LEMONSQUEEZY_VARIANT_IDS, type BillingInterval } from '@/lib/lemonsqueezy'
 
-// Creates a Stripe Checkout session for the Novo Pro subscription. Reuses an
-// existing Stripe Customer if one was already created for this user (e.g. a
-// previous canceled subscription), so billing history stays on one customer.
+// Creates a Lemon Squeezy Checkout for the Novo Pro subscription. Lemon
+// Squeezy is the live billing path (Merchant of Record) since Stripe isn't
+// usable for accounts based in the Dominican Republic — see lib/stripe.ts
+// and app/api/webhooks/stripe/route.ts, left in place so Stripe auto-recovers
+// if it's ever enabled for this account.
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || !session.user.email) {
@@ -14,28 +15,16 @@ export async function POST(request: NextRequest) {
   }
 
   const { interval } = (await request.json().catch(() => ({}))) as { interval?: BillingInterval }
-  const priceId = STRIPE_PRICE_IDS[interval === 'year' ? 'year' : 'month']
-  if (!priceId) {
-    return NextResponse.json({ error: 'Stripe price not configured' }, { status: 500 })
+  const variantId = LEMONSQUEEZY_VARIANT_IDS[interval === 'year' ? 'year' : 'month']
+  if (!variantId) {
+    return NextResponse.json({ error: 'Lemon Squeezy variant not configured' }, { status: 500 })
   }
 
-  const existing = await prisma.subscription.findUnique({ where: { userId: session.user.id } })
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `https://${request.headers.get('host')}`
-
-  const checkoutSession = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    customer: existing?.stripeCustomerId,
-    customer_email: existing?.stripeCustomerId ? undefined : session.user.email,
-    client_reference_id: session.user.id,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${baseUrl}/settings?upgraded=1`,
-    cancel_url: `${baseUrl}/settings`,
-    subscription_data: {
-      metadata: { userId: session.user.id },
-    },
-    metadata: { userId: session.user.id },
+  const url = await createLemonSqueezyCheckout({
+    variantId,
+    userId: session.user.id,
+    email: session.user.email,
   })
 
-  return NextResponse.json({ url: checkoutSession.url })
+  return NextResponse.json({ url })
 }

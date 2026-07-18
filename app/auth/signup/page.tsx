@@ -26,8 +26,8 @@ export default function SignUpPage() {
 
         const fullName = `${firstName} ${lastName}`.trim()
 
-        if (password.length < 6) {
-            setError('Debe tener al menos 8 caracteres.')
+        if (password.length < 12) {
+            setError('Debe tener al menos 12 caracteres.')
             setLoading(false)
             return
         }
@@ -223,7 +223,7 @@ export default function SignUpPage() {
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
                             </div>
-                            <p className="text-xs text-foreground/25">Mínimo 8 caracteres.</p>
+                            <p className="text-xs text-foreground/25">Mínimo 12 caracteres.</p>
                         </div>
 
                         {error && (

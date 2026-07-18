@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
         // Upsert user settings
         const userSettings = await prisma.userSettings.upsert({
             where: { userId: session.user.id },
-            update: { settings },
+            update: { settings: settings as any },
             create: {
                 userId: session.user.id,
-                settings
+                settings: settings as any
             }
         })
 

@@ -374,7 +374,8 @@ model CalendarEvent {
   start       DateTime
   end         DateTime
   allDay      Boolean  @default(false)
-  source      String   @default("novo") // 'novo' | 'ai'
+  source      String   @default("novo") // 'novo' | 'ai' | 'google'
+  googleEventId String? // set when this event is synced to/from the user's Google Calendar
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
@@ -954,22 +955,30 @@ model AiActionLog {
   @@map("ai_action_logs")
 }
 
-// Stripe subscription state, one row per user. Source of truth for billing;
+// Subscription state, one row per user. Source of truth for billing;
 // User.plan is a denormalized copy kept in sync by the webhook, so gating
 // checks (e.g. lib/ai/executor.ts) don't need a join on every AI action.
+// provider distinguishes which billing platform owns this row — Stripe
+// isn't usable for accounts based in the Dominican Republic, so Lemon
+// Squeezy (a Merchant of Record) is the live path; Stripe fields/webhook
+// stay in place, unused, so Stripe auto-recovers if it's ever enabled.
 model Subscription {
-  id                   String    @id @default(cuid())
-  userId               String    @unique
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId     String    @unique
-  stripeSubscriptionId String?   @unique
-  stripePriceId        String?
-  status               String    @default("free") // 'free' | 'active' | 'past_due' | 'canceled'
-  interval             String?   // 'month' | 'year'
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean   @default(false)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                         String    @id @default(cuid())
+  userId                     String    @unique
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider                   String    @default("stripe") // 'stripe' | 'lemonsqueezy'
+  stripeCustomerId           String?   @unique
+  stripeSubscriptionId       String?   @unique
+  stripePriceId              String?
+  lemonsqueezyCustomerId     String?
+  lemonsqueezySubscriptionId String?   @unique
+  lemonsqueezyVariantId      String?
+  status                     String    @default("free") // 'free' | 'active' | 'past_due' | 'canceled'
+  interval                   String?   // 'month' | 'year'
+  currentPeriodEnd           DateTime?
+  cancelAtPeriodEnd          Boolean   @default(false)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   @@map("subscriptions")
 }
@@ -1072,6 +1081,7 @@ model CognitiveTwinRecord {
   trustLevel       String   @default("initial") // 'initial' | 'learning' | 'adapted' | 'validated'
   isInitialized    Boolean  @default(false)
   onboardingCompletedAt DateTime?              // Set once when onboarding finishes; never mutated by Evolution Engine
+  longTermGoal     String   @default("") // free-text 12-month goal captured during onboarding
 
   // Serialized JSON blobs — mirrors CognitiveTwin TypeScript interface
   identity         Json     @default("{}")
@@ -1157,6 +1167,36 @@ model TwinSnapshot {
   @@unique([twinId, snapshotDate]) // one snapshot per day
   @@index([userId, snapshotDate])
   @@map("twin_snapshots")
+}
+
+// ─── MCP OAuth 2.1 Authorization Server ──────────────────────────────────────
+// Backing store for oidc-provider (Novo acting as both the OAuth 2.1
+// Authorization Server and the MCP Resource Server — see lib/mcp/*). One
+// generic table because oidc-provider's Adapter interface is model-agnostic:
+// it stores every kind (Client, Grant, AccessToken, AuthorizationCode,
+// RefreshToken, Interaction, Session, ...) through the same 7 methods, keyed
+// by `type` + the library's own opaque id. accountId is a denormalized copy
+// of payload.accountId (when present) so a future "connected apps" page can
+// list/revoke a user's grants without parsing JSON.
+model OAuthModel {
+  id        String    @id @default(cuid())
+  type      String    // oidc-provider model kind, e.g. 'Client' | 'AccessToken' | 'Grant' | 'Interaction' | ...
+  modelId   String    // oidc-provider's own id/jti for this instance (opaque token value, jti, client_id, uid, ...)
+  payload   Json
+  grantId   String?
+  userCode  String?
+  uid       String?
+  accountId String?   // Novo userId, when this record belongs to one (tokens, grants, sessions)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([type, modelId])
+  @@index([type, grantId])
+  @@index([type, userCode])
+  @@index([type, uid])
+  @@index([type, accountId])
+  @@index([expiresAt])
+  @@map("oauth_models")
 }
 
 // ── External Service Integration Tokens ─────────────────────────────────────

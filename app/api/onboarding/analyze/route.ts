@@ -6,6 +6,7 @@ const SYSTEM_PROMPT = `You are Novo's onboarding analyst. Read the user's onboar
 
 Return ONLY valid JSON (no markdown) with exactly this shape:
 {
+  "longTermGoal": "clean, concise restatement (1 sentence, in Spanish) of the user's stated 12-month goal",
   "identity": { "role": "student|founder|developer|creator|professional", "industry": string, "focusStyle": string, "deepWorkCapacity": number },
   "energyCurve": { "chronotype": "morning_lark|night_owl|intermediate", "peakFocusStart": "HH:MM", "peakFocusEnd": "HH:MM", "typicalSlumpHour": number },
   "metrics": { "currentCognitiveLoad": number 0-100, "decisionFatigueRisk": "low|moderate|high", "burnoutIndex": number 0-100 },
@@ -26,10 +27,19 @@ async function analyzeWithLLM(textLog: string) {
     raw = (await groqAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'qwen/qwen3-32b')).content
   } catch (groqError) {
     console.error('[Onboarding Analyze] Groq failed, trying OpenRouter:', groqError)
-    raw = (await openRouterAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'qwen/qwen3-235b-a22b:free')).content
+    raw = (await openRouterAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'openai/gpt-oss-20b:free')).content
   }
   const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim()
   return JSON.parse(cleaned)
+}
+
+// The "goals" onboarding step is the only free-text question — its question
+// text always mentions "12 meses" (see STEPS in app/onboarding/page.tsx).
+// Grabbing the user reply that immediately follows it gives the raw goal
+// answer without the two files needing to share a schema.
+function extractGoalAnswer(messages: any[]): string {
+  const idx = messages.findIndex((m: any) => m.role === 'assistant' && /12 meses/i.test(m.content))
+  return idx >= 0 && messages[idx + 1]?.role === 'user' ? messages[idx + 1].content.trim() : ''
 }
 
 export async function POST(req: Request) {
@@ -38,9 +48,13 @@ export async function POST(req: Request) {
     const textLog = messages
       .map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`)
       .join('\n')
+    const rawGoalAnswer = extractGoalAnswer(messages)
 
     try {
       const profile = await analyzeWithLLM(textLog)
+      // Belt-and-suspenders: if the LLM ever drops the field, fall back to
+      // the raw text the user typed rather than losing the goal entirely.
+      profile.longTermGoal = profile.longTermGoal || rawGoalAnswer
       return NextResponse.json(profile)
     } catch (llmError) {
       console.error('[Onboarding Analyze] LLM analysis failed, falling back to heuristic parser:', llmError)
@@ -143,6 +157,9 @@ export async function POST(req: Request) {
     const fullNarrative = `Basándome en nuestra conversación, identifico tu perfil como un ${focusStyleName}. ${diagnosis} ${energyText} Hemos optimizado Novo para estructurar tu espacio alrededor de esta realidad.`
 
     return NextResponse.json({
+      // Simplest correct thing: pass through the raw text they typed, we
+      // have no LLM available here to clean it up.
+      longTermGoal: rawGoalAnswer,
       identity: {
         role,
         industry: role === 'founder' ? 'Startup' : role === 'student' ? 'Academia' : 'Tecnología',

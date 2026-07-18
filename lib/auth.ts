@@ -249,137 +249,36 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
         try {
-          console.log('🔐 [Authorize] ==================== START ====================')
-          console.log('📋 [Authorize] Credentials received:', {
-            email: credentials?.email,
-            hasPassword: !!credentials?.password,
-            passwordLength: credentials?.password?.length
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
           })
 
-          if (!credentials?.email || !credentials?.password) {
-            const error = new Error('Missing credentials')
-            console.error('❌ [Authorize] EXCEPTION: Missing email or password')
-            console.error('📊 [Authorize] Error Details:', {
-              name: error.name,
-              message: error.message,
-              stack: error.stack,
-              credentials: {
-                emailProvided: !!credentials?.email,
-                passwordProvided: !!credentials?.password
-              }
-            })
+          // Unknown email, or an OAuth-only account with no password set. Return
+          // null without distinguishing the two — never log the email or reveal
+          // whether it's registered (avoids PII in logs + user enumeration).
+          if (!user || !user.password) {
             return null
           }
 
-          try {
-            console.log('🔍 [Authorize] Querying database for user...')
-            const user = await prisma.user.findUnique({
-              where: { email: credentials.email },
-            })
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+          if (!isPasswordValid) {
+            return null
+          }
 
-            console.log('📊 [Authorize] Database query result:', {
-              userFound: !!user,
-              userId: user?.id,
-              userEmail: user?.email,
-              hasPassword: !!user?.password,
-              passwordHash: user?.password ? `${user.password.substring(0, 10)}...` : null
-            })
-
-            if (!user) {
-              const error = new Error('User not found in database')
-              console.error('❌ [Authorize] EXCEPTION: User does not exist')
-              console.error('📊 [Authorize] Error Details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack,
-                attemptedEmail: credentials.email,
-                timestamp: new Date().toISOString()
-              })
-              return null
-            }
-
-            if (!user.password) {
-              const error = new Error('User has no password (OAuth account)')
-              console.error('❌ [Authorize] EXCEPTION: User exists but has no password')
-              console.error('📊 [Authorize] Error Details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack,
-                userId: user.id,
-                userEmail: user.email,
-                suggestion: 'User may have registered with Google OAuth'
-              })
-              return null
-            }
-
-            try {
-              console.log('🔐 [Authorize] Comparing passwords...')
-              const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
-              console.log('📊 [Authorize] Password comparison result:', isPasswordValid)
-
-              if (!isPasswordValid) {
-                const error = new Error('Invalid password')
-                console.error('❌ [Authorize] EXCEPTION: Password does not match')
-                console.error('📊 [Authorize] Error Details:', {
-                  name: error.name,
-                  message: error.message,
-                  stack: error.stack,
-                  userId: user.id,
-                  userEmail: user.email,
-                  providedPasswordLength: credentials.password.length,
-                  storedHashLength: user.password.length
-                })
-                return null
-              }
-
-              console.log('✅ [Authorize] Authentication successful!')
-              console.log('📊 [Authorize] Returning user:', {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                hasImage: !!user.image
-              })
-              console.log('🔐 [Authorize] ==================== END (SUCCESS) ====================')
-
-              return {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                image: user.image,
-              }
-            } catch (bcryptError) {
-              console.error('💥 [Authorize] CRITICAL EXCEPTION in bcrypt.compare')
-              console.error('📊 [Authorize] Bcrypt Error Details:', {
-                name: (bcryptError as Error).name,
-                message: (bcryptError as Error).message,
-                stack: (bcryptError as Error).stack,
-                type: typeof bcryptError,
-                userId: user.id
-              })
-              throw bcryptError
-            }
-          } catch (dbError) {
-            console.error('💥 [Authorize] CRITICAL EXCEPTION in database query')
-            console.error('📊 [Authorize] Database Error Details:', {
-              name: (dbError as Error).name,
-              message: (dbError as Error).message,
-              stack: (dbError as Error).stack,
-              type: typeof dbError,
-              attemptedEmail: credentials.email
-            })
-            throw dbError
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
           }
         } catch (error) {
-          console.error('💥 [Authorize] CRITICAL UNHANDLED EXCEPTION')
-          console.error('📊 [Authorize] Exception Details:', {
-            name: (error as Error).name,
-            message: (error as Error).message,
-            stack: (error as Error).stack,
-            type: typeof error,
-            errorObject: error
-          })
-          console.error('🔐 [Authorize] ==================== END (FAILURE) ====================')
+          // Log the failure type only — never credentials, emails, or hashes.
+          console.error('[Authorize] Authentication error:', (error as Error).message)
           return null
         }
       },
@@ -389,11 +288,19 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'openid profile email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/drive.file',
+          scope: 'openid profile email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
           access_type: 'offline',
           prompt: 'consent'
         },
       },
+      // Without this, NextAuth's PrismaAdapter refuses to link this Google
+      // grant to an existing session (e.g. a user who signed up with a
+      // different method, or is re-granting broader scopes) and silently
+      // bounces to the sign-in page with no visible error — the "Conectar
+      // Google" button on /connectors looked like it did nothing. Google
+      // verifies email ownership itself, so trusting its email match here
+      // is the normal, accepted use of this flag for a known provider.
+      allowDangerousEmailAccountLinking: true,
     }),
     // Add Spotify Provider
     SpotifyProvider({
@@ -408,20 +315,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
-      console.log('🔑 [JWT Callback] Called at:', new Date().toISOString())
-      console.log('📋 [JWT Callback] Params:', {
-        hasAccount: !!account,
-        hasUser: !!user,
-        tokenEmail: token.email,
-        tokenSub: token.sub
-      })
-
       // Persist the OAuth access_token and refresh_token to the JWT token
       if (account) {
-        console.log('🔐 [JWT Callback] Account found, setting tokens')
-        console.log('📊 [JWT Callback] Provider:', account.provider)
-        console.log('🆔 [JWT Callback] Provider Account ID:', account.providerAccountId)
-
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at; // Store expiration time in seconds
@@ -432,30 +327,19 @@ export const authOptions: NextAuthOptions = {
       const shouldRefresh = token.expiresAt && (Date.now() / 1000) > (token.expiresAt - 60)
 
       if (shouldRefresh) {
-        console.log(`⏰ [JWT Callback] Access token expired/expiring for ${token.provider}. Triggering rotation...`)
         return refreshAccessToken(token)
       }
 
       // Add user ID to token
       if (user) {
-        console.log('👤 [JWT Callback] User found, adding ID to token')
-        console.log('🆔 [JWT Callback] User ID:', user.id)
         token.id = user.id;
         token.name = user.name;
         token.picture = user.image;
       }
 
-      console.log('✅ [JWT Callback] Returning token with id:', token.id)
       return token;
     },
     async session({ session, token }) {
-      console.log('🎫 [Session Callback] Called at:', new Date().toISOString())
-      console.log('📋 [Session Callback] Params:', {
-        sessionEmail: session.user.email,
-        tokenId: token.id,
-        tokenEmail: token.email
-      })
-
       // Send properties to the client, like an access_token and user id from a JWT.
       session.accessToken = token.accessToken as string;
       session.provider = token.provider as string; // Provider (google, spotify, etc.)
@@ -464,17 +348,23 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.name = token.name;
         session.user.image = token.picture;
-        console.log('✅ [Session Callback] User ID added to session:', session.user.id)
-      } else {
-        console.warn('⚠️ [Session Callback] No token ID found!')
       }
 
-      console.log('📤 [Session Callback] Returning session')
       return session;
     },
     async redirect({ url, baseUrl }) {
       console.log('🔄 [Redirect Callback] Called at:', new Date().toISOString())
       console.log('📋 [Redirect Callback] Params:', { url, baseUrl })
+
+      // The MCP OAuth consent screen sends unauthenticated users here via
+      // ?callbackUrl=/oauth/consent/<uid> and needs that resumed exactly —
+      // bouncing to '/' like every other sign-in would silently break the
+      // in-progress authorization flow.
+      if (url.includes('/oauth/consent/')) {
+        const redirectUrl = url.startsWith(baseUrl) ? url : `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`
+        console.log('✅ [Redirect Callback] Resuming OAuth consent flow:', redirectUrl)
+        return redirectUrl
+      }
 
       // Redirect Spotify users to /music, others to dashboard
       const redirectUrl = url.includes('spotify') || url.includes('/music')
