@@ -3,8 +3,10 @@ const nextConfig = {
   output: process.env.NEXT_PUBLIC_CAPACITOR === 'true' ? 'export' : undefined,
   reactStrictMode: true,
   compress: true,
+  // Type-check IS enforced at build time (tsc baseline is clean at 0 errors as of
+  // 2026-07-15). Keep it enforced so TS debt can't silently accumulate again.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     formats: ['image/avif', 'image/webp'],

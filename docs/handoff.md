@@ -1,4 +1,4 @@
-# Handoff — Novo session (2026-07-11)
+# Handoff — Novo session (2026-07-17)
 
 ## Project
 
@@ -10,13 +10,322 @@ Vercel at **https://productivitynovo.vercel.app**.
 
 **Why this matters right now:** Novo is competing in the "Build with Gemini
 XPRIZE" hackathon (Category 1, Education & Human Potential, $2M pool, **deadline
-Aug 17 2026**), judged on real revenue + "AI-Native Ops" (does the AI visibly/
-provably execute real decisions autonomously). The $500k prize funds scaling
-Novo *and* the user's other businesses. (Full context lives in the auto-memory
-system — `project-xprize-hackathon.md`, `project-xprize-priorities.md`,
+Aug 17 2026** — ~31 days out as of this session), judged on real revenue +
+"AI-Native Ops" (does the AI visibly/provably execute real decisions
+autonomously). The $500k prize funds scaling Novo *and* the user's other
+businesses. (Full context also lives in the auto-memory system —
+`project-xprize-hackathon.md`, `project-xprize-priorities.md`,
 `project-hackathon-stakes-succession.md`, `novo-product-philosophy.md`.)
 
-## State right now (2026-07-11)
+## State right now (2026-07-17)
+
+**Deployed to production**, verified after every change this session via
+`npx vercel deploy --prod --yes` + `npx vercel alias set <deployment-url>
+productivitynovo.vercel.app` (the custom domain does not auto-follow a new
+prod deploy — this manual alias step is required every time; capture the
+deployment URL directly from the deploy command's own output, don't pipe it
+through `tail` first or the URL gets lost). Workflow used this session:
+`NODE_OPTIONS="--max-old-space-size=8192" npx tsc --noEmit` (authoritative
+type-check) → `npx jest` (20/20 suites) → deploy → alias → live curl/API
+verification against real accounts before calling anything done.
+
+**Nothing has been committed to git this session** (or in prior sessions —
+`git status --short` still shows 70+ modified files). Deploys go straight from
+the working directory; commit status doesn't affect what's live. If a real git
+history is wanted at some point, that needs an explicit ask — never commit
+without being asked.
+
+A huge amount of AI-pipeline, generative-UI, chatbot-polish, and landing-page
+work shipped this session — see below.
+
+## What shipped this session (chronological-ish, grouped by theme)
+
+### AI pipeline correctness — several real, previously-undiscovered bugs
+
+- **Groq's primary model was wrong for the job.** `qwen/qwen3-32b` has a 6000
+  TPM free-tier limit; the ACTION_PROMPT (tools + skills + cognitive context)
+  alone tokenizes to ~7700 tokens under Qwen's tokenizer, so *every*
+  action-classified message (create task, plan, schedule, etc.) failed with a
+  413 `rate_limit_exceeded`. Verified live via the `x-ratelimit-limit-tokens`
+  response header across several Groq models; switched to
+  `llama-3.3-70b-versatile` (12000 TPM) everywhere it's used as primary. This
+  was likely silently breaking most real action requests before this session.
+- **A decommissioned Groq model (`llama3-8b-8192`, 404 on every call) was
+  hardcoded in three places**: `lib/ai/router.ts` (intent routing for the
+  now-dead `/api/ai/generate` endpoint), and — more importantly —
+  `lib/inngest/functions/daily-insights.ts` and
+  `lib/inngest/functions/process-focus-session.ts`, i.e. the autonomous
+  daily-insight cron path that's the project's literal "AI-Native Ops"
+  evidence for the hackathon judges. This had been silently failing/producing
+  nothing for however long. Fixed to `llama-3.1-8b-instant` in both.
+- **`reasoning_format: 'hidden'` regression, self-inflicted mid-session.**
+  Added it unconditionally to `lib/groq.ts` to stop qwen3-32b's `<think>`
+  trace leaking into chat responses — but that param is qwen3-specific and
+  broke every other model with a 400 "reasoning_format is not supported with
+  this model" the moment it shipped (caught via the cognitive-engine using
+  `llama-3.3-70b-versatile`). Now gated on `model.includes('qwen3')`.
+- **Cerebras added as a new fallback provider** (`lib/cerebras.ts`), wired into
+  both `/api/ai/generate`'s model list (replacing the old dead Grok slot) and
+  `/api/ai/stream`'s rescue chain (before the also-dead Gemini rescue). **Not
+  live yet** — the user's key authenticates fine (`GET /v1/models` → 200) but
+  any actual completion returns `402 payment_required_error`. Needs a payment
+  method added at cerebras.ai. This account's only available models are
+  `gemma-4-31b` / `zai-glm-4.7` / `gpt-oss-120b` (no Llama) — using
+  `gpt-oss-120b`. Code auto-recovers once billing is enabled, no further
+  changes needed.
+- **Gemini / Grok / DashScope remain billing/key-gated**, unchanged from
+  before this session (Gemini: free-tier quota structurally `limit: 0`, needs
+  Google Cloud billing; Grok: xAI account out of credits *and* a dead model
+  id `grok-2-1212`; DashScope: `401 Invalid API-key`, needs a fresh key). Grok
+  and DashScope are deliberately left in code behind `if (false && ...)`
+  gates in `app/api/ai/generate/route.ts` with dated comments — not deleted,
+  so they auto-recover once the user fixes the underlying account issue.
+- **The cognitive engine was hallucinating for brand-new users.** Tested with
+  a genuinely fresh throwaway account (zero tasks, zero focus sessions, zero
+  history) and got back: *"You have a historical pattern of high productivity
+  during your peak window, with an average focus score of 85 and a 7-day
+  completion rate of 50%..."* — entirely invented. Root cause:
+  `completionRate` silently defaulted to `50` for zero-task users (a
+  plausible-looking fake number), which then fed an AI prompt that
+  *unconditionally* instructed "one sentence about a historical pattern
+  detected" with no cold-start guard — even though this same file already had
+  a correctly-wired `isColdStart` guard for the task list and for the
+  deterministic fallback path, just never extended to this spot. Fixed in
+  `app/api/ai/cognitive-engine/route.ts`: `completionRate` is now `null` for
+  zero-task users, the prompt says "no data yet — this user has no task
+  history at all" instead of `null%`, and the `cognitiveMemory` instruction is
+  now conditional on `isColdStart`. Re-verified live with the same fresh
+  account: now correctly says *"Not enough history yet — this fills in as you
+  use Novo."*
+- **Generative UI mismatch fixed.** The assistant's own text narrates actions
+  as already done ("He creado tu tarea") per the system prompt's "you simply
+  DO things" rule — but a generic `confirmation` block was gating *every*
+  action, including plain creates, behind a manual Confirm click. Text said
+  "done", card said "are you sure?". Fixed in
+  `components/ai/modern-chatbot/context.tsx`: additive/reversible action types
+  (CREATE_TASK, CREATE_NOTE, CREATE_ROUTINE, GENERATE_FILE,
+  UPDATE_COGNITIVE_STATE, etc.) now auto-execute via the same
+  `/api/ai/execute` path and show a completed `result` block immediately;
+  destructive/mutating actions (DELETE_*, UPDATE_TASK, etc.) still require the
+  manual confirm — a misclassified id there is harder to walk back.
+- **`editMessage` (edit-and-resend in chat) refactored.** Was a ~140-line
+  duplicate of the stream-reading loop that only ever accumulated raw text —
+  no JSON action-block parsing at all, so an edited message that triggered an
+  action showed the model's literal ` ```json ` fence instead of a card. Now
+  delegates to `sendMessage` directly (same pattern `retryMessage` already
+  used) — down to ~12 lines, and edits get the full generative-UI pipeline.
+- **Intent classifier false-positive fixed.** "¿Qué puedes hacer por mí?" (a
+  generic question) was classified as `TASK` purely because "hacer" (a common
+  Spanish verb) matched the `actionVerbs` list, with *zero* entities detected
+  — `lib/ai/classifier.ts` defaulted to TASK on `hasActionVerb` alone. Now
+  requires an actual entity (tarea/rutina/proyecto/habito/nota) before
+  classifying as an action type; a bare action verb no longer suffices.
+  Verified live: same message now returns `intent: "GENERAL"`.
+
+### Chatbot UI
+
+- Fixed a "double dropdown" bug: the conversation-history drawer had its own
+  header/close button *and* the embedded `Sidebar` component had its own
+  separate collapse header/toggle stacked inside it. `Sidebar` now takes an
+  `embedded` prop that suppresses its own header and forces expanded state
+  when used inside the drawer. Removed the brain icon from the drawer header
+  (replaced with the same small glow-dot accent used elsewhere).
+- Redesigned the composer into a floating rounded card (`rounded-[28px]`,
+  glass blur, glow border on focus) instead of an edge-to-edge bar.
+- "Adjuntar"/"Herramientas" are now visible labeled pills (previously both
+  hidden behind one bare unlabeled "+"); "Herramientas" toggles web search
+  directly with one click instead of opening a popup for it. Added a mic
+  button next to send.
+- Added quick-suggestion chips + a subtitle line to the desktop empty-state
+  hero — the `SUGGESTIONS` array already existed in `chat-input.tsx` but was
+  never rendered on desktop (mobile already had its own hardcoded chip list).
+- **Theme unification**: 10 hardcoded near-black hex backgrounds across 8
+  chatbot files (`#030305`, `#0B0B0F`, `#09090e`, `#0d0d0f`, `#0a0f1e`) — all
+  slightly different shades, and completely unresponsive to the app's actual
+  light/dark theme setting — replaced with `var(--background)` /
+  `var(--popover)`, the same tokens the rest of the app uses. **Explicit
+  decision with the user**: did NOT rewrite the ~150 hardcoded `text-white`
+  instances across the chatbot (and app-wide) — dark-first is the intended
+  brand identity, not a bug, given the landing/onboarding are also
+  deliberately dark. Only fix if the user asks for real light-mode support.
+
+### Guided empty states (Notion "behind the scenes" video lens)
+
+Watched "Behind The Scenes Of Notion's INSANE Design" (Notion/Notion Mail team
+interview) — thesis: give people primitive building blocks + guided
+defaults (a new database shows 5 ghost placeholder rows, not 1), and a
+thousand invisible compounding details are what makes something *feel* cared
+for vs. merely functional. Applied directly: swept the app for bare "No X
+yet" text-only empty states and replaced the worst offenders with icon +
+reframed narrative (+ real Twin-data tips where relevant), matching the
+pattern that already existed on `today/page.tsx` and `routines-list.tsx`.
+
+Fixed: `components/checklist-client.tsx` (tasks — also surfaces the Twin's
+own friction-point tip via a newly-exported `FRICTION_TIP` from
+`components/dashboard/now-hero.tsx`, plus 3 ghost placeholder rows showing
+the shape of a filled list), `components/trackers/habit-trackers.tsx`,
+`components/trackers/metric-trackers.tsx`, `app/school/page.tsx` (courses),
+`app/business/page.tsx` (clients + content ideas), `components/profile/
+goals-manager.tsx`.
+
+Explicitly re-checked and left alone (already good — some better than what
+was built this session): `today/page.tsx`, `routines-list.tsx`,
+`notes/page.tsx`, `social/page.tsx`'s shared `EmptyState` component,
+`google-contacts.tsx` and `fitness-stats.tsx` (both already surface *real*
+permission-troubleshooting text), `book-recommendations.tsx`,
+`components/projects/tasks-view.tsx` (already uses a shared
+`NovoEmptyState` with a real action), `cognitive-insights.tsx`,
+`decision-feed.tsx` (already uses Twin-narrative framing),
+`dashboard-habits.tsx` (returns `null` when empty — intentional, a dashboard
+widget shouldn't show itself empty, not a bug).
+
+### Landing page — GSAP page transition
+
+Watched a second reference video ("This Page Transition Makes Your Next JS
+Site Look 10x More Expensive") showing a clip-path overlay reveal built on
+the native View Transitions API / `next-view-transitions`. **Conflict with an
+existing decision**: this project already chose GSAP Flip for shared-element
+modals specifically *because* of View Transitions' cross-browser
+inconsistency — same concern applies to page-level nav. Resolved by building
+the same visual effect with GSAP instead of adopting the native API.
+
+- `components/landing/page-transition-overlay.tsx` (new) —
+  `PageTransitionProvider` + `usePageTransition()` hook. A fixed full-screen
+  div GSAP-tweens via `clip-path: circle()` to cover the screen, calls
+  `router.push()`, waits a short fixed beat (Next.js App Router has no "new
+  page painted" event without the native API), then retracts. Has a
+  try/catch fallback: any GSAP failure navigates immediately rather than
+  stranding a conversion-critical click.
+- Wired into all 7 signup/signin CTA `<Link>`s in `app/landing/page.tsx` via
+  `onClick` + `preventDefault` — no restructuring of the existing
+  `Button asChild`/`Link` composition or styling.
+- `LandingPage` split into an outer wrapper (provides the context) and an
+  inner `LandingPageContent` (consumes `usePageTransition()`) since a
+  component can't provide and consume the same context.
+- **Not visually click-through verified.** tsc clean, jest green, confirmed a
+  clean console-error-free initial page load with correct content — but the
+  `gstack browse` tool crash-looped repeatedly all session (see Tooling notes
+  below) and a real click-through of the animation was never confirmed in a
+  working browser. Worth a manual test.
+
+## Official Devpost submission-requirements email (received 2026-07-17, 1 month out)
+
+Full detail in auto-memory `project-xprize-submission-checklist.md` — summary
+here since it changes a priority call below.
+
+**What to submit**: GitHub repo (shared with `testing@devpost.com` +
+`judging@hacker.fund` if private), a 3-minute video of the AI operating live
+in production (not a slideshow), a 500–1000 word written narrative, revenue
+evidence (Stripe export/bank statement + their P&L template, **monthly
+breakdown May–August** — needs real accumulated months, not a day-30 number),
+expenses (same P&L template, required even at $0), product evidence (agent
+execution logs/API usage/screenshots — Novo's `AiActionLog`/`TwinEvolutionLog`
+Bitácora feed already covers this), and customer evidence (real contact info
++ testimonials).
+
+Form also asks explicitly: **"If you use an LLM, how you use the Gemini API
+for at least one LLM call."** This reads as a hard submission requirement.
+Judging boils down to their own 3-part framing: Business Viability, AI-Native
+Operations, Category Impact.
+
+**This promotes Gemini from "billing-gated, lower priority than Cerebras" to
+the single highest-priority open item.** The submission form apparently
+expects at least one real, working Gemini API call — Gemini is currently
+non-functional (429, quota `limit: 0`). Root cause confirmed via live search:
+this is the standard symptom of **Cloud Billing not linked to the Google
+Cloud project** that owns `GEMINI_API_KEY` — not a code bug.
+
+**Google AI Pro (the consumer subscription) does NOT substitute for this.**
+Confirmed directly with the user: they asked whether having Google AI Pro
+means they can use the Gemini API — answer is no, these are separate billing
+systems. Google AI Pro *does* include $10/month in Google Cloud credit that
+applies toward Gemini API costs once billing is linked, so it's not wasted,
+but the linking step at console.cloud.google.com → Billing still has to
+happen first (~5 minutes per Google's own docs and confirmed developer
+reports). Novo uses `gemini-2.0-flash` (text model), so it should not be
+affected by the separate platform bug that hits some image-generation models
+even after billing is linked.
+
+## What has NOT been done / deliberately deferred
+
+1. **Gemini Cloud Billing link** — now the top-priority open item (see above)
+   given the submission form's explicit Gemini API question. Link a billing
+   account to the GCP project owning `GEMINI_API_KEY` at
+   console.cloud.google.com → Billing, then re-verify live (curl the
+   endpoint, confirm no 429) before assuming it's fixed.
+2. **Cerebras billing** — add a payment method at cerebras.ai to activate
+   that fallback tier. Code is ready and will start working automatically.
+   Now second priority behind Gemini, since Cerebras is an optional fallback
+   tier while a working Gemini call may be a literal submission requirement.
+3. **Grok / DashScope billing/keys** — same situation as prior
+   sessions, unchanged. Lower priority — Groq + OpenRouter already cover the
+   live path reliably.
+5. **Landing page transition — real browser click-test.** Load `/landing`,
+   click "Empezar gratis", confirm the circle-reveal plays and lands cleanly
+   on `/auth/signup`.
+6. **Git commits** — nothing committed this session or (per the archive
+   below) in prior sessions either. Only an explicit ask changes this.
+7. **Broader TypeScript debt** — not investigated this session; prior
+   sessions' `ignoreBuildErrors` note may be stale (a later session,
+   per auto-memory, turned build enforcement ON and got errors to 0 — verify
+   `next.config.mjs`'s current `typescript.ignoreBuildErrors` value before
+   assuming either way).
+8. Two throwaway test accounts left in the database from this session's live
+   verification: `novo-ai-audit-test-*@example.com`,
+   `novo-freshcheck-*@example.com`. Harmless, fine to leave or delete.
+9. Everything in the archived sessions below that was never explicitly
+   revisited (voice pipeline unification, 3D cognitive-graph upgrade, Lenis
+   on the landing page, the 3 dead chatbot files pending deletion go-ahead) —
+   check whether any of these are still relevant before assuming so, given
+   how much has shipped since.
+
+## Immediate next steps for the next session
+
+1. **Gemini Cloud Billing link** — highest priority, per the Devpost
+   submission form's explicit Gemini API question above. Confirm with the
+   user whether they've done this yet before anything else.
+2. Real browser click-test of the landing page transition.
+3. Nudge the user toward Cerebras billing if the model-orchestra
+   reliability comes up again — second priority, still in the user's control
+   (vs. code).
+4. Continue the "polish more wow features" thread the user opened — no fixed
+   plan was set for this; use judgment or ask where to focus.
+5. If the payment-worthiness question comes up again: the last honest answer
+   was "closer, not fully yes" — the cognitive engine now gives a genuinely
+   personalized first insight instead of hallucinating or falling back to
+   canned text, but the "aha moment" still needs to land in the **first
+   minute** for a brand-new user, not just once behavioral data accumulates.
+
+## Tooling notes (read before repeating mistakes)
+
+- **`gstack browse` was unstable all session** — repeatedly reset to
+  `about:blank` or crash-looped ("Server crashed twice in a row — aborting"),
+  across multiple unrelated attempts (onboarding flow clicks, landing page
+  loads, CSS-selector clicks). Don't sink much time re-fighting it in a single
+  session; fall back to `tsc`/`jest`/direct `curl` verification against real
+  API routes and real (throwaway) accounts, and be upfront with the user
+  about what specifically wasn't visually confirmed as a result.
+- **The command-safety classifier had an extended intermittent outage**
+  mid-session — trivial commands (`echo`) passed while `curl`/`tsc`/`jest`
+  kept returning "temporarily unavailable" for several minutes at a stretch.
+  Retrying eventually works; don't sleep-loop, just retry with brief gaps
+  (a quick trivial command in between is a fine way to probe recovery) and
+  keep the user informed rather than going silent.
+- **Deploy capture gotcha**: piping `vercel deploy --prod --yes` through
+  `tail` before capturing the deployment URL loses the URL (it's earlier in
+  the output than the last few lines). Redirect full output to a file first,
+  then `grep` the URL out of the file.
+- Verifying a fresh/cold-start user experience is worth doing via direct API
+  calls (`/api/auth/csrf` → `/api/auth/callback/credentials` → hit the target
+  route with the cookie jar) rather than fighting a browser tool through a
+  full onboarding click-through — much faster and just as valid for
+  API-level bugs like the cognitive-engine hallucination found this session.
+
+---
+
+# Archive — previous session (2026-07-11)
+
+## State at that time
 
 **Deployed to production**, verified after every change this session via
 `npx vercel deploy --prod --yes` + `npx vercel alias set <deployment-url>
@@ -79,6 +388,10 @@ Shipped, all reading real Prisma-backed data:
   the nav from `sticky` to `fixed` (real structural surgery, not a drop-in),
   which needs visual verification this session didn't have. User chose to
   wait rather than risk the site's most visible element blind.
+  **Update from 2026-07-17 session**: the landing page transition work that
+  session did was scoped to a GSAP overlay reveal on navigation, not Lenis —
+  this Lenis-on-landing item is still untouched as far as that session's
+  work indicates.
 
 ### Animation craft review (emilkowalski/skills, `review-animations`)
 User installed the skill collection via `npx skills@latest add
@@ -126,6 +439,11 @@ verdict format) against the app's motion code. Six real findings, all fixed:
   OpenAI-compatible endpoint, so the same SSE streaming code path works
   unchanged) as a new rescue tier in `app/api/ai/stream/route.ts`, ahead of
   the OpenRouter tier — an independent quota pool from Groq.
+  **Update from 2026-07-17 session**: OpenRouter is now confirmed *working*
+  live (verified via direct curl) — whatever the key issue was, it's
+  resolved as of that session. Gemini's rescue tier is now confirmed dead for
+  a different reason (billing-gated, `limit: 0`), and a new Cerebras rescue
+  tier was added ahead of it.
 - **The Twin never actually learned in production** — the real root cause
   behind "no se nota una IA adaptativa real." `lib/twin-signal.ts`'s
   `emitTwinSignal()` sent every behavioral signal (task completed, focus
@@ -240,27 +558,36 @@ stays visible above the chat panel.
   the Stripe Dashboard. End-to-end verified: real Checkout redirect,
   `400 Invalid signature` confirmed the webhook route is live and validating
   signatures (not just present).
+  **Update from 2026-07-17 session**: per auto-memory, prod Stripe is still
+  `sk_test_` (test mode) as of that session — real payments don't work until
+  the user activates their Stripe account for real and swaps in a live key.
+  Also: Stripe isn't available in the Dominican Republic; the user was
+  exploring a Merchant-of-Record alternative (Lemon Squeezy) as of that
+  session — check current status before assuming either path.
 - Test purchases made directly in the Stripe Dashboard (not through
   Novo's own checkout flow) don't carry `client_reference_id`/
   `metadata.userId`, so they never reach a real user's plan — this isn't a
   bug, just means testing has to go through Settings → Plan → the actual
   upgrade button, with a Stripe test card (`4242 4242 4242 4242`).
 
-## What has NOT been done / deliberately deferred
+## What has NOT been done / deliberately deferred (as of that session)
 
 1. **OpenRouter key is empty in Vercel** (401 on every request) — needs a
    real key from the user, then `vercel env add ... --no-sensitive --yes`.
+   **Resolved as of the 2026-07-17 session** — confirmed working live.
 2. **3D cognitive-graph upgrade** and **deep visual redesign of the landing
    page** — both explicitly held for a session with visual verification
    (screenshots or live browser), given the real regression risk of blind
    large visual changes on this codebase (documented prior break from a 3D/
-   fiber React-reconciler conflict).
+   fiber React-reconciler conflict). Still untouched as of 2026-07-17 aside
+   from the scoped GSAP page-transition addition (not a redesign).
 3. **Lenis smooth scroll on the landing page** — library is installed, the
    provider component (`components/smooth-scroll-provider.tsx`) is proven in
    production elsewhere (sidebar), but wiring it into the landing requires
    first moving `FloatingNav` from `sticky` to `fixed` (Lenis's
    content-transform breaks `position: sticky` descendants) — real
-   structural change, deferred pending visual verification.
+   structural change, deferred pending visual verification. Still untouched
+   as of 2026-07-17.
 4. **Cognitive Twin Profile section from the mockup** (Archetype "Strategic
    Builder", Focus Style "Deep Diver", Learning Style, etc.) and the
    mockup's invented insight percentages — explicitly rejected as
@@ -272,30 +599,20 @@ stays visible above the chat panel.
    showed ~76 pre-existing errors across the codebase (down from ~101 at a
    much earlier point this project — no regressions introduced this
    session, but not a clean baseline either). Not touched beyond confirming
-   no new errors after each change.
+   no new errors after each change. **Per auto-memory, a later session
+   before 2026-07-17 got this to 0 and turned `ignoreBuildErrors` OFF** —
+   verify current state, this note may be fully stale.
 6. Earlier-session deferred items (voice pipeline unification across
    `lib/ai/executor.ts` / `useGeminiLiveAgent.ts` / `lib/voice-executor.ts`,
    the 3 dead chatbot files, cognitive graph backlog) — see the archived
-   session below; not revisited this session.
-
-## Immediate next steps for the next session
-
-1. Get a real OpenRouter key from the user and configure it (restores the
-   3rd AI rescue tier).
-2. If the user wants to tackle the landing redesign or 3D graph: needs a
-   session with visual verification (screenshots, live browser, or the user
-   testing and reporting back) — don't attempt blind.
-3. If picking up Lenis on the landing: move `FloatingNav` to `fixed`
-   positioning first, verify visually, then wire
-   `SmoothScrollProvider scrollRef={scrollRef}` around the page content.
-4. Ask about the older deferred items below if they're still relevant
-   (dead chatbot files, voice pipeline unification, TS debt cleanup).
+   session below; not revisited as of 2026-07-17 either, as far as that
+   session's own handoff indicates.
 
 ---
 
-# Archive — previous session (2026-07-06 → 2026-07-07)
+# Archive — earlier session (2026-07-06 → 2026-07-07)
 
-Everything below is preserved from the prior handoff for historical context.
+Everything below is preserved from an earlier handoff for historical context.
 Dates/paths/line numbers may be stale — verify against current code before
 relying on specifics.
 
@@ -306,11 +623,11 @@ relying on specifics.
 `vercel deploy --prod --yes`, live at **https://productivitynovo.vercel.app**
 (readyState `READY`, last deployment id `dpl_H6cSnymrniraetBePjpoMKnnsa82`).
 **Nothing was committed to git** at that point — that session (like others
-before it) deployed straight from the working directory;
-`git status --short` still showed ~200+ uncommitted changed files. That's a
-pre-existing pattern in this project, not something to "fix" reflexively —
-but worth knowing if a session expects `git log`/`git diff` to reflect what's
-actually running in production (it won't).
+before it, and like every session since) deployed straight from the working
+directory; `git status --short` still showed ~200+ uncommitted changed files.
+That's a long-running pattern in this project, not something to "fix"
+reflexively — but worth knowing if a session expects `git log`/`git diff` to
+reflect what's actually running in production (it won't).
 
 ## That session's latest batch: mobile chat polish + a real cross-cutting layout bug
 
@@ -376,6 +693,10 @@ correction). Final state, all in `components/ai/modern-chatbot/`:
   quick chips, no suggestion cards (all removed to match the reference's
   minimalism). `MobileHero` unchanged (it already matched the reference well)
   aside from using the shared orb.
+  **Update from 2026-07-17 session**: `DesktopHero` regained a subtitle line
+  and quick-suggestion chips (re-added deliberately, not a regression of this
+  removal — the chips now reuse the same `SUGGESTIONS` data `chat-input.tsx`
+  already had, exported for reuse, rather than being a new hardcoded list).
 - `index.tsx` — now owns **one persistent** `<ChatInput variant="bottom">`,
   rendered as a sibling of the hero/chat-area swap, always docked at the
   bottom regardless of hero/active-chat state (previously `DesktopHero` had
@@ -387,6 +708,9 @@ correction). Final state, all in `components/ai/modern-chatbot/`:
   viewport, making `MobileHero` structurally unreachable (it lived inside
   `chat-area.tsx` behind a condition that could never be true there) — now
   both heroes render, gated by CSS breakpoint (`md:hidden`/`hidden md:flex`).
+  **Update from 2026-07-17 session**: the composer wrapper's styling changed
+  again — now a floating rounded card with margin on all sides instead of an
+  edge-to-edge gradient-fade bar (see that session's notes above).
 - `chat-area.tsx` — simplified to a pure message list: removed the
   now-fully-dead hero-fallback branch, removed a duplicate voice-overlay
   state (now solely owned by `index.tsx`), removed its own composer (moved to
@@ -422,18 +746,19 @@ second message in the same conversation, mobile + desktop viewports.
 
 **Was awaiting explicit user go-ahead to delete** (confirmed dead/
 unreferenced at the time; an auto-mode classifier blocked an unprompted `rm`
-since it was inferred rather than instructed): still not deleted as of this
-session —
+since it was inferred rather than instructed): still not deleted as of the
+2026-07-11 session, and no evidence the 2026-07-17 session revisited this
+either —
 - `components/ai/modern-chatbot/thinking-indicator.tsx` (superseded by `thinking-steps.tsx`)
 - `components/ai/floating-chatbot.tsx` (confirmed zero live importers at the time)
 - `components/__tests__/chatbot.test.tsx` (stale test for the above)
 
 **Known, out-of-scope issue surfaced during that session's verification —
-resolved this session (2026-07-11), see "Chatbot: three real bugs" above**:
-`components/ai/modern-chatbot/chatbot-sidebar.tsx` (the "OmniHub v2" companion
-panel) rendering its own composer/message actions sharing `useChatbot()`
-state turned out to hide a real no-op-callback bug, not just a duplicate-
-surface design question.
+resolved in the 2026-07-11 session, see that section's "Chatbot: three real
+bugs" above**: `components/ai/modern-chatbot/chatbot-sidebar.tsx` (the
+"OmniHub v2" companion panel) rendering its own composer/message actions
+sharing `useChatbot()` state turned out to hide a real no-op-callback bug,
+not just a duplicate-surface design question.
 
 ### Earlier in that session (deployed together with the above)
 - `lib/inngest/functions/process-twin-signal.ts` — fixed a real correctness
@@ -441,10 +766,11 @@ surface design question.
   `step.run` checkpoint boundary, but 4 inference rules (procrastination/
   overcommitment×2/cognitive-load) compared it against a real `Date` with
   `>=` — comparing mismatched stringified forms, not chronologically. Fixed
-  by re-hydrating to `Date` once at the load site. (Note: this session found
-  that Inngest itself was never receiving events in production at all — see
-  "The Twin never actually learned in production" above — so this fix only
-  started mattering once the inline-execution fix landed.)
+  by re-hydrating to `Date` once at the load site. (Note: the 2026-07-11
+  session found that Inngest itself was never receiving events in production
+  at all — see that section's "The Twin never actually learned in
+  production" — so this fix only started mattering once the inline-execution
+  fix landed there.)
 - `app/globals.css` — moved the entire "Novo Liquid Glass Tier System"
   (`.liquid-glass`, `-elevated`, `-premium`, `-hover` + dark overrides) from
   `@layer utilities` to `@layer components`, fixing a real bug where
@@ -460,9 +786,9 @@ surface design question.
   `components/cognitive/decision-feed.tsx` (new), `app/cognitive/page.tsx` —
   new "Bitácora del Twin" feed next to the graph, reading straight from
   `TwinEvolutionLog` — the audit-trail proof for the hackathon's "AI-Native
-  Ops" judging criterion. (This session added `AiActionLog` alongside it and
-  merged both into one feed — see the AI-Native Ops work; not re-detailed
-  here since it happened in a gap between the two handoff snapshots.)
+  Ops" judging criterion. (The 2026-07-11 session added `AiActionLog`
+  alongside it and merged both into one feed — not re-detailed here since it
+  happened in a gap between the two handoff snapshots at that time.)
 - `lib/cognitive-context.tsx` (`FatigueNavigationWarning` repositioned to
   `top-4 right-4`, was covering page `<h1>`s), `components/command-palette.tsx`
   + `components/mobile-section-drawer.tsx` (mobile search FAB reworked into a
@@ -473,7 +799,7 @@ surface design question.
   truncating to "…"), `app/cognitive/page.tsx` header (no longer wraps on
   mobile) — 4 fixes from an explicit visual-overflow audit the user requested.
 
-## What had NOT been done / deliberately deferred (as of that session)
+## What had NOT been done / deliberately deferred (as of that earlier session)
 
 1. **Voice pipeline unification** — the codebase has **three parallel,
    un-unified "AI takes an action" systems**: `lib/ai/executor.ts` (has real
@@ -482,26 +808,28 @@ surface design question.
    no confirmation), and `components/ai/VoiceCommandHub.tsx` +
    `lib/voice-executor.ts` (a third, Whisper-based pipeline). Flagged during
    that session's exploration, not touched — unifying them is a real,
-   separate, higher-risk project of its own. **Still not touched as of
-   2026-07-11.**
+   separate, higher-risk project of its own. No evidence any later session
+   through 2026-07-17 has touched this either — still open.
 2. **3D cognitive-graph upgrade** — the user shared a Three.js reference
    (`gemelo_cognitivo.html`, a force-directed 3D node sphere with
    `OrbitControls`) and said "con el esquema de ese grafo podemos hacer algo
    mas grande y mejor" — read as an idea for later, not an explicit
-   instruction. **Still deferred as of 2026-07-11**, now with an explicit
-   reason (needs visual verification, prior 3D attempt broke the app).
-3. **Broader TypeScript debt** — see current-session note above; the error
-   count has moved (74 → ~76) but the underlying decision (fix only
-   errors that are confirmed live bugs, leave the rest cataloged) is
-   unchanged.
+   instruction. Still deferred as of 2026-07-17 — the user explicitly chose a
+   "lightweight 2D enhancement only" for the cognitive graph in a later plan,
+   not the full 3D upgrade, per auto-memory. Worth confirming that decision
+   still stands before ever picking this back up.
+3. **Broader TypeScript debt** — see the 2026-07-11 section's note; per
+   auto-memory a session before 2026-07-17 got this to 0 errors with build
+   enforcement turned on. Treat this specific item as likely resolved, but
+   verify `next.config.mjs` before assuming.
 4. **Cognitive graph backlog** from an earlier audit, not yet implemented:
    wiring Calendar/Fit/Notion signals in as graph nodes (highest impact);
-   mobile tap not persisting node-selection highlight (**note: tap-to-select
-   was added this session (2026-07-11)** — worth checking if this backlog
-   item is now resolved); the force-layout `requestAnimationFrame` loop never
-   stops even at rest; more "insight" cross-link edges beyond the single
+   mobile tap not persisting node-selection highlight (tap-to-select was
+   added in the 2026-07-11 session — worth checking if this item is now
+   resolved); the force-layout `requestAnimationFrame` loop never stops even
+   at rest; more "insight" cross-link edges beyond the single
    bottleneck↔signal pairing.
 5. **The 3 dead chatbot files** and the **duplicate `ChatbotSidebar`
    composer** — the composer/message-actions half of this turned out to be a
-   real bug, fixed this session (see above). The 3 dead-file deletions are
-   **still pending explicit user go-ahead**.
+   real bug, fixed in the 2026-07-11 session. The 3 dead-file deletions are
+   **still pending explicit user go-ahead** as of 2026-07-17.

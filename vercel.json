@@ -1,4 +1,14 @@
 {
   "buildCommand": "pnpm run vercel-build",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/daily-insights",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/reengagement",
+      "schedule": "0 9 * * 1"
+    }
+  ]
 }

@@ -11,3 +11,5 @@ node_modules
 .env*.local
 .worktrees
 .superpowers
+.gstack/
+*.tsbuildinfo

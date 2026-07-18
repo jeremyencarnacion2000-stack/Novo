@@ -2,6 +2,8 @@
   "enabledPlugins": {
     "agent-browser@agent-browser": true,
     "superpowers@superpowers-dev": true,
-    "watch@claude-video": true
+    "watch@claude-video": true,
+    "impeccable@impeccable": true,
+    "taste-skill@taste-skill": true
   }
 }
