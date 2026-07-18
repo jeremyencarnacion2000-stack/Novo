@@ -9,7 +9,7 @@ import { useTranslation } from '@/lib/i18n'
 import { Card } from '@/components/ui/card'
 import React, { useEffect, useState, useCallback } from 'react'
 import { DashboardQuickView } from './dashboard/dashboard-quick-view'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { CognitiveEngineWidget } from '@/components/cognitive/cognitive-engine-widget'
 import { NowHero } from '@/components/dashboard/now-hero'
 import { springConfig } from '@/lib/design-tokens'
@@ -18,7 +18,7 @@ import { useCognitivePhase } from '@/lib/cognitive-context'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -28,7 +28,7 @@ const containerVariants = {
   }
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,

@@ -33,8 +33,17 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export function SettingsControlCenter() {
   const [activeTab, setActiveTab] = useState<Tab>('twin')
 
+  // No own scroll/max-height on the root below — this renders in two
+  // different scroll contexts (the /settings page route, via PageWrapper's
+  // own scroll container + pb-40 nav clearance; and SettingsModal's
+  // `flex-1 overflow-y-auto` panel). A `max-h-[85vh] overflow-y-auto` used
+  // to sit there, capping this at its own independent scroll region — on
+  // the page route that orphaned it from PageWrapper's bottom padding
+  // reserved for the fixed mobile nav, so the last tab's content (e.g. the
+  // accent color picker) could render right up against/under the nav
+  // instead of above it.
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto custom-scrollbar overflow-y-auto max-h-[85vh] pr-1">
+    <div className="w-full flex flex-col gap-6 max-w-4xl mx-auto">
       {/* Premium Navigation Hub */}
       <div
         className="flex overflow-x-auto gap-1 p-1 rounded-2xl bg-foreground/[0.02] border border-foreground/[0.05] sticky top-0 backdrop-blur-xl z-20"

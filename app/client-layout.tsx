@@ -85,11 +85,6 @@ const FloatingMusicWidget = dynamic(
   () => import('@/components/music/floating-music-widget').then(m => ({ default: m.FloatingMusicWidget })),
   { ssr: false }
 )
-const TwinInsightToast = dynamic(
-  () => import('@/components/cognitive/twin-insight-toast').then(m => ({ default: m.TwinInsightToast })),
-  { ssr: false }
-)
-
 // ─── Auth wrapper ────────────────────────────────────────────────────────────
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
@@ -171,7 +166,6 @@ function AuthenticatedWidgets() {
       <SettingsModal />
       <GeminiLiveOrb />
       <FloatingMusicWidget />
-      <TwinInsightToast />
     </>
   )
 }

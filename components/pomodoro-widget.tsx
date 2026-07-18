@@ -51,7 +51,15 @@ export function PomodoroWidget() {
                     // countdown stays visible instead of getting covered.
                     "fixed z-[55] shadow-2xl border-white/10",
                     isFocusPage
-                        ? "bottom-20 left-1/2 -translate-x-1/2 w-[calc(100vw-1.5rem)] max-w-[400px] h-16 rounded-full flex items-center px-6 justify-between bg-black/40 border border-white/20"
+                        // left-4/right-32 (not centered w-calc/max-w): GeminiLiveOrb
+                        // (components/ai/GeminiLiveOrb.tsx) floats fixed at
+                        // bottom:5rem/right:1rem, ~104px wide (settings gear + orb)
+                        // when disconnected, spanning the same bottom-20 vertical
+                        // band this pill used to center itself across full-width
+                        // into — the mic rendered on top of this pill's right edge
+                        // (it has the higher z-index). right-32 (128px) leaves
+                        // clearance so they sit side by side instead of stacking.
+                        ? "bottom-20 left-4 right-32 h-16 rounded-full flex items-center px-6 justify-between bg-black/40 border border-white/20"
                         // right-16 keeps clearance from ContextHub capsule (46px) on the right edge
                         : "top-6 right-16 w-[160px] p-4 rounded-3xl bg-black/40 border-white/10 flex flex-col items-center gap-3"
                 )}
@@ -68,8 +76,16 @@ export function PomodoroWidget() {
                     className="pointer-events-none"
                     style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
                 />
-                {/* Left Section: Badge */}
-                <motion.div layout className="flex items-center gap-2">
+                {/* Left Section: Badge — `relative z-10`: the GlassSurface
+                    backdrop above is `position:absolute` with z-index:0, which
+                    (per CSS stacking rules) paints AFTER non-positioned in-flow
+                    content regardless of DOM order — so without an explicit
+                    stacking context here, the glass/blur layer rendered on top
+                    of this content instead of behind it, blurring the badge
+                    and text themselves rather than just what's behind the
+                    widget. Same `relative z-10` pattern used in app/focus's
+                    own timer card and mobile-nav.tsx's active pill. */}
+                <motion.div layout className="relative z-10 flex items-center gap-2">
                     {!isFocusPage && <Timer className="h-3 w-3 text-muted-foreground" />}
                     <Badge variant="outline" className={cn(
                         "border-0 text-white font-medium transition-colors duration-500",
@@ -84,7 +100,7 @@ export function PomodoroWidget() {
                 <motion.div
                     layout
                     className={cn(
-                        "font-mono font-bold tabular-nums text-white",
+                        "relative z-10 font-mono font-bold tabular-nums text-white",
                         isFocusPage ? "text-2xl" : "text-3xl"
                     )}
                 >
@@ -92,7 +108,7 @@ export function PomodoroWidget() {
                 </motion.div>
 
                 {/* Right Section: Controls */}
-                <motion.div layout className="flex items-center gap-1">
+                <motion.div layout className="relative z-10 flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="sm"

@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Calendar, BarChart3, Bot, Timer,
     ListChecks, CheckSquare, KanbanSquare, TrendingUp,
     GraduationCap, Briefcase, BookOpen, Sparkles, Heart, Music, Users,
-    Settings, User, Search
+    Settings, User, Search, Plug
 } from 'lucide-react'
 
 interface MobileSectionDrawerProps {
@@ -33,6 +33,7 @@ const sections = [
             { title: 'Checklist', href: '/checklist', icon: CheckSquare },
             { title: 'Projects', href: '/projects', icon: KanbanSquare },
             { title: 'Trackers', href: '/trackers', icon: TrendingUp },
+            { title: 'Conectores', href: '/connectors', icon: Plug },
         ],
     },
     {
@@ -140,14 +141,14 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
                                                 className={cn(
                                                     "flex flex-col items-center gap-2.5 py-4 px-2 rounded-[22px] transition-all duration-200 active:scale-95",
                                                     active
-                                                        ? "bg-indigo-500/12 text-indigo-400 ring-1 ring-indigo-500/20"
+                                                        ? "bg-primary/12 text-primary ring-1 ring-primary/20"
                                                         : "bg-foreground/[0.02] text-foreground/35 hover:bg-foreground/[0.04] hover:text-foreground/50"
                                                 )}
                                             >
                                                 <div className={cn(
                                                     "h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
                                                     active
-                                                        ? "bg-indigo-500/15"
+                                                        ? "bg-primary/15"
                                                         : "bg-foreground/[0.03]"
                                                 )}>
                                                     <Icon className="h-[20px] w-[20px]" strokeWidth={active ? 1.8 : 1.4} />

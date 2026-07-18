@@ -148,9 +148,14 @@
   /* Glass System - Light Mode (Frosted White) */
   --glass-opacity: 0.3;
   --glass-opacity-high: 0.7;
-  --glass-blur: 24;
-  --glass-blur-px: 24px;
-  --glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+  /* Lowered from 24 — backdrop-filter is one of the most GPU-expensive CSS
+     effects, and this variable drives every liquid-glass tier app-wide
+     (measured: 126 backdrop-blur instances). 16 keeps the frosted look while
+     cutting compositing cost meaningfully on lower-end GPUs and reducing
+     jank during scroll/animation on pages with many glass cards at once. */
+  --glass-blur: 16;
+  --glass-blur-px: 16px;
+  --glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
   --glass-panel-bg: rgba(255, 255, 255, calc(var(--glass-opacity) + 0.15));
 
   --card-hero-bg: rgba(255, 255, 255, var(--glass-opacity-high));
@@ -238,8 +243,13 @@
   /* Glass System - Dark Mode (Crystalline - UPDATED) */
   --glass-opacity: 0.12;
   --glass-opacity-high: 0.35;
-  --glass-blur: 24;
-  --glass-blur-px: 24px;
+  /* Lowered from 24 — backdrop-filter is one of the most GPU-expensive CSS
+     effects, and this variable drives every liquid-glass tier app-wide
+     (measured: 126 backdrop-blur instances). 16 keeps the frosted look while
+     cutting compositing cost meaningfully on lower-end GPUs and reducing
+     jank during scroll/animation on pages with many glass cards at once. */
+  --glass-blur: 16;
+  --glass-blur-px: 16px;
 
   --glass-panel-bg: rgba(20, 20, 23, var(--glass-opacity));
   --glass-panel-border: rgba(255, 255, 255, 0.08);
@@ -492,7 +502,7 @@
 }
 
 @utility glass-blur-xl {
-  backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
 }
 
 /* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
@@ -687,6 +697,47 @@
     background-image: radial-gradient(circle at 50% -20%, rgba(255, 184, 0, 0.02), transparent 70%);
   }
 
+  /* ── Custom wallpaper: blurred + dimmed backdrop layer ──────────────────
+     settings-context.tsx computes --bg-image / --bg-blur-px / --bg-dimness
+     from the user's wallpaper + Auto Contrast sliders and toggles
+     `has-bg-image` on <body>, but until now nothing in CSS actually read
+     those three variables — the wallpaper rendered at full brightness with
+     zero blur, so every glass card (already correctly blurred/dimmed on
+     its own terms) was compositing against a background far busier and
+     brighter than the whole Liquid Glass system assumes, reading as "no
+     blur, no contrast" everywhere at once.
+
+     A ::before pseudo-element (not body's own background-image) carries
+     the blur — filter: blur() on body itself would blur real content too.
+     Oversized by 40px on every edge so the blur's own edge-softening
+     never reveals an unblurred sliver at the viewport boundary. A
+     separate ::after applies the dimness as a flat dark scrim on top,
+     driven by --bg-dimness (0–1) independent of the blur amount. */
+  body.has-bg-image {
+    background-image: none;
+  }
+
+  body.has-bg-image::before {
+    content: '';
+    position: fixed;
+    inset: -40px;
+    z-index: -2;
+    background-image: var(--bg-image);
+    background-size: cover;
+    background-position: center;
+    filter: blur(var(--bg-blur-px, 0px));
+    pointer-events: none;
+  }
+
+  body.has-bg-image::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: rgba(0, 0, 0, var(--bg-dimness, 0));
+    pointer-events: none;
+  }
+
   /* Scrollbar — Hidden for premium spatial layout where Capsule acts as scrollbar */
   ::-webkit-scrollbar {
     display: none;
@@ -731,11 +782,14 @@
    `fixed`, pushing the panel 16px off-screen). Moving the whole tier system
    here fixes it at the root for every current and future consumer. */
 @layer components {
-  /* Tier 1: Subtle — frosted glass, readable, everyday surfaces */
+  /* Tier 1: Subtle — frosted glass, readable, everyday surfaces
+     Blur trimmed ~30% (20→14 / 28→20 / 36→26 across tiers) — backdrop-filter
+     is one of the costliest CSS effects to composite, and this tier system
+     is the most-used glass surface in the app. Relative hierarchy preserved. */
   .liquid-glass,
   .liquid-glass-subtle {
     background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
+    backdrop-filter: blur(14px) saturate(150%) brightness(1.05);
     border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.60),
@@ -746,7 +800,7 @@
   .liquid-glass-elevated {
     position: relative;
     background: rgba(255, 255, 255, 0.60);
-    backdrop-filter: blur(28px) saturate(170%) brightness(1.06);
+    backdrop-filter: blur(20px) saturate(170%) brightness(1.06);
     border: 1px solid rgba(0, 0, 0, 0.10);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.70),
@@ -757,13 +811,17 @@
     position: absolute;
     inset: -1px;
     border-radius: inherit;
+    /* Was a multi-hue rainbow gradient — on saturated wallpapers (custom
+       backgrounds) the refracted hue bled through as a bright colored
+       fringe, reported as "doesn't match the app's aesthetic". Replaced
+       with the same monochrome sheen GlassSurface.tsx's own edge highlight
+       uses, so the effect stays but the color no longer depends on
+       whatever's behind the glass. */
     background: linear-gradient(
       135deg,
-      rgba(255, 100, 100, 0.12) 0%,
-      rgba(100, 255, 100, 0.08) 35%,
+      rgba(255, 255, 255, 0.22) 0%,
       transparent 50%,
-      rgba(100, 100, 255, 0.08) 65%,
-      rgba(255, 100, 255, 0.10) 100%
+      rgba(255, 255, 255, 0.08) 100%
     );
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
@@ -779,7 +837,7 @@
   .liquid-glass-premium {
     position: relative;
     background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(36px) saturate(180%) brightness(1.08);
+    backdrop-filter: blur(26px) saturate(180%) brightness(1.08);
     border: 1px solid rgba(0, 0, 0, 0.12);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.80),
@@ -790,15 +848,15 @@
     position: absolute;
     inset: -1px;
     border-radius: inherit;
+    /* Was a multi-hue rainbow gradient — same fix as .liquid-glass-elevated
+       above: it refracted the color of whatever wallpaper sat behind it
+       instead of reading as glass. Monochrome sheen, matches
+       GlassSurface.tsx's own edge highlight. */
     background: linear-gradient(
       135deg,
-      rgba(255, 80, 80, 0.18) 0%,
-      rgba(255, 200, 50, 0.10) 20%,
-      rgba(80, 255, 80, 0.12) 40%,
+      rgba(255, 255, 255, 0.28) 0%,
       transparent 50%,
-      rgba(80, 80, 255, 0.12) 60%,
-      rgba(200, 50, 255, 0.10) 80%,
-      rgba(255, 80, 120, 0.15) 100%
+      rgba(255, 255, 255, 0.10) 100%
     );
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
@@ -882,7 +940,7 @@
     inset: 0;
     border-radius: inherit;
     /* High frequency noise for premium feel */
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     opacity: 0.03;
     pointer-events: none;
     mix-blend-mode: overlay;
@@ -1119,7 +1177,12 @@
       radial-gradient(closest-side circle at 87.5% 50%,
         var(--secondary) 50%,
         #0000 0);
-    transition: transform var(--time) cubic-bezier(0.75, 0, 0.75, 1.3);
+    /* Slight overshoot kept (not flattened to ease-out-expo like the modal
+       transitions above) — this is a mechanical toggle-switch snap, a case
+       where a little spring is the domain-appropriate motion, not a "premium
+       chrome" element. Toned down from 1.3 to 1.12 so it reads as a snap
+       rather than a wobble. */
+    transition: transform var(--time) cubic-bezier(0.75, 0, 0.75, 1.12);
   }
 
   .liquid-switch:checked {
@@ -1387,7 +1450,11 @@
 ::view-transition-group(routine-form-modal),
 ::view-transition-group(import-routine-modal) {
   animation-duration: 0.58s;
-  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); /* Premium Frictional/Elastic Spring Curve */
+  /* ease-out-expo — same curve already used elsewhere in this file (lines
+     ~337/517/538/558) for the "premium" feel. Was an elastic/overshoot curve
+     (1.56 > 1) — real objects (and premium UI chrome like modals) decelerate
+     smoothly rather than springing past the target and settling back. */
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 ::view-transition-old(settings-window),
@@ -1403,10 +1470,11 @@
 ::view-transition-new(routine-detail-modal),
 ::view-transition-new(routine-form-modal),
 ::view-transition-new(import-routine-modal) {
-  animation: vt-scale-up-spring 0.58s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  /* Same ease-out-expo swap as the group rule above — was elastic overshoot. */
+  animation: vt-scale-up 0.58s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes vt-scale-up-spring {
+@keyframes vt-scale-up {
   from {
     transform: scale(0.93) translateY(4px);
     opacity: 0;
@@ -1729,11 +1797,16 @@ html.cognitive-reduced-capacity {
   transition: background-color 1.5s ease;
 }
 
-/* ── Attention score bar — driven by --cognitive-attention (set via JS hook) */
+/* ── Attention score bar — driven by --cognitive-attention (set via JS hook)
+   Fills via transform: scaleX (GPU-accelerated) instead of width, which
+   would trigger layout reflow on every score update. transform-origin: left
+   keeps it growing from the same edge a width-based bar would. */
 .cognitive-attention-bar {
-  width: calc(var(--cognitive-attention, 70) * 1%);
+  width: 100%;
+  transform: scaleX(calc(var(--cognitive-attention, 70) / 100));
+  transform-origin: left center;
   background: linear-gradient(90deg, var(--cognitive-accent), color-mix(in srgb, var(--cognitive-accent) 60%, white));
-  transition: width 2s cubic-bezier(0.25, 0.8, 0.25, 1), background 1.5s ease;
+  transition: transform 2s cubic-bezier(0.25, 0.8, 0.25, 1), background 1.5s ease;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

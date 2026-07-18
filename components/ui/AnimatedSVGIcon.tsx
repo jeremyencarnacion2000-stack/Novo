@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { motion, type HTMLMotionProps } from 'framer-motion'
+import { motion, type SVGMotionProps } from 'framer-motion'
 
 export type IconState =
   | 'sync'
@@ -18,7 +18,7 @@ export type IconState =
   | 'microphone'
   | 'clock'
 
-export interface AnimatedSVGIconProps extends Omit<HTMLMotionProps<'svg'>, 'state'> {
+export interface AnimatedSVGIconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'state'> {
   state: IconState
   size?: number
   color?: string

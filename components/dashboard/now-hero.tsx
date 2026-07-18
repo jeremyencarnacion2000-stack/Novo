@@ -30,7 +30,7 @@ const PHASE_COPY: Record<string, string> = {
   REDUCED_CAPACITY_MODE: 'Capacidad reducida ahora mismo — un paso pequeño basta.',
 }
 
-const FRICTION_TIP: Record<string, string> = {
+export const FRICTION_TIP: Record<string, string> = {
   procrastination: 'Empieza con el paso más pequeño posible — solo 2 minutos.',
   context_switching: 'Cierra todo lo demás y quédate en una sola cosa.',
   overcommitment: 'Elige solo UNA cosa. Lo demás espera.',

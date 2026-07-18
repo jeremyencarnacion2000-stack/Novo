@@ -41,7 +41,7 @@ interface PageWrapperProps {
 }
 
 export function PageWrapper({ children, className, isFullScreen = false }: PageWrapperProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
   const { setScrollContainer } = useScrollContainer()
   let phase = 'LINEAR_EXECUTION'
   try { phase = useCognitivePhase() } catch {}

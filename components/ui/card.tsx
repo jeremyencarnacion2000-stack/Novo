@@ -27,7 +27,12 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
         depth={8}
         blur={1}
         strength={50}
-        chromaticAberration={8}
+        // 8 was the "small widget" tier (60-160px); dashboard cards render at
+        // ~300-500px, where the established scale calls for 12-14 — at 8 the
+        // displacement barely spreads any pixels on a card this large, so the
+        // glass effect reads as almost invisible (see liquid-glass-aberration
+        // memory: undersized aberration on large panels looks invisible).
+        chromaticAberration={12}
         elevation="medium"
         contrastObserver
         className={cn(

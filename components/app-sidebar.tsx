@@ -28,6 +28,7 @@ import {
   HiOutlineBolt as Brain,
   HiOutlineUsers as Users,
   HiOutlineChevronDown as ChevronDown,
+  HiOutlinePuzzlePiece as Plug,
 } from 'react-icons/hi2'
 import {
   Sidebar,
@@ -147,6 +148,7 @@ export function AppSidebar() {
         { title: t('sidebar.checklist'), href: '/checklist', icon: CheckSquare },
         { title: t('sidebar.projects'), href: '/projects', icon: KanbanSquare },
         { title: t('sidebar.trackers'), href: '/trackers', icon: TrendingUp },
+        { title: t('sidebar.connectors'), href: '/connectors', icon: Plug },
       ],
     },
     {
@@ -165,13 +167,13 @@ export function AppSidebar() {
 
   // Filter, sort, and group items dynamically based on Cognitive Twin initialized state
   const navigation = React.useMemo(() => {
-    const enabledModules = twin.workspaceLayout?.enabledModules || ['today', 'ai', 'cognitive', 'focus', 'routines', 'checklist', 'projects', 'trackers', 'school', 'business', 'library', 'spiritual', 'social', 'appearance', 'music']
+    const enabledModules = twin.workspaceLayout?.enabledModules || ['today', 'ai', 'cognitive', 'focus', 'routines', 'checklist', 'projects', 'trackers', 'connectors', 'school', 'business', 'library', 'spiritual', 'social', 'appearance', 'music']
     const pinnedModules = twin.workspaceLayout?.pinnedModules || []
 
     const filteredGroups = rawNavigation.map((group) => {
       const items = group.items.filter((item) => {
         // Core dashboard items always visible
-        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus']
+        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus', '/connectors']
         if (coreHrefs.includes(item.href)) return true
         
         const moduleKey = item.href.replace('/', '')
@@ -180,7 +182,7 @@ export function AppSidebar() {
 
       // Sort items based on their order in enabledModules
       const sortedItems = [...items].sort((a, b) => {
-        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus']
+        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus', '/connectors']
         const aIsCore = coreHrefs.includes(a.href)
         const bIsCore = coreHrefs.includes(b.href)
         

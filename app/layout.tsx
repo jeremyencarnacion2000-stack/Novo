@@ -41,6 +41,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+        {/* Outfit — landing-only display font (app/landing/page.tsx scopes it via
+            an inline font-family on its root div). Loaded here, not next/font/google,
+            for the same offline/CI build-reliability reason as Inter above. Every
+            other page keeps --font-sans: Inter unchanged. */}
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&display=swap" rel="stylesheet" />
       </head>
       <body className="font-sans h-full antialiased relative">
         {/* Background Image is now applied directly to the body in settings-context.tsx */}

@@ -77,7 +77,7 @@ const FloatingMusicWidgetComponent = () => {
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
-  const isMusicPage = pathname.startsWith('/music');
+  const isMusicPage = !!pathname?.startsWith('/music');
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);

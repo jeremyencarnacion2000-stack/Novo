@@ -31,7 +31,7 @@ interface ArtistData {
 }
 
 export default function ArtistProfilePage() {
-  const { id } = useParams()
+  const { id } = useParams() ?? {}
   const [artist, setArtist] = useState<ArtistData | null>(null)
   const [loading, setLoading] = useState(true)
   const { playTrack, playPlaylist, currentTrack, isPlaying, togglePlayPause, likedTracks, toggleLike, followedArtists, toggleFollow } = usePlayerStore()

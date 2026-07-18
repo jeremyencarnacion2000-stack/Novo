@@ -256,22 +256,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--primary-foreground', '#ffffff')
 
 
-    // Check if background image is present
+    // Check if background image is present. The actual rendering (blurred
+    // via --bg-blur-px, dimmed via --bg-dimness) happens in a body::before/
+    // ::after pair in globals.css — body's own background-image is left
+    // alone on purpose now, since filter: blur() on body itself would blur
+    // real content, not just the wallpaper.
     if (settings.backgroundImage) {
       document.body.classList.add('has-bg-image')
       root.style.setProperty('--bg-image', `url(${settings.backgroundImage})`)
-      // Apply background image directly to body to bypass stacking context issues from SidebarProvider
-      document.body.style.backgroundImage = `url(${settings.backgroundImage})`
-      document.body.style.backgroundSize = 'cover'
-      document.body.style.backgroundPosition = 'center'
-      document.body.style.backgroundAttachment = 'fixed'
     } else {
       document.body.classList.remove('has-bg-image')
       root.style.removeProperty('--bg-image')
-      document.body.style.backgroundImage = ''
-      document.body.style.backgroundSize = ''
-      document.body.style.backgroundPosition = ''
-      document.body.style.backgroundAttachment = ''
     }
 
     // Set up listeners for auto themes

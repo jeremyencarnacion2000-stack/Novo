@@ -54,7 +54,7 @@ export function MobileNav() {
         { icon: Bot, path: '/ai', label: 'AI' },
     ]
 
-    const isCompactPath = pathname === '/ai' || pathname === '/music' || pathname.startsWith('/music/') || pathname === '/cognitive'
+    const isCompactPath = pathname === '/ai' || pathname === '/music' || !!pathname?.startsWith('/music/') || pathname === '/cognitive'
 
     return (
         <>

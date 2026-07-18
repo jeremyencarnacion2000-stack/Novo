@@ -39,16 +39,20 @@ export interface AppNotification {
 }
 
 // ── Icon + colour map ──────────────────────────────────────────────────────────
+// Restrained 3-tone system (matches dashboard-shell's TwinInsight card:
+// critical=red, warning=amber, default=foreground/primary) instead of one
+// saturated hue per type — the prior 6-color rainbow was the reported
+// inconsistency with the app's otherwise monochrome + accent aesthetic.
 const typeConfig: Record<
   NotificationType,
   { iconState: IconState; color: string; colorHex: string; bg: string; bloom: string }
 > = {
-  info:        { iconState: 'sync',        color: 'text-blue-400',    colorHex: '#60a5fa', bg: 'bg-blue-500/15',    bloom: 'rgba(59,130,246,0.25)' },
-  warning:     { iconState: 'recovery',    color: 'text-amber-400',   colorHex: '#fbbf24', bg: 'bg-amber-500/15',   bloom: 'rgba(245,158,11,0.25)' },
-  success:     { iconState: 'execution',   color: 'text-emerald-400', colorHex: '#34d399', bg: 'bg-emerald-500/15', bloom: 'rgba(52,211,153,0.25)' },
-  suggestion:  { iconState: 'prediction',  color: 'text-violet-400',  colorHex: '#a78bfa', bg: 'bg-violet-500/15',  bloom: 'rgba(139,92,246,0.25)' },
-  reminder:    { iconState: 'calendar',    color: 'text-orange-400',  colorHex: '#fb923c', bg: 'bg-orange-500/15',  bloom: 'rgba(251,146,60,0.25)' },
-  achievement: { iconState: 'thinking',    color: 'text-yellow-400',  colorHex: '#facc15', bg: 'bg-yellow-500/15',  bloom: 'rgba(250,204,21,0.3)'  },
+  info:        { iconState: 'sync',       color: 'text-foreground/70', colorHex: 'rgba(255,255,255,0.7)', bg: 'bg-foreground/[0.06]', bloom: 'rgba(255,255,255,0.12)' },
+  warning:     { iconState: 'recovery',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12',      bloom: 'rgba(245,158,11,0.22)' },
+  success:     { iconState: 'execution',  color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
+  suggestion:  { iconState: 'prediction', color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
+  reminder:    { iconState: 'calendar',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12',      bloom: 'rgba(245,158,11,0.22)' },
+  achievement: { iconState: 'thinking',   color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
 }
 
 // ── Time helper ────────────────────────────────────────────────────────────────
@@ -568,7 +572,7 @@ export function NotificationCenter() {
                 blur={1}
                 strength={60}
                 chromaticAberration={12}
-                backgroundColor="rgba(10, 10, 15, 0.5)"
+                backgroundColor="rgba(10, 10, 15, 0.9)"
                 className="w-full flex-1 flex flex-col max-h-[min(620px,calc(100vh-5rem))]"
               >
                 {/* Header */}
@@ -716,7 +720,7 @@ export function NotificationCenter() {
                         Se actualiza cada 5 min
                       </p>
                       <motion.button
-                        onClick={loadNotifications}
+                        onClick={() => loadNotifications(true)}
                         className="text-[10px] text-foreground/25 hover:text-primary transition-colors flex items-center gap-1"
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}

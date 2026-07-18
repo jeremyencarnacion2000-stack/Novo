@@ -39,7 +39,7 @@ export function useSessionTracking() {
 
         const userId = session.user.id
         const module = Object.entries(routeToModule).find(([route]) =>
-            pathname.startsWith(route)
+            pathname?.startsWith(route)
         )?.[1] || 'unknown'
 
         // If module changed, end previous session and start new one

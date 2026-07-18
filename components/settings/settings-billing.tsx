@@ -21,7 +21,7 @@ export function SettingsBilling() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<BillingStatus | null>(null)
   const [redirecting, setRedirecting] = useState<'checkout' | 'portal' | null>(null)
-  const confirmingUpgrade = searchParams.get('upgraded') === '1'
+  const confirmingUpgrade = searchParams?.get('upgraded') === '1'
   const toldRef = useRef(false)
 
   const loadStatus = () => fetch('/api/billing/status').then(res => res.json())

@@ -789,7 +789,7 @@ const ContextHubComponent = () => {
     };
   }, []);
 
-  if (pathname.includes('/auth') || pathname.includes('/signin') || pathname.includes('/welcome')) {
+  if (pathname?.includes('/auth') || pathname?.includes('/signin') || pathname?.includes('/welcome')) {
     return null;
   }
 
