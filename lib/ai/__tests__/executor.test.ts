@@ -2,6 +2,16 @@
 import { executeAIAction } from '../executor';
 import { prisma } from '@/lib/prisma';
 
+// Mock Google (executor.ts pulls this in for CREATE_EVENT's best-effort push
+// sync — mocked the same way other suites touching @/lib/google do, so this
+// test file doesn't drag next-auth's OAuth client chain into jsdom, which
+// crashes on missing TextEncoder). No token => sync is skipped silently.
+jest.mock('@/lib/google', () => ({
+    calendarService: { createEvent: jest.fn(), listEvents: jest.fn() },
+    gmailService: { sendEmail: jest.fn(), listUnread: jest.fn() },
+    getGoogleAccessToken: jest.fn().mockResolvedValue(null),
+}));
+
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
     prisma: {
@@ -9,24 +19,37 @@ jest.mock('@/lib/prisma', () => ({
             create: jest.fn(),
             update: jest.fn(),
             findUnique: jest.fn(),
+            findFirst: jest.fn(),
             findMany: jest.fn(),
         },
         workoutLog: {
             create: jest.fn(),
             update: jest.fn(),
             findUnique: jest.fn(),
+            findFirst: jest.fn(),
             count: jest.fn(),
         },
         task: {
             create: jest.fn(),
             update: jest.fn(),
+            findFirst: jest.fn(),
             findMany: jest.fn(),
             count: jest.fn(),
         },
         quickNote: {
             create: jest.fn(),
             update: jest.fn(),
+            findFirst: jest.fn(),
             findMany: jest.fn(),
+        },
+        // Consulted by checkFreePlanLimit (gate) — undefined return => not 'free' => no gate.
+        user: {
+            findUnique: jest.fn(),
+        },
+        // Best-effort audit log written after every action.
+        aiActionLog: {
+            create: jest.fn(),
+            count: jest.fn(),
         },
     },
 }));
@@ -68,6 +91,8 @@ describe('AI Executor', () => {
             payload: { routineId: 'routine-1' }
         };
 
+        // ID-ownership verification uses findFirst; the handler then reads via findUnique.
+        (prisma.routine.findFirst as jest.Mock).mockResolvedValue({ id: 'routine-1', name: 'Test Routine' });
         (prisma.routine.findUnique as jest.Mock).mockResolvedValue({ id: 'routine-1', name: 'Test Routine' });
         (prisma.workoutLog.create as jest.Mock).mockResolvedValue({ id: 'log-1' });
 
@@ -118,6 +143,6 @@ describe('AI Executor', () => {
         const result = await executeAIAction(action as any, userId);
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('No handler registered');
+        expect(result.error).toContain('Invalid action');
     });
 });

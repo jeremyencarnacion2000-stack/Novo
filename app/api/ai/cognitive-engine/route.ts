@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -46,6 +47,23 @@ export async function GET(req: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Autonomous daily wrap-up runs off organic traffic (see maybeRunDailyInsights).
+    // Fires after the response, self-guarded to at most once/day at 23:00 UTC.
+    after(async () => {
+      try {
+        const { maybeRunDailyInsights } = await import('@/lib/inngest/functions/daily-insights');
+        await maybeRunDailyInsights();
+      } catch (e) {
+        console.warn('[cognitive-engine] daily-insights trigger failed:', (e as Error).message);
+      }
+      try {
+        const { maybeRunReengagement } = await import('@/lib/inngest/functions/user-reengagement');
+        await maybeRunReengagement();
+      } catch (e) {
+        console.warn('[cognitive-engine] reengagement trigger failed:', (e as Error).message);
+      }
+    });
 
     const { searchParams } = new URL(req.url);
     const chronotypeOverride = searchParams.get('chronotype');
@@ -211,7 +229,12 @@ export async function GET(req: NextRequest) {
     const recentCompleted = completedTasks.filter(t =>
       new Date(t.updatedAt) >= sevenDaysAgo
     ).length;
-    const completionRate = tasks.length > 0 ? Math.round((recentCompleted / tasks.length) * 100) : 50;
+    // No silent 50% default for zero tasks — that fake-but-plausible number
+    // was what let the AI prompt below hallucinate a "historical completion
+    // pattern" for users with no history at all (see isColdStart usage in
+    // the prompt and instructions). null is the honest value here; only
+    // isColdStart-gated prompt text may say something about it.
+    const completionRate = tasks.length > 0 ? Math.round((recentCompleted / tasks.length) * 100) : null;
 
     // Focus session quality today
     const todayFocusSessions = focusSessions.filter(s =>
@@ -259,7 +282,7 @@ export async function GET(req: NextRequest) {
     // Procrastination signal
     const procrastinationScore = Math.min(100,
       (overdueTasks.length * 15) +
-      (completionRate < 30 ? 30 : 0) +
+      (completionRate !== null && completionRate < 30 ? 30 : 0) +
       (highPriorityPending.length > 3 ? 20 : 0)
     );
 
@@ -395,7 +418,7 @@ ${twinProfileContext}
 - High priority pending: ${highPriorityPending.length}
 - Today's tasks: ${todayTasks.length}
 - Overdue tasks: ${overdueTasks.length}
-- 7-day completion rate: ${completionRate}%
+- 7-day completion rate: ${completionRate !== null ? `${completionRate}%` : 'no data yet — this user has no task history at all'}
 
 ## Calendar (real commitments outside Novo)
 ${calendarSignal.connected
@@ -454,7 +477,9 @@ Return ONLY valid JSON (no markdown, no explanation outside JSON):
     }
   ],
   "recommendation": "One powerful, specific action the user should take RIGHT NOW based on their cognitive state",
-  "cognitiveMemory": "One sentence about a historical pattern detected from the data (e.g. task abandonment pattern, peak hour pattern)"
+  "cognitiveMemory": "${isColdStart
+        ? 'Since there is no task/focus history yet, say so plainly instead of inventing one — e.g. something like \\"Not enough history yet — this fills in as you use Novo.\\"'
+        : 'One sentence about a historical pattern detected from the data (e.g. task abandonment pattern, peak hour pattern)'}"
 }
 
 Rules:
@@ -463,7 +488,8 @@ Rules:
 - Keep reorganizedDay to top 8 tasks max
 - Make insights feel like they came from a real cognitive scientist, not generic advice
 - The "reason" for each task must reference specific data (e.g., "Scheduled at ${peakLabel} because your circadian peak is 95% capacity")
-- Be specific with numbers in detail fields`;
+- Be specific with numbers in detail fields
+${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim a "historical pattern", a completion rate, or past behavior you were not given — say plainly there is not enough data yet instead of inventing one.' : ''}`;
 
     let text = '';
     let successModel = '';
@@ -473,9 +499,16 @@ Rules:
       try {
         console.log('[Cognitive API] Attempting Gemini query...');
         const result = await logAICall(
-          { userId: session.user.id, provider: 'gemini', model: 'gemini-1.5-flash', purpose: 'cognitive_reorg' },
+          // gemini-1.5-flash was decommissioned — the native SDK returned 404
+          // "model not found for v1beta" on every call, so the engine's primary
+          // path was silently dead. gemini-2.0-flash is current. NOTE: this
+          // project's Gemini free tier is still structurally capped at 0
+          // (429 RESOURCE_EXHAUSTED, needs Google Cloud billing enabled), so
+          // this path only starts working once billing is turned on — until
+          // then the Groq fallback below carries the engine.
+          { userId: session.user.id, provider: 'gemini', model: 'gemini-2.0-flash', purpose: 'cognitive_reorg' },
           async () => {
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const geminiResult = await model.generateContent(prompt);
             return {
               content: geminiResult.response.text().trim(),
@@ -496,13 +529,20 @@ Rules:
       try {
         console.log('[Cognitive API] Falling back to Groq...');
         const result = await logAICall(
-          { userId: session.user.id, provider: 'groq', model: 'qwen/qwen3-32b', purpose: 'cognitive_reorg' },
+          // Was qwen/qwen3-32b, whose Groq free-tier limit is 6000 TPM — this
+          // engine's prompt (energy + tasks + calendar + biometrics + Notion)
+          // tokenizes well past that, so it 413'd on every real call and the
+          // "AI" report was always the deterministic local synthesis below,
+          // never actually AI. llama-3.3-70b-versatile has a 12000 TPM limit
+          // (verified via the x-ratelimit-limit-tokens header) and comfortably
+          // fits this prompt. Same root cause as the /api/ai/generate fix.
+          { userId: session.user.id, provider: 'groq', model: 'llama-3.3-70b-versatile', purpose: 'cognitive_reorg' },
           () => groqAPI.generateResponse(
             prompt,
             '',
             [],
             'You are NOVO\'s Adaptive Cognitive Engine — an elite performance intelligence system.',
-            'qwen/qwen3-32b'
+            'llama-3.3-70b-versatile'
           )
         );
         text = result.content.trim();
@@ -625,7 +665,9 @@ Rules:
         // sentence ("completion momentum stays high until overdue task
         // counts cross 5 units") that never changed regardless of the
         // user's actual data.
-        cognitiveMemory: `Your 7-day completion rate is ${completionRate}%${overdueTasks.length > 0 ? `, with ${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} currently overdue` : ', with nothing overdue right now'}.`
+        cognitiveMemory: isColdStart
+          ? 'Not enough history yet — this fills in as you use Novo.'
+          : `Your 7-day completion rate is ${completionRate}%${overdueTasks.length > 0 ? `, with ${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} currently overdue` : ', with nothing overdue right now'}.`
       };
       successModel = 'local-fallback';
     }

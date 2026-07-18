@@ -1,7 +1,6 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-// @ts-ignore
 import { User, UserSettings, UserCognitiveSnapshot } from '@prisma/client';
 import { CalendarAggregator } from '@/lib/calendar-aggregator';
 import { startOfDay, endOfDay } from 'date-fns';
@@ -67,7 +66,6 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             activeSignal
         ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
-            // @ts-ignore
             prisma.userCognitiveSnapshot.findUnique({ where: { userId } }),
             prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }),
             prisma.task.count({

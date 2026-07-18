@@ -6,7 +6,10 @@ import { authOptions } from '@/lib/auth';
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id || 'demo-user-id';
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = session.user.id;
 
         const { action } = await request.json();
 

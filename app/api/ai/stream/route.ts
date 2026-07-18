@@ -107,7 +107,10 @@ function selectModelForIntent(
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id || 'demo-user-id';
+        if (!session?.user?.id) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+        }
+        const userId = session.user.id;
 
         // Twin Mode is Pro-only — re-verify server-side on every request,
         // never trust the client's requested value directly.
@@ -385,6 +388,41 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             });
         }
 
+        // Cerebras Rescue: independent quota pool from Groq, and Cerebras's
+        // OpenAI-compatible endpoint means the same SSE streaming path below
+        // works unchanged. Placed before the Gemini rescue below because the
+        // Gemini rescue is currently dead in this project (free-tier quota
+        // structurally capped at 0 — needs Google Cloud billing enabled to
+        // ever succeed; see [[project-visual-audit-round2]] /
+        // [[project-landing-redesign-references]] context), so Cerebras is
+        // the tier that actually has a chance of rescuing the request before
+        // falling through to the paid OpenRouter tier.
+        if (!groqResponse.ok) {
+            const cerebrasKey = process.env.CEREBRAS_API_KEY;
+            if (cerebrasKey) {
+                console.warn('[Novo Brain] Groq exhausted. Activating Cerebras rescue...');
+                // Verified live against GET /v1/models 2026-07-17 — this
+                // account only has gemma-4-31b / zai-glm-4.7 / gpt-oss-120b.
+                finalModel = 'gpt-oss-120b';
+                isFallbackUsed = true;
+                modelLabel = '⚡ Cerebras (Rescate)';
+
+                groqResponse = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${cerebrasKey}`
+                    },
+                    body: JSON.stringify({
+                        model: finalModel,
+                        messages,
+                        temperature: 0.6,
+                        stream: true
+                    })
+                });
+            }
+        }
+
         // Gemini Direct Rescue: Groq's free tier shares one account-level daily
         // quota across ALL its models, so once it's exhausted every Groq fallback
         // above fails together. Gemini (Google AI) is a fully independent quota
@@ -394,7 +432,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         if (!groqResponse.ok) {
             const geminiKey = process.env.GEMINI_API_KEY;
             if (geminiKey) {
-                console.warn('[Novo Brain] Groq exhausted. Activating Gemini direct rescue...');
+                console.warn('[Novo Brain] Groq and Cerebras exhausted. Activating Gemini direct rescue...');
                 finalModel = 'gemini-2.0-flash';
                 isFallbackUsed = true;
                 modelLabel = '✨ Gemini (Rescate)';
@@ -535,7 +573,14 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     }
 
                     // 4. SYSTEM AGENT (Model B) - Wrapped in try/catch to maintain stream health
-                    const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META', 'COGNITIVE'];
+                    // GENERATE_FILE was missing here — SYSTEM_AGENT_PROMPT already documents
+                    // the GENERATE_FILE action schema and the client already parses/executes
+                    // it via confirmAction() -> /api/ai/execute, but without it in this list
+                    // the System Agent (which produces that JSON action block) never ran for
+                    // file-generation requests, so Model A's own conversational reply (which
+                    // has no tool access) just improvised "I created the file" with no real
+                    // action ever executing and no download button ever appearing.
+                    const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META', 'COGNITIVE', 'GENERATE_FILE'];
                     if (actionIntents.includes(classification.type)) {
                         try {
                             console.log('[Novo Brain] Triggering System Agent for:', classification.type);

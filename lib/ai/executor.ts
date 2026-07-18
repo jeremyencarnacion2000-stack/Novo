@@ -20,6 +20,7 @@ import {
     DeleteProjectAction,
     CreateEventAction,
     CreateTrackerAction,
+    SendEmailAction,
     CreateCourseAction,
     UpdateCourseAction,
     DeleteCourseAction,
@@ -29,6 +30,7 @@ import {
     CreateTasksAction
 } from './actions';
 import { ACTION_PERMISSIONS, AIPermission } from './permissions';
+import { calendarService, gmailService, getGoogleAccessToken } from '@/lib/google';
 
 // --- Interfaces ---
 
@@ -100,7 +102,10 @@ export async function executeAIAction(
 
     // Programmatic ID Verification Layer to prevent LLM ID hallucinations
     if (action.payload) {
-        const payload = action.payload;
+        // Runtime discriminates by actionType below, which TS can't follow across
+        // the payload union — access fields through a loose view (safe: every read
+        // is guarded by the matching actionType check).
+        const payload = action.payload as Record<string, any>;
         const actionType = (action.type || (action as any).name || '').toUpperCase();
         
         let idToVerify: string | undefined = undefined;
@@ -614,6 +619,30 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
             userId: ctx.userId,
         },
     });
+
+    // Best-effort push to the user's real Google Calendar. Never let a sync
+    // failure (no Google connection, expired token, API error) break event
+    // creation — most users don't have Google connected at all.
+    try {
+        const token = await getGoogleAccessToken(ctx.userId);
+        if (token) {
+            const googleEvent = await calendarService.createEvent(
+                title,
+                description || '',
+                event.start.toISOString(),
+                event.end.toISOString()
+            );
+            if (googleEvent?.id) {
+                await ctx.prisma.calendarEvent.update({
+                    where: { id: event.id },
+                    data: { googleEventId: googleEvent.id },
+                });
+            }
+        }
+    } catch (err) {
+        console.warn('[AI Executor] Google Calendar push sync failed (non-blocking):', err);
+    }
+
     return {
         success: true,
         data: event,
@@ -623,6 +652,45 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
             redirectPath: '/calendar'
         }
     };
+});
+
+// Gmail — unlike CREATE_EVENT's Google Calendar push (a best-effort side
+// effect alongside a Novo-internal create that always succeeds regardless),
+// sending an email IS the entire point of this action: no Novo-internal
+// fallback exists, so a missing/expired Gmail connection must fail loudly
+// instead of silently no-op'ing.
+registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
+    const { to, subject, body } = action.payload;
+    if (!to || !subject || !body) throw new Error("Recipient, subject, and body are required to send an email");
+
+    const token = await getGoogleAccessToken(ctx.userId);
+    if (!token) {
+        return {
+            success: false,
+            error: 'Gmail not connected',
+            message: 'Gmail no está conectado — conéctalo en /connectors para poder enviar correos.',
+        };
+    }
+
+    try {
+        const sent = await gmailService.sendEmail(to, subject, body);
+        return {
+            success: true,
+            data: sent,
+            message: `Correo enviado a ${to}.`,
+            metadata: {
+                sectionName: 'Gmail',
+                redirectPath: '/connectors'
+            }
+        };
+    } catch (err: any) {
+        console.error('[AI Executor] Gmail send failed:', err);
+        return {
+            success: false,
+            error: err?.message || 'Gmail send failed',
+            message: 'No se pudo enviar el correo. Verifica tu conexión con Gmail e intenta de nuevo.',
+        };
+    }
 });
 
 // Trackers
@@ -963,7 +1031,6 @@ registerActionHandler('UPDATE_COGNITIVE_STATE', async (action: any, ctx) => {
     } = action.payload;
 
     // 1. Update/Upsert the user's UserCognitiveSnapshot
-    // @ts-ignore
     const snapshot = await ctx.prisma.userCognitiveSnapshot.upsert({
         where: { userId: ctx.userId },
         create: {

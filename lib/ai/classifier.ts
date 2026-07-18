@@ -89,12 +89,17 @@ const QUIZ_KEYWORDS = [
 
 // Design keywords
 const DESIGN_KEYWORDS = [
-    'diseña', 'diseno', 'design', 'ui', 'ux', 'interfaz', 'interface',
+    'diseña', 'diseno', 'design', 'interfaz', 'interface',
     'maqueta', 'mockup', 'prototipo', 'prototype', 'wireframe',
     'layout', 'estilo', 'style', 'animacion', 'animation',
-    'responsivo', 'responsive', 'tema', 'theme', 'paleta', 'palette',
+    'responsivo', 'responsive', 'theme', 'paleta', 'palette',
     'tipografia', 'typography', 'iconos', 'icons'
 ];
+
+// Short/ambiguous design terms — matched only as whole words, otherwise they
+// hit common substrings: 'ui' in "quiero", 'ux' in "auxiliar", 'tema' in
+// "sistema"/"matematicas". (This was misclassifying any Spanish "quiero…" as DESIGN.)
+const DESIGN_WORD_KEYWORDS = ['ui', 'ux', 'tema'];
 
 // Cognitive, fatigue, sleep, and styling keywords
 const COGNITIVE_KEYWORDS = [
@@ -136,7 +141,8 @@ export function classifyIntent(message: string): IntentClassification {
     const isQuiz = QUIZ_KEYWORDS.some(kw => lowerMessage.includes(kw));
 
     // 6. Detect Design intent
-    const isDesign = DESIGN_KEYWORDS.some(kw => lowerMessage.includes(kw));
+    const isDesign = DESIGN_KEYWORDS.some(kw => lowerMessage.includes(kw))
+        || DESIGN_WORD_KEYWORDS.some(kw => new RegExp(`\\b${kw}\\b`).test(lowerMessage));
 
     // 6b. Detect Cognitive intent
     const isCognitive = COGNITIVE_KEYWORDS.some(kw => lowerMessage.includes(kw));
@@ -171,13 +177,19 @@ export function classifyIntent(message: string): IntentClassification {
     } else if (isExploration) {
         intentType = 'ROUTINE_EXPLORATION';
         confidence = 0.9;
-    } else if (hasActionVerb || entities.length > 0) {
+    } else if (entities.length > 0) {
+        // Requires an actual entity (tarea/rutina/proyecto/habito/nota), not
+        // just hasActionVerb alone — "hacer" (a generic Spanish verb meaning
+        // "to do") matched actionVerbs and made bare questions like "¿Qué
+        // puedes hacer por mí?" default to TASK with zero entities detected,
+        // which then triggered the action-only System Agent pipeline for a
+        // message that wasn't asking to create anything. hasActionVerb still
+        // narrows confidence below but no longer classifies alone.
         if (entities.includes('routine')) intentType = 'ROUTINE';
         else if (entities.includes('project')) intentType = 'PROJECT';
         else if (entities.includes('task')) intentType = 'TASK';
-        else if (hasActionVerb) intentType = 'TASK'; // Default action
-        else intentType = 'SYSTEM_META';
-        confidence = 0.9;
+        else intentType = 'SYSTEM_META'; // habit/note entity, no more specific bucket
+        confidence = hasActionVerb ? 0.9 : 0.75;
     } else if (isStudy) {
         intentType = 'STUDY';
         confidence = 0.85;

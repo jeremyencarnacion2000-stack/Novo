@@ -26,7 +26,7 @@ export class GeminiAPIClient {
   private genAI: GoogleGenerativeAI;
 
   private constructor() {
-    this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY!);
   }
 
   static getInstance(): GeminiAPIClient {

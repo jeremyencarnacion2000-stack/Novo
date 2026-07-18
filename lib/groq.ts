@@ -89,7 +89,14 @@ export class GroqAPIClient {
                     temperature,
                     max_tokens: 4096,
                     top_p: 0.95,
-                    stream: false
+                    stream: false,
+                    // Only qwen3 models are reasoning models that emit a
+                    // <think>...</think> trace as literal content — sending
+                    // this param to any other model (llama, gpt-oss, etc.)
+                    // is a 400 "reasoning_format is not supported with this
+                    // model", which took down every non-qwen3 caller of this
+                    // client the first time it shipped unconditionally.
+                    ...(model.includes('qwen3') ? { reasoning_format: 'hidden' } : {})
                 })
             });
 
@@ -107,7 +114,11 @@ export class GroqAPIClient {
                 throw new Error('No response from Groq API');
             }
 
-            const content = data.choices[0].message.content || '';
+            // Defensive strip: if reasoning_format:'hidden' isn't honored for this
+            // model, don't let the raw <think> trace leak into the user-facing chat.
+            const content = (data.choices[0].message.content || '')
+                .replace(/<think>[\s\S]*?<\/think>/gi, '')
+                .trim();
 
             console.log('Groq API: Response received, length:', content.length);
 

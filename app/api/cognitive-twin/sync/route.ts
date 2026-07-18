@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       confidenceScore,
       isInitialized,
       onboardingCompletedAt,
+      longTermGoal,
     } = body
 
     const existing = await prisma.cognitiveTwinRecord.findUnique({
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
       ...(workspaceLayout !== undefined && { workspaceLayout }),
       ...(confidenceScore !== undefined && { confidenceScore }),
       ...(isInitialized !== undefined && { isInitialized }),
+      ...(longTermGoal !== undefined && { longTermGoal }),
       // Use provided timestamp if given; otherwise set to now on first init
       ...(shouldSetOnboardingDate && {
         onboardingCompletedAt: onboardingCompletedAt

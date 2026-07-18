@@ -91,6 +91,7 @@ TOOL CATALOG:
 | CREATE_NOTE | Save a note, idea, or thought | { "content", "type": "note|idea|task|reminder", "tags": [] } |
 | CREATE_EVENT | Schedule a calendar event | { "title", "description"?, "start": "ISO", "end": "ISO", "allDay"?: bool } |
 | CREATE_TRACKER | Create a habit or metric tracker | { "name", "type": "habit|metric", "unit", "goal": number } |
+| SEND_EMAIL | Send an email on the user's behalf via Gmail (requires Gmail connected) | { "to", "subject", "body" } |
 | CREATE_COURSE | Create academic course | { "name", "code", "credits", "semester", "year", "professor", "color" } |
 | ADD_GRADE | Add a grade to a course | { "courseId", "name", "score", "maxScore", "weight", "category": "Exam|Assignment|Quiz|Project|Participation", "date" } |
 | UPDATE_TASK | Update an existing task | { "id": "task-id", "updates": { "title"?, "status"?: "todo|in-progress|done", "priority"?: 1|2|3, "dueDate"?: "ISO" } } |

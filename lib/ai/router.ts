@@ -130,7 +130,7 @@ export async function routeIntent(message: string): Promise<IntentClassification
 
     // STEP 2: Fall back to LLM classification
     try {
-        const modelId = 'llama3-8b-8192';
+        const modelId = 'llama-3.1-8b-instant';
         const response = await groqAPI.generateResponse(
             message, '', [], ROUTER_SYSTEM_PROMPT, modelId, 0.0
         );

@@ -13,7 +13,7 @@ import { pickResultMessage } from '@/lib/ai/executor';
 
 interface ModelConfig {
   name: string;
-  provider: 'groq' | 'grok' | 'chutes' | 'dashscope' | 'openrouter';
+  provider: 'groq' | 'grok' | 'chutes' | 'dashscope' | 'openrouter' | 'cerebras';
   modelId: string;
   priority: number;
 }
@@ -29,25 +29,45 @@ function getAvailableModels(): ModelConfig[] {
     CHUTES: !!process.env.CHUTES_API_TOKEN,
   });
 
-  // Groq - NEW PRIMARY MODEL
+  // Groq - PRIMARY MODEL. Was qwen/qwen3-32b, but that model's Groq free-tier
+  // TPM limit is only 6000 — the ACTION_PROMPT (tools + skills + cognitive
+  // context) alone tokenizes to ~7700 tokens under Qwen's tokenizer, so every
+  // action-classified message (create task, plan, schedule, etc.) failed with
+  // a 413 rate_limit_exceeded. llama-3.3-70b-versatile has a 12000 TPM limit
+  // (verified live via the x-ratelimit-limit-tokens response header) and
+  // comfortably covers the same prompt. Confirmed 2026-07-16.
   if (process.env.GROQ_API_KEY) {
-    models.push({ name: 'qwen3-32b', provider: 'groq', modelId: 'qwen/qwen3-32b', priority: 1 });
+    models.push({ name: 'llama-3.3-70b', provider: 'groq', modelId: 'llama-3.3-70b-versatile', priority: 1 });
   }
 
-  // Grok (xAI)
-  if (process.env.GROK_API_KEY || process.env.XAI_API_KEY) {
+  // Grok (xAI) — disabled 2026-07-16: xAI team account is out of credits
+  // (api.x.ai returns "permission-denied ... reached its monthly spending
+  // limit") and grok-2-1212 is no longer a valid model id on top of that.
+  // Re-enable once the xAI account is funded and the model id is confirmed
+  // current (check https://api.x.ai/v1/models with a live key).
+  if (false && (process.env.GROK_API_KEY || process.env.XAI_API_KEY)) {
     const { grokAPI } = require('@/lib/grok');
     models.push({ name: 'grok-2', provider: 'grok', modelId: 'grok-2-1212', priority: 2 });
   }
 
-  // DashScope
-  if (process.env.DASHSCOPE_API_KEY) {
+  // Cerebras — added 2026-07-17 to take over Grok's old priority-2 slot.
+  // Independent quota pool from Groq, OpenAI-compatible, fast inference.
+  // Verified live against GET /v1/models 2026-07-17 — this account's
+  // available models are gemma-4-31b, zai-glm-4.7, gpt-oss-120b only.
+  if (process.env.CEREBRAS_API_KEY) {
+    models.push({ name: 'cerebras-gpt-oss-120b', provider: 'cerebras', modelId: 'gpt-oss-120b', priority: 2 });
+  }
+
+  // DashScope — disabled 2026-07-16: DASHSCOPE_API_KEY returns 401 "Invalid
+  // API-key provided". Needs a fresh key from the Alibaba Cloud console
+  // before this can be re-enabled.
+  if (false && process.env.DASHSCOPE_API_KEY) {
     models.push({ name: 'qwen-max', provider: 'dashscope', modelId: 'qwen-max', priority: 3 });
   }
 
   // OpenRouter
   if (process.env.OPENROUTER_API_KEY) {
-    models.push({ name: 'qwen3-235b', provider: 'openrouter', modelId: 'qwen/qwen3-235b-a22b:free', priority: 4 });
+    models.push({ name: 'gpt-oss-20b', provider: 'openrouter', modelId: 'openai/gpt-oss-20b:free', priority: 4 });
   }
 
   // Chutes
@@ -154,6 +174,11 @@ async function callModel(
     case 'chutes': {
       const { chutesAPI } = await import('@/lib/chutes');
       return await chutesAPI.generateResponse(message, '', history, systemPrompt, config.modelId);
+    }
+
+    case 'cerebras': {
+      const { cerebrasAPI } = await import('@/lib/cerebras');
+      return await cerebrasAPI.generateResponse(message, '', history, systemPrompt, config.modelId);
     }
 
     default:
@@ -303,7 +328,10 @@ export async function POST(request: NextRequest) {
   console.log('[AI API] Incoming POST request to /api/ai/generate');
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || 'demo-user-id';
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
     const body = await request.json();
     console.log('[AI API] Payload:', JSON.stringify(body));
     const { message, history, webSearchEnabled, model: requestedModel } = body;
@@ -515,7 +543,7 @@ export async function POST(request: NextRequest) {
                 type: 'result',
                 content: execResult.message || 'Calibración cognitiva realizada con éxito.',
                 status: execResult.success ? 'success' : 'failed',
-                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}), ...(execResult.payload || {}) }
+                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
               },
             ].filter(Boolean),
             metadata: { intentType: classification.type, model: result.model }

@@ -9,7 +9,17 @@ export const openRouterAPI = {
         conversationId?: string,
         history: any[] = [],
         systemPrompt?: string,
-        model: string = 'qwen/qwen3-235b-a22b:free'
+        // qwen3-235b-a22b:free was discontinued by OpenRouter (404: "unavailable
+        // for free, use qwen/qwen3-235b-a22b instead" — the paid version, which
+        // would silently start incurring real cost). Verified live 2026-07-16:
+        // OpenRouter's free tier is backed by multiple upstream providers with
+        // independent capacity — "Venice"-hosted free models (qwen3-coder,
+        // llama-3.2/3.3) were consistently 429 (shared-capacity saturation,
+        // not a code problem), while openai/gpt-oss-20b:free (different
+        // upstream) responded 200 on every attempt. Re-verify if this one
+        // ever starts failing — check response body for the provider_name
+        // before assuming the fix regressed.
+        model: string = 'openai/gpt-oss-20b:free'
     ) => {
         // Build messages array
         const messages: any[] = [];

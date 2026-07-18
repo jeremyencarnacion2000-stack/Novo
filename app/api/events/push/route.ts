@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { pushEventToUser } from '../route'
+import { pushEventToUser } from '@/lib/events-bus'
 
 // Internal webhook — called by Inngest functions and server-side AI jobs
 // to push real-time events to connected SSE clients.

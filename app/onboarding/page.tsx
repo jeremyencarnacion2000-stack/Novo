@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Brain, ArrowRight, Sparkles, Send, RefreshCw } from 'lucide-react'
 import { OrbPrimitive, ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
@@ -10,6 +11,25 @@ import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 interface Message {
   role: 'assistant' | 'user'
   content: string
+}
+
+// Base Twin profile used when the analysis endpoint is slow/unreachable. Shared
+// by the compilation timeout fallback AND handleFinalize, so finishing
+// onboarding ALWAYS initializes the Twin — never a dead "Finalize" button that
+// leaves a brand-new user stuck in the /onboarding redirect loop.
+const DEFAULT_TWIN_DATA = {
+  confidenceScore: 42,
+  trustLevel: 'initial',
+  longTermGoal: '',
+  identity: { role: '', focusStyle: '', deepWorkCapacity: 3.5, industry: '' },
+  energyCurve: { chronotype: '', peakFocusStart: '', peakFocusEnd: '', typicalSlumpHour: 14 },
+  selfDiscoveryText: 'Tu perfil base ha sido creado. El Twin aprenderá de tus patrones reales con el tiempo.',
+}
+
+interface DayPlanState {
+  tasks: any[]
+  event: any | null
+  reasoning: string[]
 }
 
 const STEPS = [
@@ -63,19 +83,25 @@ const STEPS = [
 function OnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isDemoMode = searchParams.get('demo') === 'twin'
+  const isDemoMode = searchParams?.get('demo') === 'twin'
   const { initializeTwin } = useCognitiveTwin()
-  
+  const { data: session } = useSession()
+
   const [currentStep, setCurrentStep] = useState(0)
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Bienvenido a Novo. No soy una app de tareas común: soy un Sistema Operativo Cognitivo, y vamos a construir tu Cognitive Twin juntos. Cada respuesta que me des lo hace más tuyo. ¿Empezamos?' }
   ])
   const [inputVal, setInputVal] = useState('')
-  const [stage, setStage] = useState<'interview' | 'compilation' | 'self_discovery'>('interview')
-  
+  const [stage, setStage] = useState<'interview' | 'compilation' | 'self_discovery' | 'day1_plan'>('interview')
+
   // Compilation states
   const [compileStep, setCompileStep] = useState(0)
   const [twinData, setTwinData] = useState<any>(null)
+
+  // Day 1 plan states — populated by generateAndExecuteDayPlan via
+  // /api/onboarding/day-plan, revealed one item at a time on the day1_plan stage
+  const [dayPlan, setDayPlan] = useState<DayPlanState | null>(null)
+  const [planRevealStep, setPlanRevealStep] = useState(0)
   
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -144,20 +170,34 @@ function OnboardingContent() {
     handleAnswer(val, val)
   }
 
+  // Generates + actually creates the user's Day 1 plan (2-3 tasks + a deep-work
+  // calendar block) via /api/onboarding/day-plan so /today isn't empty on first
+  // login. Fires in the background — the day1_plan stage shows a loading state
+  // if it hasn't resolved yet by the time the user gets there.
+  const triggerDayPlan = async (twin: any) => {
+    if (!session?.user?.id) return
+    try {
+      const res = await fetch('/api/onboarding/day-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ twin }),
+      })
+      const data = await res.json()
+      if (!data.error) setDayPlan(data)
+    } catch (e) {
+      console.error('Failed to generate day 1 plan:', e)
+    }
+  }
+
   const triggerCompilation = async () => {
     setStage('compilation')
-    
+
     // Call analysis endpoint with conversation history
     // 8-second timeout — fallback to default twin values to avoid infinite loading
     const analyzeTimeout = setTimeout(() => {
       if (!twinData) {
-        setTwinData({
-          confidenceScore: 42,
-          trustLevel: 'initial',
-          identity: { role: '', focusStyle: '', deepWorkCapacity: 3.5, industry: '' },
-          energyCurve: { chronotype: '', peakFocusStart: '', peakFocusEnd: '', typicalSlumpHour: 14 },
-          selfDiscoveryText: 'Tu perfil base ha sido creado. El Twin aprenderá de tus patrones reales con el tiempo.',
-        })
+        setTwinData(DEFAULT_TWIN_DATA)
+        triggerDayPlan(DEFAULT_TWIN_DATA)
       }
     }, 8000)
 
@@ -170,6 +210,7 @@ function OnboardingContent() {
       const data = await response.json()
       clearTimeout(analyzeTimeout)
       setTwinData(data)
+      triggerDayPlan(data)
     } catch (e) {
       console.error(e)
       // timeout fallback will fire at 8s
@@ -189,17 +230,31 @@ function OnboardingContent() {
     })
   }
 
+  // Reveal each created task/event one at a time on the day1_plan stage,
+  // reusing the same terminal-log timing pattern as the compilation stage.
+  useEffect(() => {
+    if (stage !== 'day1_plan' || !dayPlan) return
+    const itemCount = dayPlan.tasks.length + (dayPlan.event ? 1 : 0)
+    setPlanRevealStep(0)
+    const timers = Array.from({ length: itemCount }, (_, i) =>
+      setTimeout(() => setPlanRevealStep(i + 1), (i + 1) * 500)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [stage, dayPlan])
+
   const handleFinalize = () => {
-    if (twinData) {
-      // In demo mode we use the fully evolved data, otherwise default initialization values
-      initializeTwin({
-        ...twinData,
-        isInitialized: true,
-        confidenceScore: twinData.confidenceScore ?? 42,
-        trustLevel: twinData.trustLevel ?? 'initial'
-      })
-      router.push('/')
-    }
+    // Always initialize — fall back to the base profile if the analysis hasn't
+    // resolved yet, so the button is never inert and no new user gets stranded.
+    const data = twinData ?? DEFAULT_TWIN_DATA
+    initializeTwin({
+      ...data,
+      isInitialized: true,
+      confidenceScore: data.confidenceScore ?? 42,
+      trustLevel: data.trustLevel ?? 'initial'
+    })
+    // The Day 1 plan (when generated) already created real tasks/events, so
+    // land directly on /today instead of the empty dashboard root.
+    router.push('/today')
   }
 
   const activeStep = STEPS[currentStep]
@@ -453,16 +508,89 @@ function OnboardingContent() {
 
               </div>
 
-              {/* Confirm initialization Action */}
+              {/* Confirm initialization Action — demo mode has no Day 1 plan to
+                  generate (its Twin comes from historical simulation, not this
+                  interview), so it finalizes straight away. Real onboarding
+                  continues into the day1_plan stage. */}
               <div className="mt-8 pt-4 border-t border-white/[0.05]">
                 <p className="text-[11px] text-white/30 text-center mb-3 leading-relaxed">
                   Lo construiste vos, respondiendo {STEPS.length} preguntas — no es una plantilla genérica.
                 </p>
                 <button
+                  onClick={() => isDemoMode ? handleFinalize() : setStage('day1_plan')}
+                  className="w-full h-14 rounded-2xl bg-white hover:bg-white/95 text-black font-bold text-sm tracking-wide active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center justify-center gap-2"
+                >
+                  {isDemoMode ? 'Activar Mi Cognitive Twin' : 'Ver Mi Plan de Día 1'}
+                  <ArrowRight className="w-4 h-4 text-black" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* STAGE 4: DAY 1 PLAN REVEAL — reuses the compilation stage's
+              terminal-log visual language to reveal each real task/event the
+              backend just created via generateAndExecuteDayPlan */}
+          {stage === 'day1_plan' && (
+            <motion.div
+              key="day1_plan"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex-1 flex flex-col justify-between max-w-xl w-full mx-auto p-6 md:p-8 relative z-10 h-full overflow-y-auto"
+            >
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="mb-6 flex justify-center">
+                    <OrbPrimitive size="lg" variant="thinking" pulse glow />
+                  </div>
+                  <h2 className="text-xl font-bold tracking-tight text-white mb-2">Tu Plan de Día 1</h2>
+                  <p className="text-xs text-white/30 tracking-widest uppercase">
+                    Calibrado a tu meta, tu energía y tu fricción
+                  </p>
+                </div>
+
+                {!dayPlan ? (
+                  <div className="flex items-center justify-center gap-2 text-white/40 text-xs py-10">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Generando tu primer día...
+                  </div>
+                ) : (
+                  <div className="w-full space-y-3.5 border border-white/[0.05] rounded-2xl p-5 bg-white/[0.01] backdrop-blur-xl text-left">
+                    {dayPlan.tasks.map((task, i) => (
+                      <div key={task.id ?? i} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-mono gap-3">
+                          <span className={planRevealStep > i ? 'text-indigo-400 font-bold' : 'text-white/20'}>
+                            [{i + 1}] {task.title}
+                          </span>
+                          {planRevealStep > i && <span className="text-indigo-400 flex-shrink-0">OK</span>}
+                        </div>
+                        {planRevealStep > i && dayPlan.reasoning[i] && (
+                          <p className="text-[11px] text-white/40 pl-6 leading-relaxed">{dayPlan.reasoning[i]}</p>
+                        )}
+                      </div>
+                    ))}
+                    {dayPlan.event && (
+                      <div className="space-y-1 pt-2 border-t border-white/[0.05]">
+                        <div className="flex items-center justify-between text-[11px] font-mono gap-3">
+                          <span className={planRevealStep > dayPlan.tasks.length ? 'text-emerald-400 font-bold animate-pulse' : 'text-white/20'}>
+                            [{dayPlan.tasks.length + 1}] {dayPlan.event.title}
+                          </span>
+                          {planRevealStep > dayPlan.tasks.length && <span className="text-emerald-400 flex-shrink-0">AGENDADO</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-white/[0.05]">
+                <p className="text-[11px] text-white/30 text-center mb-3 leading-relaxed">
+                  Ya está en tu lista — no tenés que planificar nada más hoy.
+                </p>
+                <button
                   onClick={handleFinalize}
                   className="w-full h-14 rounded-2xl bg-white hover:bg-white/95 text-black font-bold text-sm tracking-wide active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center justify-center gap-2"
                 >
-                  Activar Mi Cognitive Twin
+                  Entrar — ya está listo
                   <ArrowRight className="w-4 h-4 text-black" />
                 </button>
               </div>

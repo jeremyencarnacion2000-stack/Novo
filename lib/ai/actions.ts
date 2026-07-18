@@ -26,6 +26,7 @@ export type AIActionType =
     | 'CREATE_HABIT'
     | 'CREATE_EVENT'
     | 'CREATE_TRACKER'
+    | 'SEND_EMAIL'
     | 'GENERATE_FILE'
     | 'UPDATE_COGNITIVE_STATE'
     | 'COGNITIVE_PIPELINE';
@@ -68,6 +69,7 @@ export interface DeleteRoutineAction extends BaseAction {
     type: 'DELETE_ROUTINE';
     payload: {
         id: string;
+        confirmed?: boolean;
     };
 }
 
@@ -134,6 +136,7 @@ export interface DeleteTaskAction extends BaseAction {
     type: 'DELETE_TASK';
     payload: {
         id: string;
+        confirmed?: boolean;
     };
 }
 
@@ -170,6 +173,16 @@ export interface CreateTrackerAction extends BaseAction {
         type: 'habit' | 'metric';
         unit: string;
         goal: number;
+    };
+}
+
+// --- Gmail ---
+export interface SendEmailAction extends BaseAction {
+    type: 'SEND_EMAIL';
+    payload: {
+        to: string;
+        subject: string;
+        body: string;
     };
 }
 
@@ -227,6 +240,7 @@ export interface DeleteProjectAction extends BaseAction {
     type: 'DELETE_PROJECT';
     payload: {
         id: string;
+        confirmed?: boolean;
     };
 }
 
@@ -264,6 +278,7 @@ export interface DeleteCourseAction extends BaseAction {
     type: 'DELETE_COURSE';
     payload: {
         id: string;
+        confirmed?: boolean;
     };
 }
 
@@ -299,6 +314,7 @@ export interface DeleteGradeAction extends BaseAction {
     type: 'DELETE_GRADE';
     payload: {
         id: string;
+        confirmed?: boolean;
     };
 }
 
@@ -365,6 +381,7 @@ export type AIAction =
     | UpdateNoteAction
     | CreateEventAction
     | CreateTrackerAction
+    | SendEmailAction
     | AnalyzeProgressAction
     | SystemQueryAction
     | CreateProjectAction
