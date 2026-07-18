@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle, Activity } from 'lucide-react';
+import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle, Activity, Mail } from 'lucide-react';
 
 interface ConfirmationBlockProps {
     onConfirm: () => void;
@@ -144,6 +144,23 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                         </div>
                     </div>
                 );
+            case 'SEND_EMAIL':
+                return (
+                    <div className={detailItemClass}>
+                        <Mail className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-white/40 block text-[10px] uppercase tracking-wider mb-0.5">Enviar Correo</span>
+                            <span className="text-white/90 break-words font-medium text-sm block leading-relaxed" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                                Para: {payload.to}
+                            </span>
+                            {payload.subject && (
+                                <span className="text-white/50 text-[11px] block mt-1 break-words" style={{ overflowWrap: 'anywhere' }}>
+                                    Asunto: {payload.subject}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
             case 'GENERATE_FILE':
                 const fileExt = payload.filename?.split('.').pop()?.toUpperCase() || payload.mimeType?.split('/').pop()?.toUpperCase() || 'FILE';
                 const displayName = payload.filename || payload.fileName || payload.name || 'Documento';
@@ -203,7 +220,7 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
     }
 
     return (
-        <div className="border border-primary/20 bg-[#0B0B0F]/90 rounded-2xl p-4.5 mb-4 shadow-xl shadow-black/35 relative overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-full animate-glow-pulse">
+        <div className="border border-primary/20 bg-[var(--popover)]/90 rounded-2xl p-4.5 mb-4 shadow-xl shadow-black/35 relative overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-full animate-glow-pulse">
             {/* Fine ambient neon glow line at the top */}
             <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-primary/50 to-transparent hover-glow-border" />
             

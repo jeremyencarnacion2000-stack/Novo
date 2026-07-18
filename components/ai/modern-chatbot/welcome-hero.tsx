@@ -6,6 +6,9 @@ import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { GlowingOrb } from './glowing-orb';
+import { SUGGESTIONS } from './chat-input';
+
+const DESKTOP_SUGGESTIONS = SUGGESTIONS.slice(0, 4);
 
 function getGreetingTime(): string {
   const hour = new Date().getHours();
@@ -105,7 +108,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0a0f1e]"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[var(--background)]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -151,7 +154,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
 // this hero used to embed its own separate input box, which meant the app
 // had two different-looking composers depending on whether a chat was
 // active. One input surface, matching the reference, is the point.
-export function DesktopHero() {
+export function DesktopHero({ onChipClick }: { onChipClick?: (text: string) => void }) {
   const { data: session } = useSession();
   const firstName = session?.user?.name?.split(' ')[0] ?? '';
 
@@ -187,6 +190,33 @@ export function DesktopHero() {
       >
         ¿En qué puedo<br />ayudarte hoy?
       </motion.h1>
+      <motion.p
+        className="text-white/35 text-sm text-center mt-3 max-w-sm"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        Desde respuestas rápidas hasta recomendaciones basadas en tu energía real.
+      </motion.p>
+
+      {onChipClick && (
+        <motion.div
+          className="flex flex-wrap justify-center gap-2.5 mt-9 max-w-xl"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+        >
+          {DESKTOP_SUGGESTIONS.map((chip) => (
+            <button
+              key={chip}
+              onClick={() => onChipClick(chip)}
+              className="px-4 py-2 rounded-full bg-white/[0.05] border border-white/10 text-white/70 text-sm font-medium hover:bg-white/[0.1] hover:text-white hover:border-white/20 active:scale-95 transition-all duration-200"
+            >
+              {chip}
+            </button>
+          ))}
+        </motion.div>
+      )}
     </motion.div>
   );
 }

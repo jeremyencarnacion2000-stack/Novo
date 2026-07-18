@@ -116,6 +116,8 @@ export const ACTION_TYPE_LABEL: Record<string, string> = {
   START_WORKOUT: 'Inició un entrenamiento',
   FINISH_WORKOUT: 'Terminó un entrenamiento',
   GENERATE_FILE: 'Generó un archivo',
+  GENERATE_DAILY_INSIGHT: 'Generó tu resumen diario',
+  REENGAGEMENT_EMAIL: 'Envió un email de re-enganche',
 };
 
 export function buildCognitiveGraph(

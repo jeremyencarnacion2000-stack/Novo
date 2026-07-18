@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, RefreshCw, Clock, AlertCircle, Mic, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { Brain, RefreshCw, Clock, AlertCircle, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { FocusScoreRing } from '@/components/cognitive/focus-score-ring';
 import { CognitiveStateHero, RecommendationHero, InsightCard, ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives';
 import { BurnoutRiskMeter } from '@/components/cognitive/burnout-risk-meter';
@@ -14,7 +14,6 @@ import { CognitiveMetricsStrip } from '@/components/cognitive/cognitive-metrics-
 import { ActiveModulesStrip } from '@/components/cognitive/active-modules-strip';
 import { IntegratedSystemsStrip } from '@/components/cognitive/integrated-systems-strip';
 import { DecisionFeed } from '@/components/cognitive/decision-feed';
-import { VoiceCommandHub } from '@/components/ai/VoiceCommandHub';
 import type { CognitiveEngineResponse } from '@/components/cognitive/types';
 import { cn } from '@/lib/utils';
 import { useCognitiveEngine } from '@/lib/cognitive-context';
@@ -138,7 +137,6 @@ export default function CognitivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -497,61 +495,6 @@ export default function CognitivePage() {
                   </div>
                 </div>
               </ScrollReveal>
-
-              {/* Floating Voice Trigger */}
-              <div className="fixed bottom-6 right-6 z-50">
-                <button
-                  className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shadow-lg shadow-primary/10 hover:bg-primary/25 hover:scale-105 transition-all duration-300"
-                  title="Cognitive Voice Interface"
-                  onClick={() => setIsVoiceOpen(true)}
-                >
-                  <Mic className="w-5 h-5 text-primary" />
-                </button>
-              </div>
-
-              {/* Voice Command Popover/Drawer */}
-              <AnimatePresence>
-                {isVoiceOpen && (
-                  <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setIsVoiceOpen(false)}
-                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                      transition={{ duration: 0.3, ease: 'easeOut' }}
-                      className="relative w-full max-w-lg bg-black/80 backdrop-blur-2xl border border-foreground/10 rounded-[34px] p-6 shadow-2xl overflow-hidden z-10"
-                    >
-                      <div className="absolute top-4 right-4">
-                        <button
-                          onClick={() => setIsVoiceOpen(false)}
-                          aria-label="Close voice interface"
-                          className="w-8 h-8 rounded-full bg-foreground/5 border border-foreground/10 flex items-center justify-center text-foreground/45 hover:text-foreground hover:bg-foreground/10 transition-all text-xs font-semibold"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 mb-5">
-                        <div className="w-8 h-8 rounded-xl border border-primary/25 flex items-center justify-center bg-primary/10 shadow-[0_0_16px_rgba(99,102,241,0.15)]">
-                          <Mic className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black tracking-[0.25em] uppercase text-foreground/35">Voice OS</p>
-                          <p className="text-xs font-bold text-foreground/70">Cognitive Voice Interface</p>
-                        </div>
-                      </div>
-
-                      <VoiceCommandHub />
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
 
               {/* Footer — real attribution, not a static "Powered by Gemini"
                   claim regardless of which provider (or the local fallback)

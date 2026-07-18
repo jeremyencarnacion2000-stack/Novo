@@ -33,10 +33,19 @@ const KIND_LABEL: Record<GraphNode['kind'], string> = {
   metric: 'Métrica',
 };
 
+// Below this total kinetic energy (sum of vx^2+vy^2 across nodes), the layout
+// reads as visually still — worth tuning if nodes ever look "frozen mid-drift".
+const REST_ENERGY_THRESHOLD = 0.02;
+// Consecutive low-energy frames required before stopping (~0.5s at 60fps) —
+// avoids stopping during a momentary lull mid-settle.
+const REST_FRAME_COUNT = 30;
+
 function useForceLayout(graph: CognitiveGraph | null, width: number, height: number) {
   const [positions, setPositions] = useState<SimNode[]>([]);
   const simRef = useRef<SimNode[]>([]);
   const rafRef = useRef<number | null>(null);
+  const restFramesRef = useRef(0);
+  const tickRef = useRef<(() => void) | null>(null);
   const dragRef = useRef<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -100,13 +109,44 @@ function useForceLayout(graph: CognitiveGraph | null, width: number, height: num
       }
 
       setPositions([...nodes]);
+
+      // Stop scheduling once the sim has genuinely settled (damping already
+      // decays velocity toward zero) — otherwise this RAF loop runs forever,
+      // forcing a React re-render every frame for as long as the graph stays
+      // mounted, even sitting perfectly still. Never rests mid-drag: the
+      // dragged node is pinned (zero velocity) so it wouldn't otherwise count
+      // toward energy, but moveDrag() only writes a ref — the screen only
+      // picks up the new position via this tick's setPositions call, so
+      // sleeping here would freeze the dragged node on screen mid-gesture.
+      const energy = dragRef.current
+        ? Infinity
+        : nodes.reduce((sum, n) => sum + n.vx * n.vx + n.vy * n.vy, 0);
+      if (energy < REST_ENERGY_THRESHOLD) {
+        restFramesRef.current += 1;
+        if (restFramesRef.current >= REST_FRAME_COUNT) {
+          rafRef.current = null;
+          return;
+        }
+      } else {
+        restFramesRef.current = 0;
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
+    tickRef.current = tick;
     rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); tickRef.current = null; };
   }, [graph, width, height]);
 
-  const startDrag = (id: string, x: number, y: number) => { dragRef.current = { id, x, y }; };
+  // Resumes the tick loop if it stopped at rest — called on drag start since
+  // pinning/releasing a node reintroduces motion the stopped loop wouldn't see.
+  const wakeSim = () => {
+    if (rafRef.current !== null) return; // already running
+    restFramesRef.current = 0;
+    const tick = tickRef.current;
+    if (tick) rafRef.current = requestAnimationFrame(tick);
+  };
+
+  const startDrag = (id: string, x: number, y: number) => { dragRef.current = { id, x, y }; wakeSim(); };
   const moveDrag = (x: number, y: number) => { if (dragRef.current) { dragRef.current.x = x; dragRef.current.y = y; } };
   const endDrag = () => { dragRef.current = null; };
 

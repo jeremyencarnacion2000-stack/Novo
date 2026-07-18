@@ -4,16 +4,22 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Search, Plus, MessageSquare, Trash2, MoreHorizontal, Edit, Square } from 'lucide-react';
 import { useChatbot } from './context';
 
-export function Sidebar() {
+export function Sidebar({ embedded = false }: { embedded?: boolean }) {
     const {
         conversations,
         currentConversationId,
         setCurrentConversationId,
         createConversation,
         deleteConversation,
-        sidebarCollapsed,
+        sidebarCollapsed: storedCollapsed,
         setSidebarCollapsed
     } = useChatbot();
+
+    // Embedded usage (inside the mobile/desktop drawer) has its own header +
+    // close button and a fixed drawer width — the sidebar's own collapse
+    // toggle and "Historial" header would just duplicate that chrome, so it
+    // always renders expanded and without its own header in that context.
+    const sidebarCollapsed = embedded ? false : storedCollapsed;
 
     const [searchQuery, setSearchQuery] = React.useState('');
 
@@ -68,29 +74,31 @@ export function Sidebar() {
 
     return (
         <div
-            className={`relative h-full bg-[#030305]/95 border-r border-white/5 transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : 'w-full md:w-72 lg:w-80'
+            className={`relative h-full bg-[var(--background)]/95 border-r border-white/5 transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : 'w-full md:w-72 lg:w-80'
                 }`}
         >
-            {/* Header */}
-            <div className={`flex items-center p-5 border-b border-white/5 flex-shrink-0 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-                {!sidebarCollapsed && (
-                    <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
-                        <h2 className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase">Historial</h2>
-                    </div>
-                )}
-                <button
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="p-1.5 hover:bg-white/[0.04] rounded-lg transition-all text-white/40 hover:text-white"
-                    aria-label={sidebarCollapsed ? 'Expandir' : 'Colapsar'}
-                >
-                    {sidebarCollapsed ? (
-                        <ChevronRight className="w-4 h-4" />
-                    ) : (
-                        <ChevronLeft className="w-4 h-4" />
+            {/* Header — the embedded drawer supplies its own title/close button */}
+            {!embedded && (
+                <div className={`flex items-center p-5 border-b border-white/5 flex-shrink-0 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                    {!sidebarCollapsed && (
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
+                            <h2 className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase">Historial</h2>
+                        </div>
                     )}
-                </button>
-            </div>
+                    <button
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        className="p-1.5 hover:bg-white/[0.04] rounded-lg transition-all text-white/40 hover:text-white"
+                        aria-label={sidebarCollapsed ? 'Expandir' : 'Colapsar'}
+                    >
+                        {sidebarCollapsed ? (
+                            <ChevronRight className="w-4 h-4" />
+                        ) : (
+                            <ChevronLeft className="w-4 h-4" />
+                        )}
+                    </button>
+                </div>
+            )}
 
             {/* Actions Area */}
             <div className={`p-4 space-y-3 flex-shrink-0 ${sidebarCollapsed ? 'flex flex-col items-center' : ''}`}>

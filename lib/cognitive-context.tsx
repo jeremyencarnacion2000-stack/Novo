@@ -30,6 +30,7 @@ import React, {
   useState,
 } from 'react'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import {
   computeBioState,
   COGNITIVE_PLAYLIST_QUERIES,
@@ -91,6 +92,7 @@ const CognitiveDispatchContext = createContext<CognitiveDispatchValue | null>(nu
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { status: authStatus } = useSession()
   const { playPlaylist, currentTrack } = usePlayerStore()
 
   const [chronotype, setChronotype]     = useState<Chronotype>('intermediate')
@@ -131,7 +133,12 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {})
   }, [])
 
+  // CognitiveProvider mounts app-wide (public /landing, /auth/* included), so
+  // this polling loop waits for a real session — otherwise every logged-out
+  // page load hits /api/cognitive/biometrics and gets a 401.
   useEffect(() => {
+    if (authStatus !== 'authenticated') return
+
     fetchBiometrics()
     let id: ReturnType<typeof setInterval> | null = setInterval(fetchBiometrics, 180_000)
     const onVisibility = () => {
@@ -148,7 +155,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       if (id) clearInterval(id)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [fetchBiometrics])
+  }, [fetchBiometrics, authStatus])
 
   // ── Event Bus → Engine bridge — ref handles (declared early so refresh/logHabit can populate them) ──
   const logHabitRef = useRef<(cost: number) => void>(() => {})
@@ -310,7 +317,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (
       bioState.phase === 'SYNAPTIC_FATIGUE' &&
-      HEAVY_ROUTES.some(r => pathname.startsWith(r))
+      HEAVY_ROUTES.some(r => pathname?.startsWith(r))
     ) {
       const msg =
         `⚠️ Synaptic Fatigue Detected — attention score is ${bioState.attentionScore}%. ` +
@@ -433,7 +440,12 @@ function FatigueNavigationWarning({
 }) {
   return (
     <div
-      className="fixed top-4 right-4 z-[200] max-w-sm w-[calc(100%-2rem)] sm:w-full"
+      // top-[104px] matches the clearance NotificationCenter's own dropdown
+      // already uses to sit below the bell (fixed top-16 right-4) — this
+      // banner shares the same top-right corner + z-[200] as the bell, so
+      // without it the wider warning card renders on top and makes the bell
+      // completely unclickable while a fatigue warning is showing.
+      className="fixed top-[104px] right-4 z-[200] max-w-sm w-[calc(100%-2rem)] sm:w-full"
       role="alert"
       style={{ animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both' }}
     >

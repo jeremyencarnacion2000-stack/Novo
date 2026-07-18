@@ -720,7 +720,7 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0)
           const resampled = downsampleBuffer(inputData, audioContextRef.current!.sampleRate, 16000)
-          const base64Audio = arrayBufferToBase64(resampled.buffer)
+          const base64Audio = arrayBufferToBase64(resampled.buffer as ArrayBuffer)
 
           // ── Inject RMS mic volume as CSS variable for orb animation ──
           // Uses squared mean to compute RMS (Root Mean Square), avoids React re-renders

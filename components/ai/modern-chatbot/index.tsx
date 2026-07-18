@@ -126,11 +126,11 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                 animate={{ x: 0 }}
                                 exit={{ x: '-100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                                className="absolute top-0 left-0 bottom-0 w-[85%] max-w-[320px] bg-[#030305]/98 z-50 flex flex-col border-r border-white/[0.06] shadow-2xl backdrop-blur-3xl"
+                                className="absolute top-0 left-0 bottom-0 w-[85%] max-w-[320px] bg-[var(--background)]/98 z-50 flex flex-col border-r border-white/[0.06] shadow-2xl backdrop-blur-3xl"
                             >
                                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
                                     <div className="flex items-center gap-2">
-                                        <Brain className="w-4 h-4 text-primary" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
                                         <span className="text-[11px] font-bold text-white/60 tracking-[0.2em] uppercase">Conversations</span>
                                     </div>
                                     <button
@@ -145,7 +145,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                         setTimeout(() => setIsDrawerOpen(false), 280);
                                     }
                                 }}>
-                                    <Sidebar />
+                                    <Sidebar embedded />
                                 </div>
                             </motion.div>
                         </>
@@ -232,7 +232,12 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                     />
                                 </div>
                                 <div className="hidden md:flex flex-1 flex-col min-h-0">
-                                    <DesktopHero />
+                                    <DesktopHero
+                                        onChipClick={(text) => {
+                                            createConversation();
+                                            setTimeout(() => sendMessage(text), 80);
+                                        }}
+                                    />
                                 </div>
                             </div>
                         ) : (
@@ -249,12 +254,13 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                     </AnimatePresence>
 
                     {/* Persistent composer — one input surface for both the hero
-                        and active-chat states, docked at the bottom always. */}
-                    <div ref={composerRef} className="flex-shrink-0 z-20">
-                        <div
-                            className="p-3 pb-6 md:pb-3 bg-gradient-to-t from-black via-black/95 to-transparent border-t border-white/5"
-                            style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
-                        >
+                        and active-chat states, docked at the bottom always.
+                        A short fade behind it keeps messages from ending
+                        abruptly under the card without boxing the card itself
+                        into an edge-to-edge bar. */}
+                    <div ref={composerRef} className="flex-shrink-0 z-20 relative">
+                        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent pointer-events-none" />
+                        <div className="relative px-3 sm:px-6 pt-4 pb-6 md:pb-4">
                             <ChatInput variant="bottom" />
                         </div>
                     </div>

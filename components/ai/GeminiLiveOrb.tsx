@@ -60,6 +60,29 @@ export function GeminiLiveOrb() {
     }
   }, [])
 
+  // Fade the orb out while the page is actively scrolling, so it stops
+  // visually crossing paths with whatever content passes underneath it (it's
+  // `position: fixed`, so it otherwise always overlaps whatever scrolls by
+  // at that screen position). Listens on `window` with `capture: true` since
+  // native scroll events don't bubble but DO capture-phase propagate from any
+  // nested `overflow: auto` container to window, so this catches scrolling
+  // inside any of the app's per-page scroll containers without each page
+  // needing to wire anything up itself.
+  const [isScrolling, setIsScrolling] = useState(false)
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const handleScroll = () => {
+      setIsScrolling(true)
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => setIsScrolling(false), 400)
+    }
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true })
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [])
+
   const agent = useGeminiLiveAgent({
     apiKey: savedKey || process.env.NEXT_PUBLIC_GEMINI_API_KEY,
   })
@@ -215,6 +238,13 @@ export function GeminiLiveOrb() {
           zIndex: 150,
           contain: 'layout style',
           willChange: 'auto',
+          // Fade (opacity only — never transform, see the note above about the
+          // aura's own rAF-driven transform) while scrolling AND idle, so the
+          // orb stops visually fighting with whatever page content passes
+          // underneath it. Never fades mid-interaction (connected/panel open),
+          // so it can't disappear while the user is actually talking to it.
+          opacity: isScrolling && !isConnected && !showConfig ? 0.25 : 1,
+          transition: 'opacity 200ms ease',
         }}
       >
 

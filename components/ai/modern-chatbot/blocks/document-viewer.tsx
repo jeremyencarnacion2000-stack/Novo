@@ -96,7 +96,7 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
 
             {/* Side Panel */}
             <div
-                className={`fixed top-0 right-0 z-[251] h-full flex flex-col bg-[#0B0B0F]/98 backdrop-blur-2xl shadow-[-8px_0_30px_rgba(0,0,0,0.5)] border-l border-white/10 transition-transform duration-300 ease-out ${isFullscreen ? 'w-full' : 'w-[min(600px,85vw)]'}`}
+                className={`fixed top-0 right-0 z-[251] h-full flex flex-col bg-[var(--popover)]/98 backdrop-blur-2xl shadow-[-8px_0_30px_rgba(0,0,0,0.5)] border-l border-white/10 transition-transform duration-300 ease-out ${isFullscreen ? 'w-full' : 'w-[min(600px,85vw)]'}`}
                 style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
             >
                 {/* Header */}

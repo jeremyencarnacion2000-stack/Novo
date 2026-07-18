@@ -27,7 +27,7 @@ export function ClarificationFormBlock({ request, status, onSubmit }: Clarificat
     }
 
     return (
-        <div className="border border-purple-500/20 bg-[#0B0B0F]/90 rounded-[20px] p-4.5 mb-4 shadow-xl shadow-black/35 relative overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-full">
+        <div className="border border-purple-500/20 bg-[var(--popover)]/90 rounded-[20px] p-4.5 mb-4 shadow-xl shadow-black/35 relative overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-full">
             <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
 
             <div className="flex items-center gap-2 text-purple-400/95 mb-1">
@@ -51,9 +51,9 @@ export function ClarificationFormBlock({ request, status, onSubmit }: Clarificat
                                 onChange={e => setField(field.key, e.target.value)}
                                 className="bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white/90 focus:outline-none focus:border-purple-500/40 focus:bg-white/[0.05] transition-all"
                             >
-                                <option value="" disabled className="bg-[#0B0B0F]">Selecciona una opción</option>
+                                <option value="" disabled className="bg-[var(--popover)]">Selecciona una opción</option>
                                 {(field.options || []).map(opt => (
-                                    <option key={opt} value={opt} className="bg-[#0B0B0F]">{opt}</option>
+                                    <option key={opt} value={opt} className="bg-[var(--popover)]">{opt}</option>
                                 ))}
                             </select>
                         ) : (

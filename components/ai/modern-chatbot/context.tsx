@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment, MessageBlock, Attachment } from './types';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
@@ -18,7 +19,24 @@ const SIDEBAR_KEY = 'modern-chatbot-sidebar-collapsed';
 const MODEL_KEY = 'modern-chatbot-selected-model';
 const TWIN_MODE_KEY = 'modern-chatbot-twin-mode';
 
+// The assistant's own reply narrates actions as already done ("He creado tu
+// tarea") per the system prompt's "you simply DO things" rule, but the
+// generic confirmation card was gating EVERY action — including plain
+// creates — behind a manual Confirm click, so the text said "done" while the
+// UI still asked "are you sure?". Additive, easily-undone actions execute
+// immediately instead (still via the same confirmAction()/execute() path,
+// just auto-triggered); anything that mutates or removes existing data still
+// waits for an explicit click since a misclassified id there is harder to
+// walk back.
+const AUTO_EXECUTE_ACTION_TYPES = new Set([
+    'CREATE_TASK', 'CREATE_TASKS', 'CREATE_PROJECT', 'CREATE_ROUTINE',
+    'CREATE_NOTE', 'CREATE_EVENT', 'CREATE_TRACKER', 'CREATE_COURSE',
+    'ADD_GRADE', 'START_WORKOUT', 'FINISH_WORKOUT', 'GENERATE_FILE',
+    'UPDATE_COGNITIVE_STATE', 'COGNITIVE_PIPELINE', 'ANALYZE_PROGRESS', 'SYSTEM_QUERY'
+]);
+
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
+    const { status: authStatus } = useSession();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -75,9 +93,21 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     // Track which conversations are already in the database to avoid noisy 404s
     const persistedRef = React.useRef<Set<string>>(new Set());
+    // Set right before setConversations(loadedFromDb) in the load effect below —
+    // lets the save effect (keyed on [conversations]) tell "conversations just
+    // got replaced by what the DB already has" apart from "the user actually
+    // changed something". Without this, loading N conversations immediately
+    // re-PUT/POSTs all N of them unchanged (was measured firing 18 individual
+    // full-conversation writes on a single mount, ~4s of avoidable network work
+    // on every page load, since ChatbotProvider mounts app-wide).
+    const justLoadedFromDbRef = React.useRef(false);
 
-    // Load from database on mount
+    // Load from database on mount. ChatbotProvider mounts app-wide (including
+    // public /landing, /auth/* pages), so both fetches below wait for a real
+    // session — otherwise every logged-out page load throws two 401s.
     useEffect(() => {
+        if (authStatus !== 'authenticated') return;
+
         async function loadConversations() {
             try {
                 const response = await fetch('/api/ai-conversations');
@@ -103,6 +133,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                 model: conv.model || 'grok-beta'
                             };
                         });
+                        justLoadedFromDbRef.current = true;
                         setConversations(formattedConversations);
                         setCurrentConversationId(formattedConversations[0].id);
                     }
@@ -158,7 +189,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 }
             })
             .catch(() => {});
-    }, []);
+    }, [authStatus]);
 
     // Track which conversations are currently being saved to avoid duplicates
     const savingRef = React.useRef<Set<string>>(new Set());
@@ -166,6 +197,12 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // Save conversations to database when they change
     useEffect(() => {
         async function saveToDatabase() {
+            if (justLoadedFromDbRef.current) {
+                // This run was triggered by loading conversations from the DB,
+                // not a real edit — they're already persisted as-is.
+                justLoadedFromDbRef.current = false;
+                return;
+            }
             if (conversations.length === 0) return;
 
             const conversationsToSave = conversations.filter(conv => {
@@ -624,7 +661,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE',
                                     'ADD_GRADE', 'UPDATE_GRADE', 'DELETE_GRADE',
                                     'CREATE_NOTE', 'UPDATE_NOTE',
-                                    'CREATE_EVENT', 'CREATE_TRACKER', 'REQUEST_INFO',
+                                    'CREATE_EVENT', 'CREATE_TRACKER', 'SEND_EMAIL', 'REQUEST_INFO',
                                     'ANALYZE_PROGRESS', 'SYSTEM_QUERY', 'DELETE_ALL_TASKS',
                                     'GENERATE_FILE', 'UPDATE_COGNITIVE_STATE', 'COGNITIVE_PIPELINE'
                                 ];
@@ -660,6 +697,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     'agendar_evento': 'CREATE_EVENT',
                                     'crear_tracker': 'CREATE_TRACKER',
                                     'crear_habito': 'CREATE_TRACKER',
+                                    'enviar_correo': 'SEND_EMAIL',
+                                    'enviar_email': 'SEND_EMAIL',
+                                    'mandar_correo': 'SEND_EMAIL',
                                     'solicitar_info': 'REQUEST_INFO',
                                     'pedir_detalles': 'REQUEST_INFO'
                                 };
@@ -719,6 +759,38 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                         content: action.payload,
                                         status: 'waiting'
                                     });
+                                } else if (AUTO_EXECUTE_ACTION_TYPES.has(finalType)) {
+                                    // Additive/reversible action — run it now instead of pushing a
+                                    // 'confirmation' block. The assistant's own reply already reads
+                                    // as "He creado tu tarea" (done), so gating it behind a manual
+                                    // Confirm click contradicted the text; this keeps the two in
+                                    // sync while reserving the manual confirm step (below) for
+                                    // actions that mutate or remove something that already exists.
+                                    try {
+                                        const execResponse = await fetch('/api/ai/execute', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                action: { ...action, payload: { ...action.payload, confirmed: true } }
+                                            })
+                                        });
+                                        const execResult = await execResponse.json();
+                                        blocks.push({
+                                            id: crypto.randomUUID(),
+                                            type: 'result',
+                                            content: execResult.output || (execResult.success ? 'Listo.' : 'No se pudo completar la acción.'),
+                                            status: (execResult.success ? 'success' : 'failed') as any,
+                                            metadata: execResult.metadata
+                                        });
+                                    } catch (execErr) {
+                                        console.error('[Chatbot] Auto-execute error:', execErr);
+                                        blocks.push({
+                                            id: crypto.randomUUID(),
+                                            type: 'result',
+                                            content: 'No se pudo completar la acción. Intenta de nuevo.',
+                                            status: 'failed' as any
+                                        });
+                                    }
                                 } else {
                                     blocks.push({ id: crypto.randomUUID(), type: 'confirmation', content: action, status: 'waiting' });
                                 }
@@ -1102,138 +1174,24 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const editMessage = useCallback(async (messageId: string, newContent: string) => {
         if (!currentConversationId) return;
 
-        // Find the conversation and message
         const conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) return;
 
         const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
         if (messageIndex === -1) return;
 
-        // Truncate history: keep messages up to the edited one (exclusive), then add the edited one
+        // Truncate to before the edited message (drops the old assistant reply
+        // too), then resend through sendMessage — the same delegation
+        // retryMessage already uses below. This used to be a ~140-line inline
+        // duplicate of the stream-reading loop that only ever accumulated raw
+        // text: no JSON action-block parsing, so an edited message that
+        // triggered an action showed the model's literal ```json fence
+        // instead of a confirmation/result card. Routing through sendMessage
+        // gives edits the same generative-UI handling as a normal send.
         const previousMessages = conversation.messages.slice(0, messageIndex);
-
-        // Create the updated message
-        const updatedMessage: Message = {
-            ...conversation.messages[messageIndex],
-            content: newContent,
-            timestamp: new Date().toISOString() // Update timestamp? Maybe keep original? Let's update to show it's fresh.
-        };
-
-        // Update state immediately
-        setConversations(prev => prev.map(c =>
-            c.id === currentConversationId
-                ? { ...c, messages: [...previousMessages, updatedMessage] }
-                : c
-        ));
-
-        // Trigger AI response with the new history
-        setIsLoading(true);
-        setIsTyping(true);
-        setError(null);
-        setStatusMessage('Regenerating response...');
-
-        try {
-            // We need to send the history *including* the edited message to the API
-            // The API expects the last message in 'history' or 'message' param to be the user prompt
-            // But our API structure takes `message` (current prompt) and `history` (context)
-
-            // So we pass the edited content as `message` and `previousMessages` as `history`
-
-            // Re-attach attachments if any exist on the edited message
-            const attachments = updatedMessage.attachments;
-
-            const response = await fetch('/api/ai/stream', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: newContent,
-                    history: previousMessages.map(m => ({ role: m.role, content: m.content })),
-                    attachments: attachments,
-                    webSearchEnabled: false // Or pass current state if we track it
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `API error: ${response.statusText}`);
-            }
-
-            // ... handle stream response (same as sendMessage) ...
-            // We can reuse the stream handling logic if we extract it, but for now let's duplicate or refactor.
-            // Actually, to avoid duplication and complexity, let's just use the existing stream handling logic
-            // by calling a shared internal function or just duplicating the stream reader part.
-
-            // Let's duplicate the stream reader part for now to be safe and self-contained.
-
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-
-            if (!reader) throw new Error('No reader available');
-
-            let assistantMessageId = crypto.randomUUID();
-            let fullContent = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-
-                            if (data.content) {
-                                fullContent += data.content;
-                                setStreamingMessage({
-                                    id: assistantMessageId,
-                                    role: 'assistant',
-                                    content: fullContent,
-                                    timestamp: new Date().toISOString(),
-                                    model: selectedModel
-                                });
-                            }
-
-                            if (data.status) {
-                                setStatusMessage(data.status);
-                            }
-                        } catch (e) {
-                            console.error('Error parsing stream chunk:', e);
-                        }
-                    }
-                }
-            }
-
-            // Finalize
-            const assistantMessage: Message = {
-                id: assistantMessageId,
-                role: 'assistant',
-                content: fullContent,
-                timestamp: new Date().toISOString(),
-                model: selectedModel
-            };
-
-            setStreamingMessage(null);
-            setIsLoading(false);
-            setIsTyping(false);
-            setStatusMessage(null);
-
-            setConversations(prev => prev.map(c =>
-                c.id === currentConversationId
-                    ? { ...c, messages: [...previousMessages, updatedMessage, assistantMessage] }
-                    : c
-            ));
-
-        } catch (err) {
-            console.error('Error regenerating message:', err);
-            setError(err instanceof Error ? err.message : 'Failed to regenerate');
-            setIsLoading(false);
-            setIsTyping(false);
-        }
-
-    }, [conversations, currentConversationId, selectedModel]);
+        updateConversation(currentConversationId, { messages: previousMessages });
+        await sendMessage(newContent);
+    }, [conversations, currentConversationId, sendMessage, updateConversation]);
 
     const retryMessage = useCallback(async (messageId: string) => {
         const messageIndex = messages.findIndex(m => m.id === messageId);

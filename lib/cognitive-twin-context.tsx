@@ -13,6 +13,7 @@ export interface CognitiveTwin {
   onboardingCompletedAt: string | null   // First-class persisted event — never null after onboarding
   confidenceScore: number
   trustLevel: TrustLevel
+  longTermGoal: string   // free-text 12-month goal captured during onboarding; '' for pre-existing users
 
   identity: {
     role: 'student' | 'founder' | 'developer' | 'creator' | 'professional' | ''
@@ -56,6 +57,7 @@ const defaultTwin: CognitiveTwin = {
   onboardingCompletedAt: null,
   confidenceScore: 42,
   trustLevel: 'initial',
+  longTermGoal: '',
   identity: { role: '', industry: '', focusStyle: '', deepWorkCapacity: 3.5 },
   energyCurve: { chronotype: '', peakFocusStart: '', peakFocusEnd: '', typicalSlumpHour: 14 },
   metrics: { currentCognitiveLoad: 30, decisionFatigueRisk: 'low', burnoutIndex: 10 },
@@ -91,6 +93,7 @@ function serverToTwin(serverRecord: Record<string, unknown>, fallback: Cognitive
     onboardingCompletedAt: (serverRecord.onboardingCompletedAt as string | null) ?? fallback.onboardingCompletedAt,
     confidenceScore: (serverRecord.confidenceScore as number) ?? fallback.confidenceScore,
     trustLevel: (serverRecord.trustLevel as TrustLevel) ?? fallback.trustLevel,
+    longTermGoal: (serverRecord.longTermGoal as string) ?? fallback.longTermGoal,
     identity: {
       ...fallback.identity,
       ...((serverRecord.identity as object) ?? {}),
