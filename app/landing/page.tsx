@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
 import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 import { springConfig } from '@/lib/design-tokens'
+import { PageTransitionProvider, usePageTransition } from '@/components/landing/page-transition-overlay'
 
 const PIPELINE = [
   { icon: Eye, label: 'Observe', detail: 'Lee señales reales: tareas, foco, rutinas, horarios — no encuestas.' },
@@ -61,6 +62,7 @@ function HeroVisual() {
 function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) {
   const [scrolled, setScrolled] = useState(false)
   const { scrollY } = useScroll({ container: scrollRef })
+  const { transitionTo } = usePageTransition()
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     setScrolled(latest > 24)
@@ -81,22 +83,22 @@ function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement>
             : 'max-w-7xl border-b border-[#241F19]/[0.08] bg-[#FBF6EF]/90 backdrop-blur-xl'
         }
       >
-        <div className="w-full px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-8 h-8 rounded-xl border border-primary/25 flex items-center justify-center bg-primary/10">
               <Brain className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-black tracking-[0.2em] uppercase">Novo</span>
           </div>
-          <div className="flex items-center gap-3">
-            <a href="#precios" className="hidden sm:inline text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <a href="#precios" className="hidden sm:inline text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors whitespace-nowrap">
               Precios
             </a>
-            <Link href="/auth/signin" className="text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors">
+            <Link href="/auth/signin" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signin') }} className="text-sm font-medium text-[#241F19]/60 hover:text-[#241F19] transition-colors whitespace-nowrap">
               Iniciar sesión
             </Link>
-            <Button asChild size="sm" className="shadow-[0_0_20px_rgba(99,102,241,0.35)] hover:shadow-[0_0_28px_rgba(99,102,241,0.55)]">
-              <Link href="/auth/signup">Empezar gratis</Link>
+            <Button asChild size="sm" className="shadow-[0_0_20px_rgba(99,102,241,0.35)] hover:shadow-[0_0_28px_rgba(99,102,241,0.55)] whitespace-nowrap shrink-0">
+              <Link href="/auth/signup" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signup') }}>Empezar gratis</Link>
             </Button>
           </div>
         </div>
@@ -106,7 +108,16 @@ function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement>
 }
 
 export default function LandingPage() {
+  return (
+    <PageTransitionProvider>
+      <LandingPageContent />
+    </PageTransitionProvider>
+  )
+}
+
+function LandingPageContent() {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { transitionTo } = usePageTransition()
 
   return (
     <div
@@ -120,12 +131,24 @@ export default function LandingPage() {
         ['--primary-rgb' as string]: '99, 102, 241',
         ['--primary-glow' as string]: 'rgba(99,102,241,0.5)',
         ['--ring' as string]: '#6366f1',
+        // Headline-only display face — Inter (this app's --font-sans, used
+        // everywhere) is one of the most overused faces in AI-generated UI.
+        // Swapping it wholesale is riskier than the payoff on a deadline day,
+        // so only h1/h2 opt into this via font-display; body copy keeps Inter.
+        ['--font-display' as string]: "'Outfit', var(--font-sans)",
       } as React.CSSProperties}
     >
       <SmoothScrollProvider scrollRef={scrollRef}>
         <div>
+          <a
+            href="#landing-main"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-full focus:bg-[#241F19] focus:text-[#FBF6EF] focus:text-sm focus:font-medium"
+          >
+            Saltar al contenido
+          </a>
           <FloatingNav scrollRef={scrollRef} />
 
+          <main id="landing-main">
           <section className="relative overflow-hidden">
             {/* Ghosted background wordmark — warm, barely-there texture */}
             <div className="absolute inset-x-0 top-[6%] flex justify-center pointer-events-none select-none z-0">
@@ -162,7 +185,7 @@ export default function LandingPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                   <span className="text-[10px] font-black tracking-[0.25em] uppercase text-primary">Cognitive Operating System</span>
                 </div>
-                <h1 className="text-4xl md:text-6xl font-light italic tracking-tight leading-[1.05] mb-6">
+                <h1 className="text-4xl md:text-6xl font-light italic tracking-tight leading-[1.05] mb-6" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>
                   Deja de organizar tareas.<br />
                   <span className="not-italic font-semibold">Empieza a ejecutar con tu energía real.</span>
                 </h1>
@@ -176,7 +199,7 @@ export default function LandingPage() {
                     size="lg"
                     className="text-base px-8 shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_44px_rgba(99,102,241,0.65)] hover:-translate-y-0.5"
                   >
-                    <Link href="/auth/signup">
+                    <Link href="/auth/signup" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signup') }}>
                       Empezar gratis <ArrowRight className="w-4 h-4" />
                     </Link>
                   </Button>
@@ -219,8 +242,8 @@ export default function LandingPage() {
                 <Image
                   src="/landing/product-ai.png"
                   alt="Chat con el Cognitive Twin de Novo, capturado en producción"
-                  width={1330}
-                  height={552}
+                  width={1218}
+                  height={504}
                   className="w-full h-auto"
                   priority
                 />
@@ -263,7 +286,7 @@ export default function LandingPage() {
           <section id="como-funciona" className="max-w-6xl mx-auto px-6 py-16 md:py-24 scroll-mt-16">
             <ScrollReveal>
               <p className="text-[10px] font-black tracking-[0.25em] uppercase text-primary mb-3 text-center">Cómo funciona</p>
-              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-4">El motor detrás del Twin</h2>
+              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-4" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>El motor detrás del Twin</h2>
               <p className="text-[#241F19]/60 text-center max-w-xl mx-auto mb-14">
                 Cinco etapas que corren en segundo plano cada vez que usas Novo.
               </p>
@@ -291,16 +314,21 @@ export default function LandingPage() {
           {/* ── Differentiation ─────────────────────────────────────────────── */}
           <section className="max-w-6xl mx-auto px-6 py-16 md:py-24">
             <ScrollReveal>
-              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-14">
+              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-14" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>
                 No es una app de productividad más
               </h2>
             </ScrollReveal>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* items-start (not stretch) + a slight offset on the middle card:
+                three perfectly equal-height, perfectly aligned columns is the
+                most common AI-generated layout tell. Letting height follow
+                content and staggering the center card breaks that symmetry
+                without touching the responsive/grid structure. */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
               {DIFFERENTIATORS.map((d, i) => (
                 <ScrollReveal key={d.title} delay={i * 0.08}>
                   <motion.div
-                    className="rounded-3xl p-7 h-full border border-[#241F19]/[0.08] bg-[#241F19]/[0.03] backdrop-blur-xl"
-                    whileHover={{ transform: 'translateY(-6px)', borderColor: 'rgba(99,102,241,0.4)', boxShadow: '0 20px 50px rgba(99,102,241,0.15)' }}
+                    className={`rounded-3xl p-7 border border-[#241F19]/[0.08] bg-[#241F19]/[0.03] backdrop-blur-xl ${i === 1 ? 'md:translate-y-6' : ''}`}
+                    whileHover={{ transform: i === 1 ? 'translateY(-2px)' : 'translateY(-6px)', borderColor: 'rgba(99,102,241,0.4)', boxShadow: '0 20px 50px rgba(99,102,241,0.15)' }}
                     transition={{ duration: 0.3 }}
                   >
                     <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
@@ -317,7 +345,7 @@ export default function LandingPage() {
           {/* ── Pricing ─────────────────────────────────────────────────────── */}
           <section id="precios" className="max-w-5xl mx-auto px-6 py-16 md:py-24 scroll-mt-16">
             <ScrollReveal>
-              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-3">
+              <h2 className="text-3xl md:text-4xl font-semibold text-center mb-3" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>
                 Empieza gratis. Crece cuando lo necesites.
               </h2>
               <p className="text-center text-[#241F19]/55 max-w-md mx-auto mb-14">
@@ -339,7 +367,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Button asChild variant="outline" className="border-[#241F19]/20 hover:bg-[#241F19]/5">
-                    <Link href="/auth/signup">Empezar gratis</Link>
+                    <Link href="/auth/signup" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signup') }}>Empezar gratis</Link>
                   </Button>
                 </div>
               </ScrollReveal>
@@ -364,7 +392,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Button asChild className="shadow-[0_0_20px_rgba(99,102,241,0.35)] hover:shadow-[0_0_28px_rgba(99,102,241,0.55)]">
-                    <Link href="/auth/signup">Empezar con Pro</Link>
+                    <Link href="/auth/signup" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signup') }}>Empezar con Pro</Link>
                   </Button>
                 </motion.div>
               </ScrollReveal>
@@ -375,7 +403,7 @@ export default function LandingPage() {
           <section className="relative max-w-3xl mx-auto px-6 py-20 md:py-28 text-center overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[160%] rounded-full opacity-10 blur-[140px] pointer-events-none" style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
             <ScrollReveal>
-              <h2 className="relative text-3xl md:text-5xl font-light italic tracking-tight mb-6">
+              <h2 className="relative text-3xl md:text-5xl font-light italic tracking-tight mb-6" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>
                 Tu Twin está listo <span className="not-italic font-semibold">para empezar a aprender.</span>
               </h2>
               <p className="relative text-[#241F19]/60 mb-8 max-w-lg mx-auto">
@@ -386,12 +414,13 @@ export default function LandingPage() {
                 size="lg"
                 className="relative text-base px-8 shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_44px_rgba(99,102,241,0.65)] hover:-translate-y-0.5"
               >
-                <Link href="/auth/signup">
+                <Link href="/auth/signup" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signup') }}>
                   Empezar gratis <ArrowRight className="w-4 h-4" />
                 </Link>
               </Button>
             </ScrollReveal>
           </section>
+          </main>
 
           {/* ── Footer ──────────────────────────────────────────────────────── */}
           <footer className="border-t border-[#241F19]/[0.08]">
@@ -400,7 +429,7 @@ export default function LandingPage() {
               <div className="flex items-center gap-5">
                 <Link href="/privacy" className="hover:text-[#241F19] transition-colors">Privacidad</Link>
                 <Link href="/terms" className="hover:text-[#241F19] transition-colors">Condiciones</Link>
-                <Link href="/auth/signin" className="hover:text-[#241F19] transition-colors">Iniciar sesión</Link>
+                <Link href="/auth/signin" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signin') }} className="hover:text-[#241F19] transition-colors">Iniciar sesión</Link>
               </div>
             </div>
           </footer>
