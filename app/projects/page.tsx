@@ -218,7 +218,7 @@ export default function ProjectsPage() {
             
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold text-foreground/95">
-                {primaryTask ? primaryTask.name : "Deep Circadian Rest & Reset"}
+                {primaryTask ? primaryTask.title : "Deep Circadian Rest & Reset"}
               </h2>
               <p className="text-sm text-foreground/50 leading-relaxed">
                 {primaryTask && primaryTask.description 

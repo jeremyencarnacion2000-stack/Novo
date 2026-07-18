@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           '',
           [],
           systemPrompt,
-          'qwen/qwen3-235b-a22b:free'
+          'openai/gpt-oss-20b:free'
         );
       } catch (orError) {
         console.error('OpenRouter API failed, trying Chutes:', orError);

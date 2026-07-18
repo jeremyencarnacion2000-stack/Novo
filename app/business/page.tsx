@@ -220,7 +220,18 @@ export default function BusinessPage() {
           <CardContent>
             <div className="space-y-4">
               {clients.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No clients yet</p>
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <div
+                    className="w-12 h-12 rounded-2xl border border-primary/20 flex items-center justify-center"
+                    style={{ background: 'rgba(99,102,241,0.08)' }}
+                  >
+                    <Users className="w-5 h-5 text-primary/70" />
+                  </div>
+                  <div className="max-w-xs space-y-1">
+                    <p className="text-sm font-bold text-foreground/80">Sin clientes todavía</p>
+                    <p className="text-xs text-muted-foreground">Agrega tu primer cliente para llevar el pulso de tu negocio aquí.</p>
+                  </div>
+                </div>
               ) : (
                 clients.map((client) => (
                   <div key={client.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">
@@ -258,7 +269,18 @@ export default function BusinessPage() {
           <CardContent>
             <div className="space-y-4">
               {contentIdeas.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No content ideas yet</p>
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <div
+                    className="w-12 h-12 rounded-2xl border border-primary/20 flex items-center justify-center"
+                    style={{ background: 'rgba(99,102,241,0.08)' }}
+                  >
+                    <FileText className="w-5 h-5 text-primary/70" />
+                  </div>
+                  <div className="max-w-xs space-y-1">
+                    <p className="text-sm font-bold text-foreground/80">Sin ideas todavía</p>
+                    <p className="text-xs text-muted-foreground">Anota lo primero que se te ocurra — no tiene que ser perfecto, solo un punto de partida.</p>
+                  </div>
+                </div>
               ) : (
                 contentIdeas.map((content) => (
                   <div key={content.id} className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300">

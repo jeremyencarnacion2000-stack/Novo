@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
         status: status || 'to-read',
         currentPage: 0,
         genre,
-        categories,
+        // schema stores categories as a comma-separated String
+        categories: Array.isArray(categories) ? categories.join(', ') : categories,
         description,
         format: format || 'digital',
       }

@@ -91,10 +91,19 @@ export function HabitTrackers({ trackers, onEdit, onDelete, onLogEntry }: HabitT
   if (trackers.length === 0) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <p className="text-foreground/40 text-center text-sm font-medium">
-            No habit trackers yet. Create one to start building consistency.
-          </p>
+        <CardContent className="flex flex-col items-center justify-center py-14 gap-4 text-center">
+          <div
+            className="w-14 h-14 rounded-2xl border border-primary/20 flex items-center justify-center"
+            style={{ background: 'rgba(99,102,241,0.08)', boxShadow: '0 0 32px rgba(99,102,241,0.12)' }}
+          >
+            <CheckCircle2 className="w-6 h-6 text-primary/70" />
+          </div>
+          <div className="max-w-xs space-y-1.5">
+            <p className="text-sm font-bold text-foreground/80">Nada que medir todavía</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Crea tu primer hábito y el Twin empieza a ver tu consistencia real, no solo tu intención.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );

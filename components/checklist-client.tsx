@@ -15,9 +15,12 @@ import type { ChecklistItem } from "@/types/checklist"
 import { DataIntegrator, type IntegratedTask } from "@/lib/data-integrator"
 import { sileo } from "@/lib/sileo-bell"
 import { TiltCard } from "@/components/ui/tilt-card"
+import { useCognitiveTwin } from "@/lib/cognitive-twin-context"
+import { FRICTION_TIP } from "@/components/dashboard/now-hero"
 
 export default function ChecklistClient() {
   const { data: session } = useSession()
+  const { twin } = useCognitiveTwin()
   const [isClient, setIsClient] = useState(false)
   const [items, setItems] = useState<IntegratedTask[]>([])
   const [newItemText, setNewItemText] = useState("")
@@ -81,7 +84,6 @@ export default function ChecklistClient() {
         completed: false,
         priority: "medium",
         source: "manual",
-        userId: session.user.id
       }
 
       // Optimistically insert task
@@ -333,8 +335,29 @@ export default function ChecklistClient() {
               </TiltCard>
             ))}
             {items.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No tasks yet. Add one above!
+              <div className="space-y-3 pt-2">
+                {/* Guided empty state, not a blank box: ghost rows show the
+                    shape of a filled list (Notion's placeholder-row trick),
+                    and the tip above them uses the Twin's own onboarding
+                    answer instead of generic copy — same "según nos dijiste"
+                    framing as the dashboard's NowHero card. */}
+                {twin.bottlenecks.mainFrictionPoint && FRICTION_TIP[twin.bottlenecks.mainFrictionPoint] && (
+                  <p className="text-sm text-foreground/60 px-1">
+                    {FRICTION_TIP[twin.bottlenecks.mainFrictionPoint]}
+                  </p>
+                )}
+                {['Tu tarea más importante de hoy', 'Algo pequeño para empezar con impulso', 'Lo que has estado posponiendo'].map((ghost) => (
+                  <div
+                    key={ghost}
+                    className="flex items-center gap-3 p-4 rounded-[20px] bg-foreground/[0.015] border border-dashed border-foreground/[0.08]"
+                  >
+                    <div className="h-4 w-4 rounded-sm border border-foreground/15 shrink-0" />
+                    <span className="text-foreground/25">{ghost}</span>
+                  </div>
+                ))}
+                <p className="text-center text-xs text-muted-foreground pt-1">
+                  Agrega tu primera tarea arriba — el Twin empieza a aprender desde ahí.
+                </p>
               </div>
             )}
           </div>

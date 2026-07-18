@@ -75,7 +75,8 @@ export default function TrackersPage() {
           rollbackOnError: true,
           populateCache: (newTracker, cachedTrackers) => {
             const base = Array.isArray(cachedTrackers) ? cachedTrackers : []
-            return base.map((t) => (t.id === tempId ? newTracker : t))
+            // fetcher returns the single created tracker; SWR types it as the list
+            return base.map((t) => (t.id === tempId ? (newTracker as any) : t))
           },
           revalidate: true
         }
@@ -129,7 +130,7 @@ export default function TrackersPage() {
           rollbackOnError: true,
           populateCache: (updatedTracker, cachedTrackers) => {
             const base = Array.isArray(cachedTrackers) ? cachedTrackers : []
-            return base.map((t) => (t.id === tracker.id ? updatedTracker : t))
+            return base.map((t) => (t.id === tracker.id ? (updatedTracker as any) : t))
           },
           revalidate: true
         }
@@ -163,7 +164,8 @@ export default function TrackersPage() {
             const err = await response.json()
             throw new Error(err.error || 'Failed to delete tracker')
           }
-          return true
+          // populateCache below computes the new list; fetcher result is unused
+          return undefined
         },
         {
           optimisticData,
@@ -260,8 +262,8 @@ export default function TrackersPage() {
               if (t.id === id) {
                 const hasTodayEntry = t.entries.some((e) => e.date === today)
                 const updatedEntries = hasTodayEntry
-                  ? t.entries.map((e) => (e.date === today ? loggedEntry : e))
-                  : [...t.entries, loggedEntry]
+                  ? t.entries.map((e) => (e.date === today ? (loggedEntry as any) : e))
+                  : [...t.entries, loggedEntry as any]
                 return { ...t, entries: updatedEntries }
               }
               return t

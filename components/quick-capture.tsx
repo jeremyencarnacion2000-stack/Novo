@@ -315,10 +315,10 @@ export function QuickCapture() {
                         )}
 
                         {activeTab === 'attributes' && (
-                            <motion.div className="relative z-10"
+                            <motion.div
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="p-8 space-y-8"
+                                className="relative z-10 p-8 space-y-8"
                             >
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] font-bold text-white/20 uppercase tracking-[0.3em]">Project Context</h3>

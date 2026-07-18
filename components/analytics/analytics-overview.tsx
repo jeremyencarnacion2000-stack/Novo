@@ -188,13 +188,18 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                 </div>
 
                 {/* Month Selector */}
-                <div className="flex justify-between items-center mb-10 px-2 overflow-x-auto no-scrollbar gap-4 pb-2">
+                {/* justify-start (not justify-between) — space-between fights
+                    overflow-x-auto by trying to fit all 12 months within the
+                    visible width instead of letting them overflow and scroll,
+                    so at narrow widths only the first few months were ever
+                    reachable/visible. */}
+                <div className="flex justify-start items-center mb-10 px-2 overflow-x-auto no-scrollbar gap-4 pb-2">
                     {months.map((month) => (
                         <button
                             key={month}
                             onClick={() => setSelectedMonth(month)}
                             className={cn(
-                                "text-xs font-bold transition-all duration-300 px-4 py-2 rounded-full whitespace-nowrap uppercase tracking-tighter",
+                                "shrink-0 text-xs font-bold transition-all duration-300 px-4 py-2 rounded-full whitespace-nowrap uppercase tracking-tighter",
                                 selectedMonth === month
                                     ? "bg-white text-indigo-600 shadow-[0_10px_20px_rgba(255,255,255,0.2)] scale-110"
                                     : "text-foreground/40 hover:text-foreground hover:bg-foreground/5"
@@ -222,7 +227,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                             "absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'time' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'time' ? "text-foreground" : "text-foreground/40")}>Active Hours</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10 break-words", selectedMetric === 'time' ? "text-foreground" : "text-foreground/40")}>Active Hours</p>
                         <p className="text-2xl md:text-3xl font-black relative z-10">
                             {currentStats.totalTime} <span className="text-xs font-bold text-foreground/40 ml-1">Hr</span>
                         </p>
@@ -242,7 +247,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                             "absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'productivity' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'productivity' ? "text-foreground" : "text-foreground/40")}>Productivity</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10 break-words", selectedMetric === 'productivity' ? "text-foreground" : "text-foreground/40")}>Productivity</p>
                         <p className="text-3xl md:text-4xl font-black relative z-10">
                             {currentStats.productivity}%
                         </p>
@@ -262,7 +267,7 @@ export function AnalyticsOverview({ data, metrics }: AnalyticsOverviewProps) {
                             "absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent opacity-0 transition-opacity duration-500",
                             selectedMetric === 'completions' && "opacity-100"
                         )} />
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10", selectedMetric === 'completions' ? "text-foreground" : "text-foreground/40")}>Completions</p>
+                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors relative z-10 break-words", selectedMetric === 'completions' ? "text-foreground" : "text-foreground/40")}>Completions</p>
                         <p className="text-2xl md:text-3xl font-black relative z-10">
                             {currentStats.completions}
                         </p>

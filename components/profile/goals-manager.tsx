@@ -123,8 +123,17 @@ export function GoalsManager() {
                         </div>
                     ))}
                     {filteredGoals.length === 0 && (
-                        <div className="text-center py-8 text-muted-foreground">
-                            No goals set for this {timeframe} yet.
+                        <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                            <div
+                                className="w-12 h-12 rounded-2xl border border-primary/20 flex items-center justify-center"
+                                style={{ background: 'rgba(99,102,241,0.08)' }}
+                            >
+                                <Target className="w-5 h-5 text-primary/70" />
+                            </div>
+                            <div className="max-w-xs space-y-1">
+                                <p className="text-sm font-bold text-foreground/80">Sin metas para este {timeframe} todavía</p>
+                                <p className="text-xs text-muted-foreground">Define una y el Twin la usa para priorizar tus tareas del día a día.</p>
+                            </div>
                         </div>
                     )}
                 </div>

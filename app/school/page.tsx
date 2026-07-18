@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, GraduationCap } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CourseCard } from '@/components/school/course-card';
 import { CourseDialog } from '@/components/school/course-dialog';
@@ -302,9 +302,19 @@ export default function SchoolPage() {
           </div>
 
           {courses.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No courses yet</p>
-              <p className="text-sm mt-2">Add your first course to get started!</p>
+            <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl border border-primary/20 flex items-center justify-center"
+                style={{ background: 'rgba(99,102,241,0.08)', boxShadow: '0 0 32px rgba(99,102,241,0.12)' }}
+              >
+                <GraduationCap className="w-6 h-6 text-primary/70" />
+              </div>
+              <div className="max-w-xs space-y-1.5">
+                <p className="text-sm font-bold text-foreground/80">Todavía no hay cursos</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Agrega tu primer curso para que el Twin empiece a cruzar tus calificaciones con tu carga real de trabajo.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

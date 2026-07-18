@@ -3,6 +3,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { FocusTimerWidget } from '../focus-timer-widget'
 import { FocusProvider, useFocus } from '@/lib/focus-context'
 
+// FocusProvider calls useSession(); provide an authenticated session so it
+// renders without a real <SessionProvider> wrapper.
+jest.mock('next-auth/react', () => ({
+    useSession: () => ({ data: { user: { id: 'test-user' } }, status: 'authenticated' }),
+}))
+
 // Mock the audio
 window.HTMLMediaElement.prototype.play = jest.fn()
 
@@ -40,21 +46,16 @@ describe('FocusTimerWidget', () => {
                 <TestComponent />
             </FocusProvider>
         )
+        // Activate → widget mounts and shows the initial time.
         fireEvent.click(screen.getByText('Activate'))
+        expect(screen.getByText('25:00')).toBeInTheDocument()
 
-        // Find pause button (it renders Pause icon initially)
-        // The component renders two buttons. First is Toggle (Pause), second is Reset (RotateCcw).
-        const buttons = screen.getAllByRole('button')
-        // Index 0 is "Activate" from TestComponent
-        // Index 1 is Toggle
-        // Index 2 is Reset
-
-        const toggleButton = buttons[1]
+        // Buttons: [0] "Activate" (test harness), [1] toggle (Pause/Play), [2] reset.
+        // The widget's toggle flips the active state; the widget only renders while
+        // active, so toggling it off hides the timer again.
+        const toggleButton = screen.getAllByRole('button')[1]
         fireEvent.click(toggleButton)
 
-        // Since we can't easily check internal state without exposing it, 
-        // we assume if it doesn't crash, it's working. 
-        // Ideally we would check if the icon changed or time started decreasing (requires fake timers).
-        expect(toggleButton).toBeInTheDocument()
+        expect(screen.queryByText('25:00')).not.toBeInTheDocument()
     })
 })

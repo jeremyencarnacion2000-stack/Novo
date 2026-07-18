@@ -58,7 +58,7 @@ interface FocusContextType {
   selectedTaskId: string | null
   setSelectedTaskId: (id: string | null) => void
   tasks: Task[]
-  addTask: (text: string) => void
+  addTask: (text: string, id?: string) => void
   toggleTaskCompletion: (id: string) => void
   deleteTask: (id: string) => void
 
@@ -353,8 +353,13 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Task Actions
-  const addTask = (text: string) => {
-    const newTask: Task = { id: Math.random().toString(36).substr(2, 9), text, completed: false }
+  // `id` is optional and only passed by callers that need to hand off a task
+  // they already know the identity of (e.g. the cognitive orchestrator
+  // seeding the Focus page's queue with a real backend task id) so it can be
+  // selected deterministically right after — everyday manual entry from the
+  // Focus page itself omits it and gets a random local id, same as before.
+  const addTask = (text: string, id?: string) => {
+    const newTask: Task = { id: id ?? Math.random().toString(36).substr(2, 9), text, completed: false }
     setTasks(prev => [...prev, newTask])
     if (!selectedTaskId) setSelectedTaskId(newTask.id)
   }

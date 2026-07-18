@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Edit, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { Edit, Trash2, TrendingUp, TrendingDown, LineChart } from 'lucide-react'
 import { Tracker } from '@/types/tracker'
 import { useState } from 'react'
 import { useNotifications } from '@/lib/notification-context'
@@ -72,10 +72,19 @@ export function MetricTrackers({ trackers, onEdit, onDelete, onLogEntry }: Metri
   if (trackers.length === 0) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <p className="text-muted-foreground text-center">
-            No metric trackers yet. Create one to start measuring progress.
-          </p>
+        <CardContent className="flex flex-col items-center justify-center py-14 gap-4 text-center">
+          <div
+            className="w-14 h-14 rounded-2xl border border-primary/20 flex items-center justify-center"
+            style={{ background: 'rgba(99,102,241,0.08)', boxShadow: '0 0 32px rgba(99,102,241,0.12)' }}
+          >
+            <LineChart className="w-6 h-6 text-primary/70" />
+          </div>
+          <div className="max-w-xs space-y-1.5">
+            <p className="text-sm font-bold text-foreground/80">Sin números todavía</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Mide algo concreto — peso, horas de sueño, ingresos — y empieza a ver la tendencia real, no solo cómo te sientes.
+            </p>
+          </div>
         </CardContent>
       </Card>
     )

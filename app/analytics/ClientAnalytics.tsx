@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Award, Calendar, CheckCircle2, Flame, Target, TrendingDown, TrendingUp } from 'lucide-react'
 
-import { motion } from 'framer-motion'
+import { motion, type Variants, type Transition } from 'framer-motion'
 
 interface DailyData {
   date: string
@@ -71,7 +71,7 @@ const chartConfig = {
   },
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -82,7 +82,7 @@ const containerVariants = {
   }
 }
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: {
     opacity: 1,
@@ -95,7 +95,7 @@ const cardVariants = {
   }
 }
 
-const hoverSpring = {
+const hoverSpring: Transition = {
   type: "spring",
   stiffness: 400,
   damping: 28
@@ -127,7 +127,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="flex flex-col gap-8 md:gap-12 pb-20"
+      className="flex flex-col gap-8 md:gap-12 pb-40 md:pb-12"
     >
       <motion.div variants={cardVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -151,10 +151,10 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
 
       {/* Intelligence Insights Section */}
       {insights && (
-        <div className="grid gap-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {/* Best Day & Habit Performance */}
-          <div className="md:col-span-2 grid gap-8">
-            <div className="grid gap-8 md:grid-cols-2">
+          <div className="md:col-span-2 grid grid-cols-1 gap-8">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
               {/* Best Day Card */}
               <motion.div
                 variants={cardVariants}
@@ -316,7 +316,7 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
       </motion.div>
 
       {/* Secondary Charts */}
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         {/* Completions Over Time - Stacked Area Chart */}
         <motion.div
           variants={cardVariants}

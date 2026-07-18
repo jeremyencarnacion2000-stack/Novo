@@ -52,12 +52,12 @@ export function ProductivityHeatmap({ data }: ProductivityHeatmapProps) {
 
     return (
         <div className="w-full card--primary p-6 md:p-8">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 mb-6">
                 <div>
                     <h3 className="text-lg font-bold tracking-tight">Productivity Heatmap</h3>
                     <p className="text-sm text-muted-foreground">Activity over the last 90 days</p>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider shrink-0">
                     <span>Less</span>
                     <div className="flex gap-1">
                         <div className="w-3 h-3 rounded-sm bg-foreground/5" />

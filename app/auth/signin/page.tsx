@@ -7,6 +7,16 @@ import { Loader2, Eye, EyeOff, ChevronsRight } from 'lucide-react'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
 import { InfinityOrbit } from '@/components/auth/infinity-orbit'
 
+// Only follow a same-origin relative path (never a protocol-relative "//host"
+// or absolute URL) — this is read from a query param an attacker could craft,
+// so treat it as untrusted input, not a place to allow open redirects.
+function getSafeCallbackUrl(): string {
+  if (typeof window === 'undefined') return '/'
+  const raw = new URLSearchParams(window.location.search).get('callbackUrl')
+  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw
+  return '/'
+}
+
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -31,7 +41,7 @@ export default function SignInPage() {
       if (result?.error) {
         setError('Invalid email or password')
       } else if (result?.ok) {
-        router.push('/')
+        router.push(getSafeCallbackUrl())
         router.refresh()
       } else {
         setError('Unexpected error occurred')
@@ -48,7 +58,7 @@ export default function SignInPage() {
     setGoogleLoading(true)
     try {
       await signIn('google', {
-        callbackUrl: '/',
+        callbackUrl: getSafeCallbackUrl(),
         redirect: true
       })
     } catch (error) {
