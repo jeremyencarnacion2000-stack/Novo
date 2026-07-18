@@ -4,7 +4,10 @@ import { groqAPI } from "@/lib/groq";
 import { logAICall } from "@/lib/ai-call-log";
 
 // Using Llama3 for insights generation as per requirements for low cost & speed
-const INSIGHT_MODEL = "llama3-8b-8192";
+// llama3-8b-8192 was decommissioned by Groq (404 on every call) — this
+// autonomous insight generation had been silently failing/falling back ever
+// since. llama-3.1-8b-instant is the current equivalent.
+const INSIGHT_MODEL = "llama-3.1-8b-instant";
 
 const INSIGHTS_SYSTEM_PROMPT = `
 You are Novo's Cognitive Insight Engine.
