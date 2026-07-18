@@ -48,7 +48,13 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim();
+  // Deliberately NOT calling self.clients.claim() here. Claiming immediately
+  // hands control of the page that triggered this install to the SW mid-load,
+  // right as the app's own initial fetches (conversations/session/settings)
+  // are firing — those in-flight requests get disrupted by the sudden control
+  // change and fail with "TypeError: Failed to fetch". Not claiming means the
+  // SW simply controls the NEXT navigation instead, which is fine for this
+  // app's caching needs and avoids the race entirely.
 });
 
 // Fetch event - handle caching and offline fallback
