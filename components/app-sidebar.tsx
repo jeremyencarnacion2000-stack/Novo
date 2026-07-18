@@ -322,7 +322,7 @@ export function AppSidebar() {
                                       : "text-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                                   )}
                                 >
-                                  <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
+                                  <Link href={item.href} onClick={handleLinkClick} aria-label={item.title} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
                                     <item.icon className={cn("h-5 w-5 shrink-0 relative z-10 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-foreground/40")} />
                                     {state === 'expanded' && (
                                       <span className={cn("text-sm tracking-tight relative z-10", isActive ? "font-semibold text-foreground" : "font-medium text-foreground/60")}>
