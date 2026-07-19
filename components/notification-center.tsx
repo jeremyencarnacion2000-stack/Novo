@@ -561,7 +561,12 @@ export function NotificationCenter() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.18 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className="liquid-glass-premium fixed top-[104px] right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-9rem))] flex flex-col rounded-3xl overflow-hidden"
+              // top-[188px] (not 104px): clears the Pomodoro widget's compact
+              // pill (components/pomodoro-widget.tsx, `top-6 right-16`,
+              // ~24-176px tall) when a focus session is active at the same
+              // time notifications are opened — same fix, same reasoning as
+              // lib/cognitive-context.tsx's FatigueNavigationWarning.
+              className="liquid-glass-premium fixed top-[188px] right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-9rem))] flex flex-col rounded-3xl overflow-hidden"
               style={{
                 boxShadow: '0 30px 80px rgba(0,0,0,0.65)',
               }}

@@ -440,12 +440,16 @@ function FatigueNavigationWarning({
 }) {
   return (
     <div
-      // top-[104px] matches the clearance NotificationCenter's own dropdown
-      // already uses to sit below the bell (fixed top-16 right-4) — this
-      // banner shares the same top-right corner + z-[200] as the bell, so
-      // without it the wider warning card renders on top and makes the bell
-      // completely unclickable while a fatigue warning is showing.
-      className="fixed top-[104px] right-4 z-[200] max-w-sm w-[calc(100%-2rem)] sm:w-full"
+      // top-[104px] cleared the bell's own dropdown (fixed top-16 right-4),
+      // but not the Pomodoro widget's compact pill (components/pomodoro-
+      // widget.tsx, `top-6 right-16`) — that pill runs from 24px to roughly
+      // 176px tall (badge + timer + controls, stacked), so at 104px this
+      // banner's top edge landed INSIDE the pill's vertical span. Since a
+      // synaptic-fatigue warning and an active Pomodoro session can both be
+      // showing at once (that's precisely when a fatigue warning is most
+      // likely to fire), bumped to clear the pill's max height too, not just
+      // the bell.
+      className="fixed top-[188px] right-4 z-[200] max-w-sm w-[calc(100%-2rem)] sm:w-full"
       role="alert"
       style={{ animation: 'novo-panel-in var(--novo-duration) var(--novo-spring) both' }}
     >
