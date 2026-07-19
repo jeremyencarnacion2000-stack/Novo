@@ -154,7 +154,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <DialogContent data-flip-to={flipKey} className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
+            <DialogContent data-flip-to={flipKey} className="max-w-3xl max-h-[90dvh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight">Book Details</DialogTitle>
                 </DialogHeader>

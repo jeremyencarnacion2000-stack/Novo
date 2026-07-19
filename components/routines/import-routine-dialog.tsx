@@ -181,7 +181,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
         data-flip-to="btn-import-routine"
-        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl max-h-[90dvh] overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

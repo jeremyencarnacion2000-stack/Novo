@@ -124,7 +124,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent data-flip-to={flipKey} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent data-flip-to={flipKey} className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

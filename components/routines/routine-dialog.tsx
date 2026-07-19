@@ -151,7 +151,7 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
         data-flip-to={flipKey}
-        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl max-h-[90dvh] overflow-y-auto"
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader>

@@ -63,7 +63,7 @@ export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }
       <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
         <DialogContent
           data-flip-to={`routine-${routine.id}`}
-          className="max-w-7xl w-[95vw] h-[90vh] p-0 shadow-none [&>button]:text-white [&>button]:z-20 z-[5001] rounded-[24px] md:rounded-[32px] overflow-hidden !bg-black/80 dark:!bg-black/80 backdrop-blur-2xl border border-white/10 liquid-glass-premium"
+          className="max-w-7xl w-[95vw] h-[90dvh] p-0 shadow-none [&>button]:text-white [&>button]:z-20 z-[5001] rounded-[24px] md:rounded-[32px] overflow-hidden !bg-black/80 dark:!bg-black/80 backdrop-blur-2xl border border-white/10 liquid-glass-premium"
         >
           {/* Content Viewport — overflow-y-auto directly on this div */}
           <div className="relative z-10 overflow-y-auto h-full w-full custom-scrollbar">
