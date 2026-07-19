@@ -123,14 +123,21 @@ function LandingPageContent() {
     <div
       ref={scrollRef}
       className="h-dvh w-full bg-[#0A0C0B] text-[#F1F5F3] overflow-y-auto overflow-x-hidden custom-scrollbar"
-      // Landing is a fixed-brand marketing surface — pin --primary to the Novo
-      // indigo so it never inherits the user's in-app accent (e.g. orange),
-      // which SettingsProvider writes onto :root globally.
+      // Landing is a fixed-brand marketing surface — pin the theme tokens to
+      // the Novo brand palette so it never inherits the visiting user's
+      // in-app accent/theme (e.g. a signed-in user's light mode + orange
+      // accent), which SettingsProvider/next-themes write onto :root
+      // globally. --background/--foreground were missing from this pin
+      // originally — shadcn's Button `variant="outline"` reads those two
+      // directly, so a visitor whose global theme resolved to light got a
+      // white button with near-white text on this always-dark page.
       style={{
         ['--primary' as string]: '#22D3C4',
         ['--primary-rgb' as string]: '34, 211, 196',
         ['--primary-glow' as string]: 'rgba(34,211,196,0.5)',
         ['--ring' as string]: '#22D3C4',
+        ['--background' as string]: '#0A0C0B',
+        ['--foreground' as string]: '#F1F5F3',
         // Headline-only display face — Inter (this app's --font-sans, used
         // everywhere) is one of the most overused faces in AI-generated UI.
         // Swapping it wholesale is riskier than the payoff on a deadline day,
