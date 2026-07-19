@@ -933,14 +933,26 @@ registerActionHandler<any>('DELETE_ALL_TASKS', async (action, ctx) => {
         data: { count: result.count }
     };
 });
+// The rescue models (used when the primary model is rate-limited) occasionally
+// hallucinate the literal string "undefined"/"null" for a field they should
+// have left out — a real, non-empty string, so it passes a plain `!value`
+// truthy check and ships verbatim into user-visible text (surfaced in
+// production as a chat bubble literally saying `El archivo "undefined" se ha
+// generado correctamente`). Strips those placeholder strings back to '' so
+// the normal empty-value fallback logic below still kicks in.
+function dropHallucinatedPlaceholder(value: unknown): string {
+    if (typeof value !== 'string') return value ? String(value) : '';
+    return /^(undefined|null|none|n\/a)$/i.test(value.trim()) ? '' : value;
+}
+
 registerActionHandler<any>('GENERATE_FILE', async (action, ctx) => {
     const payload = action.payload || {};
-    let content = payload.content || payload.data || payload.body || payload.text || '';
-    const mimeType = payload.mimeType || payload.mime || 'text/plain';
-    const description = payload.description || payload.title || payload.topic || '';
+    let content = dropHallucinatedPlaceholder(payload.content || payload.data || payload.body || payload.text || '');
+    const mimeType = dropHallucinatedPlaceholder(payload.mimeType || payload.mime) || 'text/plain';
+    const description = dropHallucinatedPlaceholder(payload.description || payload.title || payload.topic || '');
 
-    // Robust filename extraction with fallbacks
-    let filename = payload.filename || payload.fileName || payload.name || payload.file;
+    // Robust filename extraction with fallbacks.
+    let filename = dropHallucinatedPlaceholder(payload.filename || payload.fileName || payload.name || payload.file);
     if (!filename) {
         const extMap: Record<string, string> = {
             'text/html': '.html', 'text/css': '.css', 'text/csv': '.csv',
