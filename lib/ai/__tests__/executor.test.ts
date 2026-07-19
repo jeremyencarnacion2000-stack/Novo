@@ -145,4 +145,62 @@ describe('AI Executor', () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain('Invalid action');
     });
+
+    // Regression: ISSUE — GENERATE_FILE shipped a literal "El archivo
+    // \"undefined\" se ha generado correctamente." chat bubble in production.
+    // Root cause: the rescue model (used when the primary model hits its
+    // rate limit) hallucinated the literal string "undefined" for a field it
+    // should have left out. That's a real, non-empty string, so it passed
+    // the old `!filename` truthy check and shipped verbatim instead of
+    // falling back to a generated name. Found by /qa on 2026-07-19.
+    describe('GENERATE_FILE hallucinated-placeholder guard', () => {
+        it('falls back to a generated filename when the model hallucinates the literal string "undefined"', async () => {
+            const action = {
+                type: 'GENERATE_FILE',
+                payload: { filename: 'undefined', content: 'contenido real', mimeType: 'text/plain' },
+            };
+
+            const result = await executeAIAction(action as any, userId);
+
+            expect(result.success).toBe(true);
+            expect(result.data.filename).not.toBe('undefined');
+            expect(result.message).not.toContain('"undefined"');
+        });
+
+        it('falls back to a generated filename for "null" the same way', async () => {
+            const action = {
+                type: 'GENERATE_FILE',
+                payload: { filename: 'null', content: 'contenido real', mimeType: 'text/plain' },
+            };
+
+            const result = await executeAIAction(action as any, userId);
+
+            expect(result.data.filename).not.toBe('null');
+        });
+
+        it('keeps a real filename unchanged', async () => {
+            const action = {
+                type: 'GENERATE_FILE',
+                payload: { filename: 'reporte.txt', content: 'contenido real', mimeType: 'text/plain' },
+            };
+
+            const result = await executeAIAction(action as any, userId);
+
+            expect(result.data.filename).toBe('reporte.txt');
+            expect(result.message).toContain('reporte.txt');
+        });
+
+        it('does not leak a hallucinated "undefined" content into the generated file', async () => {
+            const action = {
+                type: 'GENERATE_FILE',
+                payload: { filename: 'notas.txt', content: 'undefined', mimeType: 'text/plain' },
+            };
+
+            const result = await executeAIAction(action as any, userId);
+
+            // Content should hit the last-resort fallback text, not the
+            // literal word "undefined" as the entire file body.
+            expect(result.data.content).not.toBe('undefined');
+        });
+    });
 });

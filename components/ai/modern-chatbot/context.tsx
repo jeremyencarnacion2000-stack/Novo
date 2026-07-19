@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment, MessageBlock, Attachment } from './types';
+import { splitSseLines, parseFinalSseLine } from '@/lib/ai/sse-buffer';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -513,23 +514,15 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             let activeIntent: string | undefined;
             let activeFallback = false;
 
-            // SSE frames don't align with network chunk boundaries — a single
-            // `data: {...}\n\n` can be split across two reader.read() results.
-            // The previous version split each raw chunk on '\n' with no carry-
-            // over buffer, so any frame straddling a boundary was silently
-            // dropped in the empty catch below. On Vercel's chunked streaming
-            // that dropped most/all content frames → the chatbot showed nothing
-            // ("never responds"), even though the API streamed correctly (curl
-            // worked). Mirror the server's own correct buffering: accumulate,
-            // split, and keep the trailing partial line for the next read.
+            // SSE frames don't align with network chunk boundaries — see
+            // lib/ai/sse-buffer.ts for why this needs a carry-over buffer.
             let sseBuffer = '';
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                sseBuffer += decoder.decode(value, { stream: true });
-                const lines = sseBuffer.split('\n');
-                sseBuffer = lines.pop() || '';
+                const { lines, buffer } = splitSseLines(decoder.decode(value, { stream: true }), sseBuffer);
+                sseBuffer = buffer;
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
@@ -570,16 +563,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 }
             }
             // Flush any final buffered frame left without a trailing newline.
-            if (sseBuffer.startsWith('data: ')) {
-                const data = sseBuffer.slice(6);
-                if (data !== '[DONE]') {
-                    try {
-                        const json = JSON.parse(data);
-                        if (json.content) {
-                            accumulatedContent += json.content;
-                        }
-                    } catch (e) { }
-                }
+            const finalFrame = parseFinalSseLine(sseBuffer);
+            if (finalFrame?.content) {
+                accumulatedContent += finalFrame.content;
             }
 
             setStreamingMessage(null);
@@ -1067,15 +1053,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                             });
 
                             // Same SSE chunk-boundary buffering as the main
-                            // stream loop above — carry the trailing partial
-                            // line across reads instead of dropping split frames.
+                            // stream loop above (see lib/ai/sse-buffer.ts).
                             let followUpBuffer = '';
                             while (true) {
                                 const { done, value } = await reader.read();
                                 if (done) break;
-                                followUpBuffer += decoder.decode(value, { stream: true });
-                                const lines = followUpBuffer.split('\n');
-                                followUpBuffer = lines.pop() || '';
+                                const { lines, buffer } = splitSseLines(decoder.decode(value, { stream: true }), followUpBuffer);
+                                followUpBuffer = buffer;
                                 for (const line of lines) {
                                     if (line.startsWith('data: ')) {
                                         const data = line.slice(6);
@@ -1096,15 +1080,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     }
                                 }
                             }
-                            if (followUpBuffer.startsWith('data: ')) {
-                                const data = followUpBuffer.slice(6);
-                                if (data !== '[DONE]') {
-                                    try {
-                                        const json = JSON.parse(data);
-                                        if (json.content) followUpContent += json.content;
-                                    } catch (e) { }
-                                }
-                            }
+                            const followUpFinalFrame = parseFinalSseLine(followUpBuffer);
+                            if (followUpFinalFrame?.content) followUpContent += followUpFinalFrame.content;
 
                             setStreamingMessage(null);
 

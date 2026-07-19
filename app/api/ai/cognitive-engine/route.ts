@@ -567,15 +567,27 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
     if (!cognitiveReport) {
       console.log('[Cognitive API] All remote models unavailable or failed. Initiating high-fidelity Local Cognitive Synthesis...');
       
+      // Cold start still has real signal to work with: the onboarding quiz
+      // captures chronotype, role, main friction point, and a 12-month goal
+      // BEFORE any task/focus history exists. The old cold-start text ("Aún
+      // sin historial real... el Twin aún no puede detectar patrones")
+      // ignored all of it and told a brand-new user "I don't know you yet"
+      // in their first five minutes — exactly the wrong first impression for
+      // a product whose whole pitch is that it reads you. Ground the
+      // cold-start insight in that onboarding profile instead: still 100%
+      // honest (nothing here is a "detected pattern"), just not empty.
+      const coldStartBottlenecks = (twinRecord?.bottlenecks as any) || {};
+      const coldStartGoal = twinRecord?.longTermGoal?.trim();
+
       const insights = [
         {
           type: 'recovery',
           severity: isColdStart ? 'info' : recoveryState === 'critical' ? 'critical' : recoveryState === 'impaired' ? 'warning' : 'info',
           headline: isColdStart
-            ? 'Aún sin historial real'
+            ? (coldStartGoal ? `Calibrado para: ${coldStartGoal}` : 'Perfil inicial calibrado')
             : recoveryState === 'critical' ? 'Impaired Sleep Debt Detected' : 'Optimal Recovery Cycle',
           detail: isColdStart
-            ? `Todavía no tienes tareas ni sesiones registradas — el Twin aún no puede detectar patrones. Por ahora, según la hora actual, tu ventana de energía estimada está en ${currentEnergy}% de capacidad.`
+            ? `Aún no tienes tareas ni sesiones registradas, así que esto no es un patrón detectado todavía — pero ya sabemos que tu ventana de foco pico (según tu cronotipo) es ${peakInstructions}, y ahora mismo tu energía estimada está en ${currentEnergy}%. En cuanto uses Novo unos días, esto pasa de estimado a real.`
             : recoveryState === 'critical'
               ? 'Activity patterns before 4:00 AM indicate high sleep debt. Prioritize cognitive restoration and low-friction tasks.'
               : 'Estimated recovery state is optimal. Your neural networks show high receptivity for deep focused work.'
@@ -589,9 +601,13 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
         {
           type: 'procrastination',
           severity: isColdStart ? 'info' : procrastinationScore > 50 ? 'warning' : 'info',
-          headline: isColdStart ? 'Sin datos de procrastinación aún' : procrastinationScore > 50 ? 'Task Rescheduling Habit Detected' : 'High Focus Momentum',
+          headline: isColdStart
+            ? (coldStartBottlenecks.mainFrictionPoint ? 'Fricción principal (según tu perfil)' : 'Sin datos de procrastinación aún')
+            : procrastinationScore > 50 ? 'Task Rescheduling Habit Detected' : 'High Focus Momentum',
           detail: isColdStart
-            ? 'Agrega y completa tareas para que el Twin empiece a medir tu ritmo real de ejecución.'
+            ? (coldStartBottlenecks.mainFrictionPoint
+                ? `Nos dijiste que tu mayor fricción es "${coldStartBottlenecks.mainFrictionPoint}". Todavía no lo hemos medido con datos reales — agrega y completa tareas para que el Twin confirme (o corrija) esa lectura.`
+                : 'Agrega y completa tareas para que el Twin empiece a medir tu ritmo real de ejecución.')
             : `Procrastination index stands at ${procrastinationScore}%. A 7-day completion rate of ${completionRate}% supports task focus.`
         },
         {
