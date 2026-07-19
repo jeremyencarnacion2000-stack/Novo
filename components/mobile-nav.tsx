@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils'
 import { useQuickCapture } from '@/lib/quick-capture-context'
 import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
 import { MobileChatSheet } from '@/components/ai/modern-chatbot/mobile-chat-sheet'
-import { useScrollDirection } from '@/hooks/use-scroll-direction'
 import { motion, LayoutGroup } from 'framer-motion'
 import { springConfig } from '@/lib/design-tokens'
 import { useModalFlip } from '@/hooks/use-modal-flip'
@@ -19,7 +18,6 @@ export function MobileNav() {
     const { onOpen } = useQuickCapture()
     const [drawerOpen, setDrawerOpen] = useState(false)
     const [chatOpen, setChatOpen] = useState(false)
-    const scrollDir = useScrollDirection(40)
 
     // Container-transform: the panel physically grows from the NAV BAR's own
     // rect/radius (matching the reference's shared-element demo) instead of
@@ -58,9 +56,13 @@ export function MobileNav() {
 
     return (
         <>
+            {/* Nav bar stays put — it used to auto-hide on scroll-down via
+                useScrollDirection, but after heavy navigation the scroll-
+                direction state would get stuck and leave the bar hidden
+                off-screen (the reported "se buggea"). A persistent bar is
+                simpler and never strands the user without navigation. */}
             <div className={cn(
-                "fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none transition-transform duration-500 ease-out gap-3",
-                scrollDir === 'down' && "translate-y-[120%]"
+                "fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3"
             )}>
                 {/* Nav bar — left side, pill-shaped. This is the flip origin:
                     it physically grows into the section panel, not the FAB. */}
