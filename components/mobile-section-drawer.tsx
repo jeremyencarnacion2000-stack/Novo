@@ -120,7 +120,7 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
                         opacity fade targets this div (it's the target's only
                         direct child), the drag transform layers on top of it. */}
                     <div
-                        className="px-5 pb-6 max-h-[65vh] overflow-y-auto scrollbar-hide"
+                        className="px-5 pb-6 max-h-[65dvh] overflow-y-auto scrollbar-hide"
                         style={{
                             transform: dragY ? `translateY(${dragY}px)` : undefined,
                             transition: dragging ? 'none' : 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)',
