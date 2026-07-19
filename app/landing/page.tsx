@@ -122,7 +122,7 @@ function LandingPageContent() {
   return (
     <div
       ref={scrollRef}
-      className="h-dvh w-full bg-[#0A0C0B] text-[#F1F5F3] overflow-y-auto overflow-x-hidden custom-scrollbar"
+      className="dark h-dvh w-full bg-[#0A0C0B] text-[#F1F5F3] overflow-y-auto overflow-x-hidden custom-scrollbar"
       // Landing is a fixed-brand marketing surface — pin the theme tokens to
       // the Novo brand palette so it never inherits the visiting user's
       // in-app accent/theme (e.g. a signed-in user's light mode + orange
@@ -131,6 +131,13 @@ function LandingPageContent() {
       // originally — shadcn's Button `variant="outline"` reads those two
       // directly, so a visitor whose global theme resolved to light got a
       // white button with near-white text on this always-dark page.
+      //
+      // The `dark` class itself was also missing: globals.css keys heading
+      // color off THAT class, not off --background/--foreground (`h1,h2,h3
+      // { color: #0f172a }` unconditionally, overridden only by `.dark h1...
+      // { color: rgba(255,255,255,.95) }`). Without it every headline on
+      // this now-dark page rendered near-black text on a near-black
+      // background — invisible, not just low-contrast.
       style={{
         ['--primary' as string]: '#22D3C4',
         ['--primary-rgb' as string]: '34, 211, 196',
