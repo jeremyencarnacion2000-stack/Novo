@@ -337,20 +337,22 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         </button>
                     </div>
 
-                    {/* "+" menu: a real bottom-sheet action sheet (drag handle,
-                        header with title/subtitle + close, flat list of rows
-                        each with an icon box / title+description / trailing
-                        state) instead of a cramped corner dropdown stacking a
-                        second nested popover (the old ModelSelector) inside
-                        the first. Centered as a compact card on wider
-                        viewports, full-width sheet on mobile. */}
+                    {/* "+" menu: on mobile a real bottom-sheet (drag handle,
+                        slides up from the viewport edge) — on desktop that
+                        same "floats centered mid-screen" treatment read as
+                        disconnected from the button that opened it, so ≥sm it
+                        anchors directly above the "+" button instead (the
+                        `relative` <form> above is the positioning parent),
+                        like the original dropdown did, just with the new
+                        row design (icon box / title+description / trailing
+                        state) instead of the old cramped single-line rows. */}
                     {showMenu && (
                         <>
                             <div
-                                className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                                className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none animate-in fade-in duration-200"
                                 onClick={() => setShowMenu(false)}
                             />
-                            <div className="fixed bottom-0 left-0 right-0 z-[201] max-h-[80vh] overflow-y-auto rounded-t-[28px] border-t border-x border-white/10 bg-[#0a0a0f] shadow-[0_-20px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom duration-300 sm:bottom-24 sm:left-1/2 sm:right-auto sm:w-[400px] sm:-translate-x-1/2 sm:rounded-[28px] sm:border">
+                            <div className="fixed bottom-0 left-0 right-0 z-[201] max-h-[80vh] overflow-y-auto rounded-t-[28px] border-t border-x border-white/10 bg-[#0a0a0f] shadow-[0_-20px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom duration-300 sm:absolute sm:inset-auto sm:bottom-full sm:left-0 sm:right-auto sm:mb-2 sm:w-[380px] sm:max-h-[70vh] sm:rounded-[28px] sm:border sm:slide-in-from-bottom-2 sm:zoom-in-95">
                                 {/* Drag handle — mobile only */}
                                 <div className="flex justify-center pt-3 pb-1 sm:hidden">
                                     <div className="w-9 h-1 rounded-full bg-white/15" />
