@@ -76,6 +76,15 @@ self.addEventListener('fetch', (event) => {
     return; // no respondWith → default browser network fetch
   }
 
+  // Only ever intercept GET. The cache below only stores/serves GET responses,
+  // so routing POST/PUT/DELETE through the SW's fetch wrapper buys nothing and
+  // risks disrupting streaming responses (e.g. the SSE stream from
+  // /api/ai/stream that powers the chatbot). Let all mutating/streaming
+  // requests hit the network natively.
+  if (request.method !== 'GET') {
+    return; // no respondWith → default browser network fetch
+  }
+
   // Handle API requests (exclude next-auth to prevent auth loops or stale session caches)
   if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/')) {
     event.respondWith(
