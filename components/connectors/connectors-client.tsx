@@ -10,39 +10,23 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
-  Link2, RefreshCw, Upload, Database, Users, BookOpen, Youtube, Github,
-  Mail, Calendar, Activity, MessageCircle, Search, ChevronLeft, ChevronRight,
-  Plus, Trash2, Sparkles,
+  Link2, RefreshCw, Upload, Database, Search, ChevronLeft, ChevronRight,
+  Plus, Trash2, Sparkles, BookOpen,
 } from 'lucide-react'
+import type { IconType } from 'react-icons'
+import {
+  SiNotion, SiGoogledrive, SiGmail, SiGoogle, SiSlack, SiGithub, SiWhatsapp,
+  SiGooglecalendar, SiGooglefit, SiSpotify, SiYoutube, SiTodoist, SiTrello,
+  SiLinear, SiObsidian, SiDiscord, SiStrava, SiFitbit, SiApplemusic,
+} from 'react-icons/si'
 
-// ── Brand icons (copied verbatim from settings-integrations.tsx — same
-//    inline SVGs used there, so Notion/Google/Drive read identically
-//    wherever they appear in the app) ─────────────────────────────────────────
-function DriveIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-      <path d="M7.71 3.5L1.15 15l3.43 5.96L10.14 9.46 7.71 3.5z" fill="#0066DA" />
-      <path d="M16.29 3.5L13.86 9.46l5.56 11.5H25L21.57 15 16.29 3.5z" fill="#00AC47" />
-      <path d="M10.14 9.46L4.58 20.96h14.84l-3.56-11.5H10.14z" fill="#EA4335" />
-    </svg>
-  )
-}
-function NotionIcon() {
-  return <span className="text-foreground/60 font-bold text-sm">N</span>
-}
-function SlackIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#36C5F0">
-      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
-    </svg>
-  )
-}
-function SpotifyIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#1DB954">
-      <path d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24zm5.5 17.3a.75.75 0 0 1-1.03.25c-2.82-1.72-6.37-2.11-10.55-1.16a.75.75 0 1 1-.33-1.46c4.58-1.04 8.5-.6 11.66 1.33.36.22.47.68.25 1.04zm1.47-3.27a.94.94 0 0 1-1.29.31c-3.23-1.98-8.15-2.56-11.97-1.4a.94.94 0 1 1-.55-1.8c4.37-1.32 9.8-.68 13.5 1.6.44.27.58.85.31 1.29zm.13-3.4C15.24 8.4 8.84 8.18 5.1 9.32a1.13 1.13 0 1 1-.66-2.16c4.28-1.3 11.36-1.05 15.85 1.62a1.13 1.13 0 1 1-1.19 1.92z" />
-    </svg>
-  )
+// ── Real brand logos via Simple Icons (react-icons/si). Each renders the
+//    platform's actual mark in its official brand color, so the marketplace
+//    reads like a real integrations catalog instead of generic glyphs.
+//    Notion/GitHub are pure-black brands, so they use the app foreground to
+//    stay visible on the dark UI. ─────────────────────────────────────────────
+function BrandIcon({ icon: Icon, color }: { icon: IconType; color?: string }) {
+  return <Icon className="w-4 h-4" style={color ? { color } : undefined} />
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
@@ -411,7 +395,7 @@ export function ConnectorsClient() {
           'Elige exactamente qué bases de datos importar',
           'Vuelve a sincronizar cuando quieras con un clic',
         ],
-        icon: <NotionIcon />,
+        icon: <BrandIcon icon={SiNotion} />,
         status: notionStatus?.connected ? 'connected' : 'available',
       },
       {
@@ -424,7 +408,7 @@ export function ConnectorsClient() {
           'Genera un respaldo de tus tareas, rutinas y proyectos',
           'Sube el respaldo directamente a tu Google Drive bajo demanda',
         ],
-        icon: <DriveIcon />,
+        icon: <BrandIcon icon={SiGoogledrive} color="#0066DA" />,
         status: driveReady ? 'connected' : 'available',
       },
       {
@@ -436,7 +420,7 @@ export function ConnectorsClient() {
         capabilities: [
           'Muestra tus contactos de Google en el módulo de Negocios',
         ],
-        icon: <Users className="w-4 h-4 text-blue-400" />,
+        icon: <BrandIcon icon={SiGoogle} color="#4285F4" />,
         status: googleConnected ? 'connected' : 'available',
       },
       {
@@ -449,7 +433,7 @@ export function ConnectorsClient() {
           'Lee tus correos no leídos',
           'El Twin puede enviar correos en tu nombre cuando se lo pidas en el chat',
         ],
-        icon: <Mail className="w-4 h-4 text-red-400" />,
+        icon: <BrandIcon icon={SiGmail} color="#EA4335" />,
         status: (gmailStatus?.connected && gmailStatus?.hasScope) ? 'connected' : 'available',
       },
       {
@@ -458,7 +442,7 @@ export function ConnectorsClient() {
         name: 'Slack',
         description: 'Recibe alertas cognitivas en tu workspace de Slack.',
         detail: 'Notificaciones del motor cognitivo entregadas directamente a un canal de Slack.',
-        icon: <SlackIcon />,
+        icon: <BrandIcon icon={SiSlack} color="#4A154B" />,
         status: 'soon',
       },
       {
@@ -467,7 +451,7 @@ export function ConnectorsClient() {
         name: 'GitHub',
         description: 'Convierte issues y PRs en tareas dentro de Novo.',
         detail: 'Sincroniza issues y pull requests asignados como tareas rastreables en Novo.',
-        icon: <Github className="w-4 h-4 text-foreground/70" />,
+        icon: <BrandIcon icon={SiGithub} />,
         status: 'soon',
       },
       {
@@ -476,7 +460,43 @@ export function ConnectorsClient() {
         name: 'WhatsApp Business',
         description: 'Gestiona conversaciones de clientes desde Novo.',
         detail: 'Centraliza mensajes de WhatsApp Business junto al resto de tu contexto de negocio.',
-        icon: <MessageCircle className="w-4 h-4 text-emerald-400" />,
+        icon: <BrandIcon icon={SiWhatsapp} color="#25D366" />,
+        status: 'soon',
+      },
+      {
+        id: 'trello',
+        category: 'productivity',
+        name: 'Trello',
+        description: 'Sincroniza tarjetas de tus tableros como tareas en Novo.',
+        detail: 'Trae tarjetas asignadas de tus tableros de Trello como tareas rastreables en Novo.',
+        icon: <BrandIcon icon={SiTrello} color="#0052CC" />,
+        status: 'soon',
+      },
+      {
+        id: 'todoist',
+        category: 'productivity',
+        name: 'Todoist',
+        description: 'Importa tus tareas pendientes de Todoist.',
+        detail: 'Trae tus tareas activas de Todoist para que el Twin las priorice junto al resto de tu carga de trabajo.',
+        icon: <BrandIcon icon={SiTodoist} color="#E44332" />,
+        status: 'soon',
+      },
+      {
+        id: 'linear',
+        category: 'productivity',
+        name: 'Linear',
+        description: 'Convierte issues asignados en tareas dentro de Novo.',
+        detail: 'Sincroniza issues de Linear asignados a ti como tareas rastreables en Novo.',
+        icon: <BrandIcon icon={SiLinear} color="#5E6AD2" />,
+        status: 'soon',
+      },
+      {
+        id: 'discord',
+        category: 'productivity',
+        name: 'Discord',
+        description: 'Recibe alertas cognitivas en tu servidor de Discord.',
+        detail: 'Notificaciones del motor cognitivo entregadas directamente a un canal de Discord.',
+        icon: <BrandIcon icon={SiDiscord} color="#5865F2" />,
         status: 'soon',
       },
       {
@@ -490,7 +510,7 @@ export function ConnectorsClient() {
           'Los eventos que el Twin agenda por ti aparecen en tu Google Calendar real',
           'Vuelve a sincronizar cuando quieras con un clic, sin duplicar eventos',
         ],
-        icon: <Calendar className="w-4 h-4 text-blue-400" />,
+        icon: <BrandIcon icon={SiGooglecalendar} color="#4285F4" />,
         status: (calendarStatus?.connected && calendarStatus?.hasScope) ? 'connected' : 'available',
       },
       {
@@ -499,7 +519,25 @@ export function ConnectorsClient() {
         name: 'Google Fit',
         description: 'Importa pasos, sueño y frecuencia cardíaca automáticamente.',
         detail: 'Trae datos de actividad, sueño y frecuencia cardíaca de Google Fit a tus trackers de salud.',
-        icon: <Activity className="w-4 h-4 text-rose-400" />,
+        icon: <BrandIcon icon={SiGooglefit} color="#4285F4" />,
+        status: 'soon',
+      },
+      {
+        id: 'strava',
+        category: 'wellness',
+        name: 'Strava',
+        description: 'Importa tus entrenamientos y actividad física.',
+        detail: 'Trae tus actividades de Strava (running, ciclismo, etc.) a tus trackers de salud en Novo.',
+        icon: <BrandIcon icon={SiStrava} color="#FC4C02" />,
+        status: 'soon',
+      },
+      {
+        id: 'fitbit',
+        category: 'wellness',
+        name: 'Fitbit',
+        description: 'Importa sueño, pasos y frecuencia cardíaca de tu Fitbit.',
+        detail: 'Trae datos biométricos de tu dispositivo Fitbit directamente al motor cognitivo.',
+        icon: <BrandIcon icon={SiFitbit} color="#00B0B9" />,
         status: 'soon',
       },
       {
@@ -516,6 +554,15 @@ export function ConnectorsClient() {
         status: googleConnected ? 'connected' : 'available',
       },
       {
+        id: 'obsidian',
+        category: 'knowledge',
+        name: 'Obsidian',
+        description: 'Importa notas de tu vault de Obsidian.',
+        detail: 'Trae notas de tu vault local de Obsidian a la biblioteca de conocimiento de Novo.',
+        icon: <BrandIcon icon={SiObsidian} color="#7C3AED" />,
+        status: 'soon',
+      },
+      {
         id: 'spotify',
         category: 'music',
         name: 'Spotify',
@@ -525,7 +572,7 @@ export function ConnectorsClient() {
           'Reproduce tus playlists y tu biblioteca de Spotify dentro de Novo',
           'Guarda canciones que te gustan y sigue artistas',
         ],
-        icon: <SpotifyIcon />,
+        icon: <BrandIcon icon={SiSpotify} color="#1DB954" />,
         status: spotifyConnected ? 'connected' : 'available',
       },
       {
@@ -538,8 +585,17 @@ export function ConnectorsClient() {
           'Reproduce audio de YouTube como fondo musical en el reproductor de Novo',
           'Busca videos y accede a tus playlists de YouTube',
         ],
-        icon: <Youtube className="w-4 h-4 text-red-500" />,
+        icon: <BrandIcon icon={SiYoutube} color="#FF0000" />,
         status: googleConnected ? 'connected' : 'available',
+      },
+      {
+        id: 'apple-music',
+        category: 'music',
+        name: 'Apple Music',
+        description: 'Reproduce tu biblioteca de Apple Music dentro de Novo.',
+        detail: 'Conecta tu cuenta de Apple Music para reproducir tu biblioteca y playlists.',
+        icon: <BrandIcon icon={SiApplemusic} color="#FA243C" />,
+        status: 'soon',
       },
       ...custom,
     ]
