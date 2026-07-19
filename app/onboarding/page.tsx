@@ -192,10 +192,21 @@ function OnboardingContent() {
   const triggerCompilation = async () => {
     setStage('compilation')
 
+    // clearTimeout doesn't help once the timer has already fired: if
+    // /api/onboarding/analyze takes >=8s, the fallback branch below AND the
+    // success branch after `await fetch` both ran, each calling
+    // triggerDayPlan → POST /api/onboarding/day-plan, which unconditionally
+    // creates real tasks + a calendar event with no dedup guard server-side
+    // — a new user got their Day 1 plan created twice. One local flag shared
+    // by both closures (this function runs once per onboarding session)
+    // makes "first one wins" instead of "both can win".
+    let dayPlanStarted = false
+
     // Call analysis endpoint with conversation history
     // 8-second timeout — fallback to default twin values to avoid infinite loading
     const analyzeTimeout = setTimeout(() => {
-      if (!twinData) {
+      if (!twinData && !dayPlanStarted) {
+        dayPlanStarted = true
         setTwinData(DEFAULT_TWIN_DATA)
         triggerDayPlan(DEFAULT_TWIN_DATA)
       }
@@ -210,7 +221,10 @@ function OnboardingContent() {
       const data = await response.json()
       clearTimeout(analyzeTimeout)
       setTwinData(data)
-      triggerDayPlan(data)
+      if (!dayPlanStarted) {
+        dayPlanStarted = true
+        triggerDayPlan(data)
+      }
     } catch (e) {
       console.error(e)
       // timeout fallback will fire at 8s

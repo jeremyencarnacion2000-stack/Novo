@@ -25,6 +25,7 @@ export function SettingsAdvanced() {
   // Backups / Data Integration
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
   const [availableBackups, setAvailableBackups] = useState<{ date: string, data: any }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -145,8 +146,22 @@ export function SettingsAdvanced() {
     }
   }
 
-  const handleDeleteAllData = () => {
-    if (confirm('Are you sure you want to delete all your data? This action cannot be undone.')) {
+  const handleDeleteAllData = async () => {
+    if (!confirm('Are you sure you want to delete all your data? This action cannot be undone.')) return
+    if (!session?.user?.id) {
+      toast({
+        title: 'Delete failed',
+        description: 'You must be logged in to delete your data.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsDeletingAll(true)
+    try {
+      const response = await fetch('/api/user/data', { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete server data')
+
       localStorage.clear()
       resetSettings()
       toast({
@@ -155,6 +170,15 @@ export function SettingsAdvanced() {
         variant: 'destructive',
       })
       window.location.reload()
+    } catch (error) {
+      console.error('Delete all data failed:', error)
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete your data. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDeletingAll(false)
     }
   }
 
@@ -270,7 +294,7 @@ export function SettingsAdvanced() {
       <Section title="Danger Zone">
         <div className="rounded-2xl border border-red-500/10 bg-red-500/[0.01] p-5 space-y-2">
           <DangerAction icon={RefreshCw} label="Reset Cognitive Twin" description="Erase learned intelligence profile patterns. Cannot be undone." onClick={handleResetTwin} />
-          <DangerAction icon={Trash2} label={t('settings.delete_all')} description="Permanently delete all workspace items and settings. Cannot be undone." onClick={handleDeleteAllData} />
+          <DangerAction icon={Trash2} label={t('settings.delete_all')} description="Permanently delete all workspace items and settings. Cannot be undone." onClick={handleDeleteAllData} loading={isDeletingAll} />
         </div>
       </Section>
 
