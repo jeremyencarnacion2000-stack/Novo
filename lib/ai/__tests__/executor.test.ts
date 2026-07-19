@@ -203,4 +203,53 @@ describe('AI Executor', () => {
             expect(result.data.content).not.toBe('undefined');
         });
     });
+
+    // Same vulnerability class as GENERATE_FILE, found while auditing the
+    // other handlers for it on 2026-07-19: CREATE_TASK wrote whatever the
+    // model sent for `title` straight into the database and back out into
+    // the chat bubble with no guard, so a hallucinated "undefined" would
+    // have created a real task literally named "undefined".
+    describe('dropHallucinatedPlaceholder guard on CREATE_TASK', () => {
+        it('falls back to a real title when the model hallucinates "undefined"', async () => {
+            (prisma.task.create as jest.Mock).mockResolvedValue({ id: 'task-1', title: 'Tarea sin título' });
+
+            const result = await executeAIAction({
+                type: 'CREATE_TASK',
+                payload: { title: 'undefined', priority: 'medium' },
+            } as any, userId);
+
+            expect(result.success).toBe(true);
+            expect(prisma.task.create).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ title: 'Tarea sin título' }),
+            }));
+            expect(result.message).not.toContain('"undefined"');
+        });
+
+        it('keeps a real title unchanged', async () => {
+            (prisma.task.create as jest.Mock).mockResolvedValue({ id: 'task-2', title: 'Comprar leche' });
+
+            await executeAIAction({
+                type: 'CREATE_TASK',
+                payload: { title: 'Comprar leche', priority: 'low' },
+            } as any, userId);
+
+            expect(prisma.task.create).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ title: 'Comprar leche' }),
+            }));
+        });
+    });
+
+    // SEND_EMAIL is irreversible and externally visible, so unlike the
+    // graceful "Tarea sin título" fallback above, a hallucinated field here
+    // must block the send rather than mail a placeholder.
+    describe('dropHallucinatedPlaceholder guard on SEND_EMAIL', () => {
+        it('refuses to send when the subject is a hallucinated "undefined"', async () => {
+            const result = await executeAIAction({
+                type: 'SEND_EMAIL',
+                payload: { to: 'a@b.com', subject: 'undefined', body: 'Hola' },
+            } as any, userId);
+
+            expect(result.success).toBe(false);
+        });
+    });
 });

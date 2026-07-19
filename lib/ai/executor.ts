@@ -48,6 +48,19 @@ export function pickResultMessage(
     return execResult.message || modelMessage || fallback;
 }
 
+// The rescue models (used when the primary model is rate-limited) occasionally
+// hallucinate the literal string "undefined"/"null" for a field they should
+// have left out — a real, non-empty string, so it passes a plain `!value`
+// truthy check and ships verbatim into user-visible text or, worse, straight
+// into the database (e.g. a CREATE_TASK whose title becomes the literal word
+// "undefined"). Strips those placeholder strings back to '' so each handler's
+// normal empty-value fallback/validation still kicks in. Shared across every
+// handler below rather than re-implemented per action.
+export function dropHallucinatedPlaceholder(value: unknown): string {
+    if (typeof value !== 'string') return value ? String(value) : '';
+    return /^(undefined|null|none|n\/a)$/i.test(value.trim()) ? '' : value;
+}
+
 export interface AIActionResult<T = any> {
     success: boolean;
     data?: T;
@@ -297,7 +310,8 @@ async function checkFreePlanLimit(
 
 // Routines
 registerActionHandler<CreateRoutineAction>('CREATE_ROUTINE', async (action, ctx) => {
-    const { name, description, daysOfWeek, exercises } = action.payload;
+    const { description, daysOfWeek, exercises } = action.payload;
+    const name = dropHallucinatedPlaceholder(action.payload.name) || 'Rutina sin título';
     // Handle multi-day payload if present (custom logic needed if 'days' is in payload but not in type)
     // For now, we cast payload to any to access 'days' if it's not in the strict type yet, 
     // OR we should update the CreateRoutineAction type. 
@@ -459,7 +473,8 @@ registerActionHandler<FinishWorkoutAction>('FINISH_WORKOUT', async (action, ctx)
 
 // Tasks
 registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
-    const { title, category, priority, dueDate } = action.payload;
+    const { category, priority, dueDate } = action.payload;
+    const title = dropHallucinatedPlaceholder(action.payload.title) || 'Tarea sin título';
     const p = priority as any;
     const finalPriority = (p === 3 || p === 'high' || p === '3') ? 'high' :
         (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
@@ -494,7 +509,7 @@ registerActionHandler<CreateTasksAction>('CREATE_TASKS', async (action, ctx) => 
                 (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
             return ctx.prisma.task.create({
                 data: {
-                    title: t.title,
+                    title: dropHallucinatedPlaceholder(t.title) || 'Tarea sin título',
                     status: 'todo',
                     priority: finalPriority,
                     dueDate: t.dueDate,
@@ -550,7 +565,8 @@ registerActionHandler<DeleteTaskAction>('DELETE_TASK', async (action, ctx) => {
 
 // Projects
 registerActionHandler<CreateProjectAction>('CREATE_PROJECT', async (action, ctx) => {
-    const { title, description, status, priority, dueDate, tags } = action.payload;
+    const { description, status, priority, dueDate, tags } = action.payload;
+    const title = dropHallucinatedPlaceholder(action.payload.title) || 'Proyecto sin título';
     const project = await ctx.prisma.project.create({
         data: {
             title,
@@ -604,8 +620,8 @@ registerActionHandler<DeleteProjectAction>('DELETE_PROJECT', async (action, ctx)
 
 // Calendar
 registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => {
-    const { title, description, start, end, allDay } = action.payload;
-    if (!title) throw new Error("Event title is required");
+    const { description, start, end, allDay } = action.payload;
+    const title = dropHallucinatedPlaceholder(action.payload.title) || 'Evento sin título';
     if (!start || !end) throw new Error("Event start and end times are required");
 
     const event = await ctx.prisma.calendarEvent.create({
@@ -660,7 +676,12 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
 // fallback exists, so a missing/expired Gmail connection must fail loudly
 // instead of silently no-op'ing.
 registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
-    const { to, subject, body } = action.payload;
+    // Sending is irreversible and externally visible — unlike the graceful
+    // "Tarea sin título" fallbacks elsewhere, a hallucinated "undefined" here
+    // must block the send, not quietly substitute a placeholder and mail it.
+    const to = dropHallucinatedPlaceholder(action.payload.to);
+    const subject = dropHallucinatedPlaceholder(action.payload.subject);
+    const body = dropHallucinatedPlaceholder(action.payload.body);
     if (!to || !subject || !body) throw new Error("Recipient, subject, and body are required to send an email");
 
     const token = await getGoogleAccessToken(ctx.userId);
@@ -695,7 +716,8 @@ registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
 
 // Trackers
 registerActionHandler<CreateTrackerAction>('CREATE_TRACKER', async (action, ctx) => {
-    const { name, type, unit, goal } = action.payload;
+    const { type, unit, goal } = action.payload;
+    const name = dropHallucinatedPlaceholder(action.payload.name);
     if (!name) throw new Error("Tracker name is required");
 
     const tracker = await ctx.prisma.tracker.create({
@@ -720,7 +742,8 @@ registerActionHandler<CreateTrackerAction>('CREATE_TRACKER', async (action, ctx)
 
 // School
 registerActionHandler<CreateCourseAction>('CREATE_COURSE', async (action, ctx) => {
-    const { name, code, credits, semester, year, professor, color } = action.payload;
+    const { code, credits, semester, year, professor, color } = action.payload;
+    const name = dropHallucinatedPlaceholder(action.payload.name) || 'Curso sin título';
     const course = await ctx.prisma.course.create({
         data: {
             name,
@@ -771,7 +794,8 @@ registerActionHandler<DeleteCourseAction>('DELETE_COURSE', async (action, ctx) =
 });
 
 registerActionHandler<AddGradeAction>('ADD_GRADE', async (action, ctx) => {
-    const { courseId, name, score, maxScore, weight, category, date } = action.payload;
+    const { courseId, score, maxScore, weight, category, date } = action.payload;
+    const name = dropHallucinatedPlaceholder(action.payload.name) || 'Evaluación sin título';
     const grade = await ctx.prisma.grade.create({
         data: {
             courseId,
@@ -826,10 +850,12 @@ registerActionHandler<DeleteGradeAction>('DELETE_GRADE', async (action, ctx) => 
 
 // Notes
 registerActionHandler<CreateNoteAction>('CREATE_NOTE', async (action, ctx) => {
-    const { title, content, tags } = action.payload;
+    const { tags } = action.payload;
+    const title = dropHallucinatedPlaceholder(action.payload.title);
+    const content = dropHallucinatedPlaceholder(action.payload.content);
     const note = await ctx.prisma.quickNote.create({
         data: {
-            content: `${title}\n\n${content}`,
+            content: title ? `${title}\n\n${content}` : content,
             tags,
             userId: ctx.userId,
             type: 'note',
@@ -933,17 +959,6 @@ registerActionHandler<any>('DELETE_ALL_TASKS', async (action, ctx) => {
         data: { count: result.count }
     };
 });
-// The rescue models (used when the primary model is rate-limited) occasionally
-// hallucinate the literal string "undefined"/"null" for a field they should
-// have left out — a real, non-empty string, so it passes a plain `!value`
-// truthy check and ships verbatim into user-visible text (surfaced in
-// production as a chat bubble literally saying `El archivo "undefined" se ha
-// generado correctamente`). Strips those placeholder strings back to '' so
-// the normal empty-value fallback logic below still kicks in.
-function dropHallucinatedPlaceholder(value: unknown): string {
-    if (typeof value !== 'string') return value ? String(value) : '';
-    return /^(undefined|null|none|n\/a)$/i.test(value.trim()) ? '' : value;
-}
 
 registerActionHandler<any>('GENERATE_FILE', async (action, ctx) => {
     const payload = action.payload || {};
