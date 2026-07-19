@@ -1,12 +1,64 @@
 'use client';
 
 import React from 'react';
-import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic } from 'lucide-react';
+import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic, Lock, Sparkles } from 'lucide-react';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
-import { ModelSelector } from './model-selector';
-import { TwinModeToggle } from './twin-mode-toggle';
 import { GlowingOrb, type OrbState } from './glowing-orb';
+
+// One row in the "+" bottom sheet — icon in a rounded box, title + optional
+// description stacked, and a trailing indicator on the right (a filled dot
+// for the active choice in a mutually-exclusive group like model selection,
+// or nothing for a plain action like "upload a file"). Mirrors the native
+// action-sheet pattern (icon / title+subtitle / trailing state) instead of
+// the cramped single-line dropdown rows this replaced.
+function SheetRow({
+    icon: Icon,
+    title,
+    description,
+    selected,
+    disabled,
+    onClick,
+}: {
+    icon: React.ComponentType<{ className?: string }>
+    title: string
+    description?: string
+    selected?: boolean
+    disabled?: boolean
+    onClick: () => void
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                selected ? 'bg-primary/[0.06]' : 'hover:bg-white/[0.04]'
+            }`}
+        >
+            <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border ${
+                selected ? 'bg-primary/10 border-primary/25 text-primary' : 'bg-white/[0.03] border-white/[0.06] text-white/50'
+            }`}>
+                <Icon className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className={`text-[13px] font-semibold ${selected ? 'text-primary' : 'text-white/85'}`}>{title}</p>
+                {description && <p className="text-[11px] text-white/35 mt-0.5 leading-snug">{description}</p>}
+            </div>
+            {/* Only choices in a real selection group (model, toggles) get a
+                radio/checkmark — plain one-shot actions like "upload a file"
+                have no on/off state to represent, so selected stays
+                undefined for those and no indicator renders. */}
+            {selected !== undefined && (
+                <div className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center ${
+                    selected ? 'border-primary bg-primary' : 'border-white/15'
+                }`}>
+                    {selected && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
+                </div>
+            )}
+        </button>
+    )
+}
 
 // Exported so DesktopHero can render the same suggestions as clickable cards
 // under the composer (mirroring MobileHero's chip row, which already existed
@@ -67,7 +119,11 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputProps) {
-    const { sendMessage, isLoading, currentConversationId, createConversation, twinMode, twinModeAvailable } = useChatbot();
+    const {
+        sendMessage, isLoading, currentConversationId, createConversation,
+        twinMode, setTwinMode, twinModeAvailable,
+        selectedModel, setSelectedModel, availableModels,
+    } = useChatbot();
     const { toast } = useToast();
     const [input, setInput] = React.useState('');
     const [showMenu, setShowMenu] = React.useState(false);
@@ -281,67 +337,102 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         </button>
                     </div>
 
-                    {/* "+" menu: attachments, web search, model, Twin Mode */}
+                    {/* "+" menu: a real bottom-sheet action sheet (drag handle,
+                        header with title/subtitle + close, flat list of rows
+                        each with an icon box / title+description / trailing
+                        state) instead of a cramped corner dropdown stacking a
+                        second nested popover (the old ModelSelector) inside
+                        the first. Centered as a compact card on wider
+                        viewports, full-width sheet on mobile. */}
                     {showMenu && (
                         <>
                             <div
-                                className="fixed inset-0 z-40"
+                                className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
                                 onClick={() => setShowMenu(false)}
                             />
-                            <div className="absolute bottom-full left-0 mb-2 flex flex-col gap-0.5 bg-[var(--popover)]/95 border border-white/10 rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 min-w-[220px] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.03] rounded-xl text-left transition-colors"
-                                >
-                                    <FileText className="w-3.5 h-3.5 text-primary/70" />
-                                    <span>Subir Documento</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => photoInputRef.current?.click()}
-                                    className="flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.03] rounded-xl text-left transition-colors"
-                                >
-                                    <Image className="w-3.5 h-3.5 text-primary/70" />
-                                    <span>Subir Imagen</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => cameraInputRef.current?.click()}
-                                    className="flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.03] rounded-xl text-left transition-colors"
-                                >
-                                    <Camera className="w-3.5 h-3.5 text-primary/70" />
-                                    <span>Tomar Foto</span>
-                                </button>
-
-                                <div className="my-1 h-px bg-white/[0.06]" />
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setWebSearchEnabled(!webSearchEnabled);
-                                        toast({
-                                            title: !webSearchEnabled ? "Búsqueda Web Activada" : "Búsqueda Web Desactivada",
-                                            description: !webSearchEnabled ? "La IA buscará información en internet." : "La IA usará solo su conocimiento interno.",
-                                        });
-                                    }}
-                                    className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.03] rounded-xl text-left transition-colors"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <Wrench className="w-3.5 h-3.5 text-primary/70" />
-                                        <span>Búsqueda web</span>
-                                    </span>
-                                    {webSearchEnabled && <Check className="w-3.5 h-3.5 text-primary" />}
-                                </button>
-
-                                <div className="my-1 h-px bg-white/[0.06]" />
-
-                                <div className="px-0.5">
-                                    <ModelSelector />
+                            <div className="fixed bottom-0 left-0 right-0 z-[201] max-h-[80vh] overflow-y-auto rounded-t-[28px] border-t border-x border-white/10 bg-[#0a0a0f] shadow-[0_-20px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom duration-300 sm:bottom-24 sm:left-1/2 sm:right-auto sm:w-[400px] sm:-translate-x-1/2 sm:rounded-[28px] sm:border">
+                                {/* Drag handle — mobile only */}
+                                <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                                    <div className="w-9 h-1 rounded-full bg-white/15" />
                                 </div>
-                                <div className="px-0.5 pt-1">
-                                    <TwinModeToggle />
+
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-white/[0.06]">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-white/90">Herramientas</h3>
+                                        <p className="text-[11px] text-white/35">Adjunta archivos o ajusta cómo responde el Twin</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMenu(false)}
+                                        aria-label="Cerrar"
+                                        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
+
+                                <div className="px-2.5 py-2">
+                                    <SheetRow icon={FileText} title="Subir documento" description="PDF, Word o texto" onClick={() => fileInputRef.current?.click()} />
+                                    <SheetRow icon={Image} title="Subir imagen" description="JPG, PNG o captura" onClick={() => photoInputRef.current?.click()} />
+                                    <SheetRow icon={Camera} title="Tomar foto" description="Usa la cámara del dispositivo" onClick={() => cameraInputRef.current?.click()} />
+
+                                    <div className="my-1.5 mx-3 h-px bg-white/[0.06]" />
+
+                                    <SheetRow
+                                        icon={Wrench}
+                                        title="Búsqueda web"
+                                        description={webSearchEnabled ? 'Activada — el Twin busca en internet' : 'Usa solo su conocimiento interno'}
+                                        selected={webSearchEnabled}
+                                        onClick={() => {
+                                            setWebSearchEnabled(!webSearchEnabled);
+                                            toast({
+                                                title: !webSearchEnabled ? "Búsqueda Web Activada" : "Búsqueda Web Desactivada",
+                                                description: !webSearchEnabled ? "La IA buscará información en internet." : "La IA usará solo su conocimiento interno.",
+                                            });
+                                        }}
+                                    />
+
+                                    <div className="my-1.5 mx-3 h-px bg-white/[0.06]" />
+
+                                    <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-white/25">Modelo</p>
+                                    {availableModels.map(model => (
+                                        <SheetRow
+                                            key={model.id}
+                                            icon={Sparkles}
+                                            title={model.name}
+                                            description={model.description}
+                                            selected={selectedModel === model.id}
+                                            disabled={!model.enabled}
+                                            onClick={() => setSelectedModel(model.id)}
+                                        />
+                                    ))}
+
+                                    <div className="my-1.5 mx-3 h-px bg-white/[0.06]" />
+
+                                    <SheetRow
+                                        icon={twinModeAvailable ? Sparkles : Lock}
+                                        title={twinModeAvailable ? 'Modo Twin' : 'Modo Twin (Pro)'}
+                                        description={twinModeAvailable ? 'Usa tu perfil cognitivo completo para responder' : 'Desbloquea con Novo Pro'}
+                                        selected={twinModeAvailable ? twinMode : undefined}
+                                        onClick={() => {
+                                            if (!twinModeAvailable) {
+                                                fetch('/api/billing/checkout', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ interval: 'month' }),
+                                                })
+                                                    .then(res => res.json())
+                                                    .then(data => { if (data.url) window.location.href = data.url; })
+                                                return
+                                            }
+                                            setTwinMode(!twinMode)
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Safe-area padding for iOS home-indicator, mobile only */}
+                                <div className="h-[env(safe-area-inset-bottom)] sm:hidden" />
                             </div>
                         </>
                     )}
