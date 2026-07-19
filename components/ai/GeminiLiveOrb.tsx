@@ -3,41 +3,49 @@
 /**
  * GeminiLiveOrb.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Futuristic Glassmorphic Voice Assistant Orb for Novo Heritage.
+ * Floating voice mic for Novo. Hold to record, release to run the command.
  *
- * Interfaces with the `useGeminiLiveAgent` hook to process voice in real-time.
- * Displays breathing micro-animations, neon energy fields, and dynamic
- * subtitles based on the current agent state.
+ * Engine: press-and-hold captures mic audio → POSTs the blob to the
+ * server-side /api/ai/transcribe (Whisper, server-held key) → the transcript
+ * runs through executeVoiceCommand against the current cognitive bioState.
  *
- * New in v2:
- *  - 'thinking' state with energetic amber/orange theme
- *  - thinkingMessage subtitle rendered under the orb panel
- *  - Audio-reactive background aura via CSS var --mic-volume (GPU-composited)
+ * Deliberately NO client API key: the previous version opened a WebSocket to
+ * Gemini's Live API, which required the user to paste a Gemini key in a modal
+ * (and Gemini's free tier is structurally capped at 0 in this project, so it
+ * never worked). It also is idle by default — nothing connects, listens, or
+ * requests the mic until the user actually presses the orb.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Settings, Volume2, Sparkles, X, AlertCircle, RefreshCw, Brain } from 'lucide-react'
-import { useGeminiLiveAgent, AgentState } from '@/hooks/useGeminiLiveAgent'
+import { Mic, X, Brain, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { whisperAPI } from '@/lib/whisper'
+import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
+import { eventBus } from '@/lib/events/event-bus'
+
+type MicState = 'idle' | 'recording' | 'processing' | 'result' | 'error'
 
 export function GeminiLiveOrb() {
-  const { phaseOverride, setPhaseOverride } = useCognitiveEngine()
-  const [showConfig, setShowConfig] = useState(false)
-  const [apiKeyInput, setApiKeyInput] = useState('')
-  const [savedKey, setSavedKey] = useState('')
-  const [whisperKeyInput, setWhisperKeyInput] = useState('')
-  const [savedWhisperKey, setSavedWhisperKey] = useState('')
+  const { bioState } = useCognitiveEngine()
 
-  // Audio-reactive aura scale — reads --mic-volume CSS var via rAF, never touches React state
+  const [micState, setMicState] = useState<MicState>('idle')
+  const [transcript, setTranscript] = useState('')
+  const [result, setResult] = useState<VoiceExecutionResult | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // ── Audio-reactive aura scale — reads --mic-volume via rAF, GPU transform only
   const auraRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     let rafId: number
     const tick = () => {
       const vol = parseFloat(getComputedStyle(document.body).getPropertyValue('--mic-volume') || '0')
       if (auraRef.current) {
-        // Scale from 1.35 (silent) to 2.2 (loud), using GPU-composited transform only
         const scale = 1.35 + vol * 0.85
         auraRef.current.style.transform = `scale(${scale.toFixed(3)})`
       }
@@ -47,27 +55,7 @@ export function GeminiLiveOrb() {
     return () => cancelAnimationFrame(rafId)
   }, [])
 
-  // Load saved API keys from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const key = localStorage.getItem('novo_gemini_api_key') || ''
-      setSavedKey(key)
-      setApiKeyInput(key)
-
-      const whisperKey = localStorage.getItem('novo_whisper_api_key') || localStorage.getItem('novo_openai_api_key') || ''
-      setSavedWhisperKey(whisperKey)
-      setWhisperKeyInput(whisperKey)
-    }
-  }, [])
-
-  // Fade the orb out while the page is actively scrolling, so it stops
-  // visually crossing paths with whatever content passes underneath it (it's
-  // `position: fixed`, so it otherwise always overlaps whatever scrolls by
-  // at that screen position). Listens on `window` with `capture: true` since
-  // native scroll events don't bubble but DO capture-phase propagate from any
-  // nested `overflow: auto` container to window, so this catches scrolling
-  // inside any of the app's per-page scroll containers without each page
-  // needing to wire anything up itself.
+  // ── Fade the orb out while scrolling & idle, so it stops crossing content
   const [isScrolling, setIsScrolling] = useState(false)
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -83,507 +71,210 @@ export function GeminiLiveOrb() {
     }
   }, [])
 
-  const agent = useGeminiLiveAgent({
-    apiKey: savedKey || process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-  })
+  const stopTracks = useCallback(() => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+  }, [])
 
-  const {
-    isConnected,
-    agentState,
-    thinkingMessage,
-    error,
-    userTranscript,
-    agentTranscript,
-    startSession,
-    stopSession,
-  } = agent
-
-  const handleSaveKey = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('novo_gemini_api_key', apiKeyInput)
-      setSavedKey(apiKeyInput)
-
-      localStorage.setItem('novo_whisper_api_key', whisperKeyInput)
-      setSavedWhisperKey(whisperKeyInput)
-      setShowConfig(false)
-    }
-  }
-
-  const handleToggleSession = React.useCallback(async () => {
-    if (isConnected) {
-      stopSession()
-    } else {
-      const hasKey = savedKey || process.env.NEXT_PUBLIC_GEMINI_API_KEY
-      if (!hasKey) {
-        setShowConfig(true)
-      } else {
-        await startSession()
+  const startRecording = useCallback(async () => {
+    if (micState === 'recording' || micState === 'processing') return
+    setErrorMsg('')
+    setResult(null)
+    setTranscript('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      recorder.onstop = async () => {
+        stopTracks()
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        if (blob.size < 1000) {
+          setMicState('idle')
+          return
+        }
+        setMicState('processing')
+        try {
+          const text = await whisperAPI.transcribeAudio(blob)
+          setTranscript(text)
+          if (!text.trim()) {
+            setErrorMsg('No se detectó voz. Intenta de nuevo.')
+            setMicState('error')
+            return
+          }
+          if (!bioState) {
+            setErrorMsg('El motor cognitivo aún se está iniciando. Intenta en un momento.')
+            setMicState('error')
+            return
+          }
+          const res = await executeVoiceCommand(text, bioState)
+          setResult(res)
+          setMicState('result')
+          eventBus.dispatch('VoiceCommandExecuted', {
+            text, action: res.action, success: res.success,
+            deferred: res.deferred ?? false, phase: bioState.phase,
+          }, { path: typeof window !== 'undefined' ? window.location.pathname : undefined })
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('voice-command-executed', { detail: { text, result: res, phase: bioState.phase } }))
+          }
+        } catch (err: any) {
+          setErrorMsg(err?.message ?? 'No se pudo transcribir. Revisa tu micrófono.')
+          setMicState('error')
+        }
       }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setMicState('recording')
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? 'Acceso al micrófono denegado.')
+      setMicState('error')
     }
-  }, [isConnected, savedKey, startSession, stopSession])
+  }, [micState, bioState, stopTracks])
 
-  // Listen to toggle event from other voice buttons
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+  }, [])
+
+  // Other voice triggers (mobile nav, etc.) dispatch toggle-gemini-live —
+  // map it to a quick start/stop so those entry points still work.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleToggle = () => {
-        handleToggleSession()
-      }
-      window.addEventListener('toggle-gemini-live', handleToggle)
-      return () => {
-        window.removeEventListener('toggle-gemini-live', handleToggle)
-      }
+    const handleToggle = () => {
+      if (micState === 'recording') stopRecording()
+      else startRecording()
     }
-  }, [handleToggleSession])
+    window.addEventListener('toggle-gemini-live', handleToggle)
+    return () => window.removeEventListener('toggle-gemini-live', handleToggle)
+  }, [micState, startRecording, stopRecording])
 
-  // Dispatch live state change events globally
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('gemini-live-state-change', {
-        detail: { state: agentState }
-      }))
-    }
-  }, [agentState])
+  // Cleanup on unmount
+  useEffect(() => () => stopTracks(), [stopTracks])
 
-  // ── Color palette per agent state ──
-  const getStateColors = (state: AgentState) => {
-    switch (state) {
-      case 'connecting':
-        return {
-          glow: 'rgba(234, 179, 8, 0.4)',
-          border: 'border-yellow-500/30',
-          bg: 'bg-yellow-500/10',
-          text: 'text-yellow-400',
-          dot: 'bg-yellow-500',
-        }
-      case 'listening':
-        return {
-          glow: 'rgba(168, 85, 247, 0.45)',
-          border: 'border-purple-500/30',
-          bg: 'bg-purple-500/10',
-          text: 'text-purple-400',
-          dot: 'bg-purple-500 animate-pulse',
-        }
-      case 'speaking':
-        return {
-          glow: 'rgba(6, 182, 212, 0.5)',
-          border: 'border-cyan-500/35',
-          bg: 'bg-cyan-500/10',
-          text: 'text-cyan-400',
-          dot: 'bg-cyan-400 animate-[ping_1.5s_infinite]',
-        }
-      case 'thinking':
-        return {
-          glow: 'rgba(249, 115, 22, 0.5)',
-          border: 'border-orange-500/35',
-          bg: 'bg-orange-500/10',
-          text: 'text-orange-400',
-          dot: 'bg-orange-400 animate-pulse',
-        }
-      case 'error':
-        return {
-          glow: 'rgba(239, 68, 68, 0.4)',
-          border: 'border-red-500/30',
-          bg: 'bg-red-500/10',
-          text: 'text-red-400',
-          dot: 'bg-red-500',
-        }
-      case 'idle':
-      default:
-        return {
-          glow: 'rgba(99, 102, 241, 0.25)',
-          border: 'border-indigo-500/20',
-          bg: 'bg-indigo-500/5',
-          text: 'text-indigo-400',
-          dot: 'bg-indigo-400',
-        }
-    }
-  }
+  // ── Per-state colors ──
+  const stateColor =
+    micState === 'recording' ? 'rgba(168, 85, 247, 0.5)'   // purple
+    : micState === 'processing' ? 'rgba(249, 115, 22, 0.5)' // orange
+    : micState === 'error' ? 'rgba(239, 68, 68, 0.45)'      // red
+    : 'rgba(99, 102, 241, 0.28)'                             // idle indigo
 
-  const tc = getStateColors(agentState)
+  const dismiss = () => { setMicState('idle'); setResult(null); setErrorMsg(''); setTranscript('') }
 
-  // ── Status label per state ──
-  const getStatusLabel = () => {
-    if (agentState === 'thinking' && thinkingMessage) return thinkingMessage
-    switch (agentState) {
-      case 'connecting':  return 'Iniciando conexión...'
-      case 'listening':   return 'Escuchando...'
-      case 'speaking':    return 'Antigravity Voz'
-      case 'thinking':    return 'Procesando...'
-      case 'error':       return 'Error de conexión'
-      default:            return 'Inactivo'
-    }
-  }
-
-  // Show subtitle panel when connected and there's something to display
-  const showPanel = isConnected && (
-    agentTranscript || userTranscript || agentState === 'listening' ||
-    agentState === 'speaking' || agentState === 'thinking'
-  )
+  const showPanel = micState === 'recording' || micState === 'processing' || micState === 'result' || micState === 'error'
 
   return (
-    <>
-      {/* ─── Main Floating Interface ─────────────────────────────────────────── */}
-      {/*
-       * IMPORTANT: This wrapper uses `position: fixed` + `contain: layout style`
-       * to ensure it is fully removed from the document scroll flow.
-       * Do NOT add any transform-based scroll listeners here — the aura uses rAF
-       * on its own ref and only mutates its own transform, never the parent.
-       */}
-      <div
-        className="flex flex-col items-end gap-3 pointer-events-none"
-        style={{
-          position: 'fixed',
-          bottom: '5rem',
-          right: '1rem',
-          zIndex: 150,
-          contain: 'layout style',
-          willChange: 'auto',
-          // Fade (opacity only — never transform, see the note above about the
-          // aura's own rAF-driven transform) while scrolling AND idle, so the
-          // orb stops visually fighting with whatever page content passes
-          // underneath it. Never fades mid-interaction (connected/panel open),
-          // so it can't disappear while the user is actually talking to it.
-          opacity: isScrolling && !isConnected && !showConfig ? 0.25 : 1,
-          transition: 'opacity 200ms ease',
-        }}
-      >
-
-        {/* Dynamic Interactive Subtitle Panel */}
-        <AnimatePresence>
-          {showPanel && (
-            <motion.div
-              initial={{ opacity: 0, y: 15, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 15, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="max-w-[280px] md:max-w-[340px] rounded-2xl border border-white/10 p-4 backdrop-blur-2xl shadow-2xl pointer-events-auto"
-              style={{
-                background: 'rgba(13, 13, 18, 0.9)',
-                boxShadow: `0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px ${tc.glow}`,
-              }}
-            >
-              {/* Agent Status Badge */}
-              <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${tc.dot}`} />
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${tc.text}`}>
-                    {getStatusLabel()}
-                  </span>
-                </div>
-                <button
-                  onClick={stopSession}
-                  className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-
-              {/* Thinking state: show animated spinner + message */}
-              <AnimatePresence mode="wait">
-                {agentState === 'thinking' ? (
-                  <motion.div
-                    key="thinking"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2.5 py-1"
-                  >
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 1.2, ease: 'linear' }}
-                    >
-                      <Brain className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                    </motion.div>
-                    <p className="text-[11px] text-orange-300/90 font-medium leading-relaxed">
-                      {thinkingMessage || 'Procesando...'}
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="transcripts"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="space-y-2.5 max-h-[140px] overflow-y-auto pr-1 scrollbar-thin"
-                  >
-                    {userTranscript && (
-                      <p className="text-[11px] text-white/40 italic font-medium">
-                        Tú: &ldquo;{userTranscript}&rdquo;
-                      </p>
-                    )}
-                    <p className="text-xs font-semibold text-white/90 leading-relaxed">
-                      {agentTranscript ? agentTranscript : (
-                        agentState === 'listening' ? (
-                          <span className="text-white/35 italic">Háblame, te escucho en tiempo real...</span>
-                        ) : (
-                          <span className="text-yellow-400/80 animate-pulse">Iniciando síntesis neural...</span>
-                        )
-                      )}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ── Voice Orb Button ── */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Settings Button (only when disconnected) */}
-          {!isConnected && (
-            <motion.button
-              whileHover={{ scale: 1.1, rotate: 30 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setShowConfig(true)}
-              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all shadow-lg"
-              title="Configurar Gemini API"
-            >
-              <Settings size={16} />
-            </motion.button>
-          )}
-
-          {/* Glowing Voice Orb */}
-          <div className="relative group">
-
-            {/* Audio-reactive background aura — driven by --mic-volume CSS var via rAF */}
-            <div
-              ref={auraRef}
-              className="absolute inset-0 rounded-full blur-xl opacity-50 transition-opacity duration-500 will-change-transform"
-              style={{
-                background: `radial-gradient(circle, ${tc.glow} 0%, transparent 70%)`,
-                transform: 'scale(1.35)',
-              }}
-            />
-
-            {/* Static hover aura */}
-            <div
-              className="absolute inset-0 rounded-full blur-lg opacity-0 group-hover:opacity-60 transition-opacity duration-500"
-              style={{
-                background: `radial-gradient(circle, ${tc.glow} 0%, transparent 70%)`,
-                transform: 'scale(1.6)',
-              }}
-            />
-
-            {/* Neon pulse ring (only connected) */}
-            {isConnected && (
-              <span
-                className="absolute inset-[-4px] rounded-full border opacity-50 pointer-events-none"
-                style={{
-                  borderColor: tc.glow,
-                  animation:
-                    agentState === 'listening'
-                      ? 'pulse 1.8s infinite ease-in-out'
-                      : agentState === 'speaking'
-                        ? 'spin 3s linear infinite'
-                        : agentState === 'thinking'
-                          ? 'pulse 0.9s infinite ease-in-out'
-                          : 'none',
-                }}
-              />
-            )}
-
-            <motion.button
-              onClick={handleToggleSession}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title={isConnected ? 'Detener asistente de voz' : 'Hablar con Gemini AI'}
-              className={`relative w-14 h-14 rounded-full flex items-center justify-center border backdrop-blur-2xl shadow-xl transition-all duration-300 ${tc.border}`}
-              style={{
-                background: isConnected
-                  ? 'rgba(15, 15, 22, 0.9)'
-                  : 'rgba(25, 25, 35, 0.7)',
-              }}
-            >
-              <AnimatePresence mode="wait">
-                {agentState === 'connecting' ? (
-                  <motion.div
-                    key="connecting"
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
-                  >
-                    <RefreshCw className="w-5 h-5 text-yellow-400" />
-                  </motion.div>
-                ) : agentState === 'thinking' ? (
-                  <motion.div
-                    key="thinking"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: [1, 1.15, 1], opacity: 1 }}
-                    transition={{ repeat: Infinity, duration: 1.0 }}
-                  >
-                    <Brain className="w-5 h-5 text-orange-400" />
-                  </motion.div>
-                ) : isConnected ? (
-                  <motion.div
-                    key="connected"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    className="flex items-center justify-center"
-                  >
-                    {agentState === 'speaking' ? (
-                      <Volume2 className="w-5 h-5 text-cyan-400 animate-bounce" />
-                    ) : (
-                      <div className="relative">
-                        <span className="absolute inset-0 rounded-full w-4 h-4 bg-purple-500/30 animate-ping" />
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                      </div>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="disconnected"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                  >
-                    <Mic className="w-5 h-5 text-indigo-400" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Listening frequency bars */}
-              {agentState === 'listening' && (
-                <div className="absolute bottom-2 flex items-end gap-0.5 h-1.5">
-                  <span className="w-0.5 bg-purple-400 rounded-full h-1 animate-[bounce_0.6s_infinite]" />
-                  <span className="w-0.5 bg-purple-400 rounded-full h-1.5 animate-[bounce_0.6s_infinite]" style={{ animationDelay: '0.1s' }} />
-                  <span className="w-0.5 bg-purple-400 rounded-full h-1 animate-[bounce_0.6s_infinite]" style={{ animationDelay: '0.2s' }} />
-                </div>
-              )}
-            </motion.button>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── API Key Configuration Modal ───────────────────────────────────────── */}
+    <div
+      className="flex flex-col items-end gap-3 pointer-events-none"
+      style={{
+        position: 'fixed',
+        bottom: '5rem',
+        right: '1rem',
+        zIndex: 150,
+        contain: 'layout style',
+        willChange: 'auto',
+        opacity: isScrolling && micState === 'idle' ? 0.25 : 1,
+        transition: 'opacity 200ms ease',
+      }}
+    >
+      {/* Status / result panel */}
       <AnimatePresence>
-        {showConfig && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowConfig(false)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-md"
-            />
-
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative max-w-md w-full rounded-3xl border border-white/10 p-6 shadow-2xl backdrop-blur-2xl overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, rgba(20, 20, 28, 0.98) 0%, rgba(10, 10, 15, 0.98) 100%)',
-              }}
-            >
-              <div className="flex justify-between items-start gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                    <Sparkles className="w-4 h-4 text-indigo-400" />
-                  </div>
-                  <h3 className="text-base font-bold text-white tracking-tight">
-                    Configuración de Voz y Copiloto
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowConfig(false)}
-                  className="p-1.5 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-colors"
-                >
-                  <X size={18} />
-                </button>
+        {showPanel && (
+          <motion.div
+            initial={{ opacity: 0, y: 15, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="max-w-[280px] md:max-w-[340px] rounded-2xl border border-white/10 p-4 backdrop-blur-2xl shadow-2xl pointer-events-auto"
+            style={{
+              background: 'rgba(13, 13, 18, 0.92)',
+              boxShadow: `0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px ${stateColor}`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: stateColor.replace('0.5', '1').replace('0.45', '1').replace('0.28', '1') }} />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">
+                  {micState === 'recording' ? 'Escuchando…'
+                    : micState === 'processing' ? 'Procesando…'
+                    : micState === 'error' ? 'Error'
+                    : 'Comando'}
+                </span>
               </div>
+              <button onClick={dismiss} className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors">
+                <X size={12} />
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                <p className="text-xs text-white/50 leading-relaxed">
-                  Para utilizar el copiloto conversacional y el hub de comandos en tiempo real, ingresa tus claves API. Se guardarán de forma segura en tu navegador.
-                </p>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex items-center justify-between">
-                    <span>Gemini API Key</span>
-                    <span className="text-[9px] text-white/20 normal-case font-normal">(para voz en tiempo real)</span>
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className="w-full h-11 px-4 rounded-xl bg-white/5 hover:bg-white/[0.08] focus:bg-white/10 border border-white/10 focus:border-indigo-500/50 text-white placeholder-white/20 text-xs tracking-wide focus:outline-none transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex items-center justify-between">
-                    <span>OpenAI / Whisper API Key</span>
-                    <span className="text-[9px] text-white/20 normal-case font-normal">(para comandos de voz)</span>
-                  </label>
-                  <input
-                    type="password"
-                    value={whisperKeyInput}
-                    onChange={(e) => setWhisperKeyInput(e.target.value)}
-                    placeholder="sk-proj-..."
-                    className="w-full h-11 px-4 rounded-xl bg-white/5 hover:bg-white/[0.08] focus:bg-white/10 border border-white/10 focus:border-indigo-500/50 text-white placeholder-white/20 text-xs tracking-wide focus:outline-none transition-all"
-                  />
-                </div>
-
-                {/* ── Simulador de Fase Cognitiva ── */}
-                <div className="border-t border-white/5 pt-4 space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex items-center justify-between">
-                    <span>Simulador de Fase Cognitiva</span>
-                    <span className="text-[9px] text-indigo-400 font-normal">Modo Demo</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['PEAK_FOCUS', 'LINEAR_EXECUTION', 'SYNAPTIC_FATIGUE', 'REDUCED_CAPACITY_MODE'] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPhaseOverride(phaseOverride === p ? null : p)}
-                        className={`h-9 rounded-xl border text-[9px] font-bold tracking-wide uppercase transition-all ${
-                          phaseOverride === p
-                            ? 'bg-indigo-500 border-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.25)]'
-                            : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        {p.replace(/_/g, ' ')}
-                      </button>
-                    ))}
+            {micState === 'processing' ? (
+              <div className="flex items-center gap-2.5 py-1">
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.2, ease: 'linear' }}>
+                  <Brain className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                </motion.div>
+                <p className="text-[11px] text-orange-300/90 font-medium">Transcribiendo tu comando…</p>
+              </div>
+            ) : micState === 'recording' ? (
+              <p className="text-xs text-white/60 italic">Suelta el micrófono para ejecutar.</p>
+            ) : micState === 'error' ? (
+              <p className="text-[11px] text-red-300 leading-relaxed">{errorMsg}</p>
+            ) : result ? (
+              <div className="space-y-2">
+                {transcript && <p className="text-[11px] text-white/40 italic">&ldquo;{transcript}&rdquo;</p>}
+                <div className="flex items-start gap-2">
+                  <div className="mt-0.5 shrink-0">
+                    {result.deferred ? <Clock className="h-3.5 w-3.5 text-amber-400" />
+                      : result.success ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      : <AlertCircle className="h-3.5 w-3.5 text-red-400" />}
                   </div>
-                  {phaseOverride && (
-                    <button
-                      type="button"
-                      onClick={() => setPhaseOverride(null)}
-                      className="w-full h-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Restablecer Ritmo Real
-                    </button>
-                  )}
-                </div>
-
-                {error && (
-                  <div className="rounded-xl bg-red-500/10 border border-red-500/25 p-3 flex gap-2.5 items-start">
-                    <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-red-300 leading-relaxed">{error}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2.5 pt-2">
-                  <button
-                    onClick={() => setShowConfig(false)}
-                    className="h-10 px-4 rounded-xl hover:bg-white/5 text-xs text-white/60 hover:text-white transition-colors font-medium"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSaveKey}
-                    className="h-10 px-5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-xs text-white font-bold transition-all shadow-[0_0_15px_rgba(99,102,241,0.35)]"
-                  >
-                    Guardar Configuración
-                  </button>
+                  <p className="text-xs text-white/85 leading-relaxed">{result.message}</p>
                 </div>
               </div>
-            </motion.div>
-          </div>
+            ) : null}
+          </motion.div>
         )}
       </AnimatePresence>
-    </>
+
+      {/* Orb button — press and hold */}
+      <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="relative group">
+          {/* Audio-reactive aura */}
+          <div
+            ref={auraRef}
+            className="absolute inset-0 rounded-full blur-xl opacity-50 transition-opacity duration-500 will-change-transform"
+            style={{ background: `radial-gradient(circle, ${stateColor} 0%, transparent 70%)`, transform: 'scale(1.35)' }}
+          />
+          {/* Pulse ring while recording */}
+          {micState === 'recording' && (
+            <span className="absolute inset-[-4px] rounded-full border opacity-50 pointer-events-none"
+              style={{ borderColor: stateColor, animation: 'pulse 1.8s infinite ease-in-out' }} />
+          )}
+
+          <motion.button
+            onMouseDown={startRecording}
+            onMouseUp={stopRecording}
+            onMouseLeave={() => { if (micState === 'recording') stopRecording() }}
+            onTouchStart={(e) => { e.preventDefault(); startRecording() }}
+            onTouchEnd={(e) => { e.preventDefault(); stopRecording() }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title="Mantén presionado para hablar"
+            className="relative w-14 h-14 rounded-full flex items-center justify-center border border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-300 select-none"
+            style={{ background: micState === 'recording' ? 'rgba(15, 15, 22, 0.9)' : 'rgba(25, 25, 35, 0.7)' }}
+          >
+            <AnimatePresence mode="wait">
+              {micState === 'processing' ? (
+                <motion.div key="proc" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.15, 1], opacity: 1 }} transition={{ repeat: Infinity, duration: 1.0 }}>
+                  <Brain className="w-5 h-5 text-orange-400" />
+                </motion.div>
+              ) : (
+                <motion.div key="mic" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
+                  <Mic className={`w-5 h-5 ${micState === 'recording' ? 'text-purple-400' : 'text-indigo-400'}`} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        </div>
+      </div>
+    </div>
   )
 }

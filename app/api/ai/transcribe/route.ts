@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { whisperAPI } from '@/lib/whisper';
+import { transcribeAudioServer } from '@/lib/whisper';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
             type: audioFile.type
         });
 
-        const transcription = await whisperAPI.transcribeAudio(audioFile);
+        const transcription = await transcribeAudioServer(audioFile);
 
         console.log('Transcription API: Success', {
             transcriptionLength: transcription.length
