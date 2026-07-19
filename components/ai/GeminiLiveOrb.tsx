@@ -76,8 +76,34 @@ export function GeminiLiveOrb() {
     streamRef.current = null
   }, [])
 
+  // Bug: micState had no path back to 'idle' after landing on 'result' or
+  // 'error' — it just sat there until the user manually hit the panel's X.
+  // Two visible symptoms from the same cause: the orb never "returned to
+  // idle" after being used, and since the scroll-fade effect below only
+  // applies `isScrolling && micState === 'idle'`, a stuck non-idle state
+  // silently disabled the fade-on-scroll behavior too. Auto-return after a
+  // few seconds, same pattern as a toast.
+  const autoIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearAutoIdleTimer = useCallback(() => {
+    if (autoIdleTimerRef.current) {
+      clearTimeout(autoIdleTimerRef.current)
+      autoIdleTimerRef.current = null
+    }
+  }, [])
+  const scheduleAutoIdle = useCallback((ms: number) => {
+    clearAutoIdleTimer()
+    autoIdleTimerRef.current = setTimeout(() => {
+      setMicState('idle')
+      setResult(null)
+      setErrorMsg('')
+      setTranscript('')
+    }, ms)
+  }, [clearAutoIdleTimer])
+  useEffect(() => () => clearAutoIdleTimer(), [clearAutoIdleTimer])
+
   const startRecording = useCallback(async () => {
     if (micState === 'recording' || micState === 'processing') return
+    clearAutoIdleTimer()
     setErrorMsg('')
     setResult(null)
     setTranscript('')
@@ -101,16 +127,19 @@ export function GeminiLiveOrb() {
           if (!text.trim()) {
             setErrorMsg('No se detectó voz. Intenta de nuevo.')
             setMicState('error')
+            scheduleAutoIdle(5000)
             return
           }
           if (!bioState) {
             setErrorMsg('El motor cognitivo aún se está iniciando. Intenta en un momento.')
             setMicState('error')
+            scheduleAutoIdle(5000)
             return
           }
           const res = await executeVoiceCommand(text, bioState)
           setResult(res)
           setMicState('result')
+          scheduleAutoIdle(8000)
           eventBus.dispatch('VoiceCommandExecuted', {
             text, action: res.action, success: res.success,
             deferred: res.deferred ?? false, phase: bioState.phase,
@@ -121,6 +150,7 @@ export function GeminiLiveOrb() {
         } catch (err: any) {
           setErrorMsg(err?.message ?? 'No se pudo transcribir. Revisa tu micrófono.')
           setMicState('error')
+          scheduleAutoIdle(5000)
         }
       }
       recorder.start()
@@ -129,8 +159,9 @@ export function GeminiLiveOrb() {
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Acceso al micrófono denegado.')
       setMicState('error')
+      scheduleAutoIdle(5000)
     }
-  }, [micState, bioState, stopTracks])
+  }, [micState, bioState, stopTracks, clearAutoIdleTimer, scheduleAutoIdle])
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -159,7 +190,7 @@ export function GeminiLiveOrb() {
     : micState === 'error' ? 'rgba(239, 68, 68, 0.45)'      // red
     : 'rgba(99, 102, 241, 0.28)'                             // idle indigo
 
-  const dismiss = () => { setMicState('idle'); setResult(null); setErrorMsg(''); setTranscript('') }
+  const dismiss = () => { clearAutoIdleTimer(); setMicState('idle'); setResult(null); setErrorMsg(''); setTranscript('') }
 
   const showPanel = micState === 'recording' || micState === 'processing' || micState === 'result' || micState === 'error'
 
