@@ -4,10 +4,33 @@ import './globals.css'
 import ClientLayout from './client-layout'
 
 
+const SITE_URL = process.env.NEXTAUTH_URL || 'https://productivitynovo.vercel.app'
+const TITLE = 'Novo — Cognitive Operating System'
+const DESCRIPTION = 'Deja de organizar tareas. Novo construye un Gemelo Cognitivo a partir de tu comportamiento real para responder una sola pregunta: ¿qué deberías hacer ahora mismo?'
+
+// metadataBase + the openGraph/twitter blocks were missing entirely — every
+// link share (WhatsApp, X, LinkedIn, Discord) rendered as a bare URL with no
+// preview card, no image, and a stale "Productivity Hub" title from before
+// the rebrand. app/opengraph-image.tsx supplies the actual card image;
+// Next.js auto-wires it into these tags once metadataBase is set.
 export const metadata: Metadata = {
-  title: 'Novo - Productivity Hub',
-  description: 'Your all-in-one productivity platform for routines, tasks, projects, and tracking',
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
   generator: 'v0.app',
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: 'Novo',
+    locale: 'es',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
   icons: {
     icon: [
       {
