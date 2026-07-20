@@ -12,6 +12,7 @@ import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
 import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
 import { evaluateNotionThresholds } from '@/lib/cognitive/notion-signal';
 import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
+import { detectAbandonmentPattern } from '@/lib/cognitive/focus-abandonment';
 import type { BiometricPayload } from '@/types/biometrics';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Collect remaining signals in parallel ────────────────────────────────
-    const [dbTasks, focusSessions, dailyAnalytics, recentSessions, notionItems] = await Promise.all([
+    const [dbTasks, focusSessions, dailyAnalytics, recentSessions, notionItems, abandonmentSample] = await Promise.all([
       prisma.task.findMany({
         where: { userId },
         orderBy: { createdAt: 'asc' },
@@ -124,7 +125,21 @@ export async function GET(req: NextRequest) {
       // to the Task shape so every downstream calculation picks them up for
       // free instead of duplicating the load/overdue/completion logic.
       prisma.checklistItem.findMany({ where: { userId, source: 'notion' } }),
+      // Wider window than the 7-day focusSessions above — a real "you always
+      // stop around minute X" pattern needs more samples than a week
+      // typically has, and this query only selects two int columns so the
+      // extra range costs little.
+      prisma.focusSession.findMany({
+        where: { userId, sessionType: 'work' },
+        orderBy: { startTime: 'desc' },
+        take: 100,
+        select: { duration: true, actualDuration: true },
+      }),
     ]);
+
+    // Real pattern or null — never a guess from a handful of scattered stops
+    // (see lib/cognitive/focus-abandonment.ts's clustering bar).
+    const abandonmentPatternMinutes = detectAbandonmentPattern(abandonmentSample);
 
     const tasks = [
       ...dbTasks,
@@ -687,6 +702,11 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       };
       successModel = 'local-fallback';
     }
+
+    // Attached after either branch builds cognitiveReport (LLM JSON or the
+    // local fallback object) rather than put in the LLM prompt/schema, so
+    // this stays a real computed value and the model can't invent its own.
+    cognitiveReport.abandonmentPatternMinutes = abandonmentPatternMinutes;
 
     const responseSignals = {
       focusScore,

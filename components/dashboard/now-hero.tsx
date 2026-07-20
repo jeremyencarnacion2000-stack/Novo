@@ -68,6 +68,12 @@ function buildEngineHeadline(report: any): string | null {
   if (report.procrastinationAlert) {
     return 'Sueles posponer tareas como esta — el paso más pequeño posible cuenta.'
   }
+  // Real clustering-verified pattern from FocusSession history (see
+  // lib/cognitive/focus-abandonment.ts) — only non-null when there's an
+  // actual consistent early-stop point, never a guess from scattered data.
+  if (typeof report.abandonmentPatternMinutes === 'number') {
+    return `Sueles interrumpir tus sesiones de foco cerca del minuto ${report.abandonmentPatternMinutes} — prueba una pausa corta justo antes de esa marca.`
+  }
   if (typeof report.peakWindowStart === 'number' && typeof report.peakWindowEnd === 'number') {
     return `Tu ventana de máximo enfoque hoy es de ${formatHour12(report.peakWindowStart)} a ${formatHour12(report.peakWindowEnd)}.`
   }
