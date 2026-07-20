@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useSession } from 'next-auth/react';
 import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment, MessageBlock, Attachment } from './types';
 import { splitSseLines, parseFinalSseLine } from '@/lib/ai/sse-buffer';
+import { sileo } from '@/lib/sileo-bell';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -291,7 +292,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     }, [selectedModel]);
 
     const deleteConversation = useCallback(async (id: string) => {
+        const previousConversationId = currentConversationId;
+        let removedConversation: Conversation | undefined;
+        let removedIndex = -1;
+
         setConversations(prev => {
+            removedIndex = prev.findIndex(c => c.id === id);
+            removedConversation = prev[removedIndex];
             const filtered = prev.filter(c => c.id !== id);
             if (currentConversationId === id && filtered.length > 0) {
                 setCurrentConversationId(filtered[0].id);
@@ -301,12 +308,32 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             return filtered;
         });
 
+        // Only the server knows whether this conversation was ever actually
+        // persisted — deleting one that isn't (204/404 either way here since
+        // the route 404s on no match) is a legitimate no-op, but a real
+        // failure (500/network) must roll the optimistic removal back.
+        // Without this, a failed server-side delete left the UI showing
+        // "gone" while the row still existed in the DB — it just reappeared
+        // on the next reload with no explanation.
         try {
-            await fetch(`/api/ai-conversations/${id}`, {
+            const response = await fetch(`/api/ai-conversations/${id}`, {
                 method: 'DELETE'
             });
+            if (!response.ok && response.status !== 404 && removedConversation) {
+                throw new Error(`Delete failed: ${response.status}`);
+            }
         } catch (error) {
             console.error('Failed to delete conversation:', error);
+            if (removedConversation) {
+                const restored = removedConversation;
+                setConversations(prev => {
+                    const next = [...prev];
+                    next.splice(Math.min(removedIndex, next.length), 0, restored);
+                    return next;
+                });
+                setCurrentConversationId(previousConversationId);
+            }
+            sileo.error({ title: 'Could not delete conversation', description: 'Please try again.' });
         }
     }, [currentConversationId]);
 
