@@ -260,29 +260,35 @@ export class IntegrationEngine {
     }
 
     /**
-     * Sync task completion across sources
+     * Sync task completion across sources.
+     * Returns false when the source has no real "completed" concept to persist
+     * (e.g. 'school' grades, or an unrecognized id prefix) — callers use this
+     * to reject the request instead of reporting success for a checkbox that
+     * silently reverts on the next load.
      */
-    static async syncCompletion(taskId: string, completed: boolean): Promise<void> {
+    static async syncCompletion(taskId: string, completed: boolean): Promise<boolean> {
         const [source, ...idParts] = taskId.split(':');
 
         switch (source) {
-            case 'routine':
+            case 'routine': {
                 const [routineId, , taskIdPart] = idParts;
                 await prisma.routineTask.update({
                     where: { id: taskIdPart },
                     data: { completed }
                 });
-                break;
+                return true;
+            }
 
-            case 'project':
+            case 'project': {
                 const [projectId, , subtaskId] = idParts;
                 await prisma.subtask.update({
                     where: { id: subtaskId },
                     data: { completed }
                 });
-                break;
+                return true;
+            }
 
-            case 'checklist':
+            case 'checklist': {
                 const checklistId = idParts[0];
                 const item = await prisma.checklistItem.update({
                     where: { id: checklistId },
@@ -311,20 +317,26 @@ export class IntegrationEngine {
                         console.error('Failed to sync completion to Notion:', notionError);
                     }
                 }
-                break;
+                return true;
+            }
 
             case 'school':
-                // School grades don't have a "completed" status
-                // When user completes, we could create a checklist reminder to study
-                break;
+                // School grades don't have a "completed" status — nothing to
+                // persist. Report failure so the UI doesn't show a checkbox
+                // that silently un-checks itself on next load.
+                return false;
 
-            case 'task':
+            case 'task': {
                 const aiTaskId = idParts[0];
                 await prisma.task.update({
                     where: { id: aiTaskId },
                     data: { status: completed ? 'done' : 'todo' }
                 });
-                break;
+                return true;
+            }
+
+            default:
+                return false;
         }
     }
 

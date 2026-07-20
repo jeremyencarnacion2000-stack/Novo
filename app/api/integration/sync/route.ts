@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        await IntegrationEngine.syncCompletion(taskId, completed);
+        const persisted = await IntegrationEngine.syncCompletion(taskId, completed);
+        if (!persisted) {
+            return NextResponse.json(
+                { error: 'This item cannot be marked complete' },
+                { status: 422 }
+            );
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {
