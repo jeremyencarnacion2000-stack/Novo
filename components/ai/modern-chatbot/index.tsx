@@ -223,20 +223,21 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                             <div key="hero" className="flex-1 flex flex-col min-h-0 overflow-hidden">
                                 <div className="md:hidden flex-1 flex flex-col min-h-0">
                                     <MobileHero
-                                        onChipClick={(text) => {
-                                            createConversation();
-                                            setTimeout(() => sendMessage(text), 80);
-                                        }}
+                                        // sendMessage already auto-creates a conversation when
+                                        // none is active — calling createConversation() first
+                                        // raced it: sendMessage's useCallback closure still saw
+                                        // the pre-update (null) currentConversationId by the time
+                                        // the setTimeout fired, so it created a SECOND conversation
+                                        // for the message, leaving the first one an orphaned empty
+                                        // "Nueva conversación" in the sidebar.
+                                        onChipClick={(text) => sendMessage(text)}
                                         onVoiceClick={toggleVoice}
                                         isVoiceListening={isVoiceListening}
                                     />
                                 </div>
                                 <div className="hidden md:flex flex-1 flex-col min-h-0">
                                     <DesktopHero
-                                        onChipClick={(text) => {
-                                            createConversation();
-                                            setTimeout(() => sendMessage(text), 80);
-                                        }}
+                                        onChipClick={(text) => sendMessage(text)}
                                     />
                                 </div>
                             </div>
