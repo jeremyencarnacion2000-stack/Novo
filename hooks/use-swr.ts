@@ -102,3 +102,12 @@ export const ROUTINE_STATS_KEY = '/api/routines/completions?days=30'
 export const useRoutineStats = () => {
   return useSWRWithConfig<any>(ROUTINE_STATS_KEY)
 }
+
+// Cognitive Engine hook — LLM-backed, so shared here (not a per-component
+// fetch) deliberately: NowHero and CognitiveEngineWidget both render on the
+// dashboard and both need this data. Without a shared SWR key they'd each
+// fire their own request, doubling LLM cost/latency on every dashboard load.
+export const COGNITIVE_ENGINE_KEY = '/api/ai/cognitive-engine'
+export const useCognitiveEngine = () => {
+  return useSWRWithConfig<any>(COGNITIVE_ENGINE_KEY)
+}

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Brain, ArrowRight, AlertTriangle, Zap, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { springConfig } from '@/lib/design-tokens';
 import { GlassSurface } from '@/components/ui/GlassSurface';
+import { useCognitiveEngine } from '@/hooks/use-swr';
 
 interface WidgetData {
   focusScore: number;
@@ -40,26 +41,19 @@ function ScoreMini({ score, color }: { score: number; color: string }) {
 }
 
 export function CognitiveEngineWidget() {
-  const [data, setData] = useState<WidgetData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/ai/cognitive-engine')
-      .then(r => r.json())
-      .then(json => {
-        if (json.success) {
-          setData({
-            focusScore: json.report.focusScore,
-            energyLevel: json.report.energyLevel,
-            burnoutRisk: json.report.burnoutRisk,
-            topInsight: json.report.insights?.[0]?.headline ?? 'Analysis complete',
-            recommendation: json.report.recommendation,
-          });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  // Shared key (hooks/use-swr.ts) — NowHero reads the same endpoint on the
+  // same dashboard render; SWR's dedupingInterval collapses both into one
+  // request instead of two independent calls to an LLM-backed route.
+  const { data: json, isLoading: loading } = useCognitiveEngine();
+  const data: WidgetData | null = json?.success
+    ? {
+        focusScore: json.report.focusScore,
+        energyLevel: json.report.energyLevel,
+        burnoutRisk: json.report.burnoutRisk,
+        topInsight: json.report.insights?.[0]?.headline ?? 'Analysis complete',
+        recommendation: json.report.recommendation,
+      }
+    : null;
 
   const scoreColor = data
     ? data.focusScore >= 70 ? '#22c55e' : data.focusScore >= 40 ? '#f59e0b' : '#ef4444'

@@ -7,6 +7,7 @@ import { ArrowRight } from 'lucide-react'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { useCognitivePhase } from '@/lib/cognitive-context'
 import { springConfig } from '@/lib/design-tokens'
+import { useCognitiveEngine } from '@/hooks/use-swr'
 
 interface TaskLite {
   id: string
@@ -37,19 +38,55 @@ export const FRICTION_TIP: Record<string, string> = {
   lack_of_structure: 'Bloquea 25 minutos ahora mismo, sin más planeación.',
 }
 
+const formatHour12 = (hour: number): string => {
+  const period = hour < 12 ? 'am' : 'pm'
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${hour12}${period}`
+}
+
+// The cognitive-engine route already computes a real procrastination read,
+// recovery state, and a chronotype-adjusted peak window for every user — but
+// that only ever surfaced on /cognitive, a page most people never open. This
+// builds real Spanish copy directly from the report's NUMERIC/enum fields
+// (never its free-text headline/detail/recommendation strings, which the
+// LLM prompt doesn't constrain to Spanish and could come back in English).
+// Only used in the branch where NowHero has nothing more concrete to show
+// (no urgent task, no platform signal) — that's exactly where a static,
+// generic friction tip was the weakest part of the hero.
+function buildEngineHeadline(report: any): string | null {
+  if (!report) return null
+  if (report.recoveryState === 'critical') {
+    return 'Tu energía estimada está muy baja ahora mismo — prioriza algo ligero.'
+  }
+  if (report.procrastinationAlert) {
+    return 'Sueles posponer tareas como esta — el paso más pequeño posible cuenta.'
+  }
+  if (typeof report.peakWindowStart === 'number' && typeof report.peakWindowEnd === 'number') {
+    return `Tu ventana de máximo enfoque hoy es de ${formatHour12(report.peakWindowStart)} a ${formatHour12(report.peakWindowEnd)}.`
+  }
+  return null
+}
+
 // The single decision that replaces the old cold-start card, which fabricated
 // clinical-sounding claims ("Impaired Sleep Debt Detected") for brand-new
 // accounts with zero real signal. Priority order: an overdue or high-priority
 // task wins (most concrete and actionable); otherwise a real calendar signal
-// logged today (e.g. meeting overload) takes over; otherwise the user's own
-// onboarding answers, framed honestly as "según nos dijiste" — never a
-// "detected" pattern.
+// logged today (e.g. meeting overload) takes over; otherwise a real
+// cognitive-engine read (recovery state, procrastination, peak window) when
+// it's loaded; otherwise the user's own onboarding answers, framed honestly
+// as "según nos dijiste" — never a "detected" pattern.
 export function NowHero() {
   const { twin } = useCognitiveTwin()
   const phase = useCognitivePhase()
   const [task, setTask] = useState<TaskLite | null>(null)
   const [platformSignal, setPlatformSignal] = useState<PlatformSignalEntry | null>(null)
   const [loading, setLoading] = useState(true)
+  // Progressive enhancement, not a load-blocking dependency: NowHero renders
+  // immediately from local signals, then re-renders with the real read once
+  // this (LLM-backed, slower) request resolves. Shares its SWR key with
+  // CognitiveEngineWidget so the two don't double the LLM call.
+  const { data: engineJson } = useCognitiveEngine()
+  const engineReport = engineJson?.success ? engineJson.report : null
 
   useEffect(() => {
     Promise.all([
@@ -129,7 +166,7 @@ export function NowHero() {
           ) : twin.energyCurve.chronotype ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
-                {frictionTip ?? 'Agrega tu primera tarea para que el Twin empiece a aprender.'}
+                {buildEngineHeadline(engineReport) ?? frictionTip ?? 'Agrega tu primera tarea para que el Twin empiece a aprender.'}
               </h2>
               <p className="relative text-sm md:text-base text-foreground/60">
                 {phaseCopy}
