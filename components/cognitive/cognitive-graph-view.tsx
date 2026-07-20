@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Crown } from 'lucide-react';
 import type { CognitiveGraph, GraphNode } from '@/lib/cognitive-graph';
 
 // Hand-rolled force-directed layout — small node count (root + ~10-14 nodes),
@@ -155,6 +157,7 @@ function useForceLayout(graph: CognitiveGraph | null, width: number, height: num
 
 export function CognitiveGraphView() {
   const [graph, setGraph] = useState<CognitiveGraph | null>(null);
+  const [proRequired, setProRequired] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -168,7 +171,14 @@ export function CognitiveGraphView() {
 
   useEffect(() => {
     fetch('/api/cognitive/graph')
-      .then(r => r.ok ? r.json() : null)
+      .then(async (r) => {
+        if (r.status === 403) {
+          const body = await r.json().catch(() => null);
+          if (body?.error === 'pro_required') setProRequired(true);
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then(setGraph)
       .catch(() => setGraph(null));
   }, []);
@@ -218,6 +228,28 @@ export function CognitiveGraphView() {
   }, [hoveredId, draggingId, graph]);
 
   const nodeById = React.useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+
+  if (proRequired) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center gap-3 px-6">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-500/10 border border-amber-500/20">
+          <Crown className="w-4 h-4 text-amber-400" />
+        </div>
+        <p className="text-xs text-foreground/50 max-w-[220px]">
+          El Cognitive Graph avanzado es una función Pro.
+        </p>
+        {/* settings-control-center.tsx's tab state isn't URL-synced, so a
+            ?tab=billing deep link wouldn't actually land there - link to
+            the section itself instead of promising a jump that doesn't work. */}
+        <Link
+          href="/settings"
+          className="text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors"
+        >
+          Actualizar a Pro →
+        </Link>
+      </div>
+    );
+  }
 
   if (!graph) {
     return (

@@ -7,6 +7,16 @@ import { inngest } from '@/lib/inngest/client'
 import { updateDailyAnalytics as sharedUpdateDailyAnalytics } from '@/lib/analytics-server'
 import { calculateCurrentStreak } from '@/app/api/stats/productivity/route'
 
+// Free plan: 30 days of history (the boundary settings-billing.tsx
+// advertises), Pro: whatever was requested. `days` is a client-supplied
+// query/body param in all three call sites below (GET and two POST
+// actions) - clamped here rather than trusted, since a Free user could
+// otherwise just ask for 365 directly.
+async function clampDaysForPlan(userId: string, requestedDays: number): Promise<number> {
+  const { plan } = (await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })) ?? {}
+  return plan === 'pro' ? requestedDays : Math.min(requestedDays, 30)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
     const userId = session.user.id
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '30')
+    const days = await clampDaysForPlan(userId, parseInt(searchParams.get('days') || '30'))
 
     const endDate = new Date()
     const startDate = new Date()
@@ -315,7 +325,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'getAnalyticsData': {
-        const days = data.days || 30
+        const days = await clampDaysForPlan(userId, data.days || 30)
         const endDate = new Date()
         const startDate = new Date()
         startDate.setDate(endDate.getDate() - days)
@@ -347,7 +357,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'calculateProductivityMetrics': {
-        const days = data.days || 30
+        const days = await clampDaysForPlan(userId, data.days || 30)
         const endDate = new Date()
         const startDate = new Date()
         startDate.setDate(endDate.getDate() - days)

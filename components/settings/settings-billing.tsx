@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Crown, Zap, CreditCard, Loader2 } from 'lucide-react'
+import { Crown, Zap, CreditCard, Loader2, History, Share2, Sparkles } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Section, SafeAction } from './settings-shared'
 
@@ -175,9 +175,18 @@ export function SettingsBilling() {
               <span className="text-[11px] text-foreground/40">$8.00/mes · 2 meses gratis</span>
             </button>
           </div>
-          <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-4 flex items-start gap-3">
-            <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-foreground/45">Acciones de IA ilimitadas, sin esperar al reinicio mensual.</p>
+          <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-4 space-y-3">
+            {[
+              { icon: Zap, text: 'Acciones de IA ilimitadas, sin esperar al reinicio mensual.' },
+              { icon: Sparkles, text: 'Twin Mode: el chat responde usando todo tu perfil cognitivo.' },
+              { icon: History, text: 'Historial de analytics ilimitado (Free ve los últimos 30 días).' },
+              { icon: Share2, text: 'Cognitive Graph avanzado: el mapa visual de tu Twin.' },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-start gap-3">
+                <Icon className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-foreground/45">{text}</p>
+              </div>
+            ))}
           </div>
         </Section>
       )}

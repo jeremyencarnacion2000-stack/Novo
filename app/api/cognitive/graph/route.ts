@@ -11,6 +11,14 @@ export async function GET() {
   }
   const userId = session.user.id;
 
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+  if (user?.plan !== 'pro') {
+    return NextResponse.json(
+      { error: 'pro_required', message: 'El Cognitive Graph avanzado es una función Pro.' },
+      { status: 403 }
+    );
+  }
+
   const [twinRecord, signalGroups, recentLogs] = await Promise.all([
     prisma.cognitiveTwinRecord.findUnique({
       where: { userId },
