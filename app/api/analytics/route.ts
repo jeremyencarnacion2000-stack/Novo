@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getAdvancedInsights } from '@/lib/analytics-server'
 import { inngest } from '@/lib/inngest/client'
 import { updateDailyAnalytics as sharedUpdateDailyAnalytics } from '@/lib/analytics-server'
+import { calculateCurrentStreak } from '@/app/api/stats/productivity/route'
 
 export async function GET(request: NextRequest) {
   try {
@@ -168,6 +169,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // The Focus page's "Active streak" stat reads this field — it was never
+    // included here, so the card was permanently stuck at "0d" regardless of
+    // actual activity. /api/stats/productivity already computes a real
+    // current-streak from completed checklist items; reuse it instead of a
+    // second implementation.
+    let streak = 0
+    try {
+      streak = await calculateCurrentStreak(userId)
+    } catch (streakError) {
+      console.error('Failed to calculate streak:', streakError)
+    }
+
     return NextResponse.json({
       dailyData: enrichedDailyData,
       events,
@@ -176,6 +189,7 @@ export async function GET(request: NextRequest) {
       taskTrend,
       focusTime: focusTimeString,
       focusTrend,
+      streak,
       habitsMastered: totalHabitsCompleted,
       habitCompletionRate: 0,
       habitTrend,

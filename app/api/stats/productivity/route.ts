@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-async function calculateCurrentStreak(userId: string): Promise<number> {
+export async function calculateCurrentStreak(userId: string): Promise<number> {
     const windowStart = new Date();
     windowStart.setDate(windowStart.getDate() - 366);
     const tasks = await prisma.checklistItem.findMany({
