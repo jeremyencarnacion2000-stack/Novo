@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeAIAction } from '@/lib/ai/executor';
+import { executeAIAction, pickDisplayableFields } from '@/lib/ai/executor';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
             output: result.success ? (result.message || JSON.stringify(result.data, null, 2)) : (result.error || result.message || 'Unknown execution error'),
             metadata: {
                 ...(result.metadata || {}),
-                ...(result.data || {})
+                ...pickDisplayableFields(result.data)
             }
         });
 

@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
         };
 
         try {
-          const { executeAIAction } = await import('@/lib/ai/executor');
+          const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
           const execResult = await executeAIAction(autoAction, userId);
 
           // Build a structured JSON that context.tsx can parse from the SSE stream
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest) {
               _result: {
                 success: execResult.success,
                 message: execResult.message,
-                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
+                metadata: { ...(execResult.metadata || {}), ...pickDisplayableFields(execResult.data) }
               }
             },
             message: execResult.success
@@ -532,7 +532,7 @@ export async function POST(request: NextRequest) {
       // 2. Auto-execute GENERATE_FILE or COGNITIVE_AUTOMATION actions
       if (actionType === 'GENERATE_FILE' || actionType === 'UPDATE_COGNITIVE_STATE' || actionType === 'COGNITIVE_PIPELINE' || classification.type === 'COGNITIVE_AUTOMATION') {
         try {
-          const { executeAIAction } = await import('@/lib/ai/executor');
+          const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
           const execResult = await executeAIAction(parsed.action, userId);
           return NextResponse.json({
             content: pickResultMessage(execResult, parsed.message, 'He realizado los cambios en tu estado cognitivo.'),
@@ -543,7 +543,7 @@ export async function POST(request: NextRequest) {
                 type: 'result',
                 content: execResult.message || 'Calibración cognitiva realizada con éxito.',
                 status: execResult.success ? 'success' : 'failed',
-                metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
+                metadata: { ...(execResult.metadata || {}), ...pickDisplayableFields(execResult.data) }
               },
             ].filter(Boolean),
             metadata: { intentType: classification.type, model: result.model }
@@ -582,7 +582,7 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const { executeAIAction } = await import('@/lib/ai/executor');
+        const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
         const execResult = await executeAIAction(autoAction, userId);
         return NextResponse.json({
           content: execResult.message || 'Archivo generado.',
@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
               type: 'result',
               content: execResult.message || 'Archivo listo.',
               status: execResult.success ? 'success' : 'failed',
-              metadata: { ...(execResult.metadata || {}), ...(execResult.data || {}) }
+              metadata: { ...(execResult.metadata || {}), ...pickDisplayableFields(execResult.data) }
             },
           ],
           metadata: { intentType: classification.type, model: result.model }

@@ -61,6 +61,25 @@ export function dropHallucinatedPlaceholder(value: unknown): string {
     return /^(undefined|null|none|n\/a)$/i.test(value.trim()) ? '' : value;
 }
 
+// Handlers return `data: <the raw Prisma record they just created/updated>`.
+// Every route that surfaces execution results to the chat UI used to spread
+// that wholesale into the confirmation card's metadata, leaking id, userId,
+// isPinned, isArchived, createdAt, updatedAt, etc. into a card a user reads
+// as "what did the AI just do" — none of it meaningful there. Allowlisted to
+// the fields the chat UI's ResultBlock/DocumentViewer actually render (the
+// file generation/preview/download flow); add a name here deliberately when
+// a future action genuinely needs to surface a field.
+const DISPLAYABLE_DATA_FIELDS = ['content', 'mimeType', 'filename', 'downloadReady', 'summary'] as const;
+
+export function pickDisplayableFields(data: unknown): Record<string, unknown> {
+    if (!data || typeof data !== 'object') return {};
+    const picked: Record<string, unknown> = {};
+    for (const key of DISPLAYABLE_DATA_FIELDS) {
+        if (key in data) picked[key] = (data as Record<string, unknown>)[key];
+    }
+    return picked;
+}
+
 export interface AIActionResult<T = any> {
     success: boolean;
     data?: T;
