@@ -25,6 +25,7 @@ export default function ProfilePage() {
     currentStreak: 0,
     goalsAchieved: 0,
   })
+  const [memberSinceYear, setMemberSinceYear] = useState<number | null>(null)
 
   useEffect(() => {
     // Fetch stats from profile API (includes streak calculation)
@@ -43,6 +44,9 @@ export default function ProfilePage() {
             currentStreak: data.stats?.currentStreak || 0,
             focusHours: data.stats?.focusHours || 0,
           }))
+          if (data.profile?.memberSince) {
+            setMemberSinceYear(new Date(data.profile.memberSince).getFullYear())
+          }
         } catch { /* malformed response */ }
       }
 
@@ -107,7 +111,7 @@ export default function ProfilePage() {
                   <p className="text-muted-foreground text-sm">{session?.user?.email}</p>
                   <Badge variant="secondary" className="mt-2">
                     <CalendarDays className="h-3 w-3 mr-1" />
-                    Member since 2024
+                    {memberSinceYear ? `Member since ${memberSinceYear}` : 'Member'}
                   </Badge>
                 </div>
               </div>
