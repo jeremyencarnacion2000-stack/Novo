@@ -7,10 +7,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Plus, Loader2, Wand2 } from 'lucide-react'
 import { useModalFlip } from '@/hooks/use-modal-flip'
 import { useToast } from '@/hooks/use-toast'
-import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 
-export function QuickCapture() {
+interface QuickCaptureProps {
+    onCreated?: () => void
+}
+
+export function QuickCapture({ onCreated }: QuickCaptureProps) {
     const [open, setOpen] = useState(false)
     const [content, setContent] = useState('')
     const [loading, setLoading] = useState(false)
@@ -18,7 +21,6 @@ export function QuickCapture() {
     const [tags, setTags] = useState<string[]>([])
     const [color, setColor] = useState('bg-background')
     const { toast } = useToast()
-    const router = useRouter()
 
     const closeFlip = useModalFlip('btn-quick-note', open)
 
@@ -81,7 +83,7 @@ export function QuickCapture() {
             setTags([])
             setColor('bg-background')
             handleOpenChange(false)
-            router.refresh()
+            onCreated?.()
         } catch (error) {
             toast({
                 title: 'Error',

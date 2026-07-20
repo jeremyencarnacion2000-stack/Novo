@@ -65,7 +65,7 @@ export default function NotesPage() {
                     <h1 className="text-2xl font-black tracking-tight text-foreground/90">Quick Notes</h1>
                     <p className="text-xs text-foreground/30 font-medium mt-0.5">Capture ideas and thoughts instantly</p>
                 </div>
-                <QuickCapture />
+                <QuickCapture onCreated={fetchNotes} />
             </div>
 
             <div className="flex items-center gap-4">
@@ -95,7 +95,7 @@ export default function NotesPage() {
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {pinnedNotes.map(note => (
-                                    <NoteCard key={note.id} note={note} />
+                                    <NoteCard key={note.id} note={note} onChange={fetchNotes} />
                                 ))}
                             </div>
                         </div>
@@ -107,7 +107,7 @@ export default function NotesPage() {
                         )}
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {otherNotes.map(note => (
-                                <NoteCard key={note.id} note={note} />
+                                <NoteCard key={note.id} note={note} onChange={fetchNotes} />
                             ))}
                         </div>
                         {activeNotes.length === 0 && (
@@ -153,7 +153,7 @@ export default function NotesPage() {
                     {archivedNotes.length > 0 ? (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {archivedNotes.map(note => (
-                                <NoteCard key={note.id} note={note} />
+                                <NoteCard key={note.id} note={note} onChange={fetchNotes} />
                             ))}
                         </div>
                     ) : (

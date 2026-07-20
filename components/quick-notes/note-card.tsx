@@ -8,7 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Pin, Archive, Trash2, Palette, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
 
 interface NoteCardProps {
     note: {
@@ -20,6 +19,7 @@ interface NoteCardProps {
         tags: string[]
         updatedAt: string
     }
+    onChange?: () => void
 }
 
 const COLORS = [
@@ -31,9 +31,8 @@ const COLORS = [
     { name: 'Purple', value: 'bg-purple-50 dark:bg-purple-950/30' },
 ]
 
-export function NoteCard({ note }: NoteCardProps) {
+export function NoteCard({ note, onChange }: NoteCardProps) {
     const { toast } = useToast()
-    const router = useRouter()
     const [loading, setLoading] = useState(false)
 
     const updateNote = async (updates: any) => {
@@ -46,7 +45,7 @@ export function NoteCard({ note }: NoteCardProps) {
             })
 
             if (!response.ok) throw new Error('Failed to update note')
-            router.refresh()
+            onChange?.()
         } catch (error) {
             toast({
                 title: 'Error',
@@ -73,7 +72,7 @@ export function NoteCard({ note }: NoteCardProps) {
                 title: 'Note deleted',
                 description: 'Note has been permanently removed'
             })
-            router.refresh()
+            onChange?.()
         } catch (error) {
             toast({
                 title: 'Error',
