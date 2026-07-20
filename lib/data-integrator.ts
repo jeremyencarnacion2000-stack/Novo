@@ -121,6 +121,13 @@ interface OfflineOperation {
   timestamp: number
   status: 'pending' | 'conflicted'
   serverData?: any
+  // Present only for a 'create' queued while offline that assigned a local
+  // temp-<timestamp> id to unblock optimistic UI. Lets syncPendingOperations
+  // patch that temp id to the real server-generated one once the queued
+  // create actually lands - without this, the temp id survives in the
+  // IndexedDB cache forever, and any edit/delete on that item before a full
+  // reload targets /api/.../temp-... and 404s server-side.
+  reconcile?: { userId: string; cacheKind: string; tempId: string }
 }
 
 const offlineStorage = new OfflineStorage()
@@ -128,15 +135,23 @@ const offlineStorage = new OfflineStorage()
 // Network status detection
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true
 
-// Sync data to cloud or queue for offline
-const syncToCloud = async (url: string, data: any, method: 'POST' | 'PUT' | 'DELETE' = 'POST') => {
+// Sync data to cloud or queue for offline. `reconcile` is only meaningful
+// for a 'create' (POST) whose caller already assigned a local temp id to an
+// optimistically-inserted item - see OfflineOperation.reconcile.
+const syncToCloud = async (
+  url: string,
+  data: any,
+  method: 'POST' | 'PUT' | 'DELETE' = 'POST',
+  reconcile?: { userId: string; cacheKind: string; tempId: string }
+) => {
   if (!isOnline) {
     // Queue for later sync
     await offlineStorage.addToQueue({
       type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
       endpoint: url,
       data,
-      method
+      method,
+      ...(method === 'POST' && reconcile ? { reconcile } : {})
     })
     return
   }
@@ -170,7 +185,8 @@ const syncToCloud = async (url: string, data: any, method: 'POST' | 'PUT' | 'DEL
       type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
       endpoint: url,
       data,
-      method
+      method,
+      ...(method === 'POST' && reconcile ? { reconcile } : {})
     })
   }
 }
@@ -196,6 +212,17 @@ async function syncPendingOperations(): Promise<void> {
 
         if (response.ok) {
           successfulIds.push(operation.id)
+          if (operation.reconcile) {
+            try {
+              const created = await response.json()
+              if (created?.id) {
+                const { userId, cacheKind, tempId } = operation.reconcile
+                await reconcileCachedId(cacheKind, userId, tempId, created.id)
+              }
+            } catch (reconcileError) {
+              console.error(`Failed to reconcile temp id for operation ${operation.id}:`, reconcileError)
+            }
+          }
         } else if (response.status === 409) {
           // Conflict
           const serverData = await response.json()
@@ -286,6 +313,23 @@ const setCachedData = async <T,>(key: string, userId: string, data: T, version: 
   }
   const prefixedKey = `cache-${userId}-${key}`
   await offlineStorage.set(prefixedKey, cache)
+}
+
+// Swaps a temp id for the real server id in a cached array, once a queued
+// offline 'create' finally lands. No-ops quietly if the cache entry is gone
+// or the item isn't there (e.g. a later online session already replaced the
+// cache from a real fetch) - reconciliation is best-effort, not required for
+// correctness once fresh server data is loaded again anyway.
+// Pure swap, split out from the IndexedDB I/O below so it's testable without
+// mocking IndexedDB.
+export function swapTempId<T extends { id: string }>(items: T[], tempId: string, realId: string): T[] {
+  return items.map(item => (item.id === tempId ? { ...item, id: realId } : item))
+}
+
+async function reconcileCachedId(cacheKind: string, userId: string, tempId: string, realId: string): Promise<void> {
+  const cached = await getCachedData<{ id: string }[]>(cacheKind, userId)
+  if (!cached || !Array.isArray(cached.data)) return
+  await setCachedData(cacheKind, userId, swapTempId(cached.data, tempId, realId))
 }
 
 // API fetch with caching
@@ -1002,8 +1046,11 @@ export const DataIntegrator = {
       }
       // POST /api/checklist returns the DB-generated record — without wiring
       // its real id back, the item keeps the temp id in local state and any
-      // toggle/delete on it before a reload silently 404s server-side.
-      const created = await syncToCloud('/api/checklist', taskData, 'POST')
+      // toggle/delete on it before a reload silently 404s server-side. If
+      // this goes offline instead, the reconcile context lets
+      // syncPendingOperations do the same swap once the queued create
+      // actually lands, instead of the temp id surviving forever.
+      const created = await syncToCloud('/api/checklist', taskData, 'POST', { userId, cacheKind: 'checklist', tempId })
       if (created?.id) {
         newTask.id = created.id
       }
@@ -1052,7 +1099,8 @@ export const DataIntegrator = {
       // (tasks-view.tsx) keeps the temp id in React state for the rest of the
       // session, and any updateTask/deleteTask on it before a reload 404s
       // server-side while the UI shows the edit/delete as having succeeded.
-      const created = await syncToCloud('/api/tasks', taskData, 'POST')
+      // Reconcile context covers the same gap for the offline-queue path.
+      const created = await syncToCloud('/api/tasks', taskData, 'POST', { userId, cacheKind: 'tasks', tempId })
       if (created?.id) {
         newTask.id = created.id
       }
