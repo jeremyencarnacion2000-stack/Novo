@@ -171,9 +171,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     // Sincronizar preferencia de animaciones/efectos en el DOM root
     root.setAttribute('data-animations', settings.showAnimations ? 'true' : 'false')
 
-    // Apply background settings
-    root.style.setProperty('--bg-dimness', `${settings.backgroundDimness / 100}`)
-    root.style.setProperty('--bg-blur-px', `${settings.backgroundBlur}px`)
+    // Apply background settings. "Auto Contrast" was persisted and rendered
+    // as a real toggle but nothing ever read it - turning it on didn't
+    // change anything. With a bright, sharp wallpaper and the defaults
+    // (15% dimness, 0px blur), glass cards go nearly invisible. When it's
+    // on and a wallpaper is set, floor dimness/blur at legible minimums
+    // (raised further at night, reusing the same isDaytime() signal auto
+    // theme already uses) instead of only the user's raw slider values.
+    const hasWallpaper = !!settings.backgroundImage
+    const autoContrastActive = settings.autoContrast && hasWallpaper
+    const minDimness = autoContrastActive ? (isDaytime() ? 35 : 55) : 0
+    const minBlurPx = autoContrastActive ? 10 : 0
+    root.style.setProperty('--bg-dimness', `${Math.max(settings.backgroundDimness, minDimness) / 100}`)
+    root.style.setProperty('--bg-blur-px', `${Math.max(settings.backgroundBlur, minBlurPx)}px`)
 
     // Apply glass opacity & blur
     const gOpacity = Math.max(0.05, settings.glassOpacity / 100)
@@ -322,7 +332,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.autoContrast, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return

@@ -376,7 +376,7 @@ export function SettingsPersonalization() {
 
           <Separator className="bg-foreground/[0.05]" />
 
-          <Row label="Auto Contrast" description="Automatically adjust wallpaper contrast depending on time of day">
+          <Row label="Auto Contrast" description="Boosts blur and dimming so cards stay readable over a custom wallpaper, more at night">
             <LiquidSwitch checked={settings.autoContrast} onCheckedChange={(checked) => updateSettings({ autoContrast: checked })} />
           </Row>
 
