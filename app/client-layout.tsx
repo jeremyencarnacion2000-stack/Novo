@@ -119,13 +119,24 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [status, router, pathname, isPublicPage, isAuthFormPage, twin.isInitialized, isTwinLoading])
 
   if (status === 'loading' || isTwinLoading) {
+    // Renders before SettingsProvider has resolved the user's theme/accent
+    // (both need a session first), so this can't rely on --background or
+    // text-primary's dynamic value - #050505 matches the app's actual dark
+    // base (see .dark's --background in globals.css) as a safe literal, not
+    // a generic bg-black. /icon.svg is the same mark the sidebar uses, not
+    // a one-off shape invented just for this screen.
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-black">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 rounded-full border-2 border-white flex items-center justify-center animate-pulse">
-            <div className="h-4 w-4 bg-white rounded-full" />
-          </div>
-          <span className="text-white/50 text-sm font-medium">Loading...</span>
+      <div className="h-screen w-full flex items-center justify-center" style={{ background: '#050505' }}>
+        <div className="flex flex-col items-center gap-5">
+          <img
+            src="/icon.svg"
+            alt="Novo"
+            width={40}
+            height={40}
+            className="animate-pulse"
+            style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.35))' }}
+          />
+          <span className="text-white/30 text-[11px] font-black tracking-[0.25em] uppercase">Cargando</span>
         </div>
       </div>
     )
