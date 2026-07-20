@@ -18,7 +18,6 @@ import { safeViewTransition } from '@/hooks/use-view-transition';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCognitiveState } from '@/lib/cognitive-context';
 import { useSettings } from '@/lib/settings-context';
 
@@ -40,7 +39,7 @@ export default function CalendarPage() {
   const [view, setView]                 = useState<CalendarView>('month');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', date: new Date(), startTime: '09:00', endTime: '10:00', source: 'google' });
+  const [newEvent, setNewEvent] = useState({ title: '', date: new Date(), startTime: '09:00', endTime: '10:00' });
   const [isCreating, setIsCreating]     = useState(false);
   const [searchQuery, setSearchQuery]   = useState('');
   const [contacts, setContacts]         = useState<any[]>([]);
@@ -131,7 +130,7 @@ export default function CalendarPage() {
     setFilters(prev => ({ ...prev, [source]: !prev[source as keyof typeof prev] }));
 
   const handleCreateEvent = () => {
-    setNewEvent({ title: '', date: currentDate, startTime: '09:00', endTime: '10:00', source: 'google' });
+    setNewEvent({ title: '', date: currentDate, startTime: '09:00', endTime: '10:00' });
     setIsCreateDialogOpen(true);
   };
 
@@ -364,15 +363,6 @@ export default function CalendarPage() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-title" className="text-right">Title</Label>
               <Input id="ev-title" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" autoComplete="off" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="ev-type" className="text-right">Type</Label>
-              <Select value={newEvent.source} onValueChange={v => setNewEvent({ ...newEvent, source: v })}>
-                <SelectTrigger className="col-span-3 bg-foreground/5 border-foreground/10"><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent className="glass-panel border-foreground/10">
-                  {Object.entries(sourceLabels).map(([k, { label }]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-start" className="text-right">Start</Label>
