@@ -71,17 +71,17 @@ export default function ExperimentPage() {
           <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
             Focus quality today (1-5): {focusScore}
           </label>
-          <input type="range" min={1} max={5} value={focusScore} onChange={(e) => setFocusScore(Number(e.target.value))} style={{ width: '100%', marginBottom: 16 }} />
+          <input type="range" min={1} max={5} value={focusScore} onChange={(e) => { setFocusScore(Number(e.target.value)); setSaved(false) }} style={{ width: '100%', marginBottom: 16 }} />
 
           <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
             Fatigue today (1-5): {fatigueScore}
           </label>
-          <input type="range" min={1} max={5} value={fatigueScore} onChange={(e) => setFatigueScore(Number(e.target.value))} style={{ width: '100%', marginBottom: 16 }} />
+          <input type="range" min={1} max={5} value={fatigueScore} onChange={(e) => { setFatigueScore(Number(e.target.value)); setSaved(false) }} style={{ width: '100%', marginBottom: 16 }} />
 
           <textarea
             placeholder="Optional notes"
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => { setNotes(e.target.value); setSaved(false) }}
             style={{ width: '100%', minHeight: 60, marginBottom: 16, background: 'transparent', border: '1px solid #333', borderRadius: 6, padding: 8, color: 'inherit' }}
           />
 
