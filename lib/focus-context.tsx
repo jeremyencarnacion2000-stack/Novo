@@ -27,6 +27,10 @@ export interface Task {
   id: string
   text: string
   completed: boolean
+  // True when `id` is a real backend Task id (seeded via addTask(text, id)
+  // by the peak-task orchestrator) rather than a locally-generated one from
+  // typing into the Focus page's own "Add a task" box.
+  isBackendTask?: boolean
 }
 
 interface FocusContextType {
@@ -359,13 +363,33 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
   // selected deterministically right after — everyday manual entry from the
   // Focus page itself omits it and gets a random local id, same as before.
   const addTask = (text: string, id?: string) => {
-    const newTask: Task = { id: id ?? Math.random().toString(36).substr(2, 9), text, completed: false }
+    const newTask: Task = { id: id ?? Math.random().toString(36).substr(2, 9), text, completed: false, isBackendTask: !!id }
     setTasks(prev => [...prev, newTask])
     if (!selectedTaskId) setSelectedTaskId(newTask.id)
   }
 
   const toggleTaskCompletion = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    const nextCompleted = !task.completed
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: nextCompleted } : t))
+
+    // Tasks seeded from the orchestrator carry a real backend Task id (see
+    // isBackendTask above) and are shown elsewhere (e.g. /checklist) — if we
+    // only flip local state, checking a task off here silently reverts the
+    // next time that id is re-fetched from the server. Locally-typed tasks
+    // (no backend id) have nothing to sync.
+    if (task.isBackendTask) {
+      fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextCompleted ? 'done' : 'todo' }),
+      }).then(res => {
+        if (!res.ok) setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !nextCompleted } : t))
+      }).catch(() => {
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !nextCompleted } : t))
+      })
+    }
   }
 
   const deleteTask = (id: string) => {
