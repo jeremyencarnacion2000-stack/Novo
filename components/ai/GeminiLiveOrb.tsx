@@ -19,16 +19,33 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, X, Brain, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { Mic, X, Brain, CheckCircle2, AlertCircle, Clock, Timer } from 'lucide-react'
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
+import { useFocus } from '@/lib/focus-context'
 import { eventBus } from '@/lib/events/event-bus'
 
 type MicState = 'idle' | 'recording' | 'processing' | 'result' | 'error'
 
+// Same mode → color mapping as pomodoro-widget.tsx, so the hub's live pill
+// and the widget agree on what "work" vs "break" looks like instead of
+// inventing a second color language for the same state.
+const FOCUS_MODE_COLOR: Record<'work' | 'shortBreak' | 'longBreak', string> = {
+  work: 'bg-red-500',
+  shortBreak: 'bg-green-500',
+  longBreak: 'bg-blue-500',
+}
+
 export function GeminiLiveOrb() {
   const { bioState } = useCognitiveEngine()
+  // Live Activity-style state: when idle (nothing voice-related happening)
+  // and a focus session is actually running, the hub shows that instead of
+  // sitting there as a plain, static mic button — same idea as an iOS Live
+  // Activity pill (the reference that prompted this), scoped to the one
+  // "live" state Novo already tracks in real time. Still the same
+  // press-and-hold voice trigger underneath; this only changes what's shown.
+  const { isActive: focusActive, time: focusTime, mode: focusMode, formatTime } = useFocus()
 
   const [micState, setMicState] = useState<MicState>('idle')
   const [transcript, setTranscript] = useState('')
@@ -193,6 +210,7 @@ export function GeminiLiveOrb() {
   const dismiss = () => { clearAutoIdleTimer(); setMicState('idle'); setResult(null); setErrorMsg(''); setTranscript('') }
 
   const showPanel = micState === 'recording' || micState === 'processing' || micState === 'result' || micState === 'error'
+  const showFocusPill = micState === 'idle' && focusActive
 
   return (
     <div
@@ -281,6 +299,7 @@ export function GeminiLiveOrb() {
           )}
 
           <motion.button
+            layout
             onMouseDown={startRecording}
             onMouseUp={stopRecording}
             onMouseLeave={() => { if (micState === 'recording') stopRecording() }}
@@ -289,13 +308,20 @@ export function GeminiLiveOrb() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title="Mantén presionado para hablar"
-            className="relative w-14 h-14 rounded-full flex items-center justify-center border border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-300 select-none"
+            className={`relative h-14 rounded-full flex items-center justify-center border border-white/10 backdrop-blur-2xl shadow-xl transition-[background-color,padding] duration-300 select-none ${showFocusPill ? 'px-4 gap-2' : 'w-14'}`}
             style={{ background: micState === 'recording' ? 'rgba(15, 15, 22, 0.9)' : 'rgba(25, 25, 35, 0.7)' }}
           >
             <AnimatePresence mode="wait">
               {micState === 'processing' ? (
                 <motion.div key="proc" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: [1, 1.15, 1], opacity: 1 }} transition={{ repeat: Infinity, duration: 1.0 }}>
                   <Brain className="w-5 h-5 text-orange-400" />
+                </motion.div>
+              ) : showFocusPill ? (
+                <motion.div key="focus-pill" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                  <span className={`w-1.5 h-1.5 rounded-full ${FOCUS_MODE_COLOR[focusMode]} animate-pulse`} />
+                  <Timer className="w-3.5 h-3.5 text-white/50" />
+                  <span className="text-xs font-mono font-bold tabular-nums text-white/85">{formatTime(focusTime)}</span>
+                  <Mic className="w-4 h-4 text-indigo-400" />
                 </motion.div>
               ) : (
                 <motion.div key="mic" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
