@@ -151,7 +151,37 @@ export function FocusProvider({ children }: { children: React.ReactNode }) {
         console.error('Failed to parse saved focus state', e)
       }
     }
+
+    // Load custom timer profiles + sound settings. There's no server model
+    // for these yet, and FocusSettings (components/focus/focus-settings.tsx)
+    // lets users "Add Profile" / delete profiles / tweak sound with nothing
+    // below it — without this, every profile you create is gone on the next
+    // reload even though the UI just showed it saved into the list.
+    try {
+      const savedProfiles = localStorage.getItem('novo-focus-profiles')
+      if (savedProfiles) setProfiles(JSON.parse(savedProfiles))
+      const savedActiveProfileId = localStorage.getItem('novo-focus-active-profile')
+      if (savedActiveProfileId) setActiveProfileId(savedActiveProfileId)
+      const savedSound = localStorage.getItem('novo-focus-sound')
+      if (savedSound) setSoundSettings(JSON.parse(savedSound))
+    } catch (e) {
+      console.error('Failed to parse saved focus profiles/sound settings', e)
+    }
   }, [])
+
+  // Persist profiles, active profile, and sound settings — same rationale
+  // as the load effect above.
+  useEffect(() => {
+    localStorage.setItem('novo-focus-profiles', JSON.stringify(profiles))
+  }, [profiles])
+
+  useEffect(() => {
+    localStorage.setItem('novo-focus-active-profile', activeProfileId)
+  }, [activeProfileId])
+
+  useEffect(() => {
+    localStorage.setItem('novo-focus-sound', JSON.stringify(soundSettings))
+  }, [soundSettings])
 
   // Save state to localStorage
   useEffect(() => {
