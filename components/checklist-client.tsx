@@ -303,7 +303,7 @@ export default function ChecklistClient() {
           </form>
 
           <div className="space-y-2">
-            {items.map(item => (
+            {sortedItems.map(item => (
               <TiltCard
                 key={item.id}
                 className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"

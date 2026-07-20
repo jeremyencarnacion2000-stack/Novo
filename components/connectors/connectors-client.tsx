@@ -290,13 +290,18 @@ export function ConnectorsClient() {
   }
 
   const handleSaveNotionDbs = async (ids: string[]) => {
-    await fetch('/api/integration/notion?action=save_databases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ databaseIds: ids }),
-    })
-    setNotionStatus(prev => prev ? { ...prev, databaseIds: ids } : prev)
-    toast({ title: 'Bases de datos guardadas' })
+    try {
+      const res = await fetch('/api/integration/notion?action=save_databases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ databaseIds: ids }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setNotionStatus(prev => prev ? { ...prev, databaseIds: ids } : prev)
+      toast({ title: 'Bases de datos guardadas' })
+    } catch {
+      toast({ title: 'No se pudieron guardar las bases de datos', variant: 'destructive' })
+    }
   }
 
   // ── Drive helper (verbatim) ──────────────────────────────────────────────
@@ -1012,6 +1017,7 @@ function AddCustomConnectorDialog({
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
   const reset = () => { setName(''); setBaseUrl(''); setApiKey('') }
 
@@ -1028,6 +1034,8 @@ function AddCustomConnectorDialog({
       reset()
       onOpenChange(false)
       onSaved()
+    } catch {
+      toast({ title: 'No se pudo guardar la conexión', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
