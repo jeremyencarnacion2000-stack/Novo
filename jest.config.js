@@ -5,28 +5,37 @@ const createJestConfig = nextJest({
   dir: './',
 })
 
-// Escape a filesystem path for safe embedding inside a RegExp source string.
-// Needed because this repo's absolute path contains literal parentheses
-// ("novo-desktop-mvp (2)") and, on Windows, backslash separators — both are
-// regex metacharacters that silently change the pattern's meaning (or throw)
-// if not escaped. Jest's own `<rootDir>` token substitution does exactly
-// this substitution WITHOUT escaping, which is what made the two previous
-// attempts at this same fix (8c7a94c, a242593) still not work.
+// Escape a single path segment for safe embedding inside a RegExp source
+// string (this repo's absolute path contains literal parentheses -
+// "novo-desktop-mvp (2)" - a regex metacharacter that silently changes the
+// pattern's meaning if not escaped).
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // Anchored to THIS run's own rootDir (the directory containing this config
 // file), not an unanchored substring match. A bare `.claude/worktrees/`
 // substring match excludes EVERY file whenever the test run itself is
-// executed from inside a worktree checkout — which is the normal case for
+// executed from inside a worktree checkout - which is the normal case for
 // every agent session (cwd is already `.claude/worktrees/<agent-id>/`) and
-// silently produced "No tests found" for all of them. Anchoring so the
-// pattern only matches worktree copies NESTED under this run's own rootDir
-// (the original problem: duplicate test files under
-// `<rootDir>/.claude/worktrees/*` confusing jest's haste map when run from
-// the main checkout) fixes that without reintroducing the duplicate-module
-// bug the pattern was added for.
-const rootDirEscaped = escapeRegExp(__dirname.replace(/\\/g, '/'))
-const nestedWorktreePattern = `^${rootDirEscaped}[\\\\/].*[\\\\/]\\.claude[\\\\/]worktrees[\\\\/]`
+// silently produced "No tests found" for all of them (bug #1, fixed in
+// 6993972). Anchoring so the pattern only matches worktree copies NESTED
+// under this run's own rootDir fixes that without reintroducing the
+// duplicate-module bug the pattern was added for in the first place.
+//
+// Built by splitting rootDir into segments and escaping/rejoining with a
+// [\\/] class, rather than normalizing to one separator style and escaping
+// the whole string at once (bug #2: that version required a literal `/`
+// immediately after rootDir - true when this run's OWN path happens to use
+// forward slashes - but Windows absolute paths use backslashes, so the
+// anchor itself silently never matched and the exclusion was a no-op).
+// Also: the segment between rootDir and `.claude/worktrees/` was previously
+// mandatory (`[\\/].*[\\/]`), which requires an intermediate path segment -
+// but when running from the main tree, `.claude/worktrees/` sits directly
+// under rootDir with nothing between them, so that never matched either.
+// Made optional via `(?:.*[\\/])?` to cover both the direct case and a
+// worktree-containing-a-worktree case.
+const rootDirSegments = __dirname.split(/[\\/]/).map(escapeRegExp)
+const rootDirPattern = rootDirSegments.join('[\\\\/]')
+const nestedWorktreePattern = `^${rootDirPattern}[\\\\/](?:.*[\\\\/])?\\.claude[\\\\/]worktrees[\\\\/]`
 
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
