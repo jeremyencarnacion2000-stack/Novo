@@ -393,6 +393,19 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                             if (block.isVisible === false) return null;
 
                             switch (block.type) {
+                                case 'markdown':
+                                case 'text':
+                                    return (
+                                        <div
+                                            key={block.id}
+                                            className="max-w-none"
+                                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', overflowX: 'hidden' }}
+                                        >
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
+                                                {block.content as string}
+                                            </ReactMarkdown>
+                                        </div>
+                                    );
                                 case 'analysis':
                                     return <AnalysisBlock key={block.id} content={block.content} />;
                                 case 'plan':
