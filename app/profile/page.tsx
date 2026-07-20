@@ -10,11 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { useSession, signOut } from 'next-auth/react'
 import { User, Target, Sparkles, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useSettings } from '@/lib/settings-context'
 
 export default function ProfilePage() {
   const { data: session } = useSession()
   const { toast } = useToast()
-  const [bio, setBio] = useState('')
+  const { settings, updateSettings } = useSettings()
+  const bio: string = settings.preferences?.bio || ''
   const [editingBio, setEditingBio] = useState(false)
   const [tempBio, setTempBio] = useState('')
   const [stats, setStats] = useState({
@@ -25,19 +27,6 @@ export default function ProfilePage() {
   })
 
   useEffect(() => {
-    // Fetch user settings for bio
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch('/api/user-settings')
-        if (response.ok) {
-          const data = await response.json()
-          setBio(data.preferences?.bio || '')
-        }
-      } catch (error) {
-        console.error('Failed to fetch user data:', error)
-      }
-    }
-
     // Fetch stats from profile API (includes streak calculation)
     const fetchStats = async () => {
       const [profileResult, goalsResult] = await Promise.allSettled([
@@ -66,26 +55,13 @@ export default function ProfilePage() {
       }
     }
 
-    fetchUserData()
     fetchStats()
   }, [])
 
-  const handleSaveBio = async () => {
-    try {
-      const response = await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferences: { bio: tempBio } }),
-      })
-
-      if (response.ok) {
-        setBio(tempBio)
-        setEditingBio(false)
-        toast({ title: 'Bio updated' })
-      }
-    } catch (error) {
-      toast({ title: 'Failed to update bio', variant: 'destructive' })
-    }
+  const handleSaveBio = () => {
+    updateSettings({ preferences: { ...settings.preferences, bio: tempBio } })
+    setEditingBio(false)
+    toast({ title: 'Bio updated' })
   }
 
   const startEditBio = () => {
