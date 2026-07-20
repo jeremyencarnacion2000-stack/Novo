@@ -192,12 +192,28 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
     setTwin(newTwin)
     try { localStorage.setItem('novo_cognitive_twin', JSON.stringify(newTwin)) } catch {}
 
-    // Persist to DB — blocking POST to ensure multi-device consistency
-    fetch('/api/cognitive-twin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTwin),
-    }).catch(() => {})
+    // Persist to DB. Not awaited by the caller (onboarding shouldn't block
+    // navigation on network conditions), so this was previously truly
+    // fire-and-forget despite a comment claiming otherwise — a failure was
+    // silent, and the profile survived only via this device's localStorage.
+    // One retry closes the common transient-failure case without turning
+    // onboarding into a hard network dependency.
+    const persistTwin = (attempt: number): void => {
+      fetch('/api/cognitive-twin/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTwin),
+      })
+        .then(res => {
+          if (!res.ok && attempt === 0) persistTwin(1)
+          else if (!res.ok) console.error('[CognitiveTwin] Failed to persist twin to server after retry:', res.status)
+        })
+        .catch(() => {
+          if (attempt === 0) persistTwin(1)
+          else console.error('[CognitiveTwin] Failed to persist twin to server after retry: network error')
+        })
+    }
+    persistTwin(0)
   }
 
   const updateTwin = (data: Partial<CognitiveTwin>) => {

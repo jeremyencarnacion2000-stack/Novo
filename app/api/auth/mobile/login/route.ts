@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import * as jose from 'jose'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
     try {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown'
+        const rl = rateLimit(`auth:mobile-login:${ip}`, 10, 300_000)
+        if (!rl.allowed) return rateLimitResponse(rl);
+
         const { email, password } = await request.json()
 
         if (!email || !password) {

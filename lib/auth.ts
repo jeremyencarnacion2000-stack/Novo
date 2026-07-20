@@ -6,6 +6,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
+import { rateLimit } from '@/lib/rate-limit'
 
 console.log('Auth config - NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
 console.log('Auth config - GOOGLE_CLIENT_ID present:', !!process.env.GOOGLE_CLIENT_ID)
@@ -248,10 +249,19 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
+
+        // Signup already rate-limits (lib/rate-limit.ts); this, the actual
+        // password-login path most requests go through, had no throttling
+        // at all - unlimited bcrypt.compare attempts per IP. NextAuth's
+        // RequestInternal types `headers` as a plain Record, not a Fetch
+        // Headers instance - no `.get()` here.
+        const ip = (req?.headers?.['x-forwarded-for'] as string) || 'unknown'
+        const rl = rateLimit(`auth:credentials:${ip}`, 10, 300_000)
+        if (!rl.allowed) return null
 
         try {
           const user = await prisma.user.findUnique({
