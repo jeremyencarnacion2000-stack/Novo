@@ -71,6 +71,13 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
   const notifications: AppNotification[] = []
   const now = new Date()
   const hour = now.getHours()
+  // Every id below is date-scoped. "read"/"deleted" state is persisted forever
+  // in localStorage by id (see loadNotifications) — a static id like
+  // 'overdue-tasks' meant swiping away today's overdue-tasks notice silently
+  // suppressed that entire category forever, even with completely different
+  // overdue tasks next week. Stamping the day onto the id makes dismissal
+  // scoped to "today's version of this notification", not the category.
+  const day = now.toISOString().slice(0, 10)
 
   try {
     const tasksRes = await fetch('/api/tasks')
@@ -82,7 +89,7 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       )
       if (overdue.length > 0) {
         notifications.push({
-          id: 'overdue-tasks', type: 'warning', read: false,
+          id: `overdue-tasks-${day}`, type: 'warning', read: false,
           title: `${overdue.length} tarea${overdue.length > 1 ? 's' : ''} vencida${overdue.length > 1 ? 's' : ''}`,
           body: overdue.slice(0, 3).map((t: any) => t.title).join(', '),
           timestamp: now.toISOString(), source: 'tasks', actionUrl: '/tasks',
@@ -94,7 +101,7 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       )
       if (highPriority.length > 0) {
         notifications.push({
-          id: 'high-priority', type: 'reminder', read: false,
+          id: `high-priority-${day}`, type: 'reminder', read: false,
           title: `${highPriority.length} tarea${highPriority.length > 1 ? 's' : ''} de prioridad alta`,
           body: highPriority.slice(0, 2).map((t: any) => t.title).join(', '),
           timestamp: now.toISOString(), source: 'tasks', actionUrl: '/tasks',
@@ -107,7 +114,7 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       )
       if (completedToday.length >= 3) {
         notifications.push({
-          id: 'daily-achievement', type: 'achievement', read: false,
+          id: `daily-achievement-${day}`, type: 'achievement', read: false,
           title: `¡${completedToday.length} tareas completadas hoy!`,
           body: '¡Buen trabajo! Sigue así 💪',
           timestamp: now.toISOString(), source: 'tasks',
@@ -117,7 +124,7 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       const inProgress = tasks.filter((t: any) => t.status === 'in-progress')
       if (inProgress.length > 5) {
         notifications.push({
-          id: 'too-many-wip', type: 'suggestion', read: false,
+          id: `too-many-wip-${day}`, type: 'suggestion', read: false,
           title: 'Muchas tareas en progreso',
           body: `Tienes ${inProgress.length} tareas en progreso. Enfócate en terminar algunas.`,
           timestamp: now.toISOString(), source: 'tasks',
@@ -128,14 +135,14 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
 
   if (hour >= 6 && hour < 9) {
     notifications.push({
-      id: 'morning-greeting', type: 'info', read: false,
+      id: `morning-greeting-${day}`, type: 'info', read: false,
       title: '¡Buenos días! ☀️',
       body: 'Revisa tu plan del día y establece tus prioridades.',
       timestamp: now.toISOString(), source: 'system', actionUrl: '/today',
     })
   } else if (hour >= 22 || hour < 3) {
     notifications.push({
-      id: 'night-review', type: 'suggestion', read: false,
+      id: `night-review-${day}`, type: 'suggestion', read: false,
       title: 'Resumen del día 🌙',
       body: 'Es buen momento para revisar lo que lograste hoy.',
       timestamp: now.toISOString(), source: 'system', actionUrl: '/analytics',
