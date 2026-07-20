@@ -153,12 +153,16 @@ const syncToCloud = async (url: string, data: any, method: 'POST' | 'PUT' | 'DEL
       if (response.status >= 500) {
         throw new Error(`Server error: ${response.statusText}`)
       } else {
-        // 4xx error - likely validation or logic error. 
+        // 4xx error - likely validation or logic error.
         // We shouldn't retry blindly, but we should log it.
         console.error(`Sync failed with ${response.status}: ${response.statusText}`, await response.text())
         return // Don't queue
       }
     }
+
+    // Callers (e.g. createManualTask) need the server-generated record — most
+    // ignore this return value, which is safe since it's additive.
+    return await response.json().catch(() => undefined)
   } catch (error) {
     // Queue for later sync if network fails or server error
     console.error('Sync failed, queuing for later:', error)
@@ -996,9 +1000,15 @@ export const DataIntegrator = {
       if (checklist) {
         await setCachedData('checklist', userId, [...checklist.data, newTask])
       }
-      await syncToCloud('/api/checklist', taskData, 'POST')
+      // POST /api/checklist returns the DB-generated record — without wiring
+      // its real id back, the item keeps the temp id in local state and any
+      // toggle/delete on it before a reload silently 404s server-side.
+      const created = await syncToCloud('/api/checklist', taskData, 'POST')
+      if (created?.id) {
+        newTask.id = created.id
+      }
       eventBus.dispatch('TaskCreated', {
-        taskId: tempId,
+        taskId: newTask.id,
         taskTitle: taskData.text || taskData.title,
         source: 'manual'
       })
