@@ -1,6 +1,17 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
+import { SWRConfig } from 'swr'
 import { NowHero } from '../now-hero'
+
+// SWR's cache is a module-level global by default - without a fresh
+// provider per test, dedupingInterval (5s, see hooks/use-swr.ts) means a
+// later test's /api/ai/cognitive-engine mock is silently ignored in favor
+// of whatever an earlier test in this file already cached for that key.
+const renderNowHero = () => render(
+  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    <NowHero />
+  </SWRConfig>
+)
 
 jest.mock('@/lib/cognitive-twin-context', () => ({
   useCognitiveTwin: () => ({
@@ -36,7 +47,7 @@ describe('NowHero calendar override', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
 
-    render(<NowHero />)
+    renderNowHero()
 
     await waitFor(() => {
       expect(screen.getByText(/3 reuniones seguidas/i)).toBeInTheDocument()
@@ -64,7 +75,7 @@ describe('NowHero calendar override', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
 
-    render(<NowHero />)
+    renderNowHero()
 
     await waitFor(() => {
       expect(screen.getByText('Tarea vencida importante')).toBeInTheDocument()
@@ -92,11 +103,73 @@ describe('NowHero calendar override', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
 
-    render(<NowHero />)
+    renderNowHero()
 
     await waitFor(() => {
       expect(screen.getByText(/3 reuniones seguidas/i)).toBeInTheDocument()
     })
     expect(screen.queryByText('Tarea de baja prioridad')).not.toBeInTheDocument()
+  });
+
+  it('offers a "Reorganizar mi día" action when a calendar disruption signal has a real reorganizedDay from the engine', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/tasks')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.includes('/api/cognitive/active-signal')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'calendar_peak_conflict', description: 'Una reunión cae dentro de tu ventana pico.', createdAt: new Date().toISOString(), platform: 'calendar' },
+          }),
+        });
+      }
+      if (url.includes('/api/ai/cognitive-engine')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            success: true,
+            report: { reorganizedDay: [{ id: 't1', title: 'Tarea', priority: 'high', scheduledHour: 10, scheduledTime: '10:00', reason: 'x' }] },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    renderNowHero()
+
+    await waitFor(() => {
+      expect(screen.getByText('Reorganizar mi día')).toBeInTheDocument()
+    })
+  });
+
+  it('does not offer to reorganize when the engine has no reorganizedDay for the signal', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/tasks')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.includes('/api/cognitive/active-signal')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'calendar_peak_conflict', description: 'Una reunión cae dentro de tu ventana pico.', createdAt: new Date().toISOString(), platform: 'calendar' },
+          }),
+        });
+      }
+      if (url.includes('/api/ai/cognitive-engine')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, report: { reorganizedDay: [] } }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    renderNowHero()
+
+    await waitFor(() => {
+      expect(screen.getByText('Una reunión cae dentro de tu ventana pico.')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Reorganizar mi día')).not.toBeInTheDocument()
   });
 });

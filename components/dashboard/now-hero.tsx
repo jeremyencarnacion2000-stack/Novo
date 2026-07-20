@@ -3,11 +3,18 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Loader2, Check } from 'lucide-react'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { useCognitivePhase } from '@/lib/cognitive-context'
 import { springConfig } from '@/lib/design-tokens'
 import { useCognitiveEngine } from '@/hooks/use-swr'
+import { cn } from '@/lib/utils'
+
+// Calendar-signal changeTypes that mean "your schedule is the problem" (as
+// opposed to e.g. a Notion signal) — the only cases where offering to
+// reorganize the day, right here, is the actual fix rather than just more
+// information. Matches lib/cognitive/calendar-signal.ts's evaluateCalendarThresholds.
+const CALENDAR_DISRUPTION_TYPES = ['calendar_meeting_overload', 'calendar_no_focus_window', 'calendar_peak_conflict']
 
 interface TaskLite {
   id: string
@@ -87,6 +94,26 @@ export function NowHero() {
   // CognitiveEngineWidget so the two don't double the LLM call.
   const { data: engineJson } = useCognitiveEngine()
   const engineReport = engineJson?.success ? engineJson.report : null
+  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>('idle')
+
+  // Same endpoint ReorganizedDay (/cognitive) already uses to persist the
+  // engine's suggested hours onto real Task records — reused here so a
+  // calendar-disruption signal can be fixed right where it's shown instead
+  // of requiring a trip to /cognitive first.
+  const handleReorganize = async (reorganizedDay: unknown) => {
+    setApplyState('applying')
+    try {
+      const res = await fetch('/api/ai/cognitive-engine/apply-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reorganizedDay }),
+      })
+      if (!res.ok) throw new Error()
+      setApplyState('applied')
+    } catch {
+      setApplyState('idle')
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -138,17 +165,23 @@ export function NowHero() {
       ? (platformSignal!.platform === 'notion' ? '/checklist' : '/calendar')
       : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
 
-  return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
-      <Link href={linkHref} className="block group">
-        <div className="relative rounded-[28px] p-8 md:p-10 border border-primary/25 bg-gradient-to-br from-primary/[0.10] via-primary/[0.03] to-transparent overflow-hidden transition-all duration-300 hover:border-primary/40">
-          <div
-            className="absolute -top-10 -right-10 w-56 h-56 rounded-full opacity-20 blur-3xl pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
-            style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
-          />
-          <p className="relative text-[11px] font-black tracking-[0.25em] uppercase text-primary/70 mb-3">Ahora →</p>
+  // The engine already computed how to fix this in the same response that
+  // produced the signal's headline — offer it right here instead of only
+  // pointing at /calendar. Notion signals and non-disruption calendar
+  // signals still just navigate, since there's nothing to "apply" for them.
+  const canReorganize = showPlatformSignal && platformSignal!.platform === 'calendar' &&
+    CALENDAR_DISRUPTION_TYPES.includes(platformSignal!.changeType) &&
+    Array.isArray(engineReport?.reorganizedDay) && engineReport.reorganizedDay.length > 0
 
-          {showTask ? (
+  const cardInner = (
+    <div className="relative rounded-[28px] p-8 md:p-10 border border-primary/25 bg-gradient-to-br from-primary/[0.10] via-primary/[0.03] to-transparent overflow-hidden transition-all duration-300 hover:border-primary/40">
+      <div
+        className="absolute -top-10 -right-10 w-56 h-56 rounded-full opacity-20 blur-3xl pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
+        style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
+      />
+      <p className="relative text-[11px] font-black tracking-[0.25em] uppercase text-primary/70 mb-3">Ahora →</p>
+
+      {showTask ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{task!.title}</h2>
               <p className="relative text-sm md:text-base text-foreground/60">
@@ -184,11 +217,47 @@ export function NowHero() {
             </>
           )}
 
-          <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-            {showTask ? 'Ir a la tarea' : showPlatformSignal ? (platformSignal!.platform === 'notion' ? 'Ver tareas' : 'Ver calendario') : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
-          </div>
+      {canReorganize ? (
+        <div className="relative mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            href={linkHref}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/50 hover:text-foreground/80 transition-colors"
+          >
+            Ver calendario <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+          <button
+            type="button"
+            disabled={applyState !== 'idle'}
+            onClick={() => handleReorganize(engineReport.reorganizedDay)}
+            className={cn(
+              'inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full border transition-all duration-300',
+              applyState === 'applied'
+                ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                : 'text-primary border-primary/30 bg-primary/10 hover:bg-primary/15 disabled:opacity-70'
+            )}
+          >
+            {applyState === 'applying' && <Loader2 className="w-3 h-3 animate-spin" />}
+            {applyState === 'applied' && <Check className="w-3 h-3" />}
+            {applyState === 'idle' ? 'Reorganizar mi día' : applyState === 'applying' ? 'Reorganizando…' : 'Día reorganizado'}
+          </button>
         </div>
-      </Link>
+      ) : (
+        <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
+          {showTask ? 'Ir a la tarea' : showPlatformSignal ? (platformSignal!.platform === 'notion' ? 'Ver tareas' : 'Ver calendario') : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
+      {canReorganize ? (
+        cardInner
+      ) : (
+        <Link href={linkHref} className="block group">
+          {cardInner}
+        </Link>
+      )}
     </motion.div>
   )
 }
