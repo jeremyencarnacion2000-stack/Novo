@@ -11,6 +11,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { User, Target, Sparkles, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
+import { clearApiCache } from '@/lib/register-sw'
 
 export default function ProfilePage() {
   const { data: session } = useSession()
@@ -80,7 +81,7 @@ export default function ProfilePage() {
         <Button
           variant="destructive"
           size="sm"
-          onClick={() => signOut({ callbackUrl: '/' })}
+          onClick={async () => { await clearApiCache(); signOut({ callbackUrl: '/' }) }}
         >
           <XCircle className="h-4 w-4 mr-2" />
           Sign Out

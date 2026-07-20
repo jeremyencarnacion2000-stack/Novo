@@ -14,6 +14,7 @@ import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { DataIntegrator } from '@/lib/data-integrator'
 import { useTranslation } from '@/lib/i18n'
 import { Section, SafeAction, DangerAction } from './settings-shared'
+import { clearApiCache } from '@/lib/register-sw'
 
 export function SettingsAdvanced() {
   const { t } = useTranslation()
@@ -303,7 +304,7 @@ export function SettingsAdvanced() {
           <Button
             variant="destructive"
             className="w-full"
-            onClick={() => signOut({ callbackUrl: '/' })}
+            onClick={async () => { await clearApiCache(); signOut({ callbackUrl: '/' }) }}
           >
             <XCircle className="mr-2 h-4 w-4" />
             Sign Out from Novo OS
