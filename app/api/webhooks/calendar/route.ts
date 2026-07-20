@@ -37,7 +37,15 @@ export async function POST(request: Request) {
       .update(userId)
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    // timingSafeEqual (not ===) so response time can't leak the signature
+    // byte-by-byte — same pattern as the Lemon Squeezy webhook.
+    const signatureBuffer = Buffer.from(signature, 'utf8');
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const isSignatureValid =
+      signatureBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+    if (!isSignatureValid) {
       console.error('🚫 [Calendar Webhook] Unauthorized signature signature mismatch.');
       return new Response('Unauthorized webhook verification failed', { status: 401 });
     }
