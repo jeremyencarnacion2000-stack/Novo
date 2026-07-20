@@ -1047,16 +1047,24 @@ export const DataIntegrator = {
       if (tasks) {
         await setCachedData('tasks', userId, [...tasks.data, newTask])
       }
-      await syncToCloud('/api/tasks', taskData, 'POST')
+      // POST /api/tasks returns the DB-generated record — same fix as
+      // createManualTask above: without wiring the real id back, the caller
+      // (tasks-view.tsx) keeps the temp id in React state for the rest of the
+      // session, and any updateTask/deleteTask on it before a reload 404s
+      // server-side while the UI shows the edit/delete as having succeeded.
+      const created = await syncToCloud('/api/tasks', taskData, 'POST')
+      if (created?.id) {
+        newTask.id = created.id
+      }
       eventBus.dispatch('TaskCreated', {
-        taskId: tempId,
+        taskId: newTask.id,
         taskTitle: taskData.title,
         source: 'standalone'
       })
       if (taskData.dueDate) {
         eventBus.dispatch('CalendarModified', {
           action: 'create',
-          eventId: tempId,
+          eventId: newTask.id,
           eventTitle: taskData.title,
           date: taskData.dueDate
         })
