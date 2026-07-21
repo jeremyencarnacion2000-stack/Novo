@@ -50,8 +50,8 @@ export default function PrivacyPage() {
                 explícito al conectar cada servicio.
               </li>
               <li>
-                <span className="text-white/90">Datos de pago:</span> si te suscribes a Novo Pro, Stripe
-                procesa el pago directamente — Novo nunca almacena tu número de tarjeta.
+                <span className="text-white/90">Datos de pago:</span> si te suscribes a Novo Pro, nuestro
+                proveedor de pagos procesa el pago directamente — Novo nunca almacena tu número de tarjeta.
               </li>
             </ul>
           </section>

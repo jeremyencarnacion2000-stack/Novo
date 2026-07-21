@@ -48,8 +48,8 @@ export default function TermsPage() {
             <h2 className="text-lg font-medium text-white mb-2">3. Planes y pagos</h2>
             <p className="text-white/70">
               Novo ofrece un plan gratuito con un límite mensual de acciones del asistente de IA, y un
-              plan Pro de pago con uso ilimitado. Los pagos se procesan a través de Stripe. Las
-              suscripciones se renuevan automáticamente al final de cada período salvo que las canceles
+              plan Pro de pago con uso ilimitado. Los pagos se procesan a través de nuestro proveedor de
+              pagos. Las suscripciones se renuevan automáticamente al final de cada período salvo que las canceles
               desde el Portal de Facturación en Configuración — la cancelación aplica al final del
               período ya pagado, sin reembolsos parciales.
             </p>
