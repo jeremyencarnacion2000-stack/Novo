@@ -2,6 +2,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { calculateCurrentStreak } from '@/lib/streaks';
 
 // GET /api/stats/productivity - Get comprehensive productivity statistics
 export async function GET(request: NextRequest) {
@@ -229,39 +230,6 @@ export async function GET(request: NextRequest) {
             { status: 500 }
         );
     }
-}
-
-export async function calculateCurrentStreak(userId: string): Promise<number> {
-    const windowStart = new Date();
-    windowStart.setDate(windowStart.getDate() - 366);
-    const tasks = await prisma.checklistItem.findMany({
-        where: { userId, completed: true, updatedAt: { gte: windowStart } },
-        orderBy: { updatedAt: 'desc' },
-        select: { updatedAt: true },
-    });
-
-    if (tasks.length === 0) return 0;
-
-    let streak = 0;
-    let currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i <= 365; i++) {
-        const checkDate = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
-        const hasActivity = tasks.some((t: any) => {
-            const taskDate = new Date(t.updatedAt);
-            taskDate.setHours(0, 0, 0, 0);
-            return taskDate.getTime() === checkDate.getTime();
-        });
-
-        if (hasActivity) {
-            streak++;
-        } else if (i > 0) {
-            break;
-        }
-    }
-
-    return streak;
 }
 
 async function calculateLongestStreak(userId: string): Promise<number> {

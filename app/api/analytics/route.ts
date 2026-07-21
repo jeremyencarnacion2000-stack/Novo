@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getAdvancedInsights } from '@/lib/analytics-server'
 import { inngest } from '@/lib/inngest/client'
 import { updateDailyAnalytics as sharedUpdateDailyAnalytics } from '@/lib/analytics-server'
-import { calculateCurrentStreak } from '@/app/api/stats/productivity/route'
+import { calculateCurrentStreak } from '@/lib/streaks'
 
 // Free plan: 30 days of history (the boundary settings-billing.tsx
 // advertises), Pro: whatever was requested. `days` is a client-supplied
