@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
@@ -243,6 +243,23 @@ export function ConnectorsClient() {
       window.history.replaceState({}, '', url.toString())
     }
   }, [])
+
+  // The auto-open-panel fix above only fires on a FRESH connect redirect -
+  // it does nothing for an account that was already connected with 0
+  // databases selected before that fix shipped (exactly the state a
+  // founder screenshot showed after the first fix: still connected, still
+  // 0 seleccionadas, because they'd connected days earlier and never
+  // manually opened "Gestionar bases de datos"). This catches that case
+  // too, once per page load (autoPromptedRef guards against reopening a
+  // panel the user deliberately closed while still mid-selection).
+  const autoPromptedRef = useRef(false)
+  useEffect(() => {
+    if (autoPromptedRef.current) return
+    if (notionStatus?.connected && (notionStatus.databaseIds?.length ?? 0) === 0 && !notionDbsOpen) {
+      autoPromptedRef.current = true
+      handleFetchNotionDbs()
+    }
+  }, [notionStatus])
 
   useEffect(() => {
     if (!session?.user?.id) return
