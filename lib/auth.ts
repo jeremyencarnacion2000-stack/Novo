@@ -242,6 +242,48 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
+  // NextAuth's default adapter only writes the Account row's OAuth fields
+  // (access_token/refresh_token/scope/...) the FIRST time a given
+  // provider+providerAccountId signs in - node_modules/next-auth/core/lib/
+  // callback-handler.js's getUserByAccount branch, taken on every SUBSEQUENT
+  // sign-in, just reuses the existing Account and returns without touching
+  // it. Concretely: every "Otorgar acceso a Drive/Calendar/Gmail" button
+  // (components/connectors/connectors-client.tsx) just calls signIn('google')
+  // again to request the broader scope this app needs beyond basic login -
+  // the user re-consents on Google's real screen, but the newly-granted
+  // scope was being silently discarded, because the stored Account row was
+  // never updated. hasScope checks (app/api/integration/drive|calendar|gmail)
+  // read that stale scope forever, so those connectors could never actually
+  // become usable after the fact. events.signIn fires on every sign-in
+  // regardless of new/existing (core/routes/callback.js), so this refreshes
+  // the stored fields against what was actually just granted.
+  events: {
+    async signIn({ account }) {
+      if (!account || account.type !== 'oauth') return
+      try {
+        await prisma.account.updateMany({
+          where: { provider: account.provider, providerAccountId: account.providerAccountId },
+          data: {
+            // Only overwrite fields this grant actually returned - Google
+            // only sends a refresh_token on the very first consent (or when
+            // prompt=consent forces re-issue, which this provider already
+            // sets - see the GoogleProvider config below), so don't null out
+            // a previously-stored one if this response happens to omit it.
+            ...(account.access_token ? { access_token: account.access_token } : {}),
+            ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+            ...(account.expires_at ? { expires_at: account.expires_at as number } : {}),
+            ...(account.scope ? { scope: account.scope } : {}),
+            ...(account.token_type ? { token_type: account.token_type } : {}),
+            ...(account.id_token ? { id_token: account.id_token } : {}),
+          },
+        })
+      } catch (error) {
+        // Never block a sign-in over this - worst case the scope stays
+        // stale for one more grant attempt.
+        console.error('[Auth] Failed to refresh Account OAuth fields on sign-in:', (error as Error).message)
+      }
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'credentials',
