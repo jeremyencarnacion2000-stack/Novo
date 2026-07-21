@@ -881,7 +881,7 @@ function ConnectorDetail({
           </button>
         ) : (
           <button
-            onClick={() => signIn('google')}
+            onClick={() => signIn('google', undefined, { scope: 'openid profile email https://www.googleapis.com/auth/drive.file' })}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
           >
             <Link2 className="w-4 h-4" />
@@ -902,7 +902,7 @@ function ConnectorDetail({
           </button>
         ) : (
           <button
-            onClick={() => signIn('google')}
+            onClick={() => signIn('google', undefined, { scope: 'openid profile email https://www.googleapis.com/auth/calendar' })}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
           >
             <Link2 className="w-4 h-4" />
@@ -942,7 +942,7 @@ function ConnectorDetail({
           </div>
         ) : (
           <button
-            onClick={() => signIn('google')}
+            onClick={() => signIn('google', undefined, { scope: 'openid profile email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly' })}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
           >
             <Link2 className="w-4 h-4" />
@@ -961,7 +961,7 @@ function ConnectorDetail({
           </a>
         ) : (
           <button
-            onClick={() => signIn('google')}
+            onClick={() => signIn('google', undefined, { scope: 'openid profile email https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/youtube.readonly' })}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
           >
             <Link2 className="w-4 h-4" />

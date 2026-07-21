@@ -261,6 +261,20 @@ export const authOptions: NextAuthOptions = {
     async signIn({ account }) {
       if (!account || account.type !== 'oauth') return
       try {
+        const existing = await prisma.account.findUnique({
+          where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
+          select: { scope: true },
+        })
+        // Each connector button below requests only the specific scope it
+        // needs (incremental authorization - see GoogleProvider's comment),
+        // so a single grant's account.scope only reflects THAT request, not
+        // everything previously granted. Union with what's already stored so
+        // connecting Calendar today doesn't erase Drive access granted
+        // yesterday - Google's token response isn't necessarily cumulative
+        // across separate authorization requests.
+        const mergedScope = account.scope
+          ? Array.from(new Set([...(existing?.scope?.split(' ') ?? []), ...account.scope.split(' ')].filter(Boolean))).join(' ')
+          : existing?.scope
         await prisma.account.updateMany({
           where: { provider: account.provider, providerAccountId: account.providerAccountId },
           data: {
@@ -272,7 +286,7 @@ export const authOptions: NextAuthOptions = {
             ...(account.access_token ? { access_token: account.access_token } : {}),
             ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
             ...(account.expires_at ? { expires_at: account.expires_at as number } : {}),
-            ...(account.scope ? { scope: account.scope } : {}),
+            ...(mergedScope ? { scope: mergedScope } : {}),
             ...(account.token_type ? { token_type: account.token_type } : {}),
             ...(account.id_token ? { id_token: account.id_token } : {}),
           },
@@ -338,9 +352,26 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Default/base scope for plain sign-in (app/auth/signin, app/auth/signup) -
+      // deliberately just the bare OIDC scopes. This USED to also request
+      // youtube.readonly + calendar + contacts.readonly + books + drive.file +
+      // gmail.send + gmail.readonly + 4 fitness scopes all in one request
+      // (fitness's own service was already fully commented out in lib/google.ts
+      // as "DISABLED... to reduce verification requirements" - the scopes were
+      // never removed to match). Google now hard-rejects that combination
+      // outright ("This request contains scopes that cannot be requested
+      // together", 400 invalid_request) - which meant EVERY Google sign-in,
+      // not just the individual connector grants, was failing.
+      //
+      // Each "Otorgar acceso a X" / "Conectar Google" button in
+      // components/connectors/connectors-client.tsx now requests only the
+      // specific scope(s) that connector needs via signIn()'s third
+      // (authorizationParams) argument - true incremental authorization,
+      // which is also just the correct way to ask for OAuth scopes: nobody
+      // should have to grant Gmail send access to log in.
       authorization: {
         params: {
-          scope: 'openid profile email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
+          scope: 'openid profile email',
           access_type: 'offline',
           prompt: 'consent'
         },
