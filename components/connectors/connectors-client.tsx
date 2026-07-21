@@ -223,7 +223,14 @@ export function ConnectorsClient() {
     const params = new URLSearchParams(window.location.search)
     const ns = params.get('notionStatus')
     if (ns === 'connected') {
-      toast({ title: 'Notion conectado', description: 'Tu workspace ahora está vinculado a Novo.' })
+      // "Vinculado a Novo" used to read as "done" - but nothing actually
+      // syncs until the user separately opens "Gestionar bases de datos"
+      // and picks at least one, a step this toast didn't mention at all.
+      // Auto-opening that panel (below) turns the required next step into
+      // the natural continuation of connecting, instead of a secondary
+      // control easy to never notice.
+      toast({ title: 'Notion conectado', description: 'Elige qué bases de datos quieres sincronizar.' })
+      handleFetchNotionDbs()
       const url = new URL(window.location.href)
       url.searchParams.delete('notionStatus')
       window.history.replaceState({}, '', url.toString())
