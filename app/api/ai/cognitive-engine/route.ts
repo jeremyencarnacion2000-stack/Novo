@@ -6,11 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { groqAPI } from '@/lib/groq';
 import { logAICall } from '@/lib/ai-call-log';
-import { calendarService, getGoogleAccessToken } from '@/lib/google';
+import { calendarService, gmailService, getGoogleAccessToken } from '@/lib/google';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
 import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
 import { evaluateNotionThresholds } from '@/lib/cognitive/notion-signal';
+import { evaluateGmailThresholds } from '@/lib/cognitive/gmail-signal';
+import { evaluateReadingSignal } from '@/lib/cognitive/books-signal';
 import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
 import { detectAbandonmentPattern } from '@/lib/cognitive/focus-abandonment';
 import type { BiometricPayload } from '@/types/biometrics';
@@ -204,6 +206,42 @@ export async function GET(req: NextRequest) {
       try {
         const notionThresholdSignals = evaluateNotionThresholds(notionItems, now);
         await persistNewPlatformSignals(twinRecord.id, userId, notionThresholdSignals);
+      } catch {
+        // Non-critical — the report itself doesn't depend on this succeeding.
+      }
+    }
+
+    // Gmail: was connected as a standalone "list unread emails" utility
+    // (components/connectors/connectors-client.tsx) with zero connection to
+    // the Twin. Same TwinEvolutionLog persistence path as Calendar/Notion —
+    // scope-gated the same way app/api/integration/gmail/route.ts checks it,
+    // since a Google Account existing doesn't mean this specific scope was
+    // ever granted (see lib/auth.ts's incremental-authorization comment).
+    if (twinRecord) {
+      try {
+        const googleAccount = await prisma.account.findFirst({ where: { userId, provider: 'google' } });
+        const hasGmailScope = !!googleAccount?.scope?.includes('gmail.readonly');
+        if (hasGmailScope) {
+          const unread = await gmailService.listUnread(50);
+          const gmailThresholdSignals = evaluateGmailThresholds(unread.length);
+          await persistNewPlatformSignals(twinRecord.id, userId, gmailThresholdSignals);
+        }
+      } catch {
+        // Not connected, scope missing, or the Gmail API call failed — no signal this run.
+      }
+    }
+
+    // Reading (Books): Novo's own Book model already tracks currentPage/
+    // status/updatedAt independent of whether Google Books is connected —
+    // no API call needed, just a query against data Novo already owns.
+    if (twinRecord) {
+      try {
+        const readingBooks = await prisma.book.findMany({
+          where: { userId, status: 'reading' },
+          select: { title: true, updatedAt: true },
+        });
+        const readingThresholdSignals = evaluateReadingSignal(readingBooks, now);
+        await persistNewPlatformSignals(twinRecord.id, userId, readingThresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
       }

@@ -28,7 +28,23 @@ interface PlatformSignalEntry {
   changeType: string
   description: string
   createdAt: string
-  platform: 'notion' | 'calendar'
+  platform: 'notion' | 'calendar' | 'gmail' | 'books'
+}
+
+// Where clicking the signal card should take you, and what the trailing
+// action-row text should say — one lookup per platform instead of a chain
+// of ternaries that quietly assumed only two platforms would ever exist.
+const PLATFORM_LINK: Record<PlatformSignalEntry['platform'], string> = {
+  notion: '/checklist',
+  calendar: '/calendar',
+  gmail: '/connectors',
+  books: '/library',
+}
+const PLATFORM_ACTION_LABEL: Record<PlatformSignalEntry['platform'], string> = {
+  notion: 'Ver tareas',
+  calendar: 'Ver calendario',
+  gmail: 'Ver conectores',
+  books: 'Ver biblioteca',
 }
 
 const PHASE_COPY: Record<string, string> = {
@@ -168,7 +184,7 @@ export function NowHero() {
   const linkHref = showTask
     ? '/checklist'
     : showPlatformSignal
-      ? (platformSignal!.platform === 'notion' ? '/checklist' : '/calendar')
+      ? PLATFORM_LINK[platformSignal!.platform]
       : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
 
   // The engine already computed how to fix this in the same response that
@@ -249,7 +265,7 @@ export function NowHero() {
         </div>
       ) : (
         <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-          {showTask ? 'Ir a la tarea' : showPlatformSignal ? (platformSignal!.platform === 'notion' ? 'Ver tareas' : 'Ver calendario') : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+          {showTask ? 'Ir a la tarea' : showPlatformSignal ? PLATFORM_ACTION_LABEL[platformSignal!.platform] : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
         </div>
       )}
     </div>
