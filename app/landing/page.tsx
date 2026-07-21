@@ -94,7 +94,12 @@ function FloatingNav({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement>
             <a href="#precios" className="hidden sm:inline text-sm font-medium text-[#F1F5F3]/60 hover:text-[#F1F5F3] transition-colors whitespace-nowrap">
               Precios
             </a>
-            <Link href="/auth/signin" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signin') }} className="text-sm font-medium text-[#F1F5F3]/60 hover:text-[#F1F5F3] transition-colors whitespace-nowrap">
+            {/* Hidden on mobile like Precios above it - "NOVO" + "Iniciar sesión" +
+                "Empezar gratis" all fighting for space in the scrolled pill (92%
+                width, whitespace-nowrap, no shrink) overflowed past its rounded
+                edge on narrow screens. The primary CTA wins the remaining room;
+                returning users can still sign in via the footer's link below. */}
+            <Link href="/auth/signin" onClick={(e) => { e.preventDefault(); transitionTo('/auth/signin') }} className="hidden sm:inline text-sm font-medium text-[#F1F5F3]/60 hover:text-[#F1F5F3] transition-colors whitespace-nowrap">
               Iniciar sesión
             </Link>
             <Button asChild size="sm" className="shadow-[0_0_20px_rgba(34,211,196,0.35)] hover:shadow-[0_0_28px_rgba(34,211,196,0.55)] whitespace-nowrap shrink-0">
@@ -173,18 +178,6 @@ function LandingPageContent() {
             <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[70%] h-[50%] rounded-full opacity-10 blur-[160px] pointer-events-none" style={{ background: 'radial-gradient(circle, #22D3C4 0%, transparent 70%)' }} />
 
             <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-16">
-              {/* Spec-sheet top row */}
-              <div className="flex items-start justify-between text-[10px] font-bold tracking-[0.2em] uppercase text-[#F1F5F3]/40 mb-8">
-                <div className="space-y-0.5">
-                  <div>SEQ.001 / TWIN&nbsp;ONLINE</div>
-                  <div className="text-[#F1F5F3]/20">República Dominicana · GMT-4</div>
-                </div>
-                <div className="text-right space-y-0.5">
-                  <div className="text-primary/70">OBSERVE → INTERPRET → PREDICT → GUIDE → LEARN</div>
-                  <div className="text-[#F1F5F3]/20">Ciclo continuo, no una foto fija</div>
-                </div>
-              </div>
-
               {/* Dominant visual: gradient placeholder replacing the old 3D
                   graph — swap for a real product screenshot when available. */}
               <HeroVisual />
@@ -195,9 +188,12 @@ function LandingPageContent() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={springConfig.gentle}
               >
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  <span className="text-[10px] font-black tracking-[0.25em] uppercase text-primary">Cognitive Operating System</span>
+                {/* Real Novo mark (same as the navbar), not another tracked-uppercase
+                    eyebrow pill — the "SEQ.001/TWIN ONLINE" spec-sheet row and the
+                    "Cognitive Operating System" badge that used to sit here read as
+                    noise, not brand. */}
+                <div className="w-14 h-14 mx-auto mb-6 rounded-2xl border border-primary/25 flex items-center justify-center bg-primary/10">
+                  <Brain className="w-7 h-7 text-primary" />
                 </div>
                 <h1 className="text-4xl md:text-6xl font-light italic tracking-tight leading-[1.05] mb-6" style={{ fontFamily: 'var(--font-display)', textWrap: 'balance' } as React.CSSProperties}>
                   Deja de organizar tareas.<br />
