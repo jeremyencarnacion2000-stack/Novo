@@ -525,13 +525,18 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 let cognitiveCoreResponse = '';
                 let insideThink = false;
 
-                // Emit model metadata as first SSE event
-                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚠️ Llama 3.1 8B (Respaldo Estable)' : '⚠️ Llama 3.3 70B (Respaldo)') : modelLabel);
+                // Emit model metadata as first SSE event. thinking-steps.tsx already
+                // renders this (via the `meta` event's `label`/`fallback` fields) as a
+                // quiet "Conectado a X" line - a fallback happening isn't an error the
+                // user needs alarmed about, it's the resilience feature working as
+                // designed. The ⚠️ emoji here (inconsistent with the other rescue-tier
+                // labels' neutral ⚡/✨) and a *second*, separately-injected warning
+                // message below - both undid that: every fallback response (which, with
+                // Gemini currently rate-limited, is effectively every response) opened
+                // with a permanent, alarming, technical note baked into the chat
+                // transcript itself, as if the assistant were apologizing.
+                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚡ Llama 3.1 8B (Respaldo Estable)' : '⚡ Llama 3.3 70B (Respaldo)') : modelLabel);
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed } })}\n\n`));
-
-                if (isFallbackUsed) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `*⚠️ Nota: El modelo principal (${model}) superó el límite de velocidad o no está disponible. Se activó el respaldo a ${currentLabel}.*\n\n` })}\n\n`));
-                }
 
                 try {
                     while (true) {

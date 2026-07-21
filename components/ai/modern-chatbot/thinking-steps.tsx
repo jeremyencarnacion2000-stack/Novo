@@ -32,8 +32,12 @@ export function ThinkingSteps({
     intent: string | null;
     fallback: boolean;
 }) {
+    // Every rescue-tier modelLabel from the route already carries its own
+    // "(Respaldo)"/"(Rescate)" wording (app/api/ai/stream/route.ts) -
+    // appending fallback's own " (respaldo)" here doubled up on every
+    // fallback response instead of adding information.
     const routeLabel = modelLabel
-        ? `Conectado a ${modelLabel}${fallback ? ' (respaldo)' : ''}${intent && INTENT_LABEL[intent] ? ` · ${INTENT_LABEL[intent]}` : ''}`
+        ? `Conectado a ${modelLabel}${intent && INTENT_LABEL[intent] ? ` · ${INTENT_LABEL[intent]}` : ''}`
         : null;
 
     const steps = [
