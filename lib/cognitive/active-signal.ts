@@ -14,11 +14,12 @@ export interface ActiveSignal {
   changeType: string;
   description: string;
   createdAt: Date;
-  platform: 'notion' | 'calendar' | 'gmail' | 'books';
+  platform: 'notion' | 'todoist' | 'calendar' | 'gmail' | 'books';
 }
 
 const PLATFORM_PREFIX_PRIORITY: { prefix: string; platform: ActiveSignal['platform'] }[] = [
   { prefix: 'notion_', platform: 'notion' },
+  { prefix: 'todoist_', platform: 'todoist' },
   { prefix: 'calendar_', platform: 'calendar' },
   { prefix: 'gmail_', platform: 'gmail' },
   { prefix: 'books_', platform: 'books' },

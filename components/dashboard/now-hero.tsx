@@ -28,7 +28,7 @@ interface PlatformSignalEntry {
   changeType: string
   description: string
   createdAt: string
-  platform: 'notion' | 'calendar' | 'gmail' | 'books'
+  platform: 'notion' | 'todoist' | 'calendar' | 'gmail' | 'books'
 }
 
 // Where clicking the signal card should take you, and what the trailing
@@ -36,12 +36,14 @@ interface PlatformSignalEntry {
 // of ternaries that quietly assumed only two platforms would ever exist.
 const PLATFORM_LINK: Record<PlatformSignalEntry['platform'], string> = {
   notion: '/checklist',
+  todoist: '/checklist',
   calendar: '/calendar',
   gmail: '/connectors',
   books: '/library',
 }
 const PLATFORM_ACTION_LABEL: Record<PlatformSignalEntry['platform'], string> = {
   notion: 'Ver tareas',
+  todoist: 'Ver tareas',
   calendar: 'Ver calendario',
   gmail: 'Ver conectores',
   books: 'Ver biblioteca',

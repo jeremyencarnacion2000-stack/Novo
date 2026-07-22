@@ -17,7 +17,7 @@ import type { IconType } from 'react-icons'
 import {
   SiNotion, SiGoogledrive, SiGmail, SiGoogle, SiSlack, SiGithub, SiWhatsapp,
   SiGooglecalendar, SiGooglefit, SiSpotify, SiYoutube, SiTodoist, SiTrello,
-  SiLinear, SiObsidian, SiDiscord, SiStrava, SiFitbit, SiApplemusic,
+  SiLinear, SiObsidian, SiDiscord, SiStrava, SiFitbit, SiApplemusic, SiApple,
 } from 'react-icons/si'
 
 // ── Real brand logos via Simple Icons (react-icons/si). Each renders the
@@ -188,6 +188,30 @@ export function ConnectorsClient() {
   const [notionDbs, setNotionDbs] = useState<{ id: string; title: string }[]>([])
   const [notionDbsOpen, setNotionDbsOpen] = useState(false)
 
+  // ── Todoist state (mirrors Notion's shape exactly) ──────────────────────────
+  const [todoistStatus, setTodoistStatus] = useState<{
+    connected: boolean
+    projectIds?: string[]
+    connectedAt?: string
+  } | null>(null)
+  const [todoistLoading, setTodoistLoading] = useState(false)
+  const [todoistSyncing, setTodoistSyncing] = useState(false)
+  const [todoistProjects, setTodoistProjects] = useState<{ id: string; title: string }[]>([])
+  const [todoistProjectsOpen, setTodoistProjectsOpen] = useState(false)
+
+  // ── Slack state (channel picker instead of database/project picker, and
+  //    a test message instead of a sync — Slack is a delivery channel) ──────
+  const [slackStatus, setSlackStatus] = useState<{
+    connected: boolean
+    teamName?: string | null
+    channelId?: string | null
+    channelName?: string | null
+  } | null>(null)
+  const [slackLoading, setSlackLoading] = useState(false)
+  const [slackTesting, setSlackTesting] = useState(false)
+  const [slackChannels, setSlackChannels] = useState<{ id: string; title: string }[]>([])
+  const [slackChannelsOpen, setSlackChannelsOpen] = useState(false)
+
   // ── Drive state ──────────────────────────────────────────────────────────
   const [driveStatus, setDriveStatus] = useState<{ connected: boolean; hasScope: boolean } | null>(null)
   const [driveBackingUp, setDriveBackingUp] = useState(false)
@@ -244,6 +268,48 @@ export function ConnectorsClient() {
     }
   }, [])
 
+  // Handle ?todoistStatus= query param from OAuth callback redirect (mirrors Notion)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const ts = params.get('todoistStatus')
+    if (ts === 'connected') {
+      toast({ title: 'Todoist conectado', description: 'Elige qué proyectos quieres sincronizar.' })
+      handleFetchTodoistProjects()
+      const url = new URL(window.location.href)
+      url.searchParams.delete('todoistStatus')
+      window.history.replaceState({}, '', url.toString())
+    } else if (ts === 'error') {
+      const reason = params.get('reason') ?? 'unknown'
+      toast({ title: 'Falló la conexión con Todoist', description: `Motivo: ${reason}`, variant: 'destructive' })
+      const url = new URL(window.location.href)
+      url.searchParams.delete('todoistStatus')
+      url.searchParams.delete('reason')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
+  // Handle ?slackStatus= query param from OAuth callback redirect (mirrors Notion/Todoist)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const ss = params.get('slackStatus')
+    if (ss === 'connected') {
+      toast({ title: 'Slack conectado', description: 'Elige a qué canal quieres que lleguen las alertas.' })
+      handleFetchSlackChannels()
+      const url = new URL(window.location.href)
+      url.searchParams.delete('slackStatus')
+      window.history.replaceState({}, '', url.toString())
+    } else if (ss === 'error') {
+      const reason = params.get('reason') ?? 'unknown'
+      toast({ title: 'Falló la conexión con Slack', description: `Motivo: ${reason}`, variant: 'destructive' })
+      const url = new URL(window.location.href)
+      url.searchParams.delete('slackStatus')
+      url.searchParams.delete('reason')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
   // The auto-open-panel fix above only fires on a FRESH connect redirect -
   // it does nothing for an account that was already connected with 0
   // databases selected before that fix shipped (exactly the state a
@@ -261,9 +327,29 @@ export function ConnectorsClient() {
     }
   }, [notionStatus])
 
+  const autoPromptedTodoistRef = useRef(false)
+  useEffect(() => {
+    if (autoPromptedTodoistRef.current) return
+    if (todoistStatus?.connected && (todoistStatus.projectIds?.length ?? 0) === 0 && !todoistProjectsOpen) {
+      autoPromptedTodoistRef.current = true
+      handleFetchTodoistProjects()
+    }
+  }, [todoistStatus])
+
+  const autoPromptedSlackRef = useRef(false)
+  useEffect(() => {
+    if (autoPromptedSlackRef.current) return
+    if (slackStatus?.connected && !slackStatus.channelId && !slackChannelsOpen) {
+      autoPromptedSlackRef.current = true
+      handleFetchSlackChannels()
+    }
+  }, [slackStatus])
+
   useEffect(() => {
     if (!session?.user?.id) return
     fetch('/api/integration/notion').then(r => r.json()).then(setNotionStatus).catch(() => setNotionStatus({ connected: false }))
+    fetch('/api/integration/todoist').then(r => r.json()).then(setTodoistStatus).catch(() => setTodoistStatus({ connected: false }))
+    fetch('/api/integration/slack').then(r => r.json()).then(setSlackStatus).catch(() => setSlackStatus({ connected: false }))
     fetch('/api/integration/drive').then(r => r.json()).then(setDriveStatus).catch(() => setDriveStatus({ connected: false, hasScope: false }))
     fetch('/api/integration/calendar').then(r => r.json()).then(setCalendarStatus).catch(() => setCalendarStatus({ connected: false, hasScope: false }))
     fetch('/api/integration/gmail').then(r => r.json()).then(setGmailStatus).catch(() => setGmailStatus({ connected: false, hasScope: false }))
@@ -325,6 +411,123 @@ export function ConnectorsClient() {
       toast({ title: 'Bases de datos guardadas' })
     } catch {
       toast({ title: 'No se pudieron guardar las bases de datos', variant: 'destructive' })
+    }
+  }
+
+  // ── Todoist helpers (mirror Notion's exactly) ───────────────────────────────
+  const handleTodoistConnect = () => { window.location.href = '/api/integration/todoist/connect' }
+
+  const handleTodoistDisconnect = async () => {
+    setTodoistLoading(true)
+    try {
+      await fetch('/api/integration/todoist', { method: 'DELETE' })
+      setTodoistStatus({ connected: false })
+      toast({ title: 'Todoist desconectado' })
+    } catch {
+      toast({ title: 'No se pudo desconectar', variant: 'destructive' })
+    } finally {
+      setTodoistLoading(false)
+    }
+  }
+
+  const handleTodoistSync = async () => {
+    setTodoistSyncing(true)
+    try {
+      const res = await fetch('/api/integration/todoist?action=sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Sync failed')
+      toast({ title: `${data.total} tareas sincronizadas desde Todoist`, description: `${data.created} creadas, ${data.updated} actualizadas` })
+    } catch (err: any) {
+      toast({ title: 'Falló la sincronización', description: err.message, variant: 'destructive' })
+    } finally {
+      setTodoistSyncing(false)
+    }
+  }
+
+  const handleFetchTodoistProjects = async () => {
+    if (todoistProjectsOpen) { setTodoistProjectsOpen(false); return }
+    try {
+      const res = await fetch('/api/integration/todoist?action=projects', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch projects')
+      setTodoistProjects(data.projects || [])
+      setTodoistProjectsOpen(true)
+    } catch {
+      toast({ title: 'No se pudieron cargar los proyectos', variant: 'destructive' })
+    }
+  }
+
+  const handleSaveTodoistProjects = async (ids: string[]) => {
+    try {
+      const res = await fetch('/api/integration/todoist?action=save_projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectIds: ids }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setTodoistStatus(prev => prev ? { ...prev, projectIds: ids } : prev)
+      toast({ title: 'Proyectos guardados' })
+    } catch {
+      toast({ title: 'No se pudieron guardar los proyectos', variant: 'destructive' })
+    }
+  }
+
+  // ── Slack helpers (channel picker + test message, not a sync) ──────────────
+  const handleSlackConnect = () => { window.location.href = '/api/integration/slack/connect' }
+
+  const handleSlackDisconnect = async () => {
+    setSlackLoading(true)
+    try {
+      await fetch('/api/integration/slack', { method: 'DELETE' })
+      setSlackStatus({ connected: false })
+      toast({ title: 'Slack desconectado' })
+    } catch {
+      toast({ title: 'No se pudo desconectar', variant: 'destructive' })
+    } finally {
+      setSlackLoading(false)
+    }
+  }
+
+  const handleSlackTest = async () => {
+    setSlackTesting(true)
+    try {
+      const res = await fetch('/api/integration/slack?action=test', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Test failed')
+      toast({ title: 'Mensaje de prueba enviado', description: 'Revisa el canal en Slack.' })
+    } catch (err: any) {
+      toast({ title: 'Falló el envío', description: err.message, variant: 'destructive' })
+    } finally {
+      setSlackTesting(false)
+    }
+  }
+
+  const handleFetchSlackChannels = async () => {
+    if (slackChannelsOpen) { setSlackChannelsOpen(false); return }
+    try {
+      const res = await fetch('/api/integration/slack?action=channels', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch channels')
+      setSlackChannels(data.channels || [])
+      setSlackChannelsOpen(true)
+    } catch {
+      toast({ title: 'No se pudieron cargar los canales', variant: 'destructive' })
+    }
+  }
+
+  const handleSaveSlackChannel = async (channelId: string, channelName: string) => {
+    try {
+      const res = await fetch('/api/integration/slack?action=save_channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId, channelName }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setSlackStatus(prev => prev ? { ...prev, channelId, channelName } : prev)
+      setSlackChannelsOpen(false)
+      toast({ title: 'Canal guardado', description: channelName })
+    } catch {
+      toast({ title: 'No se pudo guardar el canal', variant: 'destructive' })
     }
   }
 
@@ -470,9 +673,14 @@ export function ConnectorsClient() {
         category: 'productivity',
         name: 'Slack',
         description: 'Recibe alertas cognitivas en tu workspace de Slack.',
-        detail: 'Notificaciones del motor cognitivo entregadas directamente a un canal de Slack.',
+        detail: 'Elige un canal y el motor cognitivo te envía ahí sus alertas importantes (sobrecarga, patrones de abandono, etc.) el mismo día que las detecta.',
+        capabilities: [
+          'Elige a qué canal de Slack llegan las alertas',
+          'Recibe alertas del motor cognitivo el mismo día que se detectan',
+          'Envía un mensaje de prueba para confirmar que quedó bien configurado',
+        ],
         icon: <BrandIcon icon={SiSlack} color="#4A154B" />,
-        status: 'soon',
+        status: slackStatus?.connected ? 'connected' : 'available',
       },
       {
         id: 'github',
@@ -488,9 +696,9 @@ export function ConnectorsClient() {
         category: 'productivity',
         name: 'WhatsApp Business',
         description: 'Gestiona conversaciones de clientes desde Novo.',
-        detail: 'Centraliza mensajes de WhatsApp Business junto al resto de tu contexto de negocio.',
+        detail: 'Requiere verificación de Meta Business para la API de WhatsApp Business — un proceso que Meta hace directamente con la empresa dueña de la cuenta, no algo que Novo pueda activar por su cuenta. Queda documentado como pendiente hasta completar esa verificación.',
         icon: <BrandIcon icon={SiWhatsapp} color="#25D366" />,
-        status: 'soon',
+        status: 'pending',
       },
       {
         id: 'trello',
@@ -506,9 +714,14 @@ export function ConnectorsClient() {
         category: 'productivity',
         name: 'Todoist',
         description: 'Importa tus tareas pendientes de Todoist.',
-        detail: 'Trae tus tareas activas de Todoist para que el Twin las priorice junto al resto de tu carga de trabajo.',
+        detail: 'Sincroniza proyectos de Todoist como tareas en Novo. Elige qué proyectos importar y vuelve a sincronizar cuando quieras.',
+        capabilities: [
+          'Sincroniza tus proyectos de Todoist como tareas en Novo',
+          'Elige exactamente qué proyectos importar',
+          'Marcar una tarea como completada en Novo también la completa en Todoist',
+        ],
         icon: <BrandIcon icon={SiTodoist} color="#E44332" />,
-        status: 'soon',
+        status: todoistStatus?.connected ? 'connected' : 'available',
       },
       {
         id: 'linear',
@@ -541,6 +754,15 @@ export function ConnectorsClient() {
         ],
         icon: <BrandIcon icon={SiGooglecalendar} color="#4285F4" />,
         status: (calendarStatus?.connected && calendarStatus?.hasScope) ? 'connected' : 'available',
+      },
+      {
+        id: 'apple-calendar',
+        category: 'wellness',
+        name: 'Apple Calendar',
+        description: 'Importa tus eventos de iCloud Calendar.',
+        detail: 'Apple Calendar no usa OAuth como Google — se conecta por CalDAV con una contraseña específica de la app que generas en tu cuenta de Apple. Requiere un flujo de conexión distinto al de los demás conectores, todavía sin construir. Queda documentado como pendiente en vez de prometido en silencio.',
+        icon: <BrandIcon icon={SiApple} />,
+        status: 'pending',
       },
       {
         id: 'fit',
@@ -628,7 +850,7 @@ export function ConnectorsClient() {
       },
       ...custom,
     ]
-  }, [notionStatus, driveStatus, calendarStatus, gmailStatus, grantStatus, customConnectors])
+  }, [notionStatus, todoistStatus, slackStatus, driveStatus, calendarStatus, gmailStatus, grantStatus, customConnectors])
 
   const selected = connectors.find(c => c.id === selectedId) ?? null
 
@@ -722,6 +944,26 @@ export function ConnectorsClient() {
               onNotionSync={handleNotionSync}
               onFetchNotionDbs={handleFetchNotionDbs}
               onSaveNotionDbs={handleSaveNotionDbs}
+              todoistStatus={todoistStatus}
+              todoistLoading={todoistLoading}
+              todoistSyncing={todoistSyncing}
+              todoistProjects={todoistProjects}
+              todoistProjectsOpen={todoistProjectsOpen}
+              onTodoistConnect={handleTodoistConnect}
+              onTodoistDisconnect={handleTodoistDisconnect}
+              onTodoistSync={handleTodoistSync}
+              onFetchTodoistProjects={handleFetchTodoistProjects}
+              onSaveTodoistProjects={handleSaveTodoistProjects}
+              slackStatus={slackStatus}
+              slackLoading={slackLoading}
+              slackTesting={slackTesting}
+              slackChannels={slackChannels}
+              slackChannelsOpen={slackChannelsOpen}
+              onSlackConnect={handleSlackConnect}
+              onSlackDisconnect={handleSlackDisconnect}
+              onSlackTest={handleSlackTest}
+              onFetchSlackChannels={handleFetchSlackChannels}
+              onSaveSlackChannel={handleSaveSlackChannel}
               driveStatus={driveStatus}
               driveBackingUp={driveBackingUp}
               onDriveBackup={handleDriveBackup}
@@ -755,6 +997,10 @@ function ConnectorDetail({
   connector,
   notionStatus, notionLoading, notionSyncing, notionDbs, notionDbsOpen,
   onNotionConnect, onNotionDisconnect, onNotionSync, onFetchNotionDbs, onSaveNotionDbs,
+  todoistStatus, todoistLoading, todoistSyncing, todoistProjects, todoistProjectsOpen,
+  onTodoistConnect, onTodoistDisconnect, onTodoistSync, onFetchTodoistProjects, onSaveTodoistProjects,
+  slackStatus, slackLoading, slackTesting, slackChannels, slackChannelsOpen,
+  onSlackConnect, onSlackDisconnect, onSlackTest, onFetchSlackChannels, onSaveSlackChannel,
   driveStatus, driveBackingUp, onDriveBackup,
   calendarStatus, calendarSyncing, onCalendarSync,
   gmailStatus, gmailLoading, unreadEmails, onGmailListUnread,
@@ -771,6 +1017,26 @@ function ConnectorDetail({
   onNotionSync: () => void
   onFetchNotionDbs: () => void
   onSaveNotionDbs: (ids: string[]) => void
+  todoistStatus: { connected: boolean; projectIds?: string[] } | null
+  todoistLoading: boolean
+  todoistSyncing: boolean
+  todoistProjects: { id: string; title: string }[]
+  todoistProjectsOpen: boolean
+  onTodoistConnect: () => void
+  onTodoistDisconnect: () => void
+  onTodoistSync: () => void
+  onFetchTodoistProjects: () => void
+  onSaveTodoistProjects: (ids: string[]) => void
+  slackStatus: { connected: boolean; teamName?: string | null; channelId?: string | null; channelName?: string | null } | null
+  slackLoading: boolean
+  slackTesting: boolean
+  slackChannels: { id: string; title: string }[]
+  slackChannelsOpen: boolean
+  onSlackConnect: () => void
+  onSlackDisconnect: () => void
+  onSlackTest: () => void
+  onFetchSlackChannels: () => void
+  onSaveSlackChannel: (channelId: string, channelName: string) => void
   driveStatus: { connected: boolean; hasScope: boolean } | null
   driveBackingUp: boolean
   onDriveBackup: () => void
@@ -882,6 +1148,147 @@ function ConnectorDetail({
           >
             <Link2 className="w-4 h-4" />
             Conectar Notion
+          </button>
+        )
+      )}
+
+      {connector.id === 'todoist' && (
+        todoistStatus?.connected ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onTodoistSync}
+                disabled={todoistSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all text-red-300 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', todoistSyncing && 'animate-spin')} />
+                {todoistSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
+              </button>
+              <button
+                onClick={onTodoistDisconnect}
+                disabled={todoistLoading}
+                className="text-[11px] text-foreground/30 hover:text-red-400 transition-colors font-medium"
+              >
+                Desconectar
+              </button>
+            </div>
+            <div className="pt-3 border-t border-foreground/[0.05]">
+              <button
+                onClick={onFetchTodoistProjects}
+                className="flex items-center gap-1.5 text-[11px] text-foreground/40 hover:text-foreground/60 transition-colors"
+              >
+                <Database className="w-3 h-3" />
+                {todoistProjectsOpen ? 'Ocultar proyectos' : `Gestionar proyectos (${todoistStatus.projectIds?.length ?? 0} seleccionados)`}
+              </button>
+              {todoistProjectsOpen && (
+                <div className="mt-2 space-y-1.5">
+                  {todoistProjects.length === 0 ? (
+                    <p className="text-xs text-foreground/30 italic">No se encontraron proyectos en tu cuenta de Todoist.</p>
+                  ) : (
+                    todoistProjects.map(project => {
+                      const isSelected = todoistStatus.projectIds?.includes(project.id) ?? false
+                      return (
+                        <button
+                          key={project.id}
+                          onClick={() => {
+                            const currentIds = todoistStatus.projectIds ?? []
+                            const next = isSelected ? currentIds.filter(i => i !== project.id) : [...currentIds, project.id]
+                            onSaveTodoistProjects(next)
+                          }}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all',
+                            isSelected
+                              ? 'bg-red-500/10 border border-red-500/20 text-red-300'
+                              : 'bg-foreground/[0.02] border border-foreground/[0.06] text-foreground/50 hover:bg-foreground/[0.05]',
+                          )}
+                        >
+                          <span className={cn('w-2 h-2 rounded-sm flex-shrink-0', isSelected ? 'bg-red-400' : 'bg-foreground/20')} />
+                          {project.title}
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onTodoistConnect}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
+          >
+            <Link2 className="w-4 h-4" />
+            Conectar Todoist
+          </button>
+        )
+      )}
+
+      {connector.id === 'slack' && (
+        slackStatus?.connected ? (
+          <div className="flex flex-col gap-3">
+            {slackStatus.teamName && (
+              <p className="text-xs text-foreground/40">Workspace: <span className="text-foreground/70 font-medium">{slackStatus.teamName}</span></p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onSlackTest}
+                disabled={slackTesting || !slackStatus.channelId}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-fuchsia-500/10 border border-fuchsia-500/20 hover:bg-fuchsia-500/20 transition-all text-fuchsia-300 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', slackTesting && 'animate-spin')} />
+                {slackTesting ? 'Enviando...' : 'Enviar mensaje de prueba'}
+              </button>
+              <button
+                onClick={onSlackDisconnect}
+                disabled={slackLoading}
+                className="text-[11px] text-foreground/30 hover:text-red-400 transition-colors font-medium"
+              >
+                Desconectar
+              </button>
+            </div>
+            <div className="pt-3 border-t border-foreground/[0.05]">
+              <button
+                onClick={onFetchSlackChannels}
+                className="flex items-center gap-1.5 text-[11px] text-foreground/40 hover:text-foreground/60 transition-colors"
+              >
+                <Database className="w-3 h-3" />
+                {slackChannelsOpen ? 'Ocultar canales' : `Elegir canal ${slackStatus.channelName ? `(${slackStatus.channelName})` : '(ninguno seleccionado)'}`}
+              </button>
+              {slackChannelsOpen && (
+                <div className="mt-2 space-y-1.5">
+                  {slackChannels.length === 0 ? (
+                    <p className="text-xs text-foreground/30 italic">No se encontraron canales. Invita al bot de Novo al canal deseado en Slack.</p>
+                  ) : (
+                    slackChannels.map(channel => {
+                      const isSelected = slackStatus.channelId === channel.id
+                      return (
+                        <button
+                          key={channel.id}
+                          onClick={() => onSaveSlackChannel(channel.id, channel.title)}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all',
+                            isSelected
+                              ? 'bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300'
+                              : 'bg-foreground/[0.02] border border-foreground/[0.06] text-foreground/50 hover:bg-foreground/[0.05]',
+                          )}
+                        >
+                          <span className={cn('w-2 h-2 rounded-sm flex-shrink-0', isSelected ? 'bg-fuchsia-400' : 'bg-foreground/20')} />
+                          {channel.title}
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onSlackConnect}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
+          >
+            <Link2 className="w-4 h-4" />
+            Conectar Slack
           </button>
         )
       )}

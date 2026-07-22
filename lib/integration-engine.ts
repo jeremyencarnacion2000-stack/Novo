@@ -7,7 +7,7 @@ export interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'ai-task';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'todoist' | 'ai-task';
     sourceId: string;
     dueDate?: Date;
     timeOfDay?: string; // for routine tasks
@@ -75,9 +75,9 @@ export class IntegrationEngine {
                     }
                 }
             }),
-            // 3. Manual and Notion checklist items
+            // 3. Manual, Notion, and Todoist checklist items
             prisma.checklistItem.findMany({
-                where: { userId, source: { in: ['manual', 'notion'] } }
+                where: { userId, source: { in: ['manual', 'notion', 'todoist'] } }
             }),
             // 3b. Task-model tasks (created via /api/tasks or the AI assistant's
             // CREATE_TASK / CREATE_TASKS actions) — due today, or already
@@ -145,14 +145,14 @@ export class IntegrationEngine {
             }
         }
 
-        // 3. Manual and Notion checklist items
+        // 3. Manual, Notion, and Todoist checklist items
         for (const item of checklistItems) {
             tasks.push({
                 id: `checklist:${item.id}`,
                 text: item.text,
                 completed: item.completed,
                 priority: item.priority as 'low' | 'medium' | 'high',
-                source: item.source as 'manual' | 'notion',
+                source: item.source as 'manual' | 'notion' | 'todoist',
                 sourceId: item.id,
                 dueDate: item.dueDate ?? undefined
             });
@@ -315,6 +315,27 @@ export class IntegrationEngine {
                         }
                     } catch (notionError) {
                         console.error('Failed to sync completion to Notion:', notionError);
+                    }
+                } else if (item.source === 'todoist' && item.sourceId) {
+                    try {
+                        const integrationAccount = await prisma.integrationAccount.findUnique({
+                            where: {
+                                userId_provider: {
+                                    userId: item.userId,
+                                    provider: 'todoist'
+                                }
+                            }
+                        });
+                        if (integrationAccount) {
+                            const { todoistService } = await import('./todoist');
+                            if (completed) {
+                                await todoistService.closeTask(integrationAccount.accessToken, item.sourceId);
+                            } else {
+                                await todoistService.reopenTask(integrationAccount.accessToken, item.sourceId);
+                            }
+                        }
+                    } catch (todoistError) {
+                        console.error('Failed to sync completion to Todoist:', todoistError);
                     }
                 }
                 return true;

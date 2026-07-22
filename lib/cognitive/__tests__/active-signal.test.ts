@@ -24,10 +24,13 @@ describe('getActiveSignal', () => {
           description: '3 tareas de Notion vencidas', createdAt: new Date(),
         });
       }
-      return Promise.resolve({
-        id: 'c1', changeType: 'calendar_meeting_overload',
-        description: '3 reuniones seguidas', createdAt: new Date(),
-      });
+      if (where.changeType.startsWith === 'calendar_') {
+        return Promise.resolve({
+          id: 'c1', changeType: 'calendar_meeting_overload',
+          description: '3 reuniones seguidas', createdAt: new Date(),
+        });
+      }
+      return Promise.resolve(null);
     });
 
     const result = await getActiveSignal('user-1');
@@ -37,16 +40,40 @@ describe('getActiveSignal', () => {
 
   it('returns the Calendar signal when only a Calendar signal exists today', async () => {
     (prisma.twinEvolutionLog.findFirst as jest.Mock).mockImplementation(({ where }: any) => {
-      if (where.changeType.startsWith === 'notion_') return Promise.resolve(null);
-      return Promise.resolve({
-        id: 'c1', changeType: 'calendar_meeting_overload',
-        description: '3 reuniones seguidas', createdAt: new Date(),
-      });
+      if (where.changeType.startsWith === 'calendar_') {
+        return Promise.resolve({
+          id: 'c1', changeType: 'calendar_meeting_overload',
+          description: '3 reuniones seguidas', createdAt: new Date(),
+        });
+      }
+      return Promise.resolve(null);
     });
 
     const result = await getActiveSignal('user-1');
     expect(result?.platform).toBe('calendar');
     expect(result?.id).toBe('c1');
+  });
+
+  it('returns the Todoist signal when both a Todoist and a Calendar signal exist today', async () => {
+    (prisma.twinEvolutionLog.findFirst as jest.Mock).mockImplementation(({ where }: any) => {
+      if (where.changeType.startsWith === 'todoist_') {
+        return Promise.resolve({
+          id: 't1', changeType: 'todoist_overdue_accumulation',
+          description: '3 tareas de Todoist vencidas', createdAt: new Date(),
+        });
+      }
+      if (where.changeType.startsWith === 'calendar_') {
+        return Promise.resolve({
+          id: 'c1', changeType: 'calendar_meeting_overload',
+          description: '3 reuniones seguidas', createdAt: new Date(),
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const result = await getActiveSignal('user-1');
+    expect(result?.platform).toBe('todoist');
+    expect(result?.id).toBe('t1');
   });
 
   it('returns null when neither signal exists today', async () => {

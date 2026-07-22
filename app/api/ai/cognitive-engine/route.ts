@@ -11,6 +11,7 @@ import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
 import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
 import { evaluateNotionThresholds } from '@/lib/cognitive/notion-signal';
+import { evaluateTodoistThresholds } from '@/lib/cognitive/todoist-signal';
 import { evaluateGmailThresholds } from '@/lib/cognitive/gmail-signal';
 import { evaluateReadingSignal } from '@/lib/cognitive/books-signal';
 import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Collect remaining signals in parallel ────────────────────────────────
-    const [dbTasks, focusSessions, dailyAnalytics, recentSessions, notionItems, abandonmentSample] = await Promise.all([
+    const [dbTasks, focusSessions, dailyAnalytics, recentSessions, integrationItems, abandonmentSample] = await Promise.all([
       prisma.task.findMany({
         where: { userId },
         orderBy: { createdAt: 'asc' },
@@ -122,11 +123,14 @@ export async function GET(req: NextRequest) {
         orderBy: { startTime: 'desc' },
         take: 20,
       }),
-      // Notion tasks already sync into ChecklistItem (see IntegrationEngine.
-      // getTodayTasks) — the cognitive engine just never read them. Normalize
-      // to the Task shape so every downstream calculation picks them up for
-      // free instead of duplicating the load/overdue/completion logic.
-      prisma.checklistItem.findMany({ where: { userId, source: 'notion' } }),
+      // Notion and Todoist tasks already sync into ChecklistItem (see
+      // IntegrationEngine.getTodayTasks) — the cognitive engine just never
+      // read them. Normalize to the Task shape so every downstream
+      // calculation picks them up for free instead of duplicating the
+      // load/overdue/completion logic. Split by source below (not filtered
+      // to one provider here) since each platform's threshold signals and
+      // "synced from X" messaging need to stay attributed to the right one.
+      prisma.checklistItem.findMany({ where: { userId, source: { in: ['notion', 'todoist'] } } }),
       // Wider window than the 7-day focusSessions above — a real "you always
       // stop around minute X" pattern needs more samples than a week
       // typically has, and this query only selects two int columns so the
@@ -143,9 +147,12 @@ export async function GET(req: NextRequest) {
     // (see lib/cognitive/focus-abandonment.ts's clustering bar).
     const abandonmentPatternMinutes = detectAbandonmentPattern(abandonmentSample);
 
+    const notionItems = integrationItems.filter(c => c.source === 'notion');
+    const todoistItems = integrationItems.filter(c => c.source === 'todoist');
+
     const tasks = [
       ...dbTasks,
-      ...notionItems.map(c => ({
+      ...integrationItems.map(c => ({
         id: c.id,
         title: c.text,
         priority: c.priority,
@@ -206,6 +213,17 @@ export async function GET(req: NextRequest) {
       try {
         const notionThresholdSignals = evaluateNotionThresholds(notionItems, now);
         await persistNewPlatformSignals(twinRecord.id, userId, notionThresholdSignals);
+      } catch {
+        // Non-critical — the report itself doesn't depend on this succeeding.
+      }
+    }
+
+    // Todoist: same TwinEvolutionLog persistence path as Notion above, over
+    // the todoistItems split out of the same already-fetched query.
+    if (twinRecord) {
+      try {
+        const todoistThresholdSignals = evaluateTodoistThresholds(todoistItems, now);
+        await persistNewPlatformSignals(twinRecord.id, userId, todoistThresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
       }
@@ -467,7 +485,7 @@ ${twinProfileContext}
 - Focus Score computed: ${focusScore}/100
 
 ## Task Load
-- Total tasks pending: ${pendingTasks.length}${notionItems.length > 0 ? ` (${notionItems.length} synced from Notion)` : ''}
+- Total tasks pending: ${pendingTasks.length}${notionItems.length > 0 ? ` (${notionItems.length} synced from Notion)` : ''}${todoistItems.length > 0 ? ` (${todoistItems.length} synced from Todoist)` : ''}
 - High priority pending: ${highPriorityPending.length}
 - Today's tasks: ${todayTasks.length}
 - Overdue tasks: ${overdueTasks.length}
@@ -763,6 +781,7 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       completionRate,
       todayTaskCount: todayTasks.length,
       notionTaskCount: notionItems.length,
+      todoistTaskCount: todoistItems.length,
       calendar: calendarSignal,
       biometrics: biometrics ? {
         sleepMinutes: biometrics.sleep.totalSleepMinutes,

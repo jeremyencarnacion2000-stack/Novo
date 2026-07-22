@@ -1,11 +1,11 @@
 /**
- * GET /api/integration/notion/callback
+ * GET /api/integration/todoist/callback
  *
- * Receives the OAuth `code` from Notion after user authorization,
+ * Receives the OAuth `code` from Todoist after user authorization,
  * exchanges it for an access token, and upserts an IntegrationAccount
  * record for this user.
  *
- * Redirects to /settings with a ?notionStatus= query param so the UI
+ * Redirects to /settings with a ?todoistStatus= query param so the UI
  * can display a success/error toast.
  */
 
@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const settingsUrl = `${baseUrl}/?notionStatus=`;
+    const settingsUrl = `${baseUrl}/?todoistStatus=`;
 
     // ── 1. Auth guard ──────────────────────────────────────────────────────────
     const session = await getServerSession(authOptions);
@@ -30,27 +30,23 @@ export async function GET(req: NextRequest) {
     const error = searchParams.get('error');
 
     if (error || !code) {
-        console.error('[Notion Callback] OAuth error or missing code:', error);
+        console.error('[Todoist Callback] OAuth error or missing code:', error);
         return NextResponse.redirect(`${settingsUrl}error&reason=denied`);
     }
 
     // ── 3. Exchange code for access token ──────────────────────────────────────
-    const clientId = process.env.NOTION_CLIENT_ID!;
-    const clientSecret = process.env.NOTION_CLIENT_SECRET!;
-    const redirectUri = process.env.NOTION_REDIRECT_URI!;
+    const clientId = process.env.TODOIST_CLIENT_ID!;
+    const clientSecret = process.env.TODOIST_CLIENT_SECRET!;
+    const redirectUri = process.env.TODOIST_REDIRECT_URI!;
 
     let tokenData: any;
     try {
-        const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-        const tokenRes = await fetch('https://api.notion.com/v1/oauth/token', {
+        const tokenRes = await fetch('https://todoist.com/oauth/access_token', {
             method: 'POST',
-            headers: {
-                'Authorization': `Basic ${credentials}`,
-                'Content-Type': 'application/json',
-                'Notion-Version': '2022-06-28',
-            },
-            body: JSON.stringify({
-                grant_type: 'authorization_code',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
                 code,
                 redirect_uri: redirectUri,
             }),
@@ -58,29 +54,28 @@ export async function GET(req: NextRequest) {
 
         if (!tokenRes.ok) {
             const errBody = await tokenRes.text();
-            console.error('[Notion Callback] Token exchange failed:', errBody);
+            console.error('[Todoist Callback] Token exchange failed:', errBody);
             return NextResponse.redirect(`${settingsUrl}error&reason=token_exchange`);
         }
 
         tokenData = await tokenRes.json();
+        if (!tokenData.access_token) {
+            console.error('[Todoist Callback] Token response missing access_token:', tokenData);
+            return NextResponse.redirect(`${settingsUrl}error&reason=token_exchange`);
+        }
     } catch (err) {
-        console.error('[Notion Callback] Network error during token exchange:', err);
+        console.error('[Todoist Callback] Network error during token exchange:', err);
         return NextResponse.redirect(`${settingsUrl}error&reason=network`);
     }
 
     // ── 4. Upsert IntegrationAccount ───────────────────────────────────────────
-    // tokenData shape: { access_token, token_type, bot_id, workspace_id, workspace_name, ... }
+    // Fetches the existing row first and spreads its metadata, so a
+    // re-connect never silently wipes previously-selected projectIds (same
+    // bug just fixed in the Notion callback — built correctly here from
+    // the start instead of copying it).
     try {
-        // The update branch's comment claimed "Preserve existing databaseIds
-        // on re-connect" but the object it wrote never actually included
-        // databaseIds - any re-connect (disconnect+reconnect, or just
-        // clicking "Conectar Notion" again while already connected) silently
-        // wiped out every previously-selected database back to none, which
-        // would reproduce the exact "still 0 seleccionadas" symptom even
-        // after a user had genuinely picked some before. Fetching the
-        // existing row first and spreading its metadata actually preserves it.
         const existing = await prisma.integrationAccount.findUnique({
-            where: { userId_provider: { userId: session.user.id, provider: 'notion' } },
+            where: { userId_provider: { userId: session.user.id, provider: 'todoist' } },
             select: { metadata: true },
         });
         const existingMeta = (existing?.metadata as any) ?? {};
@@ -89,39 +84,33 @@ export async function GET(req: NextRequest) {
             where: {
                 userId_provider: {
                     userId: session.user.id,
-                    provider: 'notion',
+                    provider: 'todoist',
                 },
             },
             create: {
                 userId: session.user.id,
-                provider: 'notion',
+                provider: 'todoist',
                 accessToken: tokenData.access_token,
-                tokenType: tokenData.token_type,
+                tokenType: 'Bearer',
                 metadata: {
-                    workspaceId: tokenData.workspace_id ?? null,
-                    workspaceName: tokenData.workspace_name ?? null,
-                    botId: tokenData.bot_id ?? null,
-                    // No databases selected yet — user picks them from settings UI
-                    databaseIds: [],
+                    // No projects selected yet — user picks them from settings UI
+                    projectIds: [],
                 },
             },
             update: {
                 accessToken: tokenData.access_token,
-                tokenType: tokenData.token_type,
+                tokenType: 'Bearer',
                 metadata: {
                     ...existingMeta,
-                    workspaceId: tokenData.workspace_id ?? null,
-                    workspaceName: tokenData.workspace_name ?? null,
-                    botId: tokenData.bot_id ?? null,
-                    databaseIds: existingMeta.databaseIds ?? [],
+                    projectIds: existingMeta.projectIds ?? [],
                 },
                 updatedAt: new Date(),
             },
         });
 
-        console.log(`✅ [Notion] Connected for user ${session.user.id}, workspace: ${tokenData.workspace_name}`);
+        console.log(`✅ [Todoist] Connected for user ${session.user.id}`);
     } catch (err) {
-        console.error('[Notion Callback] Failed to upsert IntegrationAccount:', err);
+        console.error('[Todoist Callback] Failed to upsert IntegrationAccount:', err);
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);
     }
 
