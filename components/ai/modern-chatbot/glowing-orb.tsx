@@ -122,6 +122,8 @@ export function GlowingOrb({
     const cy = px / 2;
 
     let last = performance.now();
+    // Keep a stable non-null reference for use inside the rAF closure
+    const ctx2 = ctx;
 
     function lerp(a: number, b: number, t: number) {
       return a + (b - a) * t;
@@ -147,25 +149,25 @@ export function GlowingOrb({
       curScatter = lerp(curScatter, cfg.scatterRadius, lerpT);
       curDotSize = lerp(curDotSize, cfg.dotSize, lerpT);
 
-      ctx.clearRect(0, 0, px, px);
+      ctx2.clearRect(0, 0, px, px);
 
       // Outer glow
       const glowR = px * 0.45 * cfg.pulseScale;
-      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      const grd = ctx2.createRadialGradient(cx, cy, 0, cx, cy, glowR);
       grd.addColorStop(0, cfg.glowColor.replace(')', ', 0.9)').replace('rgba', 'rgba'));
       grd.addColorStop(0.5, cfg.glowColor);
       grd.addColorStop(1, 'transparent');
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-      ctx.fill();
+      ctx2.fillStyle = grd;
+      ctx2.beginPath();
+      ctx2.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx2.fill();
 
       // Center core dot
       const coreSize = curDotSize * (size === 'sm' ? 0.9 : 1.2);
-      ctx.fillStyle = cfg.color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, coreSize * 0.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx2.fillStyle = cfg.color;
+      ctx2.beginPath();
+      ctx2.arc(cx, cy, coreSize * 0.5, 0, Math.PI * 2);
+      ctx2.fill();
 
       // Orbit dots
       const n = cfg.dots;
@@ -184,14 +186,14 @@ export function GlowingOrb({
         const opacityNorm = 0.3 + 0.7 * ((i / n + 0.5) % 1);
         const sz = curDotSize * (size === 'sm' ? 0.75 : 1);
 
-        ctx.globalAlpha = opacityNorm;
-        ctx.fillStyle = cfg.color;
-        ctx.beginPath();
-        ctx.arc(x, y, sz, 0, Math.PI * 2);
-        ctx.fill();
+        ctx2.globalAlpha = opacityNorm;
+        ctx2.fillStyle = cfg.color;
+        ctx2.beginPath();
+        ctx2.arc(x, y, sz, 0, Math.PI * 2);
+        ctx2.fill();
       }
 
-      ctx.globalAlpha = 1;
+      ctx2.globalAlpha = 1;
       animRef.current = requestAnimationFrame(draw);
     }
 
