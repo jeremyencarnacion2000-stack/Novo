@@ -89,10 +89,10 @@ export const modalFlip = {
     const { origin, target, overlay } = findPair(id)
     if (!origin || !target) {
       // Missing pair (e.g. a caller forgot to put data-flip-from on the
-      // trigger element) must never leave the target stuck at the
-      // `.modal-flip-target { opacity: 0 }` base style forever — reveal it
-      // plainly instead of failing invisibly.
+      // trigger element) must never leave the target or overlay stuck
+      // invisible — reveal them plainly instead of failing invisibly.
       if (target) target.style.opacity = '1'
+      if (overlay) overlay.style.opacity = '1'
       onDone?.()
       return
     }
