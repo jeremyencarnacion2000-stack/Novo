@@ -1,57 +1,214 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
-export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking';
+export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'loading' | 'error';
 
-const STATE_GLOW: Record<OrbState, string> = {
-    idle: 'bg-primary/10 scale-100',
-    listening: 'bg-primary/40 scale-110 animate-pulse',
-    thinking: 'bg-primary/30 scale-125 animate-pulse',
-    speaking: 'bg-primary/35 scale-115 animate-pulse',
+interface OrbConfig {
+  dots: number;
+  radius: number;
+  dotSize: number;
+  speed: number;          // rotation speed multiplier
+  pulseScale: number;     // outer glow scale
+  color: string;
+  glowColor: string;
+  scatterRadius: number;  // how far dots scatter from their orbit
+}
+
+const STATE_CONFIG: Record<OrbState, OrbConfig> = {
+  idle: {
+    dots: 10,
+    radius: 10,
+    dotSize: 1.4,
+    speed: 0.3,
+    pulseScale: 1,
+    color: 'rgba(255,255,255,0.25)',
+    glowColor: 'rgba(255,255,255,0.04)',
+    scatterRadius: 0.5,
+  },
+  listening: {
+    dots: 14,
+    radius: 11,
+    dotSize: 1.8,
+    speed: 1.1,
+    pulseScale: 1.15,
+    color: 'rgba(99,179,237,0.9)',
+    glowColor: 'rgba(99,179,237,0.18)',
+    scatterRadius: 2.5,
+  },
+  thinking: {
+    dots: 18,
+    radius: 11,
+    dotSize: 1.6,
+    speed: 2.2,
+    pulseScale: 1.25,
+    color: 'rgba(167,139,250,0.9)',
+    glowColor: 'rgba(139,92,246,0.22)',
+    scatterRadius: 4,
+  },
+  speaking: {
+    dots: 16,
+    radius: 11,
+    dotSize: 2,
+    speed: 1.6,
+    pulseScale: 1.2,
+    color: 'rgba(52,211,153,0.9)',
+    glowColor: 'rgba(16,185,129,0.20)',
+    scatterRadius: 3,
+  },
+  loading: {
+    dots: 12,
+    radius: 10,
+    dotSize: 1.5,
+    speed: 3.5,
+    pulseScale: 1.1,
+    color: 'rgba(251,191,36,0.85)',
+    glowColor: 'rgba(245,158,11,0.15)',
+    scatterRadius: 1.5,
+  },
+  error: {
+    dots: 10,
+    radius: 10,
+    dotSize: 1.8,
+    speed: 0.6,
+    pulseScale: 1.05,
+    color: 'rgba(248,113,113,0.9)',
+    glowColor: 'rgba(239,68,68,0.18)',
+    scatterRadius: 1,
+  },
 };
 
-const SIZE: Record<'sm' | 'md' | 'lg', { outer: string; inner: string }> = {
-    sm: { outer: 'w-8 h-8', inner: 'w-6 h-6' },
-    md: { outer: 'w-16 h-16', inner: 'w-12 h-12' },
-    lg: { outer: 'w-32 h-32', inner: 'w-24 h-24' },
+const SIZE_MAP = {
+  sm: 28,
+  md: 56,
+  lg: 96,
 };
 
 export function GlowingOrb({
-    state = 'idle',
-    size = 'md',
-    className,
+  state = 'idle',
+  size = 'md',
+  className,
 }: {
-    state?: OrbState;
-    size?: 'sm' | 'md' | 'lg';
-    className?: string;
+  state?: OrbState;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }) {
-    const { outer, inner } = SIZE[size];
-    const engaged = state !== 'idle';
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+  const stateRef = useRef<OrbState>(state);
+  const timeRef = useRef<number>(0);
 
-    return (
-        <div className={cn('relative flex items-center justify-center', outer, className)}>
-            <div className={cn('absolute inset-0 rounded-full blur-2xl transition-all duration-1000', STATE_GLOW[state])} />
-            <div
-                className={cn(
-                    'relative rounded-full overflow-hidden transition-transform duration-700 shadow-[0_0_40px_rgba(var(--primary-rgb),0.4)]',
-                    inner,
-                    state === 'thinking' ? 'scale-110' : state === 'listening' || state === 'speaking' ? 'scale-105' : 'scale-100'
-                )}
-            >
-                <div
-                    className={cn(
-                        'absolute inset-0 opacity-90',
-                        engaged && 'animate-[spin_4s_linear_infinite]'
-                    )}
-                    style={{
-                        background: 'conic-gradient(from 0deg, var(--primary), rgba(var(--primary-rgb), 0.4), var(--primary))'
-                    }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-white/40 to-transparent mix-blend-overlay" />
-                <div className="absolute inset-[3%] rounded-full bg-gradient-to-b from-white/30 to-transparent backdrop-blur-sm border border-white/20" />
-            </div>
-        </div>
-    );
+  // Update state ref whenever prop changes
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const px = SIZE_MAP[size];
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // HiDPI
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = px * dpr;
+    canvas.height = px * dpr;
+    ctx.scale(dpr, dpr);
+
+    const cx = px / 2;
+    const cy = px / 2;
+
+    let last = performance.now();
+
+    function lerp(a: number, b: number, t: number) {
+      return a + (b - a) * t;
+    }
+
+    // Current interpolated values
+    let curRadius = STATE_CONFIG[stateRef.current].radius;
+    let curSpeed = STATE_CONFIG[stateRef.current].speed;
+    let curScatter = STATE_CONFIG[stateRef.current].scatterRadius;
+    let curDotSize = STATE_CONFIG[stateRef.current].dotSize;
+
+    function draw(now: number) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      timeRef.current += dt;
+      const t = timeRef.current;
+
+      const cfg = STATE_CONFIG[stateRef.current];
+      const lerpT = 1 - Math.pow(0.05, dt * 6); // smooth ~60fps interpolation
+
+      curRadius = lerp(curRadius, cfg.radius, lerpT);
+      curSpeed = lerp(curSpeed, cfg.speed, lerpT);
+      curScatter = lerp(curScatter, cfg.scatterRadius, lerpT);
+      curDotSize = lerp(curDotSize, cfg.dotSize, lerpT);
+
+      ctx.clearRect(0, 0, px, px);
+
+      // Outer glow
+      const glowR = px * 0.45 * cfg.pulseScale;
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      grd.addColorStop(0, cfg.glowColor.replace(')', ', 0.9)').replace('rgba', 'rgba'));
+      grd.addColorStop(0.5, cfg.glowColor);
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Center core dot
+      const coreSize = curDotSize * (size === 'sm' ? 0.9 : 1.2);
+      ctx.fillStyle = cfg.color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreSize * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orbit dots
+      const n = cfg.dots;
+      for (let i = 0; i < n; i++) {
+        const angle = (i / n) * Math.PI * 2 + t * curSpeed;
+
+        // Scatter: each dot wobbles on its own phase
+        const phase = (i / n) * Math.PI * 2;
+        const scatter = Math.sin(t * 1.8 + phase) * curScatter;
+        const r = curRadius + scatter;
+
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+
+        // Opacity: leading dots brighter
+        const opacityNorm = 0.3 + 0.7 * ((i / n + 0.5) % 1);
+        const sz = curDotSize * (size === 'sm' ? 0.75 : 1);
+
+        ctx.globalAlpha = opacityNorm;
+        ctx.fillStyle = cfg.color;
+        ctx.beginPath();
+        ctx.arc(x, y, sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+      animRef.current = requestAnimationFrame(draw);
+    }
+
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [px, size]);
+
+  return (
+    <div
+      className={cn('relative inline-flex items-center justify-center flex-shrink-0', className)}
+      style={{ width: px, height: px }}
+    >
+      <canvas
+        ref={canvasRef}
+        style={{ width: px, height: px }}
+        className="rounded-full"
+      />
+    </div>
+  );
 }

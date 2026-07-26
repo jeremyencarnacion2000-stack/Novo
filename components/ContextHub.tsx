@@ -963,7 +963,7 @@ const ContextHubComponent = () => {
 
   // ─── Single morphing hub — no FLIP, no element switching, pure shape animation ───
   return (
-    <div className="fixed left-0 top-0 h-full w-screen z-[60] flex flex-col items-start justify-start pointer-events-none overflow-visible">
+    <div className="fixed right-0 top-0 h-full w-screen z-[60] flex flex-col items-end justify-start pointer-events-none overflow-visible">
       <motion.div
         ref={hubRef}
         className={cn(
