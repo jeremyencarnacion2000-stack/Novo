@@ -25,6 +25,7 @@ import { ScrollContainerProvider } from '@/lib/scroll-container-context'
 import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
+import { PageTransition } from '@/components/ui/page-transition'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -149,7 +150,9 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   if (status === 'authenticated') {
     return (
       <DashboardShell>
-        {children}
+        <PageTransition>
+          {children}
+        </PageTransition>
       </DashboardShell>
     )
   }
