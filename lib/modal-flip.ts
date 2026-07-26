@@ -98,6 +98,10 @@ export const modalFlip = {
     killActive(id)
     cleanupFlying(id)
 
+    // Mark target and overlay active so CSS keeps them visible after GSAP finishes
+    target.classList.add('modal-flip-active')
+    if (overlay) overlay.classList.add('modal-flip-active')
+
     // Hide origin element instantly so button doesn't remain visible under flying clones
     origin.classList.add('modal-flip-source-active')
     gsap.set(origin, { opacity: 0 })
@@ -233,6 +237,8 @@ export const modalFlip = {
     const tl = gsap.timeline({
       defaults: { ease: EASE, duration: CLOSE_DURATION },
       onComplete: () => {
+        target.classList.remove('modal-flip-active')
+        if (overlay) overlay.classList.remove('modal-flip-active')
         cleanupFlying(id)
         gsap.set([origin, ...sharedPairs.map((p) => p.originEl)], { opacity: 1 })
         safeDone()

@@ -28,11 +28,16 @@
    modalFlip.toggle() sets opacity back to 1 as its very first inline style
    write, and the fallback path (missing flip pair) also forces it to 1 so a
    misconfigured pair never leaves a dialog stuck invisible. ────────────── */
-.modal-flip-target[data-state="open"] {
-  opacity: 1;
+.modal-flip-target {
+  opacity: 0;
 }
 
-.modal-flip-overlay[data-state="open"] {
+.modal-flip-overlay {
+  opacity: 0;
+}
+
+.modal-flip-target.modal-flip-active,
+.modal-flip-overlay.modal-flip-active {
   opacity: 1;
 }
 
