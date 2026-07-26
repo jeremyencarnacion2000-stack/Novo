@@ -32,13 +32,13 @@ export function ShareCognitiveCard({
 
   if (!isOpen) return null
 
-  const shareText = `🧠 Mi Cognitive Twin en Novo OS:
-✨ Precisión Cognitiva: ${twinScore}%
-⚡ Ventana de Foco Pico: ${peakWindow}
-🎯 Estilo de Foco: ${focusStyle}
-🛡️ Carga Cognitiva: ${cognitiveLoad}% | Riesgo de Fatiga: ${burnoutRisk}%
+  const shareText = `Mi Cognitive Twin en Novo OS:
+- Precisión Cognitiva: ${twinScore}%
+- Ventana de Foco Pico: ${peakWindow}
+- Estilo de Foco: ${focusStyle}
+- Carga Cognitiva: ${cognitiveLoad}% | Riesgo de Fatiga: ${burnoutRisk}%
 
-Optimiza tu rendimiento cognitivo sin burnout con Novo 👉 https://productivitynovo.vercel.app`
+Optimiza tu rendimiento cognitivo sin burnout con Novo -> https://productivitynovo.vercel.app`
 
   const handleCopyText = async () => {
     try {

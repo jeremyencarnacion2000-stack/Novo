@@ -115,8 +115,8 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
       if (completedToday.length >= 3) {
         notifications.push({
           id: `daily-achievement-${day}`, type: 'achievement', read: false,
-          title: `¡${completedToday.length} tareas completadas hoy!`,
-          body: '¡Buen trabajo! Sigue así 💪',
+          title: `${completedToday.length} tareas completadas hoy`,
+          body: 'Excelente avance. Sigue enfocado.',
           timestamp: now.toISOString(), source: 'tasks',
         })
       }
@@ -136,14 +136,14 @@ async function generateSmartNotifications(): Promise<AppNotification[]> {
   if (hour >= 6 && hour < 9) {
     notifications.push({
       id: `morning-greeting-${day}`, type: 'info', read: false,
-      title: '¡Buenos días! ☀️',
+      title: 'Buenos días',
       body: 'Revisa tu plan del día y establece tus prioridades.',
       timestamp: now.toISOString(), source: 'system', actionUrl: '/today',
     })
   } else if (hour >= 22 || hour < 3) {
     notifications.push({
       id: `night-review-${day}`, type: 'suggestion', read: false,
-      title: 'Resumen del día 🌙',
+      title: 'Resumen del día',
       body: 'Es buen momento para revisar lo que lograste hoy.',
       timestamp: now.toISOString(), source: 'system', actionUrl: '/analytics',
     })
@@ -704,7 +704,7 @@ export function NotificationCenter() {
                         </motion.div>
                         <div className="text-center">
                           <p className="text-xs text-foreground/30 font-medium">Todo en orden</p>
-                          <p className="text-[10px] text-foreground/18 mt-0.5">Sin notificaciones pendientes 🎉</p>
+                          <p className="text-[10px] text-foreground/18 mt-0.5">Sin notificaciones pendientes</p>
                         </div>
                       </motion.div>
                     ) : (

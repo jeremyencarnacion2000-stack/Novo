@@ -62,7 +62,7 @@ function selectModelForIntent(
         return {
             model: 'qwen/qwen3-32b',              // Code gen model (Step 2)
             prompt: REPLICATION_CODE_PROMPT,
-            label: '🔬 Design Replicator',
+            label: 'Design Replicator',
             isReplication: true                         // Flag for two-model pipeline
         };
     }
@@ -72,7 +72,7 @@ function selectModelForIntent(
         return {
             model: 'llama-3.2-11b-vision-preview',
             prompt: COGNITIVE_CORE_PROMPT,
-            label: '👁️ Vision'
+            label: 'Vision'
         };
     }
 
@@ -81,25 +81,25 @@ function selectModelForIntent(
             return {
                 model: 'qwen/qwen3-32b',
                 prompt: CODE_SPECIALIST_PROMPT,
-                label: '🧠 Code Engine'
+                label: 'Code Engine'
             };
         case 'QUIZ':
             return {
                 model: 'qwen/qwen3-32b',
                 prompt: QUIZ_SPECIALIST_PROMPT,
-                label: '🎯 Quiz Engine'
+                label: 'Quiz Engine'
             };
         case 'DESIGN':
             return {
                 model: 'qwen/qwen3-32b',
                 prompt: DESIGN_SPECIALIST_PROMPT,
-                label: '🎨 Design Engine'
+                label: 'Design Engine'
             };
         default:
             return {
                 model: 'llama-3.3-70b-versatile',
                 prompt: COGNITIVE_CORE_PROMPT,
-                label: '💬 Cognitive Core'
+                label: 'Cognitive Core'
             };
     }
 }
@@ -197,16 +197,16 @@ export async function POST(request: NextRequest) {
 
             // Update prompt to match the explicitly chosen model
             if (model.includes('qwen') || model.includes('coder-32b')) {
-                modelLabel = '⚡ Qwen 2.5 Coder';
+                modelLabel = 'Qwen 2.5 Coder';
                 selectedPrompt = SYSTEM_PROMPT; // General-purpose prompt for Qwen
             } else if (model.includes('gpt-oss')) {
-                modelLabel = '🧠 Code Engine (Qwen 32B)';
+                modelLabel = 'Code Engine (Qwen 32B)';
                 selectedPrompt = CODE_SPECIALIST_PROMPT;
             } else if (model.includes('llama-3.3')) {
-                modelLabel = '💬 Cognitive Core (Llama 3.3)';
+                modelLabel = 'Cognitive Core (Llama 3.3)';
                 selectedPrompt = COGNITIVE_CORE_PROMPT;
             } else if (model.includes('llama-4-scout') || model.includes('llama-3.2') || model.includes('vision')) {
-                modelLabel = '👁️ Vision Scout (Llama 3.2)';
+                modelLabel = 'Vision Scout (Llama 3.2)';
                 selectedPrompt = COGNITIVE_CORE_PROMPT;
             } else {
                 modelLabel = model.split('/').pop() || model;
@@ -424,7 +424,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 // account only has gemma-4-31b / zai-glm-4.7 / gpt-oss-120b.
                 finalModel = 'gpt-oss-120b';
                 isFallbackUsed = true;
-                modelLabel = '⚡ Cerebras (Rescate)';
+                modelLabel = 'Cerebras (Rescate)';
 
                 groqResponse = await fetch('https://api.cerebras.ai/v1/chat/completions', {
                     method: 'POST',
@@ -454,7 +454,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 console.warn('[Novo Brain] Groq and Cerebras exhausted. Activating Gemini direct rescue...');
                 finalModel = 'gemini-2.0-flash';
                 isFallbackUsed = true;
-                modelLabel = '✨ Gemini (Rescate)';
+                modelLabel = 'Gemini (Rescate)';
 
                 groqResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
                     method: 'POST',
@@ -484,7 +484,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 console.warn('[Novo Brain] Groq completely throttled/failed. Activating OpenRouter rescue fallback...');
                 finalModel = 'openai/gpt-4o-mini';
                 isFallbackUsed = true;
-                modelLabel = '⚡ GPT-4o mini (Rescate)';
+                modelLabel = 'GPT-4o mini (Rescate)';
                 
                 groqResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',

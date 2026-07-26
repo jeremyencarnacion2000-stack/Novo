@@ -17,6 +17,7 @@ import { ScrollReveal } from '@/components/ui/scroll-reveal'
 import { useCognitivePhase } from '@/lib/cognitive-context'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { Shield } from 'lucide-react'
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -101,9 +102,16 @@ export default function DashboardClient() {
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
                     phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5"
                   )}
-                  style={{ textShadow: '0 0 10px currentColor' }}
+                <motion.span
+                  className={cn(
+                    "text-[9px] font-mono font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border shadow-sm inline-flex items-center gap-1.5",
+                    phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/5",
+                    phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
+                    phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5"
+                  )}
                 >
-                  🛡️ Adaptive Shield: {phase === 'PEAK_FOCUS' ? 'Peak Focus' : phase === 'SYNAPTIC_FATIGUE' ? 'Recovery Mode' : 'Stress Adapt'}
+                  <Shield className="w-3 h-3" />
+                  <span>Adaptive Shield: {phase === 'PEAK_FOCUS' ? 'Peak Focus' : phase === 'SYNAPTIC_FATIGUE' ? 'Recovery Mode' : 'Stress Adapt'}</span>
                 </motion.span>
               )}
             </h2>
@@ -154,13 +162,14 @@ export default function DashboardClient() {
               {phase !== 'LINEAR_EXECUTION' && (
                 <span
                   className={cn(
-                    "text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded-full border leading-none",
+                    "text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded-full border leading-none inline-flex items-center gap-1",
                     phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
                     phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20"
                   )}
                 >
-                  🛡️ Shield Active
+                  <Shield className="w-2.5 h-2.5" />
+                  <span>Shield Active</span>
                 </span>
               )}
             </h2>

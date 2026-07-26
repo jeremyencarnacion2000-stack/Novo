@@ -88,11 +88,9 @@ export const modalFlip = {
 
     const { origin, target, overlay } = findPair(id)
     if (!origin || !target) {
-      // Missing pair (e.g. a caller forgot to put data-flip-from on the
-      // trigger element) must never leave the target or overlay stuck
-      // invisible — reveal them plainly instead of failing invisibly.
-      if (target) target.style.opacity = '1'
-      if (overlay) overlay.style.opacity = '1'
+      // Missing pair — reveal target and overlay smoothly without GSAP FLIP
+      if (target) gsap.to(target, { opacity: 1, duration: 0.2 })
+      if (overlay) gsap.to(overlay, { opacity: 1, duration: 0.2 })
       onDone?.()
       return
     }
@@ -100,15 +98,9 @@ export const modalFlip = {
     killActive(id)
     cleanupFlying(id)
 
-    // NOTE: deliberately NO prefers-reduced-motion branch here. An earlier
-    // version skipped the physical animation for users whose OS reports
-    // reduced motion (common on low-RAM Windows machines where "Show
-    // animations in Windows" is off) and played a plain 150ms opacity fade
-    // instead — which read as "the animation is missing entirely." The
-    // reference implementation this ports has no such branch; the container
-    // transform IS the product experience, so it always runs.
-
+    // Hide origin element instantly so button doesn't remain visible under flying clones
     origin.classList.add('modal-flip-source-active')
+    gsap.set(origin, { opacity: 0 })
 
     const originRect = origin.getBoundingClientRect()
     const originRadius = getComputedStyle(origin).borderRadius

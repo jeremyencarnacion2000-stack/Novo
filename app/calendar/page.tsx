@@ -51,15 +51,15 @@ export default function CalendarPage() {
   });
 
   const sourceLabels: Record<string, { label: string; icon: string; color: string }> = {
-    google:    { label: 'Google',    icon: '📅', color: '#A5B4FC' },
-    checklist: { label: 'Tasks',     icon: '✓',  color: '#67E8F9' },
-    project:   { label: 'Projects',  icon: '📋', color: '#6EE7B7' },
-    school:    { label: 'School',    icon: '🎓', color: '#C4B5FD' },
-    routine:   { label: 'Routines',  icon: '🔄', color: '#FDBA74' },
-    habit:     { label: 'Habits',    icon: '✨', color: '#5EEAD4' },
-    business:  { label: 'Business',  icon: '💼', color: '#FCA5A5' },
-    holidays:  { label: 'Holidays',  icon: '🎉', color: '#CBD5E1' },
-    novo:      { label: 'Asistente', icon: '🤖', color: '#818CF8' },
+    google:    { label: 'Google',    icon: '•', color: '#A5B4FC' },
+    checklist: { label: 'Tasks',     icon: '✓', color: '#67E8F9' },
+    project:   { label: 'Projects',  icon: '•', color: '#6EE7B7' },
+    school:    { label: 'School',    icon: '•', color: '#C4B5FD' },
+    routine:   { label: 'Routines',  icon: '•', color: '#FDBA74' },
+    habit:     { label: 'Habits',    icon: '•', color: '#5EEAD4' },
+    business:  { label: 'Business',  icon: '•', color: '#FCA5A5' },
+    holidays:  { label: 'Holidays',  icon: '•', color: '#CBD5E1' },
+    novo:      { label: 'Asistente', icon: '•', color: '#818CF8' },
   };
 
   // ── Fetch events ──

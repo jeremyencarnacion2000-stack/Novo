@@ -29,11 +29,11 @@
    write, and the fallback path (missing flip pair) also forces it to 1 so a
    misconfigured pair never leaves a dialog stuck invisible. ────────────── */
 .modal-flip-target {
-  /* opacity managed by modalFlip / GSAP / Radix */
+  opacity: 0;
 }
 
 .modal-flip-overlay {
-  /* opacity managed by modalFlip / GSAP / Radix */
+  opacity: 0;
 }
 
 @keyframes novo-panel-in {

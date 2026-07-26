@@ -537,7 +537,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 model: 'auto'
             });
 
-            let activeModelLabel = '💬 Cognitive Core';
+            let activeModelLabel = 'Cognitive Core';
             let activeIntent: string | undefined;
             let activeFallback = false;
 
