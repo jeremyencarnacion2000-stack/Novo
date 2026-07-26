@@ -128,6 +128,8 @@ export const modalFlip = {
       onComplete: () => {
         gsap.set(target, { clearProps: 'position,left,top,width,height,borderRadius,overflow,zIndex,transition' })
         gsap.set(contentEls, { clearProps: 'opacity,transition' })
+        gsap.set(target, { opacity: 1 })
+        if (overlay) gsap.set(overlay, { opacity: 1 })
         // Reveal the real target copies and hide the flying clones — kept
         // alive (not removed) so they can fly back on close.
         gsap.set(sharedPairs.map((p) => p.targetEl), { opacity: 1 })
