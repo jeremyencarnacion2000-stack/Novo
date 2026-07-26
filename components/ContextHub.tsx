@@ -12,7 +12,7 @@
  */
 
 import React, { startTransition, useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { usePlayerStore } from '@/lib/player-store';
 import { useSettings } from '@/lib/settings-context';
 import { useFocus } from '@/lib/focus-context';
@@ -22,8 +22,11 @@ import type { CognitivePhase } from '@/lib/cognitive-engine';
 import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
   Sun, Moon, Music, CloudSun, Cloud, CloudRain, Zap,
-  Brain, X, GripVertical
+  Brain, X, GripVertical, ArrowRight, Target, Coffee
 } from 'lucide-react';
+import {
+  SiNotion, SiTodoist, SiSlack, SiGmail, SiGooglecalendar
+} from 'react-icons/si';
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
@@ -44,22 +47,147 @@ const PHASE_LABEL: Record<CognitivePhase, string> = {
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type HubState = 'idle' | 'capsule' | 'expanded';
+type HubState = 'idle' | 'capsule' | 'expanded' | 'notification';
 type WeatherIcon = 'sun' | 'cloud-sun' | 'cloud' | 'cloud-rain' | 'zap';
+
+const HUB_SHAPE: Record<HubState, { width: number; height: number; radius: number }> = {
+  idle: { width: 8, height: 80, radius: 20 },
+  capsule: { width: 46, height: 190, radius: 9999 },
+  notification: { width: 352, height: 118, radius: 30 },
+  expanded: { width: 360, height: 310, radius: 26 },
+};
+
+const HUB_SPRING = {
+  type: 'spring' as const,
+  stiffness: 520,
+  damping: 34,
+  mass: 0.86,
+  restDelta: 0.01,
+  restSpeed: 0.01,
+};
+
+export interface TwinNotificationPayload {
+  title: string;
+  description: string;
+  platform?: 'notion' | 'todoist' | 'slack' | 'gmail' | 'calendar' | 'books' | 'twin';
+  severity?: 'info' | 'warning' | 'critical';
+  actionLabel?: string;
+  actionUrl?: string;
+}
+
+export function emitTwinNotification(payload: TwinNotificationPayload) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cognitive:notification', { detail: payload }));
+  }
+}
+
+function NotificationContent({
+  notification,
+  onDismiss,
+}: {
+  notification: TwinNotificationPayload;
+  onDismiss: () => void;
+}) {
+  const router = useRouter();
+
+  // Strip any legacy generic emojis from title to enforce NOVO vector icon design system
+  const cleanTitle = notification.title
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .trim();
+
+  const isCritical = notification.severity === 'critical';
+  const isWarning = notification.severity === 'warning';
+
+  const dotColor = isCritical ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-emerald-400';
+  const tagColor = isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-indigo-400';
+
+  const iconContainerClass = isCritical
+    ? 'bg-red-500/15 border-red-500/30 text-red-400'
+    : isWarning
+    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+    : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400';
+
+  const renderIcon = () => {
+    if (notification.platform === 'notion') return <SiNotion className="w-3.5 h-3.5 text-white" />;
+    if (notification.platform === 'todoist') return <SiTodoist className="w-3.5 h-3.5 text-red-400" />;
+    if (notification.platform === 'slack') return <SiSlack className="w-3.5 h-3.5 text-emerald-400" />;
+    if (notification.platform === 'gmail') return <SiGmail className="w-3.5 h-3.5 text-red-400" />;
+    if (notification.platform === 'calendar') return <SiGooglecalendar className="w-3.5 h-3.5 text-blue-400" />;
+
+    if (cleanTitle.toLowerCase().includes('fatiga')) return <Coffee className="w-3.5 h-3.5 text-amber-400" />;
+    if (cleanTitle.toLowerCase().includes('foco') || cleanTitle.toLowerCase().includes('focus')) return <Target className="w-3.5 h-3.5 text-indigo-400" />;
+    if (cleanTitle.toLowerCase().includes('capacidad') || cleanTitle.toLowerCase().includes('reducida')) return <Zap className="w-3.5 h-3.5 text-red-400" />;
+
+    return <Brain className="w-3.5 h-3.5 text-indigo-400" />;
+  };
+
+  return (
+    <div className="w-full h-full p-3.5 flex flex-col justify-between overflow-hidden relative bg-black/95 border border-white/10 backdrop-blur-3xl rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)]">
+      {/* Top Header Row — iOS Dynamic Island style dot indicator + category tag */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", dotColor)} />
+          <span className={cn("text-[9px] font-mono font-bold tracking-widest uppercase opacity-90", tagColor)}>
+            TWIN SIGNAL
+          </span>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Main Content Row */}
+      <div className="flex items-center gap-3 my-0.5 min-w-0">
+        <div className={cn("w-8 h-8 rounded-full border flex items-center justify-center flex-shrink-0 shadow-inner", iconContainerClass)}>
+          {renderIcon()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-[13px] font-bold text-white tracking-tight leading-tight truncate">
+            {cleanTitle}
+          </h4>
+          <p className="text-[10px] text-white/70 font-normal leading-snug line-clamp-2 mt-0.5">
+            {notification.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Action Footer */}
+      {notification.actionLabel && (
+        <div className="flex justify-end pt-0.5">
+          <button
+            onClick={() => {
+              if (notification.actionUrl) {
+                router.push(notification.actionUrl);
+              }
+              onDismiss();
+            }}
+            className="px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/15 text-[10px] font-semibold text-white transition-all shadow-sm flex items-center gap-1 cursor-pointer active:scale-95"
+          >
+            <span>{notification.actionLabel}</span>
+            <ArrowRight className="w-3 h-3 text-white/80" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Weather icon map (Thin-Line Custom SVGs with stroke-width: 1.2) ──────────
 function getWeatherIcon(type: WeatherIcon) {
   const strokeCls = "w-4 h-4 stroke-[1.2]";
   switch (type) {
-    case 'sun': 
+    case 'sun':
       return <Sun className={cn(strokeCls, "text-amber-300/80")} strokeWidth={1.2} />;
-    case 'cloud-sun': 
+    case 'cloud-sun':
       return <CloudSun className={cn(strokeCls, "text-zinc-400")} strokeWidth={1.2} />;
-    case 'cloud': 
+    case 'cloud':
       return <Cloud className={cn(strokeCls, "text-zinc-500")} strokeWidth={1.2} />;
-    case 'cloud-rain': 
+    case 'cloud-rain':
       return <CloudRain className={cn(strokeCls, "text-blue-400/80")} strokeWidth={1.2} />;
-    case 'zap': 
+    case 'zap':
       return <Zap className={cn(strokeCls, "text-yellow-400/80")} strokeWidth={1.2} />;
   }
 }
@@ -96,7 +224,7 @@ function AnalogClock({ time, attentionScore }: { time: Date | null; attentionSco
     <svg viewBox="0 0 44 44" className="w-10 h-10" strokeLinecap="round">
       {/* Background track circle */}
       <circle cx="22" cy="22" r="21" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.8" />
-      
+
       {/* Dynamic Cognitive Capacity Outer Arc */}
       <circle
         cx="22"
@@ -230,8 +358,8 @@ function PlaylistPanel() {
             className={cn(
               'flex-1 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
-              activeList === tab 
-                ? 'bg-white/5 backdrop-blur-md text-white border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]' 
+              activeList === tab
+                ? 'bg-white/5 backdrop-blur-md text-white border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
                 : 'text-zinc-500 hover:text-zinc-300'
             )}
           >
@@ -388,9 +516,9 @@ function ClockSection({
       </div>
 
       <p className="text-[10px] font-mono font-medium text-zinc-500 tracking-tighter leading-none">{formattedTime}</p>
-      
+
       <div className="w-6 h-px bg-white/10 my-0.5" />
-      
+
       {getWeatherIcon(weatherIcon)}
     </>
   );
@@ -473,7 +601,7 @@ function ExpandedContent({
               <p className="text-[8px] text-amber-400/80 leading-normal">Stress score high. Tap to initiate 2-min recovery.</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
             className="px-2 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/40 text-[8px] font-bold uppercase tracking-widest text-white border border-amber-500/30 transition-all flex-shrink-0"
           >
@@ -493,8 +621,8 @@ function ExpandedContent({
             className={cn(
               'flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
-              activeTab === tab 
-                ? 'bg-white/5 backdrop-blur-md text-white border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]' 
+              activeTab === tab
+                ? 'bg-white/5 backdrop-blur-md text-white border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
                 : 'text-zinc-500 hover:text-zinc-300'
             )}
           >
@@ -613,11 +741,13 @@ const ContextHubComponent = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [cognitiveAlert, setCognitiveAlert] = useState(false);
   const [dopaminePulse, setDopaminePulse] = useState(false);
+  const [activeNotification, setActiveNotification] = useState<TwinNotificationPayload | null>(null);
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Direct y motion value — no spring to avoid oscillation
-  const y = useMotionValue(24);
+  const y = useMotionValue(80);
   const [windowHeight, setWindowHeight] = useState(800);
   const SCROLL_BAR_HEIGHT = 80;
 
@@ -646,8 +776,8 @@ const ContextHubComponent = () => {
       const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
 
       // Update vertical position directly (no spring)
-      if (hubStateRef.current !== 'expanded') {
-        const topPadding = 24;
+      if (hubStateRef.current !== 'expanded' && hubStateRef.current !== 'notification') {
+        const topPadding = 80;
         const travelRange = Math.max(0, windowHeight - topPadding - 24 - SCROLL_BAR_HEIGHT);
         y.set(progress * travelRange + topPadding);
       }
@@ -659,7 +789,7 @@ const ContextHubComponent = () => {
         if (!isHoveredRef.current) {
           setHubState(cur => cur === 'capsule' ? 'idle' : cur);
         }
-      }, 100);
+      }, 1400);
     };
 
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
@@ -735,28 +865,64 @@ const ContextHubComponent = () => {
     };
     const onRoutine = () => {
       setHubState('capsule');
-      setTimeout(() => setHubState('idle'), 1500);
+      setTimeout(() => setHubState('idle'), 1800);
+    };
+    const handleNotification = (e: Event) => {
+      const detail = (e as CustomEvent).detail as TwinNotificationPayload;
+      if (detail) {
+        setActiveNotification(detail);
+        setHubState('notification');
+        if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+        notificationTimerRef.current = setTimeout(() => {
+          setCognitiveAlert(false);
+          setHubState('idle');
+        }, 6000);
+      }
     };
     const onFatigue = () => {
       setCognitiveAlert(true);
-      setHubState('capsule');
-      setTimeout(() => setCognitiveAlert(false), 4000);
+      handleNotification(new CustomEvent('cognitive:notification', {
+        detail: {
+          title: 'Alerta de Fatiga Cognitiva',
+          description: 'Se ha detectado acumulación de fatiga. Te recomendamos hacer una pausa de 5 minutos o activar la música de foco.',
+          platform: 'twin',
+          severity: 'warning',
+          actionLabel: 'Escuchar Música',
+          actionUrl: '/music'
+        }
+      }));
     };
     const onNavWarn = () => {
       setCognitiveAlert(true);
-      setHubState('capsule');
-      setTimeout(() => setCognitiveAlert(false), 3000);
+      handleNotification(new CustomEvent('cognitive:notification', {
+        detail: {
+          title: 'Ventana de Foco Activa',
+          description: 'Estás en tu ventana pico de concentración. Evita el cambio de contexto para maximizar tu rendimiento.',
+          platform: 'twin',
+          severity: 'info',
+          actionLabel: 'Ver Tareas',
+          actionUrl: '/checklist'
+        }
+      }));
     };
     const onReduced = () => {
       setCognitiveAlert(true);
-      expandedViaHoverRef.current = false;
-      setHubState('expanded');
-      setTimeout(() => setCognitiveAlert(false), 5000);
+      handleNotification(new CustomEvent('cognitive:notification', {
+        detail: {
+          title: 'Capacidad Reducida',
+          description: 'Tu reserva energética está baja. Se recomienda respiración guiada o tareas de bajo impacto.',
+          platform: 'twin',
+          severity: 'critical',
+          actionLabel: 'Iniciar Respiración',
+          actionUrl: '/cognitive'
+        }
+      }));
     };
 
     window.addEventListener('habit-completed', onHabit);
     window.addEventListener('cognitive:task-completed', onTask);
     window.addEventListener('routine-opened', onRoutine);
+    window.addEventListener('cognitive:notification', handleNotification);
     window.addEventListener('cognitive:fatigue-onset', onFatigue);
     window.addEventListener('cognitive:navigation-warning', onNavWarn);
     window.addEventListener('cognitive:reduced-capacity-onset', onReduced);
@@ -764,9 +930,11 @@ const ContextHubComponent = () => {
       window.removeEventListener('habit-completed', onHabit);
       window.removeEventListener('cognitive:task-completed', onTask);
       window.removeEventListener('routine-opened', onRoutine);
+      window.removeEventListener('cognitive:notification', handleNotification);
       window.removeEventListener('cognitive:fatigue-onset', onFatigue);
       window.removeEventListener('cognitive:navigation-warning', onNavWarn);
       window.removeEventListener('cognitive:reduced-capacity-onset', onReduced);
+      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     };
   }, [logHabit]);
 
@@ -795,11 +963,11 @@ const ContextHubComponent = () => {
 
   // ─── Single morphing hub — no FLIP, no element switching, pure shape animation ───
   return (
-    <div className="fixed right-0 top-0 h-full w-[60px] z-[60] flex flex-col items-end justify-start pointer-events-none">
+    <div className="fixed right-0 top-0 h-full w-screen z-[60] flex flex-col items-end justify-start pointer-events-none overflow-visible">
       <motion.div
         ref={hubRef}
         className={cn(
-          "pointer-events-auto select-none relative overflow-hidden border transition-colors duration-300",
+          "context-hub-layer pointer-events-auto select-none relative overflow-hidden border transition-colors duration-300",
           hubState === 'idle'
             ? 'bg-white/20 border-white/5 cursor-pointer hover:bg-white/40'
             : hubState === 'capsule' && cognitiveAlert
@@ -809,23 +977,26 @@ const ContextHubComponent = () => {
                 : 'border-white/10 bg-black/95 backdrop-blur-3xl cursor-default',
           (hubState === 'capsule' || hubState === 'expanded') && dopaminePulse && 'animate-dopamine-pulse',
         )}
-        style={{ marginRight: '4px', y }}
+        style={{ y }}
         initial={{
-          width: 8, height: 80, borderRadius: 20, opacity: 0.55,
+          width: HUB_SHAPE.idle.width, height: HUB_SHAPE.idle.height, borderRadius: HUB_SHAPE.idle.radius, opacity: 0.55,
           boxShadow: '0 0 0 rgba(0,0,0,0)',
+          transformOrigin: '100% 50%',
         }}
         animate={{
-          width: hubState === 'idle' ? 8 : hubState === 'capsule' ? 46 : 360,
-          height: hubState === 'idle' ? 80 : hubState === 'capsule' ? 190 : 310,
-          borderRadius: hubState === 'idle' ? 20 : hubState === 'capsule' ? 9999 : 24,
+          width: HUB_SHAPE[hubState].width,
+          height: HUB_SHAPE[hubState].height,
+          borderRadius: HUB_SHAPE[hubState].radius,
           opacity: hubState === 'idle' ? 0.55 : 1,
           boxShadow: hubState === 'idle'
             ? '0 0 0 rgba(0,0,0,0)'
             : hubState === 'expanded'
-              ? '0 32px 64px rgba(0,0,0,0.8), inset 0 0 24px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.08)'
-              : '0 16px 48px rgba(0,0,0,0.7)',
+              ? '-24px 32px 72px rgba(0,0,0,0.78), inset 0 0 24px rgba(255,255,255,0.025), inset 0 1px 0 rgba(255,255,255,0.09)'
+              : hubState === 'notification'
+                ? '-18px 18px 48px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.10)'
+                : '-10px 16px 48px rgba(0,0,0,0.62)',
         }}
-        transition={{ type: 'tween', duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+        transition={HUB_SPRING}
         onMouseEnter={() => {
           setIsHovered(true);
           if (hubState === 'idle') setHubState('capsule');
@@ -863,14 +1034,32 @@ const ContextHubComponent = () => {
               <CapsuleContent cognitiveAlert={cognitiveAlert} />
             </motion.div>
           )}
+          {hubState === 'notification' && activeNotification && (
+            <motion.div
+              key="notification"
+              className="absolute inset-0"
+              initial={{ opacity: 0, x: 16, scale: 0.985, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, x: 10, scale: 0.985, filter: 'blur(5px)' }}
+              transition={{ type: 'spring', stiffness: 560, damping: 38, mass: 0.78 }}
+            >
+              <NotificationContent
+                notification={activeNotification}
+                onDismiss={() => {
+                  setCognitiveAlert(false);
+                  setHubState('capsule');
+                }}
+              />
+            </motion.div>
+          )}
           {hubState === 'expanded' && (
             <motion.div
               key="expanded"
               className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              initial={{ opacity: 0, x: 18, scale: 0.992, filter: 'blur(5px)' }}
+              animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, x: 12, scale: 0.992, filter: 'blur(5px)' }}
+              transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.76 }}
             >
               <ExpandedContent
                 setHubState={setHubState}

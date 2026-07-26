@@ -431,7 +431,7 @@ export function AppSidebar() {
                   aria-label="Settings"
                   className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative",
                     state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "w-full",
-                    isSettingsOpen ? "p-0 overflow-hidden" : "px-3 hover:bg-foreground/10"
+                    isSettingsOpen ? "p-0 overflow-hidden opacity-0 pointer-events-none" : "px-3 hover:bg-foreground/10 opacity-100"
                   )}
                 >
                   {isSettingsOpen ? (

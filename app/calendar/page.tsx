@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { modalFlip } from '@/lib/modal-flip';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -143,16 +143,14 @@ export default function CalendarPage() {
   // setTimeout() raced the render and could fire before the target existed,
   // leaving the modal permanently invisible (data-flip-target defaults to
   // opacity:0 and only modalFlip's own success path clears that).
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isCreateDialogOpen) return
-    const id = requestAnimationFrame(() => { modalFlip.toggle('btn-create-event') })
-    return () => cancelAnimationFrame(id)
+    modalFlip.toggle('btn-create-event')
   }, [isCreateDialogOpen])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selectedEvent) return
-    const id = requestAnimationFrame(() => { modalFlip.toggle(`event-${selectedEvent.id}`) })
-    return () => cancelAnimationFrame(id)
+    modalFlip.toggle(`event-${selectedEvent.id}`)
   }, [selectedEvent])
 
   const handleCloseCreateDialog = () => {
@@ -209,7 +207,7 @@ export default function CalendarPage() {
   return (
     <>
       <div className="h-full w-full p-0 md:p-4 overflow-hidden">
-        <Card variant="secondary" className="flex flex-col lg:flex-row gap-6 h-full min-h-0 rounded-none md:rounded-[28px] p-4 md:p-6 pb-24 md:pb-6 overflow-hidden relative border-foreground/10">
+        <Card variant="secondary" className="flex flex-col lg:flex-row gap-6 h-full min-h-0 rounded-none md:rounded-[28px] p-4 md:p-6 pb-24 md:pb-6 overflow-y-auto md:overflow-hidden relative border-foreground/10">
 
           {/* Mobile sidebar toggle */}
           <div className="lg:hidden flex justify-between items-center mb-4">

@@ -99,78 +99,14 @@ function DashboardShellInner({ children }: DashboardShellProps) {
             </PageWrapper>
           </div>
 
-          {/* Fixed Mobile Navigation */}
-          {pathname !== '/ai' && (
-            <div className="md:hidden">
-              <MobileNav />
-            </div>
-          )}
+          {/* Fixed Mobile Navigation — visible on all pages including /ai */}
+          <div className="md:hidden">
+            <MobileNav />
+          </div>
 
           {/* ── Floating Voice Button ──────────────────────────────────── */}
           {!isFullScreenPage && (
-            // bottom-40 (160px), not bottom-6: GeminiLiveOrb floats fixed at
-            // bottom:5rem with a 56px button — its top edge sits ~136px above
-            // the viewport bottom (same clearance value already established
-            // in PageWrapper.tsx's own pb-40 comment for this exact orb). At
-            // bottom-6 this stack's insight card grew upward directly into
-            // that band, so the orb visually sat on top of the card's own
-            // dismiss X.
             <div className="fixed bottom-40 right-6 z-[150] flex flex-col items-end gap-3">
-              {/* Unified Twin insight — live phase transitions and the DB-polled
-                  "Twin evolution" feed both render through this one card now
-                  (see usePeakTaskOrchestrator). Some insights are FYI-only;
-                  when `action` is present it's a real one-tap operation, not
-                  just text, rendered as a second row below the message. */}
-              <AnimatePresence>
-                {insight && (
-                  <motion.div
-                    key={insight.id}
-                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                    className="
-                      max-w-xs w-full rounded-[28px] border border-foreground/10 px-4 py-3
-                      backdrop-blur-[28px] bg-background/90
-                      shadow-[0_8px_40px_rgba(0,0,0,0.5)]
-                      flex flex-col gap-2.5
-                    "
-                  >
-                    <div className="flex items-start gap-3">
-                      <p
-                        className={cn(
-                          'flex-1 text-xs leading-relaxed',
-                          insight.tone === 'critical'
-                            ? 'text-red-400/85'
-                            : insight.tone === 'warning'
-                              ? 'text-amber-400/85'
-                              : 'text-foreground/75'
-                        )}
-                      >
-                        {insight.message}
-                      </p>
-                      <button
-                        onClick={dismissInsight}
-                        className="shrink-0 p-1 rounded-lg hover:bg-foreground/10 transition-colors text-foreground/30 hover:text-foreground/60"
-                        aria-label="Dismiss insight"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    {insight.action && (
-                      <button
-                        onClick={() => {
-                          insight.action?.onClick()
-                          dismissInsight()
-                        }}
-                        className="self-start px-3 py-1.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-                      >
-                        {insight.action.label}
-                      </button>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Voice drawer panel */}
               <AnimatePresence>

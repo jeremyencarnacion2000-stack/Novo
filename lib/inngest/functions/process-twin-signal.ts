@@ -1,5 +1,6 @@
 import { inngest } from '../client'
 import { prisma } from '@/lib/prisma'
+import { runTwinAgent } from '@/lib/cognitive/twin-agent'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -459,6 +460,9 @@ export async function processTwinSignalHandler(
         })
       } catch { /* non-critical */ }
     })
+
+    // ── Twin Agent: fire proactive actions (non-blocking) ──────────────────
+    step.run('run-twin-agent', () => runTwinAgent(userId)).catch(() => {/* non-critical */})
 
     return {
       success: true,

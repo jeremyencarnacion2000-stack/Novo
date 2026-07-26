@@ -1,4 +1,162 @@
-# Handoff — Novo session (2026-07-17)
+# Handoff — Novo session (2026-07-22)
+
+## Project
+
+**Novo** — a "Cognitive Operating System," not a productivity app. Core thesis: a
+"Cognitive Twin" continuously models the user's attention/energy/habits/workload
+from real behavioral signals and answers "what should this person do right now?"
+Next.js 16 (App Router), Prisma/Postgres (Neon), NextAuth, Tailwind v4, deployed to
+Vercel at **https://productivitynovo.vercel.app**. Hackathon deadline (Gemini
+XPRIZE) is Aug 17 2026 — see auto-memory for full context, unchanged this session.
+
+## State right now (2026-07-22)
+
+**Deployed to production** — `npx tsc --noEmit --incremental false` clean → `npx
+jest` (27 suites, 110 passed/1 skipped) → full local `npx next build --webpack`
+clean → `git commit` → `npx vercel deploy --prod --yes` → `npx vercel alias set
+<url> productivitynovo.vercel.app` → `curl` sanity check (200).
+
+**Git history note — this changes a long-standing pattern.** Every prior
+session's handoff (archived below) says "nothing committed, ever." That is
+**no longer true**: this session's work is a real commit
+(`6f109a9 feat(integrations): build Todoist + Slack end-to-end, fix Notion
+databaseIds wipe on reconnect`), and `git log` shows 7 more real commits
+immediately before it (`a1ef99d` Gmail/Books Twin wiring, `7022323`/`4a8939f`
+Notion database-selection prompts, `9ff1d9d` the OAuth scope split,
+`abcf337` the route-export build fix, `4eac2af` landing nav/hero fixes,
+`bd57cf2` the generic-payment-language legal fix) — real git history now
+exists for a meaningful stretch of recent work, evidently started in a
+session between 2026-07-17 and now that isn't separately documented here.
+**Do not assume "uncommitted working directory" going forward — check `git
+log` for real state before repeating the old assumption.** Leftover
+uncommitted at end of this session (harmless, unrelated to this session's
+work, left as-is): `next-env.d.ts` (build-tool regen), `public/icon.svg`
+(pre-existing 1-line change, origin unknown), `mid.png` and `notebooklm-mcp/`
+(untracked — the latter is intentionally-untouched hackathon video docs per
+auto-memory).
+
+## What shipped this session
+
+Continuing a long open-ended "fix everything you can, then keep working
+until you'd genuinely pay for this" thread from prior sessions (full detail
+in auto-memory, not re-derived here). This session's concrete deliverable,
+picking up an explicit prior decision ("Construye Slack + Todoist completos
+ahora; deja WhatsApp/Apple Calendar documentados como pendientes"):
+
+### Fixed: Notion re-connect silently wiped selected databases
+`app/api/integration/notion/callback/route.ts`'s `update` branch had a
+comment claiming "preserve existing databaseIds on re-connect" but the
+object it actually wrote never included that field — any re-connection
+(disconnect+reconnect, or clicking "Conectar Notion" again while already
+connected) silently reset database selection back to zero. This is a
+plausible real root cause for the recurring "Notion sigue en 0
+seleccionadas" complaints from earlier sessions, which had previously only
+been treated as a UX/auto-open problem, not a data-loss bug. Fixed by
+fetching the existing row's metadata before the upsert and spreading it in.
+
+### Built: Todoist integration, end-to-end
+- `lib/todoist.ts` — REST API v2 service layer: `listProjects`,
+  `fetchAllTasks`, `closeTask`/`reopenTask` (completion push-back).
+  Todoist's priority scale is inverted from intuition (1=normal, 4=urgent) —
+  mapped explicitly, not left as a raw number.
+- `app/api/integration/todoist/{connect,callback,route}.ts` — OAuth2 flow,
+  built with the Notion metadata-preservation fix applied **from the
+  start** (fetch-existing-then-spread), not repeating the bug just found.
+- `components/connectors/connectors-client.tsx` — full UI parity with
+  Notion: project picker, sync button, auto-open-picker-when-zero-selected
+  effect, `?todoistStatus=` OAuth-redirect toast handling.
+- Checking a task complete in Novo now calls Todoist's `close` endpoint
+  (and `reopen` on uncheck) via `IntegrationEngine.syncCompletion` — not
+  just a local-only checkbox that silently diverges from the real Todoist
+  state.
+
+### Built: Slack integration, end-to-end (as a delivery channel, not a task source)
+- `lib/slack.ts` — `listChannels`, `postMessage` via the Slack Web API.
+- `app/api/integration/slack/{connect,callback,route}.ts` — OAuth v2 ("Add
+  to Slack") bot-token flow, channel picker + save, and a "send test
+  message" action.
+- `lib/cognitive/platform-signals.ts` — `persistNewPlatformSignals` (the
+  one shared path every platform's detected signals already flow through)
+  now also pushes any newly-detected **warning-severity** signal to the
+  user's chosen Slack channel the same day it's found, if connected. This
+  is the one piece of this session's work that's a genuinely new capability
+  rather than a parity build-out — the Twin can now reach the user outside
+  the app.
+- UI: channel picker + test-message button + auto-open-when-no-channel
+  effect in `connectors-client.tsx`, matching the Notion/Todoist pattern.
+
+### Fixed: a second instance of "the Twin doesn't actually read what it syncs"
+While wiring Todoist in, re-checked whether the Cognitive Twin's
+`app/api/ai/cognitive-engine/route.ts` genuinely uses it (per the user's
+explicit ask to verify this for every integration, not just claim it).
+Found the same bug class already once fixed for Notion: the route only
+ever queried `ChecklistItem` rows with `source: 'notion'` for its
+workload/threshold calculations, so Todoist tasks would sync into the DB,
+show in the day's task list (`IntegrationEngine.getTodayTasks` — also
+fixed, was filtering `source: { in: ['manual', 'notion'] }`), but never
+actually reach the Twin's overdue/stagnation/priority-due-soon signal
+logic or its total-pending-tasks count. Fixed:
+- New `lib/cognitive/todoist-signal.ts` — `evaluateTodoistThresholds`,
+  mirrors `notion-signal.ts`'s three thresholds exactly (overdue
+  accumulation ≥3, 7-day stagnation, high-priority due within 2h).
+- `cognitive-engine/route.ts` now splits the combined
+  notion+todoist `ChecklistItem` query into per-platform arrays (kept
+  separate, not merged — `evaluateNotionThresholds` and the "X synced
+  from Notion" prompt text would otherwise mislabel Todoist items as
+  Notion's) and runs both threshold evaluators.
+- `lib/cognitive/active-signal.ts` — added a `todoist_` priority tier
+  (right after `notion_`) to the same-day signal reader that feeds the
+  "Ahora" hero card and AI chat context.
+- `components/dashboard/now-hero.tsx` — `PLATFORM_LINK`/
+  `PLATFORM_ACTION_LABEL` lookups extended for `todoist`.
+- Added `lib/cognitive/__tests__/todoist-signal.test.ts` (mirrors
+  `notion-signal.test.ts`) and a new test case in
+  `active-signal.test.ts`; also had to fix that file's *existing* two
+  tests, whose mock only branched on `notion_` vs "anything else" — the
+  new `todoist_` priority tier fell into that catch-all and returned the
+  wrong signal, a pure test-mock artifact, not a real bug.
+
+### Documented (not built): WhatsApp Business + Apple Calendar
+Per the explicit prior decision to leave these two as documented-pending
+rather than silently omitted or falsely "coming soon": both now show
+`status: 'pending'` ("Activación pendiente") in the connectors catalog with
+real, specific reasons in their detail text — WhatsApp needs Meta Business
+API verification (an external process Meta runs with the business, not
+something triggerable from code), Apple Calendar needs CalDAV +
+app-specific-password auth instead of the OAuth flow every other connector
+uses (a different connection flow, not yet built). Apple Calendar didn't
+exist in the catalog before this session; WhatsApp existed but was
+generic `'soon'`.
+
+## What has NOT been done / still open
+
+1. **Todoist and Slack don't actually work for real users yet** — both
+   503 gracefully with a clear message rather than failing silently, but
+   need real OAuth app credentials registered and set in Vercel:
+   `TODOIST_CLIENT_ID`/`TODOIST_CLIENT_SECRET`/`TODOIST_REDIRECT_URI`
+   (register at https://developer.todoist.com/appconsole.html) and
+   `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_REDIRECT_URI` (register
+   at https://api.slack.com/apps, scopes `chat:write,channels:read,
+   groups:read`). Both redirect URIs must point at
+   `https://productivitynovo.vercel.app/api/integration/{todoist,slack}/
+   callback`. Same category of blocker as the Stripe live-key /
+   Gemini-billing items already tracked in auto-memory — code-complete,
+   needs the user's own external-account action.
+2. **WhatsApp/Apple Calendar** — genuinely not built, correctly
+   documented as such. WhatsApp needs the user to complete Meta Business
+   verification before any code work is worth doing. Apple Calendar needs
+   a CalDAV client built from scratch (different auth model entirely) —
+   worth doing only if the user actually wants it prioritized.
+3. Everything listed as open in the 2026-07-17 section below (Gemini
+   Cloud Billing link, Cerebras billing, landing-transition browser
+   click-test, the "polish more wow features" open thread, the
+   first-minute-cold-start-experience question) was **not touched this
+   session** — this session was scoped specifically to the integrations
+   work above. Re-check relevance before picking any of it back up.
+
+---
+
+# Archive — previous session (2026-07-17)
 
 ## Project
 
@@ -323,7 +481,7 @@ even after billing is linked.
 
 ---
 
-# Archive — previous session (2026-07-11)
+# Archive — earlier session (2026-07-11)
 
 ## State at that time
 

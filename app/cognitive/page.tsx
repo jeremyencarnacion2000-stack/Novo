@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, RefreshCw, Clock, AlertCircle, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { Brain, RefreshCw, Clock, AlertCircle, ChevronDown, ChevronUp, MessageCircle, Share2, Sparkles, Zap } from 'lucide-react';
 import { FocusScoreRing } from '@/components/cognitive/focus-score-ring';
 import { CognitiveStateHero, RecommendationHero, InsightCard, ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives';
 import { BurnoutRiskMeter } from '@/components/cognitive/burnout-risk-meter';
@@ -14,6 +14,7 @@ import { CognitiveMetricsStrip } from '@/components/cognitive/cognitive-metrics-
 import { ActiveModulesStrip } from '@/components/cognitive/active-modules-strip';
 import { IntegratedSystemsStrip } from '@/components/cognitive/integrated-systems-strip';
 import { DecisionFeed } from '@/components/cognitive/decision-feed';
+import { ShareCognitiveCard } from '@/components/cognitive/share-cognitive-card';
 import type { CognitiveEngineResponse } from '@/components/cognitive/types';
 import { cn } from '@/lib/utils';
 import { useCognitiveEngine } from '@/lib/cognitive-context';
@@ -137,6 +138,7 @@ export default function CognitivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -263,6 +265,14 @@ export default function CognitivePage() {
                 </span>
               </div>
             )}
+            <button
+              onClick={() => setIsShareOpen(true)}
+              aria-label="Compartir diagnóstico"
+              className="h-8 px-3 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 hover:bg-indigo-500/20 text-[10px] font-bold tracking-wide transition-all flex items-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Compartir</span>
+            </button>
             <button
               onClick={() => router.push('/ai')}
               aria-label="Chat con el Twin"
@@ -511,6 +521,16 @@ export default function CognitivePage() {
           )}
         </div>
       </div>
+      <ShareCognitiveCard
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        twinScore={data?.twin?.confidenceScore ?? (report?.focusScore ?? 88)}
+        trustLevel={data?.twin?.trustLevel ?? 'high'}
+        chronotype={chronotype === 'night_owl' ? 'Búho Nocturno' : chronotype === 'morning_lark' ? 'Foco Matutino' : 'Intermedio'}
+        peakWindow={report ? `${report.peakWindowStart}:00 - ${report.peakWindowEnd}:00` : '20:00 - 23:00'}
+        cognitiveLoad={report?.cognitiveLoad ?? 35}
+        burnoutRisk={report?.burnoutRisk ?? 12}
+      />
     </div>
   );
 }

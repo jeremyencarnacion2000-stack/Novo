@@ -36,6 +36,7 @@ import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import type { CognitivePhase } from '@/lib/cognitive-engine'
 import type { BurnoutPrediction } from '@/lib/cognitive-memory'
 import type { TwinInsight } from '@/lib/cognitive/insight-types'
+import { emitTwinNotification } from '@/components/ContextHub'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,16 @@ export function usePeakTaskOrchestrator() {
     setState(s => {
       if (s.insight?.action && !next.action) return s
       return { ...s, insight: next }
+    })
+
+    // Route insight directly to ContextHub for Sileo vertical shape morphing
+    emitTwinNotification({
+      title: next.message,
+      description: next.action ? 'Peak Focus window open. Tap to start guided execution.' : 'Twin Engine Update',
+      platform: 'twin',
+      severity: next.tone === 'critical' ? 'critical' : next.tone === 'warning' ? 'warning' : 'info',
+      actionLabel: next.action?.label,
+      actionUrl: '/focus',
     })
   }, [])
 

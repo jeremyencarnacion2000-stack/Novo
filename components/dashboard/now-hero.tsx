@@ -203,7 +203,14 @@ export function NowHero() {
         className="absolute -top-10 -right-10 w-56 h-56 rounded-full opacity-20 blur-3xl pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
         style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
       />
-      <p className="relative text-[11px] font-black tracking-[0.25em] uppercase text-primary/70 mb-3">Ahora →</p>
+      <div className="relative flex items-center justify-between mb-3">
+        <p className="text-[11px] font-black tracking-[0.25em] uppercase text-primary/70">
+          Ahora →
+        </p>
+        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary">
+          Twin Activo · {twin?.confidenceScore ?? 42}% precisión
+        </span>
+      </div>
 
       {showTask ? (
             <>

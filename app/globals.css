@@ -22,10 +22,9 @@
    lib/modal-flip.ts drives the entire animation via inline GSAP tweens on
    the real box model (left/top/width/height/border-radius) — no CSS
    keyframes or toggled classes are involved anymore. This rule only hides
-   the target for the one-frame gap between React mounting DialogContent at
-   its natural position and modalFlip.toggle()'s requestAnimationFrame
-   snapping it to the origin's rect; without it that gap would flash the
-   dialog at its centered resting position before the animation starts.
+   the target until the layout-effect flip driver snaps it to the origin's
+   rect; without it the dialog can flash at its centered resting position
+   before the container transform starts.
    modalFlip.toggle() sets opacity back to 1 as its very first inline style
    write, and the fallback path (missing flip pair) also forces it to 1 so a
    misconfigured pair never leaves a dialog stuck invisible. ────────────── */
@@ -139,11 +138,7 @@
     0 20px 60px rgba(90, 120, 255, 0.12),
     0 8px 24px rgba(90, 120, 255, 0.18);
   /* App Background Overlay - Light Mode */
-  --app-bg-overlay:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.05) 0%, transparent 60%),
-    radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 15% 60%, rgba(56, 189, 248, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.05) 0%, transparent 50%);
+  --app-bg-overlay: none;
 
   /* Glass System - Light Mode (Frosted White) */
   --glass-opacity: 0.3;
@@ -234,11 +229,7 @@
   --sidebar-ring: rgba(99, 102, 241, 0.5);
 
   /* App Background Overlay - Dark Mode */
-  --app-bg-overlay:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
-    radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.12) 0%, transparent 50%),
-    radial-gradient(circle at 15% 60%, rgba(56, 189, 248, 0.10) 0%, transparent 50%),
-    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.10) 0%, transparent 50%);
+  --app-bg-overlay: none;
 
   /* Glass System - Dark Mode (Crystalline - UPDATED) */
   --glass-opacity: 0.12;
@@ -661,10 +652,8 @@
     @apply overflow-hidden font-sans;
     transition: background-color 0.5s ease, color 0.5s ease;
 
-    /* Light Theme - Soft Warm Solid */
     background: var(--background);
     color: var(--foreground);
-    background-image: radial-gradient(circle at 50% -20%, rgba(255, 184, 0, 0.05), transparent 70%);
     background-attachment: fixed;
   }
 
@@ -694,7 +683,7 @@
   .dark body {
     background: var(--background);
     color: var(--foreground);
-    background-image: radial-gradient(circle at 50% -20%, rgba(255, 184, 0, 0.02), transparent 70%);
+    background-attachment: fixed;
   }
 
   /* ── Custom wallpaper: blurred + dimmed backdrop layer ──────────────────
@@ -1878,13 +1867,16 @@ html.cognitive-reduced-capacity .animate-ping {
    since GSAP Flip animates the dialog content directly rather than a
    cloned element — no clone-specific styling needed. ─────────────────── */
 [data-flip-from].modal-flip-source-active {
-  opacity: 0.6;
-  transition: opacity 180ms ease;
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: none !important;
 }
 
 /* Swapy drag handle cursor feedback */
 [data-swapy-item] {
   cursor: grab;
+  transition: transform 0.28s var(--novo-spring), box-shadow 0.28s ease;
+  will-change: transform;
 }
 [data-swapy-item]:active {
   cursor: grabbing;
@@ -1897,17 +1889,23 @@ html.cognitive-reduced-capacity .animate-ping {
   cursor: default;
 }
 
-/* Swapy dragging item — lift effect */
-[data-swapy-item].swapy-dragging {
-  opacity: 0.35;
-  transform: scale(0.97);
-  transition: opacity 180ms ease, transform 180ms ease;
+/* Swapy dragging item — physical shrink & elevation gesture */
+[data-swapy-item][data-swapy-dragging],
+[data-swapy-dragging] {
+  opacity: 0.92 !important;
+  transform: scale(0.93) rotate(-1deg) translateY(-2px) !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--primary) !important;
+  border-radius: 18px !important;
+  z-index: 1000 !important;
+  transition: transform 0.15s ease-out, opacity 0.15s ease, box-shadow 0.15s ease !important;
 }
 
-/* Swapy drop slot highlight */
+/* Swapy drop slot active hover highlight */
+[data-swapy-slot][data-swapy-highlighted],
 [data-swapy-slot].swapy-over {
-  background: rgba(129, 140, 248, 0.06);
-  border-radius: 16px;
-  outline: 1.5px dashed rgba(129, 140, 248, 0.35);
-  transition: background 180ms ease, outline 180ms ease;
+  background: rgba(129, 140, 248, 0.12) !important;
+  border-radius: 18px !important;
+  outline: 2px dashed var(--primary) !important;
+  outline-offset: -2px !important;
+  transition: background 180ms ease, outline 180ms ease !important;
 }

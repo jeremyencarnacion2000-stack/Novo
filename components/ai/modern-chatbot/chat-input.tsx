@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic, Lock, Sparkles } from 'lucide-react';
+import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic, Lock, Sparkles, Plug } from 'lucide-react';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 import { GlowingOrb, type OrbState } from './glowing-orb';
+import { ConnectorsModal } from './connectors-modal';
 
 // One row in the "+" bottom sheet — icon in a rounded box, title + optional
 // description stacked, and a trailing indicator on the right (a filled dot
@@ -127,6 +128,7 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
     const { toast } = useToast();
     const [input, setInput] = React.useState('');
     const [showMenu, setShowMenu] = React.useState(false);
+    const [isConnectorsModalOpen, setIsConnectorsModalOpen] = React.useState(false);
     const [webSearchEnabled, setWebSearchEnabled] = React.useState(false);
     const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
     const [voiceState, setVoiceState] = React.useState<'idle' | 'listening' | 'speaking' | 'thinking' | 'connecting' | 'error'>('idle');
@@ -382,6 +384,18 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                     <div className="my-1.5 mx-3 h-px bg-white/[0.06]" />
 
                                     <SheetRow
+                                        icon={Plug}
+                                        title="Conectores & Plugins"
+                                        description="Notion, Todoist, Google Calendar, Slack, Gmail..."
+                                        onClick={() => {
+                                            setShowMenu(false);
+                                            setIsConnectorsModalOpen(true);
+                                        }}
+                                    />
+
+                                    <div className="my-1.5 mx-3 h-px bg-white/[0.06]" />
+
+                                    <SheetRow
                                         icon={Wrench}
                                         title="Búsqueda web"
                                         description={webSearchEnabled ? 'Activada — el Twin busca en internet' : 'Usa solo su conocimiento interno'}
@@ -444,6 +458,12 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                     <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                     <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
                 </form>
+
+                {/* Floating Connectors / Plugins Modal */}
+                <ConnectorsModal
+                    isOpen={isConnectorsModalOpen}
+                    onClose={() => setIsConnectorsModalOpen(false)}
+                />
             </div>
         </div>
     );

@@ -430,6 +430,16 @@ export function NotificationCenter() {
     return () => document.removeEventListener('mousedown', handler)
   }, [isOpen])
 
+  // open-notifications custom event — fired by the mobile nav bell button
+  useEffect(() => {
+    const handler = () => {
+      setIsOpen(true)
+      loadNotifications()
+    }
+    window.addEventListener('open-notifications', handler)
+    return () => window.removeEventListener('open-notifications', handler)
+  }, [loadNotifications])
+
   // ── Actions ────────────────────────────────────────────────────────
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
@@ -474,8 +484,8 @@ export function NotificationCenter() {
         whileTap={{ scale: 0.95 }}
         className={
           sileoToast
-            ? "fixed top-16 right-4 z-[200] h-12 max-w-[min(360px,calc(100vw-2rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
-            : "fixed top-16 right-4 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
+            ? "fixed top-4 right-16 z-[200] h-12 max-w-[min(360px,calc(100vw-2rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
+            : "fixed top-4 right-16 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
         }
         style={{ isolation: 'isolate' }}
       >

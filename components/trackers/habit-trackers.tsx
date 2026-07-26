@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, CheckCircle2, Circle, Sparkles } from 'lucide-react';
+import { Edit, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { Tracker } from '@/types/tracker';
 import { useNotifications } from '@/lib/notification-context';
 import { useNotificationScheduler } from '@/lib/notification-scheduler';
@@ -236,7 +236,7 @@ function HabitCard({
             const isToday = date === new Date().toISOString().split('T')[0];
 
             return (
-              <HabitDaySquare
+        <HabitDaySquare
                 key={date}
                 date={date}
                 hasEntry={hasEntry}
@@ -257,7 +257,7 @@ function HabitCard({
               ${
                 todayEntry
                   ? 'bg-foreground/10 hover:bg-foreground/15 text-foreground/95 border border-foreground/10'
-                  : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white hover:brightness-110'
+                  : 'bg-primary text-primary-foreground hover:opacity-90'
               }
             `}
           >
@@ -339,13 +339,14 @@ function HabitDaySquare({
         }}
         onClick={handlePress}
         className={`
-          w-full aspect-square rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-indigo-500
+          w-full aspect-square rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 cursor-pointer select-none outline-none
           ${
             hasEntry
-              ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
+              ? 'bg-primary text-primary-foreground'
+              : isToday
+              ? 'bg-foreground/[0.03] border border-primary/40 ring-1 ring-primary/30 hover:bg-foreground/[0.08]'
               : 'bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.08] hover:border-foreground/10'
           }
-          ${isToday ? 'ring-1.5 ring-indigo-500/50 border-indigo-500/20' : ''}
         `}
       >
         {/* Pulse Ripple overlay */}

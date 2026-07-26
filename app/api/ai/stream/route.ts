@@ -225,10 +225,24 @@ export async function POST(request: NextRequest) {
         // Step 1: Llama 3.2 Vision analyzes the image visually (non-streaming)
         // Step 2: Qwen 2.5 Coder generates code from the analysis (streaming)
         // =====================================================================
-        const apiKey = process.env.GROQ_API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), { status: 503 });
+        const groqKey = process.env.GROQ_API_KEY;
+        const cerebrasKey = process.env.CEREBRAS_API_KEY;
+        const geminiKey = process.env.GEMINI_API_KEY;
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const hasAnyKey = Boolean(groqKey || cerebrasKey || geminiKey || openRouterKey);
+
+        if (!hasAnyKey) {
+            return new Response(new ReadableStream({
+                start(controller) {
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: "El asistente está en modo de demostración. Configura tus claves de API (GROQ_API_KEY, GEMINI_API_KEY o OPENROUTER_API_KEY) en Vercel o en tu archivo .env.local para respuestas en vivo." })}\n\n`));
+                    controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                    controller.close();
+                }
+            }), {
+                headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' }
+            });
         }
+        const apiKey = groqKey;
 
         let visualAnalysis = '';
         if (isReplication && hasImages) {
@@ -329,22 +343,27 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         let isFallbackUsed = false;
         let originalErrorMsg = '';
 
-        let groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: finalModel,
-                messages,
-                temperature: ['CODE', 'QUIZ', 'DESIGN'].includes(classification.type) ? 0.2 : 0.6,
-                max_tokens: ['CODE', 'QUIZ', 'DESIGN'].includes(classification.type) ? 16384 : 4096,
-                stream: true
-            })
-        });
+        let groqResponse: Response;
+        if (groqKey) {
+            groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${groqKey}`
+                },
+                body: JSON.stringify({
+                    model: finalModel,
+                    messages,
+                    temperature: ['CODE', 'QUIZ', 'DESIGN'].includes(classification.type) ? 0.2 : 0.6,
+                    max_tokens: ['CODE', 'QUIZ', 'DESIGN'].includes(classification.type) ? 16384 : 4096,
+                    stream: true
+                })
+            });
+        } else {
+            groqResponse = new Response('GROQ_API_KEY omitted', { status: 503 });
+        }
 
-        if (!groqResponse.ok && finalModel !== 'llama-3.3-70b-versatile') {
+        if (!groqResponse.ok && groqKey && finalModel !== 'llama-3.3-70b-versatile') {
             originalErrorMsg = await groqResponse.text();
             console.warn(`[Novo Brain] Primary model ${finalModel} failed: ${originalErrorMsg}. Retrying with Llama 3.3 70B fallback...`);
 
@@ -355,7 +374,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${groqKey}`
                 },
                 body: JSON.stringify({
                     model: finalModel,
@@ -368,7 +387,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         }
 
         // Final Ultimate Fallback to Llama 3.1 8B (highly stable, very high rate limit) if Qwen Coder also fails
-        if (!groqResponse.ok && finalModel !== 'llama-3.1-8b-instant') {
+        if (!groqResponse.ok && groqKey && finalModel !== 'llama-3.1-8b-instant') {
             console.warn(`[Novo Brain] Fallback model ${finalModel} also failed. Triggering Ultimate stable fallback Llama 3.1 8B...`);
             finalModel = 'llama-3.1-8b-instant';
             isFallbackUsed = true;
@@ -376,7 +395,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${groqKey}`
                 },
                 body: JSON.stringify({
                     model: finalModel,
@@ -586,7 +605,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     // has no tool access) just improvised "I created the file" with no real
                     // action ever executing and no download button ever appearing.
                     const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META', 'COGNITIVE', 'GENERATE_FILE'];
-                    if (actionIntents.includes(classification.type)) {
+                    if (actionIntents.includes(classification.type) && groqKey) {
                         try {
                             console.log('[Novo Brain] Triggering System Agent for:', classification.type);
 
@@ -594,7 +613,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${apiKey}`
+                                    'Authorization': `Bearer ${groqKey}`
                                 },
                                 body: JSON.stringify({
                                     model: 'llama-3.3-70b-versatile',

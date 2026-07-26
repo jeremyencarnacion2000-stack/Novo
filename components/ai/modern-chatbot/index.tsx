@@ -92,8 +92,13 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
 
     return (
         <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-black">
-            {/* PulseChat's ambient bottom glow — the dominant background cue */}
-            <div className="absolute bottom-0 left-0 right-0 h-[65vh] bg-gradient-to-t from-[#1b4b8a] via-[#0b1b36] to-transparent pointer-events-none -z-0 opacity-80" />
+            {/* Dynamic ambient bottom glow matching the user's accent color setting */}
+            <div
+                className="absolute bottom-0 left-0 right-0 h-[65vh] pointer-events-none -z-0 opacity-80"
+                style={{
+                    background: 'linear-gradient(to top, rgba(var(--primary-rgb), 0.28) 0%, rgba(var(--primary-rgb), 0.08) 50%, transparent 100%)'
+                }}
+            />
 
             {/* Voice Overlay */}
             <AnimatePresence>

@@ -89,6 +89,7 @@ model User {
   quickNotes QuickNote[]
   timeBlocks TimeBlock[]
   cognitiveTwinRecord CognitiveTwinRecord?
+  twinAgentLogs       TwinAgentLog[]
 
   // Social
   // Social
@@ -1098,6 +1099,7 @@ model CognitiveTwinRecord {
   signals          BehavioralSignal[]
   evolutionLog     TwinEvolutionLog[]
   snapshots        TwinSnapshot[]
+  agentLogs        TwinAgentLog[]
 
   @@map("cognitive_twin_records")
 }
@@ -1220,4 +1222,25 @@ model IntegrationAccount {
   @@unique([userId, provider])
   @@index([userId])
   @@map("integration_accounts")
+}
+
+// ── Twin Agent Action Log — records every autonomous action the Twin takes ───
+model TwinAgentLog {
+  id          String   @id @default(cuid())
+  twinId      String
+  userId      String
+  capability  String   // "create_catchup_task" | "triage_overdue_tasks" | "notify_burnout_risk" | "suggest_focus_block" | "reschedule_overload" | "suggest_recovery_routine"
+  trigger     String   // what pattern triggered this
+  description String
+  result      String   @default("success") // "success" | "skipped" | "failed"
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  twin        CognitiveTwinRecord @relation(fields: [twinId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([twinId])
+  @@index([createdAt])
+  @@map("twin_agent_logs")
 }

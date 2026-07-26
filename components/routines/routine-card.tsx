@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge'
 import { Edit, Trash2, Clock, CalendarDays, Dumbbell, Activity, Play } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { cn } from '@/lib/utils'
-import { modalFlip } from '@/lib/modal-flip'
 
 interface RoutineCardProps {
     routine: Routine
@@ -20,7 +19,6 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
     const isStructured = routine.days && routine.days.length > 0
 
     const handleViewClick = () => {
-        modalFlip.toggle(`routine-${routine.id}`)
         onView(routine)
     }
 

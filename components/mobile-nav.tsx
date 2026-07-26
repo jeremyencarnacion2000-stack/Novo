@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { LayoutDashboard, BarChart3, Bell, Bot, Plus } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Calendar, Bot, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useQuickCapture } from '@/lib/quick-capture-context'
@@ -40,15 +40,15 @@ export function MobileNav() {
     // from the AI button itself, same engine, no route change involved. The
     // nav bar stays exactly where it is throughout — "esa división elegante
     // entre el nav bar... y la página."
-    const closeChatFlip = useModalFlip('mobile-ai-panel', chatOpen)
-    const handleCloseChat = () => closeChatFlip(() => setChatOpen(false))
+    const closeChatFlip = useModalFlip('mobile-ai-panel', false)
+    const handleCloseChat = () => {}
 
     const isActive = (path: string) => pathname === path || pathname === path + '/'
 
     const navItems = [
         { icon: LayoutDashboard, path: '/', label: 'Home' },
         { icon: BarChart3, path: '/analytics', label: 'Stats' },
-        { icon: Bell, path: '/notifications', label: 'Alerts', action: 'notifications' },
+        { icon: Calendar, path: '/calendar', label: 'Calendar' },
         { icon: Bot, path: '/ai', label: 'AI' },
     ]
 
@@ -89,13 +89,7 @@ export function MobileNav() {
                                     aria-current={active ? 'page' : undefined}
                                     onClick={() => {
                                         navigator.vibrate?.(10)
-                                        if (isAI) {
-                                            setChatOpen(true)
-                                        } else if (item.action === 'notifications') {
-                                            window.dispatchEvent(new CustomEvent('open-notifications'))
-                                        } else {
-                                            router.push(item.path)
-                                        }
+                                        router.push(item.path)
                                     }}
                                     className={cn(
                                         "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] h-[44px]",
@@ -166,9 +160,6 @@ export function MobileNav() {
             {/* Section Drawer — mounted only while open; unmounts in the
                 close flight's onDone, not on click (see handleCloseDrawer) */}
             {drawerOpen && <MobileSectionDrawer onClose={handleCloseDrawer} />}
-
-            {/* Fullscreen AI chat sheet — same deferred-unmount pattern */}
-            {chatOpen && <MobileChatSheet onClose={handleCloseChat} />}
         </>
     )
 }

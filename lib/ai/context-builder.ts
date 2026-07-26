@@ -39,6 +39,7 @@ export interface CognitiveContext {
     };
     activeSignal: ActiveSignal | null;
     twinContext: TwinContextSummary | null;
+    activePlugins?: string[];
 }
 
 export interface UserContext {
@@ -63,7 +64,9 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             tasksList,
             routinesList,
             projectsList,
-            activeSignal
+            activeSignal,
+            checklistItems,
+            integrationAccounts
         ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
             prisma.userCognitiveSnapshot.findUnique({ where: { userId } }),
@@ -101,10 +104,30 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
                 orderBy: { updatedAt: 'desc' },
                 take: 10
             }),
-            getActiveSignal(userId)
+            getActiveSignal(userId),
+            prisma.checklistItem.findMany({
+                where: { userId, completed: false, source: { in: ['notion', 'todoist'] } },
+                take: 15
+            }),
+            prisma.integrationAccount.findMany({
+                where: { userId },
+                select: { provider: true, createdAt: true }
+            })
         ]);
 
         const twinContext = options?.twinMode ? await buildTwinContextSummary(userId) : null;
+
+        const combinedTasks = [
+            ...tasksList,
+            ...checklistItems.map(c => ({
+                id: c.id,
+                title: c.text,
+                status: 'todo',
+                priority: c.priority,
+                source: c.source,
+                dueDate: c.dueDate
+            }))
+        ];
 
         const structuredContext: CognitiveContext = {
             system: {
@@ -123,11 +146,11 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             },
             state: {
                 overdueTasks: overdueTaskCount,
-                activeTasks: taskCount,
+                activeTasks: taskCount + checklistItems.length,
                 activeRoutines: routineCount,
                 activeProjects: projectCount,
                 lastInsight: snapshot?.lastInsightGeneratedAt ? snapshot.lastInsightGeneratedAt.toISOString() : null,
-                tasksList,
+                tasksList: combinedTasks,
                 routinesList,
                 projectsList
             },
@@ -137,7 +160,8 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
                 compactMode: settings?.compactMode || false,
             },
             activeSignal,
-            twinContext
+            twinContext,
+            activePlugins: (integrationAccounts || []).map(a => a.provider)
         };
 
         const summary = JSON.stringify(structuredContext, null, 2);

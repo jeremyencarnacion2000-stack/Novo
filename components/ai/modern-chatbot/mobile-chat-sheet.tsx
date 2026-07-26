@@ -61,7 +61,7 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
             />
             <div
                 data-flip-to="mobile-ai-panel"
-                className="modal-flip-target fixed top-0 left-0 right-0 z-[5001] rounded-b-[32px] overflow-hidden md:hidden flex flex-col"
+                className="modal-flip-target fixed top-0 left-0 right-0 z-[5001] rounded-b-[40px] overflow-hidden md:hidden flex flex-col"
                 style={bottomStyle}
             >
                 <div className="flex-1 min-h-0 overflow-hidden">

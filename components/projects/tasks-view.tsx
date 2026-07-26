@@ -324,14 +324,16 @@ export function TasksView() {
                     <NovoSkeleton variant="card" />
                   </div>
                 ) : columnTasks.length === 0 && !filteredTaskIds ? (
-                  // True empty state (no tasks in this column at all)
+                  // True empty state — slot still needs a data-swapy-item child
                   <div data-swapy-slot={`empty-${column.status}`} className="h-full min-h-[200px]">
-                    <NovoEmptyState
-                      message="Drop tasks here or create one."
-                      actionLabel="Breathe"
-                      onAction={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
-                      className="py-10 min-h-[200px] w-full"
-                    />
+                    <div data-swapy-item={`placeholder-${column.status}`} data-swapy-no-drag className="h-full min-h-[200px]">
+                      <NovoEmptyState
+                        message="Drop tasks here or create one."
+                        actionLabel="Breathe"
+                        onAction={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
+                        className="py-10 min-h-[200px] w-full"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -410,9 +412,15 @@ export function TasksView() {
                     {/* Permanent drop zone — always present in this column */}
                     <div
                       data-swapy-slot={`empty-${column.status}`}
-                      className="h-10 w-full flex items-center justify-center border border-dashed border-foreground/[0.04] rounded-2xl text-[10px] text-foreground/20 hover:text-foreground/40 hover:border-foreground/10 hover:bg-foreground/[0.01] transition-all duration-300"
+                      className="h-10 w-full"
                     >
-                      Drop here
+                      <div
+                        data-swapy-item={`placeholder-${column.status}`}
+                        data-swapy-no-drag
+                        className="h-10 w-full flex items-center justify-center border border-dashed border-foreground/[0.04] rounded-2xl text-[10px] text-foreground/20 hover:text-foreground/40 hover:border-foreground/10 hover:bg-foreground/[0.01] transition-all duration-300"
+                      >
+                        Drop here
+                      </div>
                     </div>
                   </>
                 )}

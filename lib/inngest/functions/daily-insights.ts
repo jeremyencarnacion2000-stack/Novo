@@ -2,6 +2,7 @@ import { inngest } from "../client";
 import { prisma } from "@/lib/prisma";
 import { groqAPI } from "@/lib/groq";
 import { logAICall } from "@/lib/ai-call-log";
+import { syncAllPlugins } from "@/lib/plugins/plugin-orchestrator";
 
 // llama3-8b-8192 was decommissioned by Groq (404 on every call) — this
 // autonomous daily-insight generation had been silently failing/falling back
@@ -22,6 +23,10 @@ Under 150 characters.
 // also written to AiActionLog with triggeredBy: 'cron', so the autonomous run
 // shows up in the Bitácora as provable AI-Native Ops evidence ("automático").
 export async function runDailyInsights() {
+    // 0. Sync all connected plugins first so Twin data is fresh
+    const allUsers = await prisma.user.findMany({ select: { id: true }, take: 100 });
+    await Promise.allSettled(allUsers.map((u) => syncAllPlugins(u.id)));
+
     // 1. Get all users who had a cognitive snapshot updated in the last 24h
     const usersWithActivity = await prisma.userCognitiveSnapshot.findMany({
         where: {
@@ -127,6 +132,12 @@ export const processDailyInsights = inngest.createFunction(
     { id: "process-daily-insights" },
     { cron: "0 23 * * *" }, // Runs every day at 23:00 (11:00 PM) UTC as a default
     async ({ step }: { step: any }) => {
+        // Step 1: sync all plugins so Twin data is up to date
+        await step.run("sync-all-plugins", async () => {
+            const allUsers = await prisma.user.findMany({ select: { id: true }, take: 100 });
+            await Promise.allSettled(allUsers.map((u) => syncAllPlugins(u.id)));
+        });
+        // Step 2: generate daily insights
         return await step.run("run-daily-insights", runDailyInsights);
     }
 );
