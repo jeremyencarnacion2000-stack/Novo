@@ -97,13 +97,6 @@ export default function DashboardClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className={cn(
-                    "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border leading-none shadow-sm transition-all duration-500",
-                    phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/5",
-                    phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
-                    phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5"
-                  )}
-                <motion.span
-                  className={cn(
                     "text-[9px] font-mono font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border shadow-sm inline-flex items-center gap-1.5",
                     phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/5",
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
