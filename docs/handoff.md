@@ -1,3 +1,38 @@
+# Handoff — Novo session (2026-07-26)
+
+## Project
+
+**Novo** — a "Cognitive Operating System," not a productivity app. Core thesis: a
+"Cognitive Twin" continuously models the user's attention/energy/habits/workload
+from real behavioral signals and answers "what should this person do right now?"
+Next.js 16 (App Router), Prisma/Postgres (Neon), NextAuth, Tailwind v4, deployed to
+Vercel at **https://productivitynovo.vercel.app**. Hackathon deadline (Gemini
+XPRIZE) is Aug 17 2026.
+
+## State right now (2026-07-26)
+
+- **Gemini API Integration fixed and upgraded to `gemini-flash-latest`** with model fallbacks.
+- **Shared Element Transitions & Modal System** aligned 1:1 with reference GSAP HTML configuration.
+
+## What shipped this session
+
+### 1. Shared Element Transitions & UI Motion (`lib/modal-flip.ts`, `components/dashboard-shell.tsx`)
+- **CustomEasings**: Registered GSAP `CustomEase` for `appleFluid` (`M0,0 C0.16,1 0.3,1 1,1`), `contentEntrance` (`M0,0 C0.18,1 0.26,1 1,1`), and `contentExit` (`M0,0 C0.35,0 0.15,1 1,1`) matching reference HTML.
+- **Precision Timing**:
+  - Open: 0.52s total duration; inner content cascade-reveals starting at 0.12s for 0.44s with `y:28 scale:0.91 blur:16px` -> `y:0 scale:1 blur:0px` (stagger 0.05s).
+  - Close: 0.48s total duration; inner content hides first in 0.18s with `y:12 blur:8px`.
+  - Backdrop: 0.38s open / 0.35s close.
+- **iOS-style Viewport Depth Effect**: Added `data-app-viewport` tag to `dashboard-shell.tsx` root container (`style={{ transformOrigin: 'top center' }}`). On modal open, the main application viewport scales down (0.94 mobile / 0.97 desktop with 28px border-radius) creating depth behind the active sheet/modal.
+
+### 2. Gemini API Fixes & Model Migration (`lib/gemini.ts`, `app/api/ai/stream/route.ts`, `app/api/ai/cognitive-engine/route.ts`)
+- **Fixed 404 Deprecation Error**: `gemini-2.5-flash` was deprecated by Google for new API keys (returning 404 Not Found). Updated default active model to **`gemini-flash-latest`** (HTTP 200 OK across REST and SDK).
+- **Automated Fallback Chain**: Implemented candidate fallback queue (`gemini-flash-latest` ➔ `gemini-2.0-flash` ➔ `gemini-2.0-flash-lite`) in `lib/gemini.ts` so API calls seamlessly recover if a model experiences rate limits (429) or deprecation.
+- **Native `systemInstruction`**: Updated `lib/gemini.ts` to pass `systemInstruction` directly to `getGenerativeModel` config instead of adding synthetic user/model conversation turns.
+- **Lazy SDK Instantiation**: Changed `lib/gemini.ts` to lazily construct `GoogleGenerativeAI` at call time rather than module load time, preventing static build crashes when `GEMINI_API_KEY` is undefined.
+- **Rescue Endpoint Update**: Updated `/v1beta/openai/chat/completions` rescue route in `app/api/ai/stream/route.ts` to `gemini-flash-latest`.
+
+---
+
 # Handoff — Novo session (2026-07-22)
 
 ## Project

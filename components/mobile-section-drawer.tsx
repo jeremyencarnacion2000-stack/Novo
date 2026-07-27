@@ -10,6 +10,8 @@ import {
     Settings, User, Search, Plug
 } from 'lucide-react'
 
+import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+
 interface MobileSectionDrawerProps {
     onClose: () => void
 }
@@ -53,36 +55,11 @@ const sections = [
 export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
     const router = useRouter()
     const pathname = usePathname()
+    const dragHandleRef = useDragToDismiss<HTMLDivElement>({ onDismiss: onClose })
 
     const handleNavigate = (href: string) => {
         router.push(href)
         onClose()
-    }
-
-    // Swipe-down-to-dismiss ("retroceso"). Deliberately NOT framer-motion's
-    // `drag` prop and NOT on the `data-flip-to` element itself — GSAP owns
-    // that element's position/size via direct inline styles during open/
-    // close, and a second animation system fighting for the same transform
-    // would judder. Instead this drags an inner content wrapper (one level
-    // below what GSAP touches) as a visual preview, and calls the real
-    // `onClose` — which runs the actual GSAP close-flip — past a threshold.
-    const [dragY, setDragY] = React.useState(0)
-    const [dragging, setDragging] = React.useState(false)
-    const dragStartY = React.useRef(0)
-
-    const handleDragStart = (e: React.PointerEvent) => {
-        dragStartY.current = e.clientY
-        setDragging(true)
-        ;(e.target as Element).setPointerCapture(e.pointerId)
-    }
-    const handleDragMove = (e: React.PointerEvent) => {
-        if (!dragging) return
-        setDragY(Math.max(0, e.clientY - dragStartY.current))
-    }
-    const handleDragEnd = () => {
-        setDragging(false)
-        if (dragY > 70) onClose()
-        setDragY(0)
     }
 
     return (
@@ -105,26 +82,19 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
                     background: 'color-mix(in srgb, var(--background) 92%, transparent)',
                 }}
             >
-                    {/* Handle — drag down from here to dismiss */}
+                    {/* Handle — drag down from here to dismiss with native physics */}
                     <div
-                        className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none"
-                        onPointerDown={handleDragStart}
-                        onPointerMove={handleDragMove}
-                        onPointerUp={handleDragEnd}
-                        onPointerCancel={handleDragEnd}
+                        ref={dragHandleRef}
+                        className="flex justify-center pt-3.5 pb-3 cursor-grab active:cursor-grabbing touch-none select-none"
                     >
-                        <div className="w-9 h-[3px] rounded-full bg-foreground/8" />
+                        <div className="w-9 h-[4px] rounded-full bg-foreground/15 hover:bg-foreground/30 transition-colors" />
                     </div>
 
-                    {/* Sections — the dragged content wrapper; GSAP's own
-                        opacity fade targets this div (it's the target's only
-                        direct child), the drag transform layers on top of it. */}
+                    {/* Sections */}
                     <div
+                        data-modal-content
                         className="px-5 pb-6 max-h-[65dvh] overflow-y-auto scrollbar-hide"
-                        style={{
-                            transform: dragY ? `translateY(${dragY}px)` : undefined,
-                            transition: dragging ? 'none' : 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)',
-                        }}>
+                    >
                         {sections.map((section) => (
                             <div key={section.title} className="mb-5 last:mb-2">
                                 <p className="text-[9px] font-semibold text-foreground/15 uppercase tracking-[0.3em] pl-1 mb-2.5">

@@ -63,6 +63,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
   return (
     <SidebarProvider defaultOpen={false}>
       <div
+        data-app-viewport
         className={cn(
           // h-dvh, not h-screen: on mobile, 100vh is sized against the
           // largest possible viewport (address bar collapsed), not what's
@@ -74,6 +75,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
           settings.compactMode && 'compact-mode',
           !settings.showAnimations && 'no-animations'
         )}
+        style={{ transformOrigin: 'top center', willChange: 'transform, border-radius' }}
       >
         {/* Persistent sidebar */}
         <div className="hidden md:flex h-full">

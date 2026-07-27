@@ -4,28 +4,21 @@ import { gsap } from 'gsap'
 
 // Shared "literal cloned DOM node that flies from A to B" primitive, used by
 // both the modal container-transform (lib/modal-flip.ts) and the anchored
-// Select treatment (lib/select-flip.ts) so the two don't hand-roll the same
-// clone/measure/tween logic twice.
+// Select treatment (lib/select-flip.ts).
 
 export function isSvgIcon(el: HTMLElement): boolean {
   return el.tagName.toLowerCase() === 'svg'
 }
 
-// SVGs and <img> are both "replaced elements" — sized via width/height, not
-// font metrics. A book cover shared-item needs this too: it must scale from
-// its small grid-thumbnail rect to the modal's larger cover rect mid-flight.
 function isBoxSized(el: HTMLElement): boolean {
   const tag = el.tagName.toLowerCase()
-  return tag === 'svg' || tag === 'img'
+  return tag === 'svg' || tag === 'img' || el.children.length > 0
 }
 
 /**
  * Clones `originEl` into a fixed-position floating element matching its
- * exact current rect/appearance. SVG icons (Lucide renders as literal
- * `<svg>`) are sized via width/height — that's what actually controls an
- * SVG's rendered size. Text elements are sized via font properties instead,
- * matching the reference exactly (resizing a text node's box doesn't change
- * its visual size; font-size does).
+ * exact current rect/appearance. Animates position, size, font properties,
+ * border-radius, and background-color for ultra-fluid native-grade morphs.
  */
 export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLElement {
   const rect = originEl.getBoundingClientRect()
@@ -33,19 +26,24 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
   const clone = originEl.cloneNode(true) as HTMLElement
   clone.removeAttribute('data-shared-item')
   clone.setAttribute('data-flying-clone', '')
+  
   Object.assign(clone.style, {
     position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
     margin: '0',
+    borderRadius: cs.borderRadius,
+    backgroundColor: cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : 'transparent',
+    boxShadow: cs.boxShadow !== 'none' ? cs.boxShadow : 'none',
     zIndex: String(zIndex),
     pointerEvents: 'none',
     transition: 'none',
+    willChange: 'left, top, width, height, border-radius, background-color',
   } as CSSStyleDeclaration)
-  if (isBoxSized(originEl)) {
-    clone.style.width = `${rect.width}px`
-    clone.style.height = `${rect.height}px`
-  } else {
+
+  if (!isBoxSized(originEl)) {
     clone.style.fontSize = cs.fontSize
     clone.style.fontWeight = cs.fontWeight
     clone.style.color = cs.color
@@ -53,6 +51,7 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
     clone.style.lineHeight = cs.lineHeight
     clone.style.whiteSpace = 'nowrap'
   }
+
   document.body.appendChild(clone)
   return clone
 }
@@ -61,15 +60,29 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
 export function flyTo(tl: gsap.core.Timeline, el: HTMLElement, destEl: HTMLElement, duration: number, position: number) {
   const rect = destEl.getBoundingClientRect()
   const cs = getComputedStyle(destEl)
-  const vars: gsap.TweenVars = { left: rect.left, top: rect.top, duration }
-  if (isBoxSized(destEl)) {
-    vars.width = rect.width
-    vars.height = rect.height
-  } else {
+  
+  const vars: gsap.TweenVars = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    duration,
+  }
+
+  if (cs.borderRadius && cs.borderRadius !== '0px') {
+    vars.borderRadius = cs.borderRadius
+  }
+
+  if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+    vars.backgroundColor = cs.backgroundColor
+  }
+
+  if (!isBoxSized(destEl)) {
     vars.fontSize = cs.fontSize
     vars.fontWeight = cs.fontWeight
     vars.color = cs.color
     vars.letterSpacing = cs.letterSpacing
   }
+
   tl.to(el, vars, position)
 }

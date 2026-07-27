@@ -452,7 +452,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             const geminiKey = process.env.GEMINI_API_KEY;
             if (geminiKey) {
                 console.warn('[Novo Brain] Groq and Cerebras exhausted. Activating Gemini direct rescue...');
-                finalModel = 'gemini-2.0-flash';
+                finalModel = 'gemini-flash-latest';
                 isFallbackUsed = true;
                 modelLabel = 'Gemini (Rescate)';
 

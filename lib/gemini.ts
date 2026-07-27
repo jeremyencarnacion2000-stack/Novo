@@ -1,8 +1,5 @@
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ConversationMessage } from '@/types/ai';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY env var is not set')
 
 export interface GeminiFunctionCall {
   name: string;
@@ -21,12 +18,23 @@ export interface GeminiTool {
   }[];
 }
 
+// Fallback models in priority order.
+// 'gemini-flash-latest' points to Google's current active stable flash model.
+const FALLBACK_MODELS = [
+  'gemini-flash-latest',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+];
+
 export class GeminiAPIClient {
   private static instance: GeminiAPIClient;
-  private genAI: GoogleGenerativeAI;
 
-  private constructor() {
-    this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY!);
+  private getGenAI(): GoogleGenerativeAI {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY env var is not set');
+    }
+    return new GoogleGenerativeAI(key);
   }
 
   static getInstance(): GeminiAPIClient {
@@ -38,82 +46,73 @@ export class GeminiAPIClient {
 
   async generateResponse(
     message: string,
-    context: string,
+    context?: string,
     history: ConversationMessage[] = [],
     systemPrompt?: string,
-    tools?: any[] // Function declarations
+    tools?: any[],
+    preferredModel?: string
   ): Promise<{ content: string; functionCalls: GeminiFunctionCall[] }> {
-    try {
-      // Configure model with tools if provided
-      const modelConfig: any = { model: 'gemini-2.5-flash' };
+    const genAI = this.getGenAI();
 
-      // Add tools if provided
-      if (tools && tools.length > 0) {
-        modelConfig.tools = [{
-          functionDeclarations: tools
-        }];
-      }
+    const candidateModels = preferredModel
+      ? [preferredModel, ...FALLBACK_MODELS.filter(m => m !== preferredModel)]
+      : FALLBACK_MODELS;
 
-      const model = this.genAI.getGenerativeModel(modelConfig);
+    let lastError: any = null;
 
-      // Convert history to Gemini format, adding system prompt as first user message if provided
-      const chatHistory = [];
+    for (const modelName of candidateModels) {
+      try {
+        const modelConfig: any = { model: modelName };
 
-      // If there's a system prompt, add it as the first exchange
-      if (systemPrompt) {
-        chatHistory.push({
-          role: 'user',
-          parts: [{ text: systemPrompt }]
-        });
-        chatHistory.push({
-          role: 'model',
-          parts: [{ text: 'Understood. I will follow these instructions.' }]
-        });
-      }
+        if (systemPrompt) {
+          modelConfig.systemInstruction = systemPrompt;
+        }
 
-      // Add conversation history
-      history.forEach(msg => {
-        chatHistory.push({
+        if (tools && tools.length > 0) {
+          modelConfig.tools = [{
+            functionDeclarations: tools
+          }];
+        }
+
+        const model = genAI.getGenerativeModel(modelConfig);
+
+        const chatHistory = history.map(msg => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }]
+        }));
+
+        const chat = model.startChat({
+          history: chatHistory,
+          generationConfig: {
+            maxOutputTokens: 2000,
+          },
         });
-      });
 
-      // Start chat
-      const chat = model.startChat({
-        history: chatHistory,
-        generationConfig: {
-          maxOutputTokens: 2000,
-        },
-      });
+        const prompt = context ? `[Context: ${context}]\n\n${message}` : message;
+        const result = await chat.sendMessage(prompt);
+        const response = await result.response;
 
-      // Send message
-      const result = await chat.sendMessage(message);
-      const response = await result.response;
-
-      // Handle function calls if any
-      const functionCalls: GeminiFunctionCall[] = [];
-      const calls = response.functionCalls();
-      if (calls && calls.length > 0) {
-        calls.forEach(call => {
-          functionCalls.push({
-            name: call.name,
-            args: call.args as Record<string, any>
+        const functionCalls: GeminiFunctionCall[] = [];
+        const calls = response.functionCalls();
+        if (calls && calls.length > 0) {
+          calls.forEach(call => {
+            functionCalls.push({
+              name: call.name,
+              args: call.args as Record<string, any>
+            });
           });
-        });
+          return { content: '', functionCalls };
+        }
 
-        // Return empty content if there are function calls
-        // The API will handle function execution and send results back
-        return { content: '', functionCalls };
+        const text = response.text();
+        return { content: text, functionCalls };
+      } catch (error: any) {
+        console.warn(`[GeminiAPIClient] Model ${modelName} failed, trying next fallback:`, error?.message || error);
+        lastError = error;
       }
-
-      const text = response.text();
-      return { content: text, functionCalls };
-
-    } catch (error) {
-      console.error('Gemini API error:', error);
-      throw new Error(`Gemini API error: ${error instanceof Error ? error.message : String(error)}`);
     }
+
+    throw new Error(`Gemini API error across all candidate models: ${lastError?.message || String(lastError)}`);
   }
 }
 

@@ -570,17 +570,19 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       try {
         console.log('[Cognitive API] Attempting Gemini query...');
         const result = await logAICall(
-          // gemini-1.5-flash was decommissioned — the native SDK returned 404
-          // "model not found for v1beta" on every call, so the engine's primary
-          // path was silently dead. gemini-2.0-flash is current. NOTE: this
-          // project's Gemini free tier is still structurally capped at 0
-          // (429 RESOURCE_EXHAUSTED, needs Google Cloud billing enabled), so
-          // this path only starts working once billing is turned on — until
-          // then the Groq fallback below carries the engine.
-          { userId: session.user.id, provider: 'gemini', model: 'gemini-2.0-flash', purpose: 'cognitive_reorg' },
+          { userId: session.user.id, provider: 'gemini', model: 'gemini-flash-latest', purpose: 'cognitive_reorg' },
           async () => {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-            const geminiResult = await model.generateContent(prompt);
+            let modelName = 'gemini-flash-latest';
+            let model = genAI.getGenerativeModel({ model: modelName });
+            let geminiResult;
+            try {
+              geminiResult = await model.generateContent(prompt);
+            } catch (e) {
+              console.warn('[Cognitive API] gemini-flash-latest failed, trying gemini-2.0-flash:', e);
+              modelName = 'gemini-2.0-flash';
+              model = genAI.getGenerativeModel({ model: modelName });
+              geminiResult = await model.generateContent(prompt);
+            }
             return {
               content: geminiResult.response.text().trim(),
               tokensIn: geminiResult.response.usageMetadata?.promptTokenCount,
