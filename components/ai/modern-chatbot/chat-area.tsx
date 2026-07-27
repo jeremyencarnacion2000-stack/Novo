@@ -72,13 +72,6 @@ export function ChatArea() {
         };
     }, [streamingMessage]);
 
-    // The safe-area bottom padding: composer height + 32px breathing room + env()
-    // --composer-h is set by index.tsx's persistent composer and inherits down
-    // through the DOM via normal CSS custom-property cascade.
-    const safeAreaStyle: React.CSSProperties = {
-        paddingBottom: 'calc(var(--composer-h, 144px) + 32px + env(safe-area-inset-bottom, 0px))',
-    };
-
     return (
         <div className="flex-1 flex flex-col relative min-h-0 bg-transparent overflow-hidden">
             {/* Messages scroll area */}
@@ -87,7 +80,7 @@ export function ChatArea() {
                 className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar min-h-0 relative"
                 data-lenis-prevent
             >
-                <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6" style={safeAreaStyle}>
+                <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6 pb-8">
                     {messages.map((message) => (
                         <ChatMessage key={message.id} message={message} />
                     ))}

@@ -786,7 +786,7 @@ export default function MusicPage() {
   }
 
   return (
-    <div className="absolute inset-0 p-0 sm:p-4 lg:p-6 flex flex-col justify-between bg-transparent">
+    <div className="w-full h-full flex flex-col min-h-0 relative p-0 sm:p-4 lg:p-6 bg-transparent overflow-hidden">
       {/* ─── FLOATING MAIN CONTAINER ─── */}
       <div className="w-full h-full bg-[#151713]/85 backdrop-blur-2xl border-0 sm:border sm:border-white/10 rounded-none sm:rounded-[28px] flex overflow-hidden shadow-2xl relative">
         
