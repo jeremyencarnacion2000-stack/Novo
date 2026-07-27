@@ -20,13 +20,17 @@ export function ChatArea() {
     const streamingRafRef = useRef<number | null>(null);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+        if (!scrollContainerRef.current) return;
         if (behavior === 'instant') {
-            if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-            }
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
         } else {
             requestAnimationFrame(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({
+                        top: scrollContainerRef.current.scrollHeight,
+                        behavior: 'smooth',
+                    });
+                }
             });
         }
     }, []);
@@ -62,7 +66,12 @@ export function ChatArea() {
             cancelAnimationFrame(streamingRafRef.current);
         }
         streamingRafRef.current = requestAnimationFrame(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTo({
+                    top: scrollContainerRef.current.scrollHeight,
+                    behavior: 'smooth',
+                });
+            }
             streamingRafRef.current = null;
         });
         return () => {

@@ -10,8 +10,11 @@ import { modalFlip } from '@/lib/modal-flip'
  */
 export function useModalFlip(flipKey: string, open: boolean) {
   useLayoutEffect(() => {
-    if (!open) return
-    modalFlip.toggle(flipKey)
+    if (!open || !flipKey) return
+    const id = requestAnimationFrame(() => {
+      modalFlip.toggle(flipKey)
+    })
+    return () => cancelAnimationFrame(id)
   }, [open, flipKey])
 
   return useCallback(

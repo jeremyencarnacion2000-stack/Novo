@@ -112,14 +112,20 @@ function killActive(id: string) {
 
 export const modalFlip = {
   /** Animates the dialog content growing out of the origin element. */
-  toggle(id: string, onDone?: () => void) {
+  toggle(id: string, onDone?: () => void, retries = 3) {
     if (typeof window === 'undefined') { onDone?.(); return }
 
     const { origin, target, overlay } = findPair(id)
-    if (!origin || !target) {
-      // Missing pair — reveal target and overlay smoothly without GSAP FLIP
-      if (target)   gsap.to(target,  { opacity: 1, duration: 0.2 })
-      if (overlay)  gsap.to(overlay, { opacity: 1, duration: 0.2 })
+
+    // If target (Radix Portal content) hasn't mounted into DOM yet, retry next frame
+    if (!target && retries > 0) {
+      requestAnimationFrame(() => {
+        modalFlip.toggle(id, onDone, retries - 1)
+      })
+      return
+    }
+
+    if (!target) {
       onDone?.()
       return
     }
@@ -127,9 +133,28 @@ export const modalFlip = {
     killActive(id)
     cleanupFlying(id)
 
-    // Mark target and overlay active so CSS keeps them visible after GSAP finishes
+    // Mark target and overlay active so CSS keeps them visible
     target.classList.add('modal-flip-active')
     if (overlay) overlay.classList.add('modal-flip-active')
+
+    // If origin is missing, perform a smooth modal scale/fade entrance fallback
+    if (!origin) {
+      gsap.set(target, { opacity: 0, scale: 0.94, y: 8 })
+      if (overlay) gsap.set(overlay, { opacity: 0 })
+
+      const tlFallback = gsap.timeline({
+        onComplete: () => {
+          gsap.set(target, { clearProps: 'transform' })
+          activeTimelines.delete(id)
+          onDone?.()
+        },
+      })
+      tlFallback.to(target, { opacity: 1, scale: 1, y: 0, duration: 0.28, ease: EASE_ENTRANCE }, 0)
+      if (overlay) tlFallback.to(overlay, { opacity: 1, duration: 0.25 }, 0)
+
+      activeTimelines.set(id, tlFallback)
+      return
+    }
 
     // Hide origin instantly so it doesn't remain visible under flying clones
     origin.classList.add('modal-flip-source-active')

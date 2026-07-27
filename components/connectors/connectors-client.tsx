@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
+import { useModalFlip } from '@/hooks/use-modal-flip'
 import { cn } from '@/lib/utils'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -94,8 +95,9 @@ function ConnectorCard({ connector, onClick }: { connector: Connector; onClick: 
   return (
     <button
       onClick={onClick}
+      data-flip-from={`connector-${connector.id}`}
       className={cn(
-        'text-left rounded-2xl border p-4 flex flex-col gap-4 transition-all duration-300',
+        'text-left rounded-2xl border p-4 flex flex-col gap-4 transition-all duration-300 active:scale-95 hover:scale-[1.02]',
         isSoon
           ? 'border-foreground/[0.05] bg-foreground/[0.01] opacity-60 cursor-default'
           : 'border-foreground/[0.06] bg-foreground/[0.015] hover:bg-foreground/[0.04] hover:border-foreground/10 cursor-pointer',
@@ -103,6 +105,7 @@ function ConnectorCard({ connector, onClick }: { connector: Connector; onClick: 
     >
       <div className="flex items-start justify-between gap-2">
         <div
+          data-shared-item="icon"
           className={cn(
             'w-10 h-10 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center flex-shrink-0',
             isSoon && 'grayscale opacity-50',
@@ -113,7 +116,7 @@ function ConnectorCard({ connector, onClick }: { connector: Connector; onClick: 
         <StatusPill status={connector.status} />
       </div>
       <div>
-        <p className="text-sm font-semibold text-foreground/85">{connector.name}</p>
+        <p data-shared-item="title" className="text-sm font-semibold text-foreground/85">{connector.name}</p>
         <p className="text-xs text-foreground/35 mt-1 leading-relaxed">{connector.description}</p>
       </div>
     </button>
@@ -872,6 +875,10 @@ export function ConnectorsClient() {
       )
     : null
 
+  const detailFlipKey = selected ? `connector-${selected.id}` : ''
+  const closeDetailFlip = useModalFlip(detailFlipKey, !!selected)
+  const handleCloseDetail = () => closeDetailFlip(() => setSelectedId(null))
+
   return (
     <div className="flex flex-col gap-6 md:gap-8">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
@@ -883,7 +890,8 @@ export function ConnectorsClient() {
         </div>
         <button
           onClick={() => setAddCustomOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70 flex-shrink-0 self-start md:self-auto"
+          data-flip-from="btn-add-custom-connector"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70 flex-shrink-0 self-start md:self-auto active:scale-95"
         >
           <Plus className="w-4 h-4" />
           Conectar API personalizada
@@ -929,8 +937,8 @@ export function ConnectorsClient() {
         Más conectores se añaden con cada versión de Novo.
       </p>
 
-      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelectedId(null)}>
-        <DialogContent className="rounded-3xl max-w-md">
+      <Dialog open={!!selected} onOpenChange={(open) => !open && handleCloseDetail()}>
+        <DialogContent data-flip-to={detailFlipKey} className="rounded-3xl max-w-md">
           {selected && (
             <ConnectorDetail
               connector={selected}
@@ -1053,11 +1061,11 @@ function ConnectorDetail({
     <div className="flex flex-col gap-5">
       <DialogHeader>
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center flex-shrink-0">
+          <div data-shared-item="icon" className="w-11 h-11 rounded-xl bg-foreground/5 border border-foreground/8 flex items-center justify-center flex-shrink-0">
             {connector.icon}
           </div>
           <div>
-            <DialogTitle className="text-base">{connector.name}</DialogTitle>
+            <DialogTitle data-shared-item="title" className="text-base">{connector.name}</DialogTitle>
             <StatusPill status={connector.status} />
           </div>
         </div>
@@ -1450,6 +1458,9 @@ function AddCustomConnectorDialog({
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
 
+  const closeCustomFlip = useModalFlip('btn-add-custom-connector', open)
+  const handleClose = () => closeCustomFlip(() => { onOpenChange(false); reset() })
+
   const reset = () => { setName(''); setBaseUrl(''); setApiKey('') }
 
   const handleSave = async () => {
@@ -1462,8 +1473,7 @@ function AddCustomConnectorDialog({
         body: JSON.stringify({ name, baseUrl, apiKey }),
       })
       if (!res.ok) throw new Error('save failed')
-      reset()
-      onOpenChange(false)
+      handleClose()
       onSaved()
     } catch {
       toast({ title: 'No se pudo guardar la conexión', variant: 'destructive' })
@@ -1473,8 +1483,8 @@ function AddCustomConnectorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset() }}>
-      <DialogContent className="rounded-3xl max-w-md">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
+      <DialogContent data-flip-to="btn-add-custom-connector" className="rounded-3xl max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">Conectar API personalizada</DialogTitle>
           <DialogDescription className="text-foreground/50">
