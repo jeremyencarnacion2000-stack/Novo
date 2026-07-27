@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import React from 'react'
+import Script from 'next/script'
 import './globals.css'
 import ClientLayout from './client-layout'
+
+const GA_MEASUREMENT_ID = 'G-429617187'
 
 
 const SITE_URL = process.env.NEXTAUTH_URL || 'https://productivitynovo.vercel.app'
@@ -70,6 +73,24 @@ export default function RootLayout({
             other page keeps --font-sans: Inter unchanged. */}
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&display=swap" rel="stylesheet" />
       </head>
+
+      {/* ── Google Analytics 4 ── loads after hydration, non-blocking */}
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_MEASUREMENT_ID}', {
+            page_path: window.location.pathname,
+            send_page_view: true,
+          });
+        `}
+      </Script>
+
       <body className="font-sans h-full antialiased relative">
         {/* Background Image is now applied directly to the body in settings-context.tsx */}
 
