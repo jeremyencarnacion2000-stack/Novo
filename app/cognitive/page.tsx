@@ -44,7 +44,7 @@ function CognitiveLoader() {
   }, []);
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-[#060608]/80 backdrop-blur-sm z-20">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/80 backdrop-blur-sm z-20">
       <div className="relative">
         <div className="absolute inset-0 rounded-2xl border-2 border-primary/30 animate-ping" />
         <motion.div

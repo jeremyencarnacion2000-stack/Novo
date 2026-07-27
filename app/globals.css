@@ -826,12 +826,19 @@
   /* Tier 3: Premium — stronger chromatic edge + max blur */
   .liquid-glass-premium {
     position: relative;
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(26px) saturate(180%) brightness(1.08);
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    /* Always a dark glass surface — used for Cognitive Engine, notification
+       panels, and premium full-page cards that require dark contrast regardless
+       of the active theme. Light mode "glass" was rgba(255,255,255,0.65) which
+       made the Cognitive Engine completely invisible (white content on white bg). */
+    background: rgba(10, 8, 18, 0.88);
+    backdrop-filter: blur(26px) saturate(160%) brightness(1.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.80),
-      0 16px 60px rgba(0, 0, 0, 0.10);
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 16px 60px rgba(0, 0, 0, 0.45);
+    will-change: transform;
+    transform: translateZ(0);
+    isolation: isolate;
   }
   .liquid-glass-premium::before {
     content: '';
@@ -902,14 +909,40 @@
   .dark .liquid-glass-elevated::before { opacity: 0.5; }
   .dark .liquid-glass-premium::before { opacity: 0.6; }
   .dark .liquid-glass-premium {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(10, 8, 18, 0.92);
+    border-color: rgba(255, 255, 255, 0.10);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-      0 16px 60px rgba(0, 0, 0, 0.55);
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 16px 60px rgba(0, 0, 0, 0.60);
   }
 }
+
+/* ── Smooth animated panel / modal GPU compositing ───────────────────────────
+   Framer Motion animates opacity + scale + y on modal panels that also have
+   backdrop-filter (blur). Without GPU promotion the browser repaints the
+   blurred layer on every animation frame → visible jank and motion blur.
+   Adding will-change + translateZ lifts the element to its own compositor
+   layer so transform/opacity changes are GPU-only and always 60fps.
+   isolation: isolate prevents the stacking context from leaking into siblings
+   and breaking the backdrop-filter clipping rectangle.                       */
+[data-framer-appear-id],
+.modal-flip-target,
+.app-modal,
+[role="dialog"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+/* Radix/Framer portals that animate backdrop-filter panels */
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+
 
 @layer utilities {
 
