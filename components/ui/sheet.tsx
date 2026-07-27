@@ -5,6 +5,26 @@ import * as SheetPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+
+function MobileSheetDragHandle({ side, onDismiss }: { side: string; onDismiss?: () => void }) {
+  const ref = useDragToDismiss<HTMLDivElement>({
+    onDismiss: onDismiss ?? (() => {
+      const closeBtn = document.querySelector<HTMLElement>('[data-slot="sheet-close"]')
+      closeBtn?.click()
+    }),
+    enabled: side === 'bottom',
+  })
+  if (side !== 'bottom') return null
+  return (
+    <div
+      ref={ref}
+      className="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
+    >
+      <div className="w-10 h-[5px] rounded-full bg-foreground/20 hover:bg-foreground/40 transition-colors" />
+    </div>
+  )
+}
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -66,13 +86,17 @@ function SheetContent({
           side === 'top' &&
             'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b',
           side === 'bottom' &&
-            'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t',
+            'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t rounded-t-3xl',
           className,
         )}
         {...props}
       >
+        <MobileSheetDragHandle side={side} />
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+        <SheetPrimitive.Close
+          data-slot="sheet-close"
+          className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none"
+        >
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>

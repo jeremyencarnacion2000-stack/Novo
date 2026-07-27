@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 
 function Dialog({
   ...props
@@ -98,6 +99,23 @@ function FlipAnchoredPositioner({
   )
 }
 
+function MobileDialogDragHandle() {
+  const ref = useDragToDismiss<HTMLDivElement>({
+    onDismiss: () => {
+      const closeBtn = document.querySelector<HTMLElement>('[data-slot="dialog-close"]')
+      closeBtn?.click()
+    },
+  })
+  return (
+    <div
+      ref={ref}
+      className="flex sm:hidden justify-center pt-3 pb-2 -mt-3 -mx-4 cursor-grab active:cursor-grabbing touch-none select-none"
+    >
+      <div className="w-9 h-[4px] rounded-full bg-foreground/20 hover:bg-foreground/40 transition-colors" />
+    </div>
+  )
+}
+
 function DialogContent({
   className,
   children,
@@ -123,7 +141,7 @@ function DialogContent({
         // in a non-scrolling wrapper, gets cropped equally from top and
         // bottom with no way to scroll to the cropped part. dvh tracks the
         // real visual viewport instead.
-        'bg-background pointer-events-auto relative w-full max-w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-lg border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
+        'bg-background pointer-events-auto relative w-full max-w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
         isFlipModal
           ? 'modal-flip-target'
           : 'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200',
@@ -131,11 +149,12 @@ function DialogContent({
       )}
       {...props}
     >
+      <MobileDialogDragHandle />
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close
           data-slot="dialog-close"
-          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
         >
           <XIcon />
           <span className="sr-only">Close</span>

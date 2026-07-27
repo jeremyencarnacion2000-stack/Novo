@@ -16,6 +16,24 @@ import {
 import { sileo, subscribeSileoBell, type BellToast } from '@/lib/sileo-bell'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon'
+import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+
+// ── Mobile drag handle for notifications panel ─────────────────────────────
+function MobileNotifDragHandle({ onDismiss }: { onDismiss: () => void }) {
+  const ref = useDragToDismiss<HTMLDivElement>({ onDismiss })
+  return (
+    <div
+      ref={ref}
+      className="flex sm:hidden justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none select-none shrink-0 -mx-1"
+    >
+      <motion.div
+        className="w-10 h-[5px] rounded-full bg-foreground/20"
+        whileHover={{ scaleX: 1.15, backgroundColor: 'rgba(var(--primary-rgb),0.5)' }}
+        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+      />
+    </div>
+  )
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type NotificationType =
@@ -574,29 +592,38 @@ export function NotificationCenter() {
             <motion.div
               ref={panelRef}
               key="notification-panel"
-              initial={{ opacity: 0, y: -12, scale: 0.96, transformOrigin: 'top right' }}
+              // Desktop: dropdown from top-right. Mobile: bottom sheet rising from bottom
+              initial={typeof window !== 'undefined' && window.innerWidth < 640
+                ? { opacity: 0, y: 32, scale: 0.97 }
+                : { opacity: 0, y: -16, scale: 0.94, transformOrigin: 'top right' }
+              }
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.18 } }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              exit={typeof window !== 'undefined' && window.innerWidth < 640
+                ? { opacity: 0, y: 24, scale: 0.97, transition: { duration: 0.22 } }
+                : { opacity: 0, y: -10, scale: 0.96, transition: { duration: 0.18 } }
+              }
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               // top-[188px] (not 104px): clears the Pomodoro widget's compact
               // pill (components/pomodoro-widget.tsx, `top-6 right-16`,
               // ~24-176px tall) when a focus session is active at the same
               // time notifications are opened — same fix, same reasoning as
               // lib/cognitive-context.tsx's FatigueNavigationWarning.
-              className="liquid-glass-premium fixed top-[188px] right-4 z-[201] w-[min(400px,calc(100vw-2rem))] max-h-[min(620px,calc(100vh-9rem))] flex flex-col rounded-3xl overflow-hidden"
+              className="fixed z-[201] flex flex-col overflow-hidden
+                bottom-[4.5rem] left-3 right-3 rounded-3xl
+                sm:bottom-auto sm:top-[188px] sm:left-auto sm:right-4 sm:w-[min(400px,calc(100vw-2rem))]
+                max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-9rem))]"
               style={{
-                boxShadow: '0 30px 80px rgba(0,0,0,0.65)',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.25), 0 30px 80px rgba(0,0,0,0.55)',
               }}
             >
-              <GlassSurface
-                radius={24}
-                depth={16}
-                blur={1}
-                strength={60}
-                chromaticAberration={12}
-                backgroundColor="rgba(10, 10, 15, 0.9)"
-                className="w-full flex-1 flex flex-col max-h-[min(620px,calc(100vh-5rem))]"
-              >
+              {/* Backdrop blur glass shell — theme-aware, no hardcoded dark bg */}
+              <div className="relative w-full flex-1 flex flex-col bg-background/92 dark:bg-[rgba(10,10,18,0.92)] backdrop-blur-2xl border border-border/20 dark:border-white/[0.07] rounded-3xl overflow-hidden max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-5rem))]">
+                {/* Subtle top shimmer line */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-[1px] rounded-full pointer-events-none"
+                  style={{ background: 'linear-gradient(90deg, transparent, rgba(var(--primary-rgb),0.4), transparent)' }}
+                />
+                {/* Mobile drag handle — above header */}
+                <MobileNotifDragHandle onDismiss={() => setIsOpen(false)} />
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07] shrink-0">
                   <div className="flex items-center gap-2.5">
@@ -759,7 +786,7 @@ export function NotificationCenter() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </GlassSurface>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>,
