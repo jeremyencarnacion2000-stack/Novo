@@ -30,17 +30,12 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
   }, [viewDate])
 
   return (
-    <div className="rounded-[20px] border border-foreground/[0.06] p-5 relative overflow-hidden"
-      style={{
-        background: 'linear-gradient(145deg, rgba(20,16,28,0.95) 0%, rgba(10,8,16,0.98) 100%)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.4)',
-      }}
-    >
+    <div className="rounded-[20px] border border-border/10 p-5 relative overflow-hidden bg-card/90 dark:bg-card/40 backdrop-blur-xl shadow-lg text-foreground">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <button
           onClick={() => setViewDate(subMonths(viewDate, 1))}
-          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/50 hover:text-foreground hover:border-foreground/25 transition-all"
+          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/60 hover:text-foreground hover:border-foreground/25 transition-all"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -49,7 +44,7 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
         </span>
         <button
           onClick={() => setViewDate(addMonths(viewDate, 1))}
-          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/50 hover:text-foreground hover:border-foreground/25 transition-all"
+          className="w-8 h-8 rounded-full border border-foreground/10 flex items-center justify-center text-foreground/60 hover:text-foreground hover:border-foreground/25 transition-all"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -58,7 +53,7 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
       {/* Weekday headers */}
       <div className="grid grid-cols-7 mb-2">
         {WEEKDAYS.map(d => (
-          <div key={d} className="text-center text-[9px] font-bold tracking-widest text-foreground/25 uppercase">
+          <div key={d} className="text-center text-[9px] font-bold tracking-widest text-foreground/40 uppercase">
             {d}
           </div>
         ))}
@@ -77,16 +72,16 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
               onClick={() => onSelect(day)}
               className={cn(
                 'relative w-full aspect-square flex items-center justify-center text-sm font-medium rounded-full transition-all duration-200',
-                !inMonth && 'text-foreground/10',
-                inMonth && !today && !sel && 'text-foreground/60 hover:text-foreground hover:bg-foreground/[0.06]',
-                sel && !today && 'bg-primary text-primary-foreground',
+                !inMonth && 'text-foreground/20',
+                inMonth && !today && !sel && 'text-foreground/75 hover:text-foreground hover:bg-foreground/[0.08]',
+                sel && !today && 'bg-primary text-primary-foreground font-bold',
                 today && 'text-primary-foreground font-bold',
               )}
             >
               {today && (
                 <span
                   className="absolute inset-0 rounded-full bg-primary"
-                  style={{ boxShadow: '0 0 16px rgba(124,58,237,0.5), 0 0 4px rgba(124,58,237,0.8)' }}
+                  style={{ boxShadow: '0 0 12px rgba(var(--primary-rgb),0.5)' }}
                 />
               )}
               <span className="relative z-10">{format(day, 'd')}</span>
@@ -98,11 +93,11 @@ export function MiniCalendar({ selected, onSelect }: MiniCalendarProps) {
       {/* Top accent glow */}
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 rounded-full pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(124,58,237,0.5), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(var(--primary-rgb),0.5), transparent)' }}
       />
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-8 rounded-full pointer-events-none blur-xl opacity-30"
-        style={{ background: 'rgba(124,58,237,0.6)' }}
+        style={{ background: 'rgba(var(--primary-rgb),0.6)' }}
       />
     </div>
   )
