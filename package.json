@@ -12,7 +12,8 @@
     "prisma:push": "prisma db push",
     "start": "next start",
     "postinstall": "prisma generate",
-    "test": "jest"
+    "test": "jest",
+    "verify:migrations:clean": "node scripts/verify-clean-migration-chain.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",
