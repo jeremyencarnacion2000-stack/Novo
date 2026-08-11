@@ -66,6 +66,7 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
             {/* Backdrop — opacity driven by the same GSAP timeline as the panel */}
             <div
                 data-flip-overlay="mobile-nav-panel"
+                data-testid="workspace-backdrop"
                 aria-hidden="true"
                 className="modal-flip-overlay fixed inset-0 z-[5000] bg-black/60 md:hidden"
                 onClick={onClose}

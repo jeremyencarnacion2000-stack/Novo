@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GeminiLiveOrb } from '@/components/ai/GeminiLiveOrb'
 import { MobileNav } from '@/components/mobile-nav'
+import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
 import {
   MobileOverlayProvider,
   useMobileOverlay,
@@ -194,6 +195,24 @@ describe('mobile overlay policy', () => {
     expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Primary mobile navigation' })).not.toBeInTheDocument()
     expect(screen.queryAllByTestId('mobile-primary-target')).toHaveLength(0)
+  })
+
+  it('tracks the real workspace drawer lifecycle through provider suppression', async () => {
+    const user = userEvent.setup()
+    function DrawerLifecycleProbe() {
+      const [open, setOpen] = useState(true)
+      const { suppressSecondary } = useMobileOverlay()
+      return <>
+        <output aria-label="Drawer suppression">{String(suppressSecondary)}</output>
+        {open && <MobileSectionDrawer onClose={() => setOpen(false)} />}
+      </>
+    }
+
+    render(<MobileOverlayProvider><DrawerLifecycleProbe /></MobileOverlayProvider>)
+    await waitFor(() => expect(screen.getByLabelText('Drawer suppression')).toHaveTextContent('true'))
+
+    await user.click(screen.getByTestId('workspace-backdrop'))
+    await waitFor(() => expect(screen.getByLabelText('Drawer suppression')).toHaveTextContent('false'))
   })
 
   it('does not suppress desktop utilities when a provider-owned modal signal is active', async () => {
