@@ -7,7 +7,10 @@ export type CanonicalObservationVerification =
   | 'unverified'
   | 'inferred'
 
-export type ExternalObservationSource = 'webhook' | 'delta_pull' | 'full_pull' | 'manual_sync'
+// MCP is an authenticated transport for a provider observation. It still
+// needs provider ordering evidence, so it intentionally cannot use the
+// serialized-sync fallback below.
+export type ExternalObservationSource = 'webhook' | 'delta_pull' | 'full_pull' | 'manual_sync' | 'mcp'
 
 export type NovoExternalObservation = {
   userId: string

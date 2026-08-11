@@ -1,0 +1,5 @@
+# MCP ambient reconciliation adapter
+
+`lib/cognitive-reconciliation/mcp-provider-completion-reconciliation.ts` is the MCP transport adapter for provider completion evidence. It requires a complete provider identity, an event ID, provider revision ordering evidence, valid provider timestamps, and a trusted server-side verified imported-entity relation. It then delegates to `createAmbientReconciliationService` with `actor: 'agent'` and `source: 'mcp'`.
+
+The route is intentionally not wired yet. The current Prisma schema only has `ChecklistItem { userId, source, sourceId }`; it cannot prove the adapter's full connection/account identity or persist the provider revision needed by the ambient ordering contract. Wiring an MCP tool directly to the current rows would weaken ownership/order guarantees and create an unsafe write path. Add the durable imported-entity mapping and transactional `ReconciliationStore` adapter first, then have the route construct the verified relation from that server-side mapping. Do not route `complete_task` or `start_task` through this adapter: `record_recommendation_outcome` remains the sole explicit `OutcomeEvent` path.
