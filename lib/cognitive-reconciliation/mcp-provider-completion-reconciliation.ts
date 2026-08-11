@@ -10,6 +10,12 @@ import {
   type ReconciliationTransaction,
 } from './ambient-reconciliation'
 
+const canonicalProviderVerifications = new Set<CanonicalObservationVerification>([
+  'verified_source_state',
+  'signed_webhook',
+  'deterministic_match',
+])
+
 /**
  * The relation is deliberately duplicated with the provider identity. This
  * lets the adapter prove that an MCP caller did not merely name a local row:
@@ -126,6 +132,13 @@ export function createMcpProviderCompletionAdapter({
     if (!relation) return confirmation('imported_entity_relation_missing')
     if (!relationMatches(caller, completion, relation)) return confirmation('imported_entity_relation_unverified')
 
+    // MCP authentication proves the Novo caller, not the asserted provider
+    // completion. A future route must obtain this evidence through the owned
+    // provider connection (or a verified provider delivery) before calling
+    // this adapter; do not promote missing evidence to deterministic_match.
+    if (!completion.verification) return confirmation('verification_evidence_missing')
+    if (!canonicalProviderVerifications.has(completion.verification)) return confirmation('verification_not_canonical')
+
     // An MCP receipt cannot establish a serialized pull ordering boundary.
     // Require provider-documented revision evidence before invoking the core.
     if (!hasText(completion.externalRevision)) return confirmation('ordering_basis_missing')
@@ -149,7 +162,7 @@ export function createMcpProviderCompletionAdapter({
       observedAt: completion.observedAt,
       fetchedAt: completion.fetchedAt,
       externalRevision: completion.externalRevision,
-      verification: completion.verification ?? 'deterministic_match',
+      verification: completion.verification,
       rawContentStored: false,
       metadata: { transport: 'mcp', importedEntityId: relation.importedEntityId },
     }

@@ -77,6 +77,7 @@ function completion(overrides: Partial<McpProviderCompletion> = {}): McpProvider
   return {
     provider: 'todoist', connectionId: 'connection-1', providerAccountId: 'account-1', entityType: 'task', sourceEntityId: 'todoist-task-1',
     sourceEventId: 'provider-event-1', externalRevision: 'rev-2',
+    verification: 'verified_source_state',
     occurredAt: new Date('2026-08-11T12:00:00.000Z'), observedAt: new Date('2026-08-11T12:00:01.000Z'), fetchedAt: new Date('2026-08-11T12:00:02.000Z'),
     importedEntityRelation: {
       importedEntityId: 'checklist-1', verified: true, userId: 'user-1', provider: 'todoist', connectionId: 'connection-1',
@@ -141,6 +142,21 @@ describe('MCP provider completion ambient adapter', () => {
 
     expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'provider_identity_incomplete' })
     expect(store.ledger).toHaveLength(0)
+    expect(store.seenObservations).toHaveLength(0)
+  })
+
+  it.each([
+    ['omitted', undefined, 'verification_evidence_missing'],
+    ['unverified', 'unverified', 'verification_not_canonical'],
+    ['inferred', 'inferred', 'verification_not_canonical'],
+  ] as const)('quarantines %s provider verification without writes', async (_kind, verification, reason) => {
+    const store = new MemoryStore()
+    const result = await createMcpProviderCompletionAdapter({ store })({ userId: 'user-1' }, completion({ verification }))
+
+    expect(result).toMatchObject({ disposition: 'confirmation_required', reason })
+    expect(store.projections).toHaveLength(0)
+    expect(store.ledger).toHaveLength(0)
+    expect(store.runs).toHaveLength(0)
     expect(store.seenObservations).toHaveLength(0)
   })
 
