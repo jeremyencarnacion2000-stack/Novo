@@ -123,6 +123,7 @@ model User {
 
   // External Integrations (Notion, Drive, etc.)
   integrationAccounts IntegrationAccount[]
+  todoistOAuthStates TodoistOAuthState[]
   externalEntityMappings ExternalEntityMapping[]
   ambientReconciliationClaims AmbientReconciliationClaim[]
 
@@ -1573,6 +1574,21 @@ model IntegrationAccount {
   @@unique([userId, provider])
   @@index([userId])
   @@map("integration_accounts")
+}
+
+model TodoistOAuthState {
+  id         String   @id @default(cuid())
+  provider   String
+  userId     String
+  nonceHash  String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  status     String   @default("issued")
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, userId, nonceHash])
+  @@index([expiresAt, status])
+  @@map("todoist_oauth_states")
 }
 
 // Stable identity mapping between a provider entity and a Novo-owned entity.

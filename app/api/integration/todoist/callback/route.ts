@@ -13,6 +13,8 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { hashTodoistNonce, parseTodoistOAuthState } from '@/lib/todoist-oauth-state';
 
 export async function GET(req: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -27,6 +29,18 @@ export async function GET(req: NextRequest) {
     // ── 2. Validate OAuth code ─────────────────────────────────────────────────
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const storedState = cookies().get('novo_todoist_oauth_state')?.value;
+    cookies().delete('novo_todoist_oauth_state');
+    const payload = parseTodoistOAuthState(state);
+    if (!storedState || state !== storedState || !payload || payload.userId !== session.user.id) {
+        return NextResponse.redirect(`${settingsUrl}error&reason=invalid_state`);
+    }
+    const claimed = await prisma.todoistOAuthState.updateMany({
+        where: { provider: 'todoist', userId: session.user.id, nonceHash: hashTodoistNonce(payload.nonce), status: 'issued', consumedAt: null, expiresAt: { gt: new Date() } },
+        data: { status: 'consumed', consumedAt: new Date() },
+    });
+    if (claimed.count !== 1) return NextResponse.redirect(`${settingsUrl}error&reason=invalid_state`);
     const error = searchParams.get('error');
 
     if (error || !code) {
