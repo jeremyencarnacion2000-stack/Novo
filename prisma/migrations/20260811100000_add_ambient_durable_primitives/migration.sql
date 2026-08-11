@@ -3,7 +3,12 @@ ALTER TABLE "integration_accounts"
   ADD COLUMN "syncCursor" TEXT,
   ADD COLUMN "syncCursorUpdatedAt" TIMESTAMP(3),
   ADD COLUMN "lastSyncRunId" TEXT,
-  ADD COLUMN "lastSyncedAt" TIMESTAMP(3);
+  ADD COLUMN "lastSyncedAt" TIMESTAMP(3),
+  ADD COLUMN "lastAttemptAt" TIMESTAMP(3),
+  ADD COLUMN "lastSuccessfulSyncAt" TIMESTAMP(3),
+  ADD COLUMN "syncStatus" TEXT,
+  ADD COLUMN "syncErrorCode" TEXT,
+  ADD COLUMN "syncErrorMessage" TEXT;
 
 CREATE TABLE "external_entity_mappings" (
   "id" TEXT NOT NULL,

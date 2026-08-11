@@ -1560,6 +1560,11 @@ model IntegrationAccount {
   syncCursorUpdatedAt   DateTime?
   lastSyncRunId         String?
   lastSyncedAt          DateTime?
+  lastAttemptAt         DateTime?
+  lastSuccessfulSyncAt  DateTime?
+  syncStatus            String?
+  syncErrorCode         String?
+  syncErrorMessage      String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
