@@ -15,6 +15,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { hashTodoistNonce, parseTodoistOAuthState } from '@/lib/todoist-oauth-state';
+import { fetchTodoistProviderIdentity } from '@/lib/todoist-provider-identity';
 
 export async function GET(req: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -24,6 +25,13 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.redirect(`${settingsUrl}error&reason=unauthenticated`);
+    }
+
+    let providerAccountId: string;
+    try {
+        providerAccountId = (await fetchTodoistProviderIdentity(tokenData.access_token)).providerAccountId;
+    } catch {
+        return NextResponse.redirect(`${settingsUrl}error&reason=identity_verification`);
     }
 
     // ── 2. Validate OAuth code ─────────────────────────────────────────────────
@@ -106,6 +114,7 @@ export async function GET(req: NextRequest) {
                 provider: 'todoist',
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
+                providerAccountId,
                 metadata: {
                     // No projects selected yet — user picks them from settings UI
                     projectIds: [],
@@ -114,6 +123,7 @@ export async function GET(req: NextRequest) {
             update: {
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
+                providerAccountId,
                 metadata: {
                     ...existingMeta,
                     projectIds: existingMeta.projectIds ?? [],
