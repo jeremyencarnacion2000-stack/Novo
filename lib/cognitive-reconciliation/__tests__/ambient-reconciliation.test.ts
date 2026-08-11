@@ -2,18 +2,19 @@ import {
   createAmbientReconciliationService,
   type ActivityEventCreate,
   type ActivityRunCreate,
+  type ImportedEntityProjection,
+  type ImportedEntityRecord,
   type LedgerSignalCreate,
   type NovoExternalObservation,
-  type OutcomeEventCreate,
+  type OrderingAssessment,
+  type OrderingBasis,
   type OwnedConnectionLookup,
+  type ProjectionIdentity,
   type ReconciliationStore,
   type ReconciliationTransaction,
-  type RecommendedActionRecord,
-  type RecommendedActionUpdate,
 } from '../ambient-reconciliation'
 
 type LedgerRecord = LedgerSignalCreate & { id: string }
-type OutcomeRecord = OutcomeEventCreate & { id: string }
 
 class MemoryReconciliationStore implements ReconciliationStore, ReconciliationTransaction {
   readonly connections: OwnedConnectionLookup[] = [{
@@ -23,17 +24,25 @@ class MemoryReconciliationStore implements ReconciliationStore, ReconciliationTr
     providerAccountId: 'todoist-account-1',
   }]
   readonly pausedSources = new Set<string>()
-  readonly actions: RecommendedActionRecord[] = [{
-    id: 'action-1',
+  readonly importedEntities: ImportedEntityRecord[] = [{
+    id: 'checklist-1',
     userId: 'user-1',
-    planId: 'plan-1',
-    taskId: 'task-1',
-    status: 'started',
+    provider: 'todoist',
+    connectionId: 'connection-1',
+    providerAccountId: 'todoist-account-1',
+    entityType: 'task',
+    sourceEntityId: 'todoist-task-9',
+    lifecycleState: 'active',
+    lastExternalRevision: 'rev-1',
+    lastSyncRunId: null,
   }]
+  readonly recommendedActions = [{ id: 'action-1', userId: 'user-1', taskId: 'task-1', status: 'dismissed' }]
+  readonly outcomes: Array<Record<string, unknown>> = []
+  readonly projections: ImportedEntityProjection[] = []
   readonly ledger: LedgerRecord[] = []
-  readonly outcomes: OutcomeRecord[] = []
   readonly activityRuns: ActivityRunCreate[] = []
   readonly activityEvents: ActivityEventCreate[] = []
+  orderingOverride: OrderingAssessment | null = null
 
   async runAtomically<T>(work: (transaction: ReconciliationTransaction) => Promise<T>) {
     return work(this)
@@ -56,18 +65,31 @@ class MemoryReconciliationStore implements ReconciliationStore, ReconciliationTr
     return this.ledger.find((signal) => signal.userId === userId && signal.fingerprint === fingerprint) ?? null
   }
 
-  async findLatestCompletionSignal(userId: string, source: string, sourceRef: string, signalType: string) {
-    return this.ledger
-      .filter((signal) => signal.userId === userId && signal.source === source && signal.sourceRef === sourceRef && signal.signalType === signalType)
-      .sort((left, right) => right.observedAt.getTime() - left.observedAt.getTime())[0] ?? null
+  async findOwnedImportedEntities(identity: ProjectionIdentity) {
+    return this.importedEntities.filter((entity) => (
+      entity.userId === identity.userId
+      && entity.provider === identity.provider
+      && entity.connectionId === identity.connectionId
+      && entity.providerAccountId === identity.providerAccountId
+      && entity.entityType === identity.entityType
+      && entity.sourceEntityId === identity.sourceEntityId
+    ))
   }
 
-  async findLinkedRecommendedActions(userId: string, recommendedActionId?: string, sourceRef?: string) {
-    return this.actions.filter((action) => (
-      action.userId === userId
-      && (!recommendedActionId || action.id === recommendedActionId)
-      && (!sourceRef || action.taskId === sourceRef)
-    ))
+  async assessOrdering(entity: ImportedEntityRecord, observation: NovoExternalObservation, basis: OrderingBasis) {
+    if (this.orderingOverride) return this.orderingOverride
+    if (basis === 'provider_revision') {
+      const current = Number(entity.lastExternalRevision?.replace('rev-', ''))
+      const incoming = Number(observation.externalRevision?.replace('rev-', ''))
+      const relation = !Number.isFinite(current) || !Number.isFinite(incoming)
+        ? 'unknown'
+        : incoming > current ? 'newer' : incoming < current ? 'older' : 'tied'
+      return { basis, relation } as OrderingAssessment
+    }
+    return {
+      basis,
+      relation: entity.lastSyncRunId === observation.syncRunId ? 'tied' : 'newer',
+    } as OrderingAssessment
   }
 
   async createLedgerSignal(input: LedgerSignalCreate) {
@@ -79,17 +101,14 @@ class MemoryReconciliationStore implements ReconciliationStore, ReconciliationTr
     return record
   }
 
-  async completeRecommendedAction(input: RecommendedActionUpdate) {
-    const action = this.actions.find((candidate) => candidate.id === input.id && candidate.userId === input.userId)
-    if (!action) throw new Error('recommended_action_not_found')
-    Object.assign(action, input.data)
-    return action
-  }
-
-  async createOutcomeEvent(input: OutcomeEventCreate) {
-    const record = { ...input, id: `outcome-${this.outcomes.length + 1}` }
-    this.outcomes.push(record)
-    return record
+  async projectImportedLifecycle(input: ImportedEntityProjection) {
+    const entity = this.importedEntities.find((candidate) => candidate.id === input.id && candidate.userId === input.userId)
+    if (!entity) throw new Error('imported_entity_not_found')
+    entity.lifecycleState = input.lifecycleState
+    entity.lastExternalRevision = input.externalRevision ?? null
+    entity.lastSyncRunId = input.syncRunId ?? null
+    this.projections.push(input)
+    return entity
   }
 
   async createActivityRun(input: ActivityRunCreate) {
@@ -101,6 +120,13 @@ class MemoryReconciliationStore implements ReconciliationStore, ReconciliationTr
     this.activityEvents.push(input)
     return input
   }
+
+  // Legacy methods deliberately remain on the fake during RED. They expose
+  // any accidental recommendation/outcome mutation by the old service.
+  async findLatestCompletionSignal() { return null }
+  async findLinkedRecommendedActions() { return [{ id: 'action-1', userId: 'user-1', planId: 'plan-1', taskId: 'task-1', status: this.recommendedActions[0].status }] }
+  async completeRecommendedAction(input: { data: { status: string } }) { this.recommendedActions[0].status = input.data.status; return this.recommendedActions[0] }
+  async createOutcomeEvent(input: Record<string, unknown>) { this.outcomes.push(input); return { ...input, id: `outcome-${this.outcomes.length}` } }
 }
 
 const caller = { userId: 'user-1' }
@@ -111,14 +137,17 @@ function completionObservation(overrides: Partial<NovoExternalObservation> = {})
     provider: 'todoist',
     connectionId: 'connection-1',
     providerAccountId: 'todoist-account-1',
-    source: 'todoist',
+    source: 'delta_pull',
     sourceEventId: 'event-1',
+    deliveryId: 'delivery-1',
     sourceEntityId: 'todoist-task-9',
     entityType: 'task',
     kind: 'completed',
     actor: 'provider_user',
     occurredAt: new Date('2026-08-11T12:00:00.000Z'),
     observedAt: new Date('2026-08-11T12:00:05.000Z'),
+    fetchedAt: new Date('2026-08-11T12:00:10.000Z'),
+    externalRevision: 'rev-2',
     verification: 'verified_source_state',
     rawContentStored: false,
     metadata: { recommendedActionId: 'action-1', sourceRef: 'task-1' },
@@ -127,23 +156,57 @@ function completionObservation(overrides: Partial<NovoExternalObservation> = {})
 }
 
 describe('ambient external-observation reconciliation', () => {
-  it('deduplicates a replayed provider event by its stable fingerprint', async () => {
+  it('projects only the owned imported lifecycle and safe evidence', async () => {
+    const store = new MemoryReconciliationStore()
+    const reconcile = createAmbientReconciliationService({
+      store,
+      now: () => new Date('2026-08-11T12:01:00.000Z'),
+    })
+
+    const result = await reconcile(caller, completionObservation())
+
+    expect(result).toMatchObject({
+      disposition: 'projected',
+      importedEntityId: 'checklist-1',
+      recommendationInvalidated: false,
+      stalePlanDisposition: 'mark_stale',
+      learningEligible: false,
+    })
+    expect(store.importedEntities[0].lifecycleState).toBe('completed')
+    expect(store.recommendedActions[0].status).toBe('dismissed')
+    expect(store.outcomes).toHaveLength(0)
+    expect(store.ledger).toEqual([expect.objectContaining({
+      source: 'todoist',
+      signalType: 'external_task_completed',
+      reliability: 'deterministic',
+      observedAt: new Date('2026-08-11T12:00:05.000Z'),
+    })])
+    expect(store.activityRuns).toEqual([expect.objectContaining({
+      userId: 'user-1', surface: 'novo_loop', phase: 'completed', sequence: 1, status: 'completed', resultRef: 'checklist-1',
+    })])
+    expect(store.activityEvents).toEqual([expect.objectContaining({
+      sequence: 1, phase: 'completed', terminal: true, requiresConfirmation: false, recoverable: false,
+    })])
+  })
+
+  it('deduplicates a replay without duplicate imported, ledger, or activity writes', async () => {
     const store = new MemoryReconciliationStore()
     const reconcile = createAmbientReconciliationService({ store })
     const observation = completionObservation()
 
     const first = await reconcile(caller, observation)
-    const replay = await reconcile(caller, { ...observation, observedAt: new Date('2026-08-11T12:02:00.000Z') })
+    const replay = await reconcile(caller, { ...observation, observedAt: new Date('2026-08-11T12:04:00.000Z') })
 
-    expect(first.disposition).toBe('completed')
+    expect(first.disposition).toBe('projected')
     expect(replay.disposition).toBe('duplicate')
+    expect(store.projections).toHaveLength(1)
     expect(store.ledger).toHaveLength(1)
-    expect(store.outcomes).toHaveLength(1)
     expect(store.activityRuns).toHaveLength(1)
     expect(store.activityEvents).toHaveLength(1)
+    expect(store.outcomes).toHaveLength(0)
   })
 
-  it('turns a concurrent unique-claim race into one completion and one duplicate', async () => {
+  it('turns a concurrent ledger claim race into one projection and one duplicate', async () => {
     const store = new MemoryReconciliationStore()
     const reconcile = createAmbientReconciliationService({ store })
 
@@ -152,71 +215,94 @@ describe('ambient external-observation reconciliation', () => {
       reconcile(caller, completionObservation()),
     ])
 
-    expect(results.map((result) => result.disposition).sort()).toEqual(['completed', 'duplicate'])
+    expect(results.map((result) => result.disposition).sort()).toEqual(['duplicate', 'projected'])
+    expect(store.projections).toHaveLength(1)
     expect(store.ledger).toHaveLength(1)
-    expect(store.outcomes).toHaveLength(1)
     expect(store.activityRuns).toHaveLength(1)
-    expect(store.activityEvents).toHaveLength(1)
+    expect(store.outcomes).toHaveLength(0)
   })
 
-  it('leaves state unchanged when an older completion arrives out of order', async () => {
+  it('classifies an older provider revision as stale even when its timestamps are later', async () => {
     const store = new MemoryReconciliationStore()
     const reconcile = createAmbientReconciliationService({ store })
-    await reconcile(caller, completionObservation({ sourceEventId: 'event-new' }))
+    await reconcile(caller, completionObservation({ sourceEventId: 'event-new', externalRevision: 'rev-3' }))
 
     const stale = await reconcile(caller, completionObservation({
       sourceEventId: 'event-old',
-      occurredAt: new Date('2026-08-11T11:59:59.000Z'),
-      observedAt: new Date('2026-08-11T12:03:00.000Z'),
+      deliveryId: 'delivery-old',
+      externalRevision: 'rev-2',
+      occurredAt: new Date('2026-08-11T13:00:00.000Z'),
+      observedAt: new Date('2026-08-11T13:00:05.000Z'),
     }))
 
-    expect(stale.disposition).toBe('stale')
+    expect(stale).toMatchObject({ disposition: 'stale', reason: 'older_provider_order', stalePlanDisposition: 'unchanged' })
+    expect(store.projections).toHaveLength(1)
     expect(store.ledger).toHaveLength(1)
-    expect(store.outcomes).toHaveLength(1)
+    expect(store.outcomes).toHaveLength(0)
   })
 
-  it('requires confirmation when a source reference resolves ambiguously', async () => {
+  it('quarantines a completion with no documented revision or serialized sync-run basis', async () => {
     const store = new MemoryReconciliationStore()
-    store.actions.push({ id: 'action-2', userId: 'user-1', planId: 'plan-2', taskId: 'task-1', status: 'accepted' })
+    const reconcile = createAmbientReconciliationService({ store })
+
+    const result = await reconcile(caller, completionObservation({ externalRevision: undefined, syncRunId: undefined }))
+
+    expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'ordering_basis_missing' })
+    expect(store.projections).toHaveLength(0)
+    expect(store.ledger).toHaveLength(0)
+    expect(store.activityRuns).toHaveLength(0)
+    expect(store.outcomes).toHaveLength(0)
+  })
+
+  it.each(['tied', 'overlap', 'unknown'] as const)(
+    'quarantines %s ordering without writes',
+    async (relation) => {
+      const store = new MemoryReconciliationStore()
+      store.orderingOverride = { basis: 'provider_revision', relation }
+      const reconcile = createAmbientReconciliationService({ store })
+
+      const result = await reconcile(caller, completionObservation())
+
+      expect(result).toMatchObject({ disposition: 'confirmation_required', reason: `ordering_${relation}` })
+      expect(store.projections).toHaveLength(0)
+      expect(store.ledger).toHaveLength(0)
+      expect(store.activityRuns).toHaveLength(0)
+      expect(store.outcomes).toHaveLength(0)
+    },
+  )
+
+  it('accepts a documented serialized full-sync run without comparing timestamps itself', async () => {
+    const store = new MemoryReconciliationStore()
     const reconcile = createAmbientReconciliationService({ store })
 
     const result = await reconcile(caller, completionObservation({
-      metadata: { sourceRef: 'task-1' },
+      source: 'full_pull',
+      externalRevision: undefined,
+      syncRunId: 'sync-run-2',
     }))
 
-    expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'ambiguous_link' })
-    expect(store.actions.map((action) => action.status)).toEqual(['started', 'accepted'])
-    expect(store.ledger).toHaveLength(0)
-    expect(store.outcomes).toHaveLength(0)
+    expect(result.disposition).toBe('projected')
+    expect(store.projections).toEqual([expect.objectContaining({ orderingBasis: 'serialized_sync_run', syncRunId: 'sync-run-2' })])
   })
 
-  it('requires confirmation when neither an action nor a source reference is linked', async () => {
-    const store = new MemoryReconciliationStore()
-    const reconcile = createAmbientReconciliationService({ store })
+  it('quarantines missing or ambiguous imported entity mappings', async () => {
+    const missingStore = new MemoryReconciliationStore()
+    missingStore.importedEntities.splice(0)
+    const missing = await createAmbientReconciliationService({ store: missingStore })(caller, completionObservation())
 
-    const result = await reconcile(caller, completionObservation({ metadata: {} }))
+    const ambiguousStore = new MemoryReconciliationStore()
+    ambiguousStore.importedEntities.push({ ...ambiguousStore.importedEntities[0], id: 'checklist-2' })
+    const ambiguous = await createAmbientReconciliationService({ store: ambiguousStore })(caller, completionObservation())
 
-    expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'missing_link' })
-    expect(store.actions[0].status).toBe('started')
-    expect(store.ledger).toHaveLength(0)
-    expect(store.outcomes).toHaveLength(0)
+    expect(missing).toMatchObject({ disposition: 'confirmation_required', reason: 'imported_entity_missing' })
+    expect(ambiguous).toMatchObject({ disposition: 'confirmation_required', reason: 'ambiguous_imported_entity' })
+    expect(missingStore.ledger).toHaveLength(0)
+    expect(ambiguousStore.ledger).toHaveLength(0)
+    expect(missingStore.outcomes).toHaveLength(0)
+    expect(ambiguousStore.outcomes).toHaveLength(0)
   })
 
-  it('requires confirmation when an action ID and source reference do not belong to the same link', async () => {
-    const store = new MemoryReconciliationStore()
-    const reconcile = createAmbientReconciliationService({ store })
-
-    const result = await reconcile(caller, completionObservation({
-      metadata: { recommendedActionId: 'action-1', sourceRef: 'another-user-task' },
-    }))
-
-    expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'missing_link' })
-    expect(store.actions[0].status).toBe('started')
-    expect(store.ledger).toHaveLength(0)
-    expect(store.outcomes).toHaveLength(0)
-  })
-
-  it('rejects an observation whose user or provider connection is not owned by the caller', async () => {
+  it('rejects forged ownership and an unowned provider connection', async () => {
     const store = new MemoryReconciliationStore()
     const reconcile = createAmbientReconciliationService({ store })
 
@@ -225,29 +311,12 @@ describe('ambient external-observation reconciliation', () => {
 
     expect(forgedUser).toMatchObject({ disposition: 'rejected', reason: 'ownership_mismatch' })
     expect(foreignConnection).toMatchObject({ disposition: 'rejected', reason: 'connection_not_owned' })
+    expect(store.projections).toHaveLength(0)
     expect(store.ledger).toHaveLength(0)
     expect(store.outcomes).toHaveLength(0)
   })
 
-  it('does not trust a linked-action resolver that returns another user\'s action', async () => {
-    const store = new MemoryReconciliationStore()
-    store.findLinkedRecommendedActions = async () => [{
-      id: 'foreign-action',
-      userId: 'user-2',
-      planId: 'foreign-plan',
-      taskId: 'task-1',
-      status: 'started',
-    }]
-    const reconcile = createAmbientReconciliationService({ store })
-
-    const result = await reconcile(caller, completionObservation())
-
-    expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'missing_link' })
-    expect(store.ledger).toHaveLength(0)
-    expect(store.outcomes).toHaveLength(0)
-  })
-
-  it('ignores a user-paused source without touching recommendations or outcomes', async () => {
+  it('ignores a paused provider source without any writes', async () => {
     const store = new MemoryReconciliationStore()
     store.pausedSources.add('user-1:todoist')
     const reconcile = createAmbientReconciliationService({ store })
@@ -255,108 +324,22 @@ describe('ambient external-observation reconciliation', () => {
     const result = await reconcile(caller, completionObservation())
 
     expect(result).toMatchObject({ disposition: 'ignored', reason: 'source_paused' })
-    expect(store.actions[0].status).toBe('started')
+    expect(store.recommendedActions[0].status).toBe('dismissed')
+    expect(store.projections).toHaveLength(0)
     expect(store.ledger).toHaveLength(0)
     expect(store.outcomes).toHaveLength(0)
   })
 
   it.each(['unverified', 'inferred'] as const)(
-    'requires confirmation for %s completion evidence',
+    'quarantines %s completion evidence',
     async (verification) => {
       const store = new MemoryReconciliationStore()
-      const reconcile = createAmbientReconciliationService({ store })
-
-      const result = await reconcile(caller, completionObservation({ verification }))
+      const result = await createAmbientReconciliationService({ store })(caller, completionObservation({ verification }))
 
       expect(result).toMatchObject({ disposition: 'confirmation_required', reason: 'verification_not_canonical' })
+      expect(store.projections).toHaveLength(0)
       expect(store.ledger).toHaveLength(0)
       expect(store.outcomes).toHaveLength(0)
     },
   )
-
-  it.each(['verified_source_state', 'signed_webhook', 'deterministic_match'] as const)(
-    'accepts %s as canonical completion evidence',
-    async (verification) => {
-      const store = new MemoryReconciliationStore()
-      const reconcile = createAmbientReconciliationService({ store })
-
-      const result = await reconcile(caller, completionObservation({ verification }))
-
-      expect(result.disposition).toBe('completed')
-      expect(store.ledger).toHaveLength(1)
-      expect(store.outcomes).toHaveLength(1)
-    },
-  )
-
-  it('records one attributable completion while invalidating, but not learning from, the recommendation', async () => {
-    const store = new MemoryReconciliationStore()
-    const reconcile = createAmbientReconciliationService({
-      store,
-      now: () => new Date('2026-08-11T12:01:00.000Z'),
-    })
-
-    const result = await reconcile(caller, completionObservation({ verification: 'signed_webhook' }))
-
-    expect(result).toMatchObject({
-      disposition: 'completed',
-      recommendationId: 'action-1',
-      recommendationInvalidated: true,
-      learningEligible: false,
-    })
-    expect(store.actions[0]).toMatchObject({
-      status: 'completed',
-      completedAt: new Date('2026-08-11T12:01:00.000Z'),
-      lastActor: 'provider_user',
-    })
-    expect(store.ledger).toEqual([
-      expect.objectContaining({
-        source: 'todoist',
-        sourceRef: 'task-1',
-        signalType: 'external_task_completed',
-        reliability: 'deterministic',
-        observedAt: new Date('2026-08-11T12:00:00.000Z'),
-      }),
-    ])
-    expect(store.outcomes).toEqual([
-      expect.objectContaining({
-        userId: 'user-1',
-        planId: 'plan-1',
-        recommendedActionId: 'action-1',
-        type: 'completed',
-        metadata: {
-          actor: 'provider_user',
-          source: 'todoist',
-          completion: {
-            kind: 'completed',
-            sourceEventId: 'event-1',
-            sourceEntityId: 'todoist-task-9',
-            entityType: 'task',
-            occurredAt: '2026-08-11T12:00:00.000Z',
-            observedAt: '2026-08-11T12:00:05.000Z',
-            verification: 'signed_webhook',
-            rawContentStored: false,
-          },
-        },
-      }),
-    ])
-    expect(store.activityRuns).toEqual([
-      expect.objectContaining({
-        userId: 'user-1',
-        surface: 'novo_loop',
-        phase: 'completed',
-        sequence: 1,
-        status: 'completed',
-        resultRef: 'action-1',
-      }),
-    ])
-    expect(store.activityEvents).toEqual([
-      expect.objectContaining({
-        sequence: 1,
-        phase: 'completed',
-        terminal: true,
-        requiresConfirmation: false,
-        recoverable: false,
-      }),
-    ])
-  })
 })

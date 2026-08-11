@@ -7,26 +7,28 @@ export type CanonicalObservationVerification =
   | 'unverified'
   | 'inferred'
 
+export type ExternalObservationSource = 'webhook' | 'delta_pull' | 'full_pull' | 'manual_sync'
+
 export type NovoExternalObservation = {
   userId: string
   provider: string
   connectionId: string
   providerAccountId: string
-  source: string
+  source: ExternalObservationSource
   sourceEventId: string
+  deliveryId?: string
   sourceEntityId: string
   entityType: string
   kind: string
   actor: string
   occurredAt: Date
   observedAt: Date
+  fetchedAt: Date
+  externalRevision?: string
+  syncRunId?: string
   verification: CanonicalObservationVerification
   rawContentStored: boolean
-  metadata: Readonly<{
-    recommendedActionId?: string
-    sourceRef?: string
-    [key: string]: unknown
-  }>
+  metadata: Readonly<Record<string, unknown>>
 }
 
 export type ReconciliationCaller = { userId: string }
@@ -38,13 +40,21 @@ export type OwnedConnectionLookup = {
   providerAccountId: string
 }
 
-export type RecommendedActionRecord = {
-  id: string
-  userId: string
-  planId: string
-  taskId: string | null
-  status: string
+export type ProjectionIdentity = OwnedConnectionLookup & {
+  entityType: string
+  sourceEntityId: string
 }
+
+export type ImportedEntityRecord = ProjectionIdentity & {
+  id: string
+  lifecycleState: string
+  lastExternalRevision: string | null
+  lastSyncRunId: string | null
+}
+
+export type OrderingBasis = 'provider_revision' | 'serialized_sync_run'
+export type OrderingRelation = 'newer' | 'older' | 'tied' | 'overlap' | 'unknown'
+export type OrderingAssessment = { basis: OrderingBasis; relation: OrderingRelation }
 
 export type LedgerSignalCreate = {
   userId: string
@@ -59,29 +69,19 @@ export type LedgerSignalCreate = {
 
 export type LedgerSignalRecord = LedgerSignalCreate & { id: string }
 
-export type RecommendedActionUpdate = {
+export type ImportedEntityProjection = {
   id: string
   userId: string
-  data: {
-    status: 'completed'
-    statusAt: Date
-    completedAt: Date
-    responseAt: Date
-    terminalReason: string
-    lastActor: string
-  }
+  lifecycleState: 'completed'
+  orderingBasis: OrderingBasis
+  externalRevision: string | null
+  syncRunId: string | null
+  fetchedAt: Date
+  observedAt: Date
+  actor: string
+  sourceEventId: string
+  deliveryId: string | null
 }
-
-export type OutcomeEventCreate = {
-  userId: string
-  planId: string
-  recommendedActionId: string
-  type: 'completed'
-  metadata: Record<string, unknown>
-  idempotencyKey: string
-}
-
-export type OutcomeEventRecord = OutcomeEventCreate & { id: string }
 
 export type ActivityRunCreate = {
   id: string
@@ -114,11 +114,10 @@ export type ReconciliationTransaction = {
   ownsConnection(input: OwnedConnectionLookup): Promise<boolean>
   isSourcePaused(userId: string, source: string): Promise<boolean>
   findLedgerByFingerprint(userId: string, fingerprint: string): Promise<LedgerSignalRecord | null>
-  findLatestCompletionSignal(userId: string, source: string, sourceRef: string, signalType: string): Promise<LedgerSignalRecord | null>
-  findLinkedRecommendedActions(userId: string, recommendedActionId?: string, sourceRef?: string): Promise<RecommendedActionRecord[]>
+  findOwnedImportedEntities(identity: ProjectionIdentity): Promise<ImportedEntityRecord[]>
+  assessOrdering(entity: ImportedEntityRecord, observation: NovoExternalObservation, basis: OrderingBasis): Promise<OrderingAssessment>
   createLedgerSignal(input: LedgerSignalCreate): Promise<LedgerSignalRecord>
-  completeRecommendedAction(input: RecommendedActionUpdate): Promise<RecommendedActionRecord>
-  createOutcomeEvent(input: OutcomeEventCreate): Promise<OutcomeEventRecord>
+  projectImportedLifecycle(input: ImportedEntityProjection): Promise<ImportedEntityRecord>
   createActivityRun(input: ActivityRunCreate): Promise<ActivityRunCreate>
   createActivityEvent(input: ActivityEventCreate): Promise<ActivityEventCreate>
 }
@@ -127,14 +126,16 @@ export type ReconciliationStore = {
   runAtomically<T>(work: (transaction: ReconciliationTransaction) => Promise<T>): Promise<T>
 }
 
+export type StalePlanDisposition = 'unchanged' | 'mark_stale'
+
 export type AmbientReconciliationResult = {
-  disposition: 'completed' | 'duplicate' | 'stale' | 'confirmation_required' | 'ignored' | 'rejected'
+  disposition: 'projected' | 'duplicate' | 'stale' | 'confirmation_required' | 'ignored' | 'rejected'
   reason?: string
-  recommendationId?: string
+  importedEntityId?: string
   ledgerSignalId?: string
-  outcomeEventId?: string
   activityRunId?: string
-  recommendationInvalidated: boolean
+  recommendationInvalidated: false
+  stalePlanDisposition: StalePlanDisposition
   learningEligible: false
 }
 
@@ -157,25 +158,25 @@ function baseResult(
     disposition,
     ...(reason ? { reason } : {}),
     recommendationInvalidated: false,
+    stalePlanDisposition: 'unchanged',
     learningEligible: false,
   }
 }
 
-/**
- * The fingerprint deliberately excludes receive-time fields and arbitrary
- * metadata. A provider event remains the same delivery when it is replayed at
- * a later time or its JSON key order changes.
- */
+/** Delivery identity is intentionally distinct from ordering evidence. */
 export function externalObservationFingerprint(observation: NovoExternalObservation) {
   return createHash('sha256').update(JSON.stringify([
     observation.userId,
     observation.provider,
     observation.connectionId,
     observation.providerAccountId,
-    observation.source,
-    observation.sourceEventId,
     observation.entityType,
     observation.sourceEntityId,
+    observation.source,
+    observation.sourceEventId,
+    observation.deliveryId ?? null,
+    observation.externalRevision ?? null,
+    observation.syncRunId ?? null,
     observation.kind,
   ])).digest('hex')
 }
@@ -185,160 +186,143 @@ function completionSignalType(entityType: string) {
   return `external_${safeEntityType}_completed`
 }
 
+function projectionSourceRef(identity: ProjectionIdentity) {
+  return [identity.provider, identity.connectionId, identity.providerAccountId, identity.entityType, identity.sourceEntityId].join(':')
+}
+
+function orderingBasis(observation: NovoExternalObservation): OrderingBasis | null {
+  if (observation.externalRevision?.trim()) return 'provider_revision'
+  const serializedSnapshot = (observation.source === 'full_pull' || observation.source === 'manual_sync')
+    && Boolean(observation.syncRunId?.trim())
+    && Number.isFinite(observation.fetchedAt.getTime())
+  return serializedSnapshot ? 'serialized_sync_run' : null
+}
+
 function isUniqueClaimConflict(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
 }
 
 export function createAmbientReconciliationService({ store, now = () => new Date() }: AmbientReconciliationDependencies) {
   return async (caller: ReconciliationCaller, observation: NovoExternalObservation): Promise<AmbientReconciliationResult> => {
-    // userId on the observation is attribution, not authentication. The
-    // independently supplied caller owns the authorization boundary.
+    // Observation ownership is attribution only; authorization comes from the
+    // independently authenticated caller and the owned connection lookup.
     if (caller.userId !== observation.userId) return baseResult('rejected', 'ownership_mismatch')
 
     try {
       return await store.runAtomically(async (transaction) => {
-      const ownsConnection = await transaction.ownsConnection({
-        userId: caller.userId,
-        provider: observation.provider,
-        connectionId: observation.connectionId,
-        providerAccountId: observation.providerAccountId,
-      })
-      if (!ownsConnection) return baseResult('rejected', 'connection_not_owned')
+        const connection = {
+          userId: caller.userId,
+          provider: observation.provider,
+          connectionId: observation.connectionId,
+          providerAccountId: observation.providerAccountId,
+        }
+        if (!await transaction.ownsConnection(connection)) return baseResult('rejected', 'connection_not_owned')
 
-      if (await transaction.isSourcePaused(caller.userId, observation.source)) {
-        return baseResult('ignored', 'source_paused')
-      }
+        const providerPaused = await transaction.isSourcePaused(caller.userId, observation.provider)
+        const transportPaused = await transaction.isSourcePaused(caller.userId, observation.source)
+        if (providerPaused || transportPaused) return baseResult('ignored', 'source_paused')
 
-      const fingerprint = externalObservationFingerprint(observation)
-      if (await transaction.findLedgerByFingerprint(caller.userId, fingerprint)) {
-        return baseResult('duplicate', 'observation_already_reconciled')
-      }
+        const fingerprint = externalObservationFingerprint(observation)
+        if (await transaction.findLedgerByFingerprint(caller.userId, fingerprint)) {
+          return baseResult('duplicate', 'observation_already_reconciled')
+        }
 
-      if (observation.kind !== 'completed') return baseResult('confirmation_required', 'unsupported_kind')
-      if (!canonicalCompletionVerification.has(observation.verification)) {
-        return baseResult('confirmation_required', 'verification_not_canonical')
-      }
+        if (observation.kind !== 'completed') return baseResult('confirmation_required', 'unsupported_kind')
+        if (!canonicalCompletionVerification.has(observation.verification)) {
+          return baseResult('confirmation_required', 'verification_not_canonical')
+        }
 
-      const recommendedActionId = typeof observation.metadata.recommendedActionId === 'string'
-        ? observation.metadata.recommendedActionId.trim() || undefined
-        : undefined
-      const sourceRef = typeof observation.metadata.sourceRef === 'string'
-        ? observation.metadata.sourceRef.trim() || undefined
-        : undefined
-      if (!recommendedActionId && !sourceRef) return baseResult('confirmation_required', 'missing_link')
+        const basis = orderingBasis(observation)
+        if (!basis) return baseResult('confirmation_required', 'ordering_basis_missing')
 
-      const candidates = (await transaction.findLinkedRecommendedActions(
-          caller.userId,
-          recommendedActionId,
-          sourceRef,
-        ))
-        .filter((action) => action.userId === caller.userId)
-        .filter((action) => !recommendedActionId || action.id === recommendedActionId)
-        .filter((action) => !sourceRef || action.taskId === sourceRef)
-      if (candidates.length === 0) return baseResult('confirmation_required', 'missing_link')
-      if (candidates.length !== 1) return baseResult('confirmation_required', 'ambiguous_link')
+        const identity: ProjectionIdentity = {
+          ...connection,
+          entityType: observation.entityType,
+          sourceEntityId: observation.sourceEntityId,
+        }
+        const candidates = (await transaction.findOwnedImportedEntities(identity))
+          .filter((entity) => entity.userId === identity.userId)
+          .filter((entity) => entity.provider === identity.provider)
+          .filter((entity) => entity.connectionId === identity.connectionId)
+          .filter((entity) => entity.providerAccountId === identity.providerAccountId)
+          .filter((entity) => entity.entityType === identity.entityType)
+          .filter((entity) => entity.sourceEntityId === identity.sourceEntityId)
+        if (candidates.length === 0) return baseResult('confirmation_required', 'imported_entity_missing')
+        if (candidates.length !== 1) return baseResult('confirmation_required', 'ambiguous_imported_entity')
 
-      const action = candidates[0]
-      const resolvedSourceRef = sourceRef ?? action.taskId ?? action.id
-      const signalType = completionSignalType(observation.entityType)
-      const latest = await transaction.findLatestCompletionSignal(
-        caller.userId,
-        observation.source,
-        resolvedSourceRef,
-        signalType,
-      )
-      if (latest && observation.occurredAt.getTime() <= latest.observedAt.getTime()) {
-        return baseResult('stale', 'out_of_order_observation')
-      }
-      if (action.status === 'completed') return baseResult('duplicate', 'recommendation_already_completed')
+        const entity = candidates[0]
+        const order = await transaction.assessOrdering(entity, observation, basis)
+        if (order.basis !== basis) return baseResult('confirmation_required', 'ordering_unknown')
+        if (order.relation === 'older') return baseResult('stale', 'older_provider_order')
+        if (order.relation !== 'newer') return baseResult('confirmation_required', `ordering_${order.relation}`)
+        if (entity.lifecycleState === 'completed') return baseResult('duplicate', 'imported_entity_already_completed')
 
-      const completedAt = now()
-      const idempotencyKey = `ambient:${fingerprint}`
-      const activityRunId = `ambient-reconciliation:${fingerprint}`
-      const ledger = await transaction.createLedgerSignal({
-        userId: caller.userId,
-        fingerprint,
-        source: observation.source,
-        sourceRef: resolvedSourceRef,
-        signalType,
-        label: `Verified external ${observation.entityType} completion`,
-        observedAt: observation.occurredAt,
-        reliability: 'deterministic',
-      })
-      await transaction.completeRecommendedAction({
-        id: action.id,
-        userId: caller.userId,
-        data: {
-          status: 'completed',
-          statusAt: completedAt,
-          completedAt,
-          responseAt: completedAt,
-          terminalReason: 'verified_external_completion',
-          lastActor: observation.actor,
-        },
-      })
-      const outcome = await transaction.createOutcomeEvent({
-        userId: caller.userId,
-        planId: action.planId,
-        recommendedActionId: action.id,
-        type: 'completed',
-        metadata: {
+        const completedAt = now()
+        const activityRunId = `ambient-reconciliation:${fingerprint}`
+
+        // The ledger claim is inside the same required transaction as the
+        // imported projection and activity writes. It is not an OutcomeEvent
+        // and does not authorize any RecommendedAction or Task transition.
+        const ledger = await transaction.createLedgerSignal({
+          userId: caller.userId,
+          fingerprint,
+          source: observation.provider,
+          sourceRef: projectionSourceRef(identity),
+          signalType: completionSignalType(observation.entityType),
+          label: `Verified imported ${observation.entityType} completion`,
+          observedAt: observation.observedAt,
+          reliability: 'deterministic',
+        })
+        await transaction.projectImportedLifecycle({
+          id: entity.id,
+          userId: caller.userId,
+          lifecycleState: 'completed',
+          orderingBasis: basis,
+          externalRevision: observation.externalRevision ?? null,
+          syncRunId: observation.syncRunId ?? null,
+          fetchedAt: observation.fetchedAt,
+          observedAt: observation.observedAt,
           actor: observation.actor,
-          source: observation.source,
-          completion: {
-            kind: observation.kind,
-            sourceEventId: observation.sourceEventId,
-            sourceEntityId: observation.sourceEntityId,
-            entityType: observation.entityType,
-            occurredAt: observation.occurredAt.toISOString(),
-            observedAt: observation.observedAt.toISOString(),
-            verification: observation.verification,
-            rawContentStored: observation.rawContentStored,
-          },
-        },
-        idempotencyKey,
-      })
-      await transaction.createActivityRun({
-        id: activityRunId,
-        userId: caller.userId,
-        surface: 'novo_loop',
-        phase: 'completed',
-        sequence: 1,
-        status: 'completed',
-        startedAt: completedAt,
-        completedAt,
-        expiresAt: new Date(completedAt.getTime() + 30 * 60_000),
-        resultRef: action.id,
-        resultSummary: 'Verified external completion reconciled.',
-      })
-      await transaction.createActivityEvent({
-        id: `ambient-reconciliation-event:${fingerprint}`,
-        runId: activityRunId,
-        sequence: 1,
-        phase: 'completed',
-        label: 'External completion reconciled',
-        detail: `${observation.source} reported a verified completion.`,
-        timestamp: completedAt,
-        requiresConfirmation: false,
-        recoverable: false,
-        terminal: true,
-      })
+          sourceEventId: observation.sourceEventId,
+          deliveryId: observation.deliveryId ?? null,
+        })
+        await transaction.createActivityRun({
+          id: activityRunId,
+          userId: caller.userId,
+          surface: 'novo_loop',
+          phase: 'completed',
+          sequence: 1,
+          status: 'completed',
+          startedAt: completedAt,
+          completedAt,
+          expiresAt: new Date(completedAt.getTime() + 30 * 60_000),
+          resultRef: entity.id,
+          resultSummary: 'Verified imported lifecycle reconciled; planning context is stale.',
+        })
+        await transaction.createActivityEvent({
+          id: `ambient-reconciliation-event:${fingerprint}`,
+          runId: activityRunId,
+          sequence: 1,
+          phase: 'completed',
+          label: 'Imported completion reconciled',
+          detail: `${observation.provider} reported a verified imported completion.`,
+          timestamp: completedAt,
+          requiresConfirmation: false,
+          recoverable: false,
+          terminal: true,
+        })
 
-      return {
-        disposition: 'completed',
-        recommendationId: action.id,
-        ledgerSignalId: ledger.id,
-        outcomeEventId: outcome.id,
-        activityRunId,
-        recommendationInvalidated: true,
-        learningEligible: false,
-      }
+        return {
+          disposition: 'projected',
+          importedEntityId: entity.id,
+          ledgerSignalId: ledger.id,
+          activityRunId,
+          recommendationInvalidated: false,
+          stalePlanDisposition: 'mark_stale',
+          learningEligible: false,
+        }
       })
     } catch (error) {
-      // NovoSignalLedger(userId, fingerprint), OutcomeEvent.idempotencyKey and
-      // deterministic activity IDs are the existing uniqueness boundaries.
-      // A concurrent transaction losing one of those claims is a replay, not
-      // a second completion and not an error to retry into duplicate writes.
       if (isUniqueClaimConflict(error)) return baseResult('duplicate', 'observation_already_reconciled')
       throw error
     }
