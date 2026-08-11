@@ -30,3 +30,11 @@ PASS — 2 suites, 8 tests
 
 The test runner emitted an existing `baseline-browser-mapping` freshness notice;
 there were no test failures.
+
+## Documentation follow-up
+
+The audit table now includes the previously omitted `app/api/mcp/route.ts`,
+`app/cognitive/page.tsx`, `components/__tests__/mobile-nav.test.tsx`, and
+`lib/db-biometrics.ts` results. The quick-action record cites the post-change
+commit `3b057ac` rather than stale pre-change line numbers. No UI or data files
+were changed in this follow-up.
