@@ -12,6 +12,8 @@ import { RefreshCw, Trash2, Upload, Check } from 'lucide-react'
 import { useSettings } from '@/lib/settings-context'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
+import { GlassSurface } from '@/components/ui/GlassSurface'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Section, Row } from './settings-shared'
 
 export function SettingsPersonalization() {
@@ -263,6 +265,28 @@ export function SettingsPersonalization() {
         </div>
       </Section>
 
+      <Section title="Live Material Preview">
+        <div
+          data-testid="material-preview"
+          aria-label="Live material preview"
+          className="bg-[var(--novo-canvas-background)] relative min-h-64 overflow-hidden rounded-2xl border border-foreground/10 bg-cover bg-center p-4 shadow-inner"
+        >
+          <GlassSurface
+            data-testid="preview-context-glass"
+            className="h-full min-h-56 justify-end rounded-xl p-4"
+          >
+            <p className="text-xs font-medium text-foreground/70">Context Glass</p>
+            <Card data-testid="preview-focus-card" className="mt-3 gap-3 rounded-lg p-4 lg:p-4">
+              <CardHeader className="gap-1">
+                <CardTitle className="text-base">Focus Surface</CardTitle>
+                <CardDescription>Cards and context use the same material contract as your workspace.</CardDescription>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">Changes apply as you adjust the controls below.</CardContent>
+            </Card>
+          </GlassSurface>
+        </div>
+      </Section>
+
       {/* Crystalline Material Sliders */}
       <Section title="Crystalline Material controls">
         <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-6">
@@ -341,11 +365,12 @@ export function SettingsPersonalization() {
             {/* Card Liquid Glass Opacity */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <Label>Dashboard Card Glass Opacity</Label>
+                <Label htmlFor="card-opacity">Dashboard Card Glass Opacity</Label>
                 <span className="text-xs text-foreground/40">{settings.cardOpacity}%</span>
               </div>
               <Progress value={settings.cardOpacity} className="h-1.5 bg-foreground/5" />
               <input
+                id="card-opacity"
                 type="range"
                 min="0"
                 max="100"
@@ -359,11 +384,12 @@ export function SettingsPersonalization() {
             {/* Card Liquid Glass Intensity */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <Label>Dashboard Card Refraction Blur</Label>
+                <Label htmlFor="card-liquid-intensity">Dashboard Card Refraction Blur</Label>
                 <span className="text-xs text-foreground/40">{settings.cardLiquidIntensity}px</span>
               </div>
               <Progress value={(settings.cardLiquidIntensity / 50) * 100} className="h-1.5 bg-foreground/5" />
               <input
+                id="card-liquid-intensity"
                 type="range"
                 min="0"
                 max="50"
