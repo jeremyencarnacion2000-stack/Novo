@@ -19,6 +19,7 @@ interface MobileOverlayContextValue {
   openOverlay: (kind: OpenMobileOverlayKind) => void
   closeOverlay: () => void
   setKeyboardOpen: (open: boolean) => void
+  setModalOpen: (open: boolean) => void
   suppressSecondary: boolean
 }
 
@@ -28,6 +29,7 @@ const defaultValue: MobileOverlayContextValue = {
   openOverlay: () => undefined,
   closeOverlay: () => undefined,
   setKeyboardOpen: () => undefined,
+  setModalOpen: () => undefined,
   suppressSecondary: false,
 }
 
@@ -41,18 +43,13 @@ function isEditableControl(element: Element | null) {
     || element instanceof HTMLElement && element.isContentEditable
 }
 
-function hasOpenModalOrSheet() {
-  const candidates = document.querySelectorAll<HTMLElement>(
-    '[role="dialog"][aria-modal="true"], [data-slot="dialog-content"][data-state="open"], [data-slot="sheet-content"][data-state="open"]',
-  )
-
-  return Array.from(candidates).some((candidate) => !candidate.closest('[data-mobile-overlay]'))
-}
-
 export function MobileOverlayProvider({ children }: { children: React.ReactNode }) {
   const [activeOverlay, setActiveOverlay] = useState<MobileOverlayKind>('none')
   const [keyboardOpen, setKeyboardOpenState] = useState(false)
   const [modalOrSheetOpen, setModalOrSheetOpen] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 767,
+  )
   const activeOverlayRef = useRef(activeOverlay)
   const ownsHistoryEntryRef = useRef(false)
   const closingHistoryEntryRef = useRef(false)
@@ -135,17 +132,15 @@ export function MobileOverlayProvider({ children }: { children: React.ReactNode 
   }, [])
 
   useEffect(() => {
-    const updateModalState = () => setModalOrSheetOpen(hasOpenModalOrSheet())
-    updateModalState()
-
-    const observer = new MutationObserver(updateModalState)
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['aria-modal', 'data-state'],
-      childList: true,
-      subtree: true,
-    })
-    return () => observer.disconnect()
+    const media = window.matchMedia?.('(max-width: 767px)')
+    const update = () => setIsMobileViewport(window.innerWidth <= 767)
+    update()
+    media?.addEventListener?.('change', update)
+    window.addEventListener('resize', update)
+    return () => {
+      media?.removeEventListener?.('change', update)
+      window.removeEventListener('resize', update)
+    }
   }, [])
 
   const value = useMemo<MobileOverlayContextValue>(() => ({
@@ -154,8 +149,9 @@ export function MobileOverlayProvider({ children }: { children: React.ReactNode 
     openOverlay,
     closeOverlay,
     setKeyboardOpen: setKeyboardOpenState,
-    suppressSecondary: activeOverlay !== 'none' || keyboardOpen || modalOrSheetOpen,
-  }), [activeOverlay, closeOverlay, keyboardOpen, modalOrSheetOpen, openOverlay])
+    setModalOpen: setModalOrSheetOpen,
+    suppressSecondary: isMobileViewport && (activeOverlay !== 'none' || keyboardOpen || modalOrSheetOpen),
+  }), [activeOverlay, closeOverlay, isMobileViewport, keyboardOpen, modalOrSheetOpen, openOverlay])
 
   return (
     <MobileOverlayContext.Provider value={value}>

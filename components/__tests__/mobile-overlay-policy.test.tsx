@@ -103,21 +103,22 @@ function PolicySurface({ withModal = false }: { withModal?: boolean }) {
 
   return (
     <MobileOverlayProvider>
-      <MobileNav />
-      <GeminiLiveOrb />
-      <FloatingMusicWidget />
-      {withModal && (
-        <>
-          <button onClick={() => setModalOpen(true)}>Open test modal</button>
-          {modalOpen && (
-            <div role="dialog" aria-modal="true" aria-label="Test modal">
-              <button>Modal action</button>
-            </div>
-          )}
-        </>
-      )}
+      <PolicyContent modalOpen={modalOpen} setModalOpen={setModalOpen} withModal={withModal} />
     </MobileOverlayProvider>
   )
+}
+
+function PolicyContent({ modalOpen, setModalOpen, withModal }: { modalOpen: boolean; setModalOpen: (open: boolean) => void; withModal: boolean }) {
+  const overlay = useMobileOverlay()
+  return <>
+    <MobileNav />
+    <GeminiLiveOrb />
+    <FloatingMusicWidget />
+    {withModal && <>
+      <button onClick={() => { setModalOpen(true); overlay.setModalOpen(true) }}>Open test modal</button>
+      {modalOpen && <div role="dialog" aria-modal="true" aria-label="Test modal"><button>Modal action</button></div>}
+    </>}
+  </>
 }
 
 function OverlayReplacementProbe() {
@@ -182,6 +183,36 @@ describe('mobile overlay policy', () => {
       expect(screen.queryByRole('button', { name: /reproductor a pantalla completa/i })).not.toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Modal action' })).toBeInTheDocument()
+  })
+
+  it('removes the primary navigation from the accessibility tree while its sheet is open', async () => {
+    const user = userEvent.setup()
+    render(<PolicySurface />)
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary mobile navigation' })).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('mobile-primary-target')).toHaveLength(0)
+  })
+
+  it('does not suppress desktop utilities when a provider-owned modal signal is active', async () => {
+    setMobileViewport(1024)
+    function DesktopProbe() {
+      const { setModalOpen } = useMobileOverlay()
+      return <button onClick={() => setModalOpen(true)}>Open desktop modal</button>
+    }
+    render(
+      <MobileOverlayProvider>
+        <DesktopProbe />
+        <GeminiLiveOrb />
+        <FloatingMusicWidget />
+      </MobileOverlayProvider>,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open desktop modal' }))
+    expect(screen.getByTitle(/presionado/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /reproductor a pantalla completa/i })).toBeInTheDocument()
   })
 
   it('consumes browser Back by closing the active sheet before route navigation', async () => {

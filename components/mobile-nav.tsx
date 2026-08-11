@@ -52,6 +52,7 @@ export function MobileNav() {
     // When the software keyboard or a different modal/sheet owns the mobile
     // surface, remove every background navigation target from the a11y tree.
     if (suppressSecondary && activeOverlay !== 'navigation') return null
+    const navigationOpen = activeOverlay === 'navigation'
 
     return (
         <>
@@ -60,7 +61,7 @@ export function MobileNav() {
                 direction state would get stuck and leave the bar hidden
                 off-screen (the reported "se buggea"). A persistent bar is
                 simpler and never strands the user without navigation. */}
-            <nav
+            {!navigationOpen && <nav
                 aria-label="Primary mobile navigation"
                 className="fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3"
                 style={{ paddingBottom: 'var(--mobile-safe-area-bottom)' }}
@@ -157,7 +158,7 @@ export function MobileNav() {
                         <Plus className="h-5 w-5 text-foreground/60" strokeWidth={2} />
                     </motion.div>
                 </motion.button>
-            </nav>
+            </nav>}
 
             {/* Section Drawer — mounted only while open; unmounts in the
                 close flight's onDone, not on click (see handleCloseDrawer) */}

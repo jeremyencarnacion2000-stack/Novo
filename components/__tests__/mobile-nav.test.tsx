@@ -82,7 +82,7 @@ describe('MobileNav', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button')).toHaveLength(6)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
   it('uses Focus Surface without the legacy drawer blur override', () => {
