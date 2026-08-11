@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -12,6 +12,7 @@ import {
 
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 import { useTranslation } from '@/lib/i18n'
+import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
 interface MobileSectionDrawerProps {
     onClose: () => void
@@ -22,6 +23,12 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
+    const { setModalOpen } = useMobileOverlay()
+
+    useEffect(() => {
+        setModalOpen(true)
+        return () => setModalOpen(false)
+    }, [setModalOpen])
     const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({ onDismiss: onClose })
 
     // Primary navigation lives in MobileNav. This drawer is deliberately
