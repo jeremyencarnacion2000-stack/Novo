@@ -78,6 +78,9 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
    */
   backgroundColor?: string
 
+  /** The product material this surface represents. @default 'context' */
+  material?: 'context' | 'focus'
+
   /**
    * Elevation tier — affects shadow intensity.
    * @default 'medium'
@@ -112,10 +115,9 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
 
 // ─── Shadow / Highlight Tokens ────────────────────────────────────────────────
 
-const elevationShadow: Record<NonNullable<GlassSurfaceProps['elevation']>, string> = {
-  low:    '0 4px 24px rgba(0,0,0,0.18), inset 1px 1px 0 rgba(255,255,255,0.30), inset -1px -1px 0 rgba(255,255,255,0.10)',
-  medium: '0 24px 80px rgba(0,0,0,0.35), inset 1px 1px 0 rgba(255,255,255,0.40), inset -1px -1px 0 rgba(255,255,255,0.12)',
-  high:   '0 40px 120px rgba(0,0,0,0.50), inset 1px 1px 0 rgba(255,255,255,0.55), inset -1px -1px 0 rgba(255,255,255,0.18)',
+type GlassBackdropStyle = React.CSSProperties & {
+  '--novo-glass-background': string
+  '--novo-glass-backdrop-filter'?: string
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -130,7 +132,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       chromaticAberration = 6,
       adaptive = true,
       debug = false,
-      backgroundColor = 'rgba(var(--md-sys-color-neutral-background), 0.05)',
+      backgroundColor,
+      material = 'context',
       elevation = 'medium',
       as,
       contrastObserver = false,
@@ -146,11 +149,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
   ) {
     const {
       ref: internalRef,
-      filterUrl,
       mapUrl,
-      hasSVGFilterSupport,
-      useSVGFilter,
-      buildBackdropFilter,
     } = useLiquidGlass({
       radius,
       depth,
@@ -260,12 +259,13 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       }
     }, [radius])
 
-    const bgStyles = React.useMemo<React.CSSProperties>(() => {
-      let activeBg = backgroundColor
-      let activeBorder = '1px solid rgba(255, 255, 255, 0.08)'
-      let activeShadow = elevationShadow[elevation as 'low' | 'medium' | 'high']
+    const bgStyles = React.useMemo<GlassBackdropStyle>(() => {
+      const materialVariable = `--novo-${material}`
+      let activeBg = backgroundColor ?? `var(${materialVariable}-background)`
+      let activeBorder = `var(${materialVariable}-border)`
+      let activeShadow = `var(${materialVariable}-box-shadow)`
 
-      if (contrastObserver && resolvedContrast) {
+      if (backgroundColor && contrastObserver && resolvedContrast) {
         // Keep the tint near-transparent so the displacement/refraction stays
         // visible (crystal-clear look). Just enough tint to anchor the panel.
         if (resolvedContrast === 'dark') {
@@ -283,13 +283,13 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         }
       }
 
-      const baseBg: React.CSSProperties = {
+      const baseBg: GlassBackdropStyle = {
         position: 'absolute',
         inset: 0,
         borderRadius: 'inherit',
         pointerEvents: 'none',
         zIndex: 0,
-        background: activeBg,
+        '--novo-glass-background': activeBg,
         border: activeBorder,
         boxShadow: activeShadow,
         transition: 'backdrop-filter 200ms ease, filter 200ms ease, opacity 200ms ease',
@@ -304,19 +304,9 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         }
       }
 
-      // Exact srdavo/ekino backdrop-filter chain. The displacement filter must
-      // sit *inside* backdrop-filter (not the `filter` property) so it bends the
-      // content behind the panel. A half pre-blur softens the backdrop so the
-      // lens samples smooth pixels, then the SVG filter displaces + chromatically
-      // splits it, then the full blur + tone pass finishes the material.
-      const displace = hasSVGFilterSupport && useSVGFilter && filterUrl ? `${filterUrl} ` : ''
-      const bd = displace 
-        ? `blur(${blur / 2}px) ${displace}blur(${blur}px) brightness(1.1) saturate(1.5)`
-        : `blur(${Math.max(20, blur * 10)}px) saturate(150%) brightness(1.05)`
       return {
         ...baseBg,
-        backdropFilter: bd,
-        WebkitBackdropFilter: bd,
+        '--novo-glass-backdrop-filter': `var(${materialVariable}-backdrop-filter)`,
       }
     }, [
       backgroundColor,
@@ -325,10 +315,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       resolvedContrast,
       debug,
       mapUrl,
-      hasSVGFilterSupport,
-      useSVGFilter,
-      filterUrl,
-      blur,
+      material,
     ])
 
     const Component = as || 'div'
@@ -341,13 +328,14 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         data-contrast={resolvedContrast}
         className={cn(
           'flex flex-col',
+          material === 'focus' ? 'novo-focus-surface' : 'novo-context-glass',
           className,
         )}
         style={{ ...computedStyle, ...style }}
         {...rest}
       >
         {/* Liquid Glass Background Layer */}
-        <div aria-hidden style={bgStyles} />
+        <div aria-hidden data-glass-backdrop className="novo-glass-backdrop" style={bgStyles} />
 
         {/* Inner edge highlight */}
         <div

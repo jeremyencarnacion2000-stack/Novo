@@ -1,10 +1,275 @@
 @import 'tailwindcss';
+@import '@heroui/styles';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
+/* Ambient surface inspired by the reference: a restrained, slowly drifting
+   color field plus dither noise. It lives inside the app viewport instead of
+   on body so custom wallpapers and public pages remain independent. */
+@keyframes novo-ambient-drift {
+  0% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
+  50% { transform: translate3d(2%, 1%, 0) scale(1.08); }
+  100% { transform: translate3d(4%, -2%, 0) scale(1.04); }
+}
+
+@keyframes novo-premium-drift {
+  0% { transform: translate3d(-1.5%, -1%, 0) scale(1.04); }
+  50% { transform: translate3d(1%, 1.5%, 0) scale(1.08); }
+  100% { transform: translate3d(2%, -1%, 0) scale(1.05); }
+}
+
+@keyframes landing-ambient-drift {
+  0% { transform: translate3d(-2%, -1%, 0) scale(1.02); }
+  50% { transform: translate3d(1%, 2%, 0) scale(1.06); }
+  100% { transform: translate3d(3%, -1%, 0) scale(1.03); }
+}
+
+.landing-ambient { position: relative; isolation: isolate; }
+.landing-ambient::before,
+.landing-ambient::after { content: ''; position: absolute; inset: -10%; pointer-events: none; border-radius: inherit; }
+.landing-ambient::before {
+  z-index: -2;
+  background: radial-gradient(ellipse 55% 70% at 16% 10%, rgba(67,190,126,.2), transparent 70%), radial-gradient(ellipse 52% 70% at 88% 16%, rgba(25,171,155,.14), transparent 72%), linear-gradient(135deg, #070908 4%, #0a120d 52%, #070908 100%);
+  filter: blur(12px) saturate(92%);
+  animation: landing-ambient-drift 26s ease-in-out infinite alternate;
+}
+.landing-ambient::after { z-index: -1; opacity: .14; mix-blend-mode: soft-light; background-image: var(--glass-noise); background-size: 180px 180px; }
+@media (prefers-reduced-motion: reduce) { .landing-ambient::before { animation: none; } }
+
+[data-app-viewport] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-app-viewport] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The wallpaper must live inside the app's backdrop root. Painting it only
+   on body::before leaves cards and the sidebar in a different compositor,
+   where backdrop-filter sees a flat transparent plane instead of the image. */
+[data-app-viewport] > [data-app-wallpaper] {
+  position: absolute;
+  inset: -40px;
+  z-index: 0;
+  display: none;
+  pointer-events: none;
+}
+
+body.has-bg-image [data-app-wallpaper] {
+  display: block;
+  background: var(--novo-canvas-background);
+  background-size: cover;
+  background-position: center;
+  filter: var(--novo-canvas-backdrop-filter);
+}
+
+/* Runtime-generated liquid glass uses CSS tokens so settings can update the
+   actual backdrop layer without React rebuilding the SVG displacement map.
+   Keeping the browser property here also lets the build emit both standard
+   and Safari-prefixed forms from one canonical declaration. */
+.novo-glass-backdrop {
+  background: var(--novo-glass-background, transparent);
+  backdrop-filter: var(--novo-glass-backdrop-filter, none);
+}
+
+[data-app-viewport]::before,
+[data-app-viewport]::after {
+  content: '';
+  position: absolute;
+  inset: -8%;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+[data-app-viewport]::before {
+  z-index: 0;
+  opacity: .34;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='novoNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23novoNoise)' opacity='.22'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+[data-app-viewport]::after {
+  z-index: 0;
+  opacity: .28;
+  filter: blur(44px) saturate(115%);
+  background:
+    radial-gradient(ellipse 54% 46% at 18% 18%, rgba(35, 197, 126, .24), transparent 72%),
+    radial-gradient(ellipse 48% 52% at 82% 20%, rgba(20, 184, 166, .17), transparent 72%),
+    radial-gradient(ellipse 48% 54% at 56% 92%, rgba(183, 243, 208, .12), transparent 76%);
+  animation: novo-ambient-drift 22s ease-in-out infinite alternate;
+}
+
+html:not(.dark) [data-app-viewport]::after {
+  opacity: .18;
+  background:
+    radial-gradient(ellipse 54% 46% at 18% 18%, rgba(34, 160, 106, .18), transparent 72%),
+    radial-gradient(ellipse 48% 52% at 82% 20%, rgba(20, 160, 150, .12), transparent 72%),
+    radial-gradient(ellipse 48% 54% at 56% 92%, rgba(216, 198, 160, .14), transparent 76%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-viewport]::after { animation: none; }
+}
+
+/* Appearance changes are a single handoff rather than a flash of individual
+   variables. Native View Transitions crossfade the complete rendered frame,
+   including a custom wallpaper; this CSS block is the consistent fallback. */
+html[data-appearance-transition] body,
+html[data-appearance-transition] [data-app-viewport],
+html[data-appearance-transition] [data-app-viewport]::after {
+  transition: background-color 520ms cubic-bezier(0.16, 1, 0.3, 1), color 360ms ease, opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), filter 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-appearance-transition] body.has-bg-image::before {
+  animation: novo-wallpaper-settle 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes novo-wallpaper-settle {
+  from { opacity: 0.45; transform: scale(1.025); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+::view-transition-old(root) {
+  animation: novo-appearance-out 180ms ease-out both;
+}
+
+::view-transition-new(root) {
+  animation: novo-appearance-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes novo-appearance-out { to { opacity: 0; } }
+@keyframes novo-appearance-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-appearance-transition] body.has-bg-image::before,
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none; transition: none; }
+}
+
+/* Premium Novo surface: a calm editorial field for high-value moments such as
+   Ahora and billing. The texture is intentionally low contrast so copy remains
+   the focus while the field gives the surface a tactile, crafted feel. */
+.novo-premium-field {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
+}
+
+.novo-premium-field::before,
+.novo-premium-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.novo-premium-field::before {
+  z-index: 0;
+  opacity: .18;
+  mix-blend-mode: soft-light;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+}
+
+.novo-premium-field::after {
+  z-index: 0;
+  opacity: .3;
+  background: radial-gradient(ellipse 48% 60% at 64% 110%, rgba(183, 243, 208, .15), transparent 74%);
+  transform: translate3d(0, 0, 0) scale(1.04);
+  animation: novo-premium-drift 18s ease-in-out infinite alternate;
+  transition: transform 900ms var(--novo-spring), opacity 450ms ease;
+}
+
+.novo-premium-field:hover::after { transform: translate3d(-2%, -1%, 0) scale(1.08); opacity: .42; }
+.novo-premium-field > * { position: relative; z-index: 1; }
+
+.novo-settings-nav {
+  position: relative;
+  isolation: isolate;
+  background: var(--novo-context-background);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  border: var(--novo-context-border);
+  box-shadow: var(--novo-context-box-shadow);
+}
+
+.novo-settings-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: .18;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .novo-premium-field::after,
+  .novo-premium-field:hover::after { transform: none; transition: none; animation: none; }
+}
+
+/* Shared dialog depth: the panel gets the same quiet texture as the app
+   surface, while all interactive/content children remain above the layers. */
+[data-slot='dialog-content'] {
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
+}
+
+[data-slot='dialog-content']::before,
+[data-slot='dialog-content']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+[data-slot='dialog-content']::before {
+  z-index: 0;
+  opacity: .24;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='dialogNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23dialogNoise)' opacity='.2'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+[data-slot='dialog-content']::after {
+  z-index: 0;
+  opacity: .2;
+  background: radial-gradient(ellipse at 16% 0%, rgba(35, 197, 126, .16), transparent 58%), radial-gradient(ellipse at 90% 100%, rgba(20, 184, 166, .11), transparent 62%);
+}
+
+[data-slot='dialog-content'] > * { position: relative; z-index: 1; }
+
 /* ── Novo Panel Animation System (Sileo-derived spring physics) ────────── */
 :root {
+  /* The three material roles have safe startup values. SettingsContext
+     replaces all twelve values atomically from the material contract. */
+  --novo-canvas-background: var(--background);
+  --novo-canvas-backdrop-filter: blur(0px);
+  --novo-canvas-border: 1px solid transparent;
+  --novo-canvas-box-shadow: none;
+  --novo-context-background: rgba(255, 255, 255, 0.68);
+  --novo-context-backdrop-filter: blur(12px) saturate(160%) brightness(1.04);
+  --novo-context-border: 1px solid #767676;
+  --novo-context-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 8px 28px rgba(15, 23, 42, 0.14);
+  --novo-focus-background: rgba(255, 255, 255, 0.78);
+  --novo-focus-backdrop-filter: blur(18px) saturate(160%) brightness(1.04);
+  --novo-focus-border: 1px solid #767676;
+  --novo-focus-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 12px 36px rgba(15, 23, 42, 0.18);
+
   --novo-spring: linear(
     0, 0.002 0.6%, 0.007 1.2%, 0.015 1.8%, 0.026 2.4%, 0.041 3.1%,
     0.06 3.8%, 0.108 5.3%, 0.157 6.6%, 0.214 8%, 0.467 13.7%, 0.577 16.3%,
@@ -16,6 +281,32 @@
   --novo-duration: 500ms;
   --novo-duration-fast: 350ms;
   --novo-duration-slow: 650ms;
+  --chart-1: oklch(0.32 0 none);
+  --chart-2: oklch(0.41 0 none);
+  --chart-3: oklch(0.54 0 none);
+  --chart-4: oklch(0.71 0 none);
+  --chart-5: oklch(0.89 0 none);
+  --chart-background: oklch(1 0 0);
+  --chart-foreground: oklch(0.145 0.004 285);
+  --chart-foreground-muted: oklch(0.55 0.014 260);
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
+  --chart-crosshair: oklch(0.4 0.1828 274.34);
+  --chart-grid: oklch(0.9 0 0);
+  --chart-brush-border: var(--chart-grid);
+  --chart-tooltip-background: oklch(0.21 0.006 285 / 0.8);
+  --chart-tooltip-foreground: oklch(0.985 0 0);
+  --chart-tooltip-muted: oklch(0.65 0.01 260);
+  --chart-marker-background: oklch(0.97 0.005 260);
+  --chart-marker-border: oklch(0.85 0.01 260);
+  --chart-marker-foreground: oklch(0.3 0.01 260);
+  --chart-label: oklch(0.45 0.01 260);
+  --chart-scale-01: oklch(0.98 0.003 106);
+  --chart-scale-02: oklch(0.92 0.008 106);
+  --chart-scale-03: oklch(0.82 0.015 106);
+  --chart-scale-04: oklch(0.68 0.02 106);
+  --chart-scale-05: oklch(0.55 0.025 106);
+  --chart-scale-pattern-color: oklch(0.96 0.005 106);
 }
 
 /* ── Modal shared-element ("Container Transform") dialog target ───────────
@@ -39,6 +330,80 @@
 .modal-flip-target.modal-flip-active,
 .modal-flip-overlay.modal-flip-active {
   opacity: 1;
+}
+
+/* Task form submenus ------------------------------------------------------
+   State/priority lists and the date picker are layers of the task modal, not
+   independent windows. They therefore open from the exact Radix origin of
+   their trigger and use a short, calm material transition. The selectors are
+   intentionally scoped: menus elsewhere keep their own interaction density. */
+@keyframes task-submenu-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.975); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes task-submenu-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  to { opacity: 0; transform: translateY(-2px) scale(0.985); filter: blur(2px); }
+}
+
+[data-task-submenu],
+[data-task-date-picker] {
+  transform-origin: var(--radix-select-content-transform-origin, var(--radix-popover-content-transform-origin));
+  will-change: transform, opacity, filter;
+}
+
+[data-task-submenu][data-state='open'],
+[data-task-date-picker][data-state='open'] {
+  animation: task-submenu-enter 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+[data-task-submenu][data-state='closed'],
+[data-task-date-picker][data-state='closed'] {
+  animation: task-submenu-exit 130ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+[data-task-submenu] [data-task-submenu-item] {
+  transition: transform 140ms ease-out, background-color 140ms ease, color 140ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-task-submenu] [data-task-submenu-item]:hover {
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-task-submenu][data-state],
+  [data-task-date-picker][data-state] {
+    animation: none;
+    transition: opacity 120ms ease;
+  }
+
+  [data-task-submenu] [data-task-submenu-item] {
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+}
+
+.cognitive-engine-summary {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 330px;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cognitive-engine-summary:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+    background-color: color-mix(in srgb, var(--background) 94%, var(--primary) 6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cognitive-engine-summary {
+    transition: none;
+  }
 }
 
 @keyframes novo-panel-in {
@@ -165,9 +530,6 @@
   --glass-text-muted: #64748b;
 
   /* ── Sidebar Glass Layer (Frosted — brand-protected, do not alias to card vars) */
-  --sidebar-blur-px: 24px;       /* matches --glass-blur-px by default */
-  --sidebar-opacity: 0.30;
-  --sidebar-brightness: 1.05;
 
   /* ── Liquid Glass Layer (Dashboard Cards — independent from sidebar) */
   --card-blur-px: 16px;
@@ -187,6 +549,14 @@
 }
 
 .dark {
+  --novo-canvas-background: var(--background);
+  --novo-context-background: rgba(10, 14, 20, 0.56);
+  --novo-context-border: 1px solid #737a84;
+  --novo-context-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 12px 34px rgba(0, 0, 0, 0.34);
+  --novo-focus-background: rgba(10, 14, 20, 0.68);
+  --novo-focus-border: 1px solid #737a84;
+  --novo-focus-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 16px 48px rgba(0, 0, 0, 0.42);
+
   /* Material design systems background variable mapping */
   --md-sys-color-neutral-background: 20, 20, 23;
   /* Novo Design DNA: Carbon Mode (Dark Premium) */
@@ -258,9 +628,6 @@
   --glass-text-muted: #a1a1aa;
 
   /* ── Sidebar Glass Layer — dark mode values (frosted premium) */
-  --sidebar-blur-px: 24px;
-  --sidebar-opacity: 0.12;
-  --sidebar-brightness: 1.0;
 
   /* ── Liquid Glass Layer — dark mode */
   --card-blur-px: 16px;
@@ -277,6 +644,27 @@
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 24px 80px rgba(0,0,0,0.5);
   --glass-background-sampling: saturate(160%);
+  --chart-1: oklch(1 0 none);
+  --chart-2: oklch(0.73 0 none);
+  --chart-3: oklch(0.51 0 none);
+  --chart-4: oklch(0.39 0 none);
+  --chart-5: oklch(0.32 0 none);
+  --chart-background: oklch(0.145 0 0);
+  --chart-foreground: oklch(0.45 0 0);
+  --chart-foreground-muted: oklch(0.65 0.01 260);
+  --chart-crosshair: oklch(0.45 0 0);
+  --chart-grid: oklch(0.25 0 0);
+  --chart-brush-border: var(--chart-grid);
+  --chart-marker-background: oklch(0.25 0.01 260);
+  --chart-marker-border: oklch(0.4 0.01 260);
+  --chart-marker-foreground: oklch(0.9 0 0);
+  --chart-label: oklch(0.75 0.01 260);
+  --chart-scale-01: oklch(0.28 0.03 270);
+  --chart-scale-02: oklch(0.38 0.04 270);
+  --chart-scale-03: oklch(0.48 0.05 270);
+  --chart-scale-04: oklch(0.58 0.06 270);
+  --chart-scale-05: oklch(0.68 0.07 270);
+  --chart-scale-pattern-color: oklch(0.145 0 0);
 }
 
 @theme inline {
@@ -340,6 +728,58 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --backdrop-blur-custom: calc(var(--glass-blur) * 1px);
+
+  --color-chart-scale-pattern-color: var(----chart-scale-pattern-color);
+
+  --color-chart-scale-05: var(----chart-scale-05);
+
+  --color-chart-scale-04: var(----chart-scale-04);
+
+  --color-chart-scale-03: var(----chart-scale-03);
+
+  --color-chart-scale-02: var(----chart-scale-02);
+
+  --color-chart-scale-01: var(----chart-scale-01);
+
+  --color-chart-label: var(----chart-label);
+
+  --color-chart-marker-foreground: var(----chart-marker-foreground);
+
+  --color-chart-marker-border: var(----chart-marker-border);
+
+  --color-chart-marker-background: var(----chart-marker-background);
+
+  --color-chart-tooltip-muted: var(----chart-tooltip-muted);
+
+  --color-chart-tooltip-foreground: var(----chart-tooltip-foreground);
+
+  --color-chart-tooltip-background: var(----chart-tooltip-background);
+
+  --chart-brush-border: var(----chart-brush-border);
+
+  --color-chart-grid: var(----chart-grid);
+
+  --color-chart-crosshair: var(----chart-crosshair);
+
+  --chart-line-secondary: var(----chart-line-secondary);
+
+  --chart-line-primary: var(----chart-line-primary);
+
+  --color-chart-foreground-muted: var(----chart-foreground-muted);
+
+  --color-chart-foreground: var(----chart-foreground);
+
+  --color-chart-background: var(----chart-background);
+
+  --color-chart-5: var(----chart-5);
+
+  --color-chart-4: var(----chart-4);
+
+  --color-chart-3: var(----chart-3);
+
+  --color-chart-2: var(----chart-2);
+
+  --color-chart-1: var(----chart-1);
 }
 
 /* Soft Ambient Shadow Utility */
@@ -350,26 +790,27 @@
 @utility card--hero {
   background: var(--card-hero-bg);
   border: 1px solid var(--card-hero-border);
-  backdrop-filter: blur(calc(var(--glass-blur) * 1.5px)) saturate(180%);
+  backdrop-filter: blur(calc(var(--card-blur-px) + 8px)) saturate(180%);
 }
 
 @utility card--primary {
   background: var(--card-primary-bg);
   border: 1px solid var(--card-primary-border);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(calc(var(--glass-blur) * 1.2px)) saturate(180%);
+  backdrop-filter: blur(calc(var(--card-blur-px) + 4px)) saturate(180%);
 }
 
 @utility card--secondary {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(calc(var(--glass-blur) * 1px)) saturate(160%);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 @utility card--tertiary {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(calc(var(--glass-blur) * 0.8px)) saturate(140%);
+  backdrop-filter: blur(max(4px, calc(var(--card-blur-px) - 4px))) saturate(140%);
 }
 
 /* Glass Blur Utility — heavier for 'milky' look */
@@ -393,11 +834,11 @@
 .glass-panel {
   position: relative;
   overflow: hidden;
-  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.8));
-  border: 1px solid var(--glass-border);
+  background: var(--novo-context-background);
+  border: var(--novo-context-border);
   border-radius: var(--glass-radius);
-  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 /* NDL Glass Primitives — light-mode default (white surface, dark hairline
@@ -407,10 +848,10 @@
    an near-invisible near-white-on-white surface whenever the user actually
    switched to light theme. */
 @utility glass-surface {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 @utility glass-floating {
@@ -425,12 +866,6 @@
   backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--cognitive-card-border, rgba(0, 0, 0, 0.12));
   box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
-
-.dark .glass-surface {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .dark .glass-floating {
@@ -500,13 +935,15 @@
 /* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
 .glass-card {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-  background: rgba(255, 255, 255, var(--glass-opacity));
-  border: 1px solid var(--glass-border);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
   border-radius: var(--glass-radius);
-  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  box-shadow: var(--glass-shadow);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
     background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
@@ -527,7 +964,7 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--glass-radius);
   box-shadow: var(--glass-shadow);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
     background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
@@ -547,7 +984,7 @@
   backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
   box-shadow: var(--glass-shadow);
   padding: 8px 16px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), box-shadow 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
   color: var(--foreground);
 
   &:hover {
@@ -626,9 +1063,9 @@
 
 /* ─── Global Focus-Visible Ring System — WCAG 2.1 AA ──────────────────────────
    Uses :focus-visible so mouse users see no ring, keyboard users get a clear indicator.
-   The indigo glow matches the Novo design DNA and passes AA contrast on dark surfaces. */
+   The primary green glow follows the Novo design DNA and passes AA contrast on dark surfaces. */
 :focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.8);
+  outline: 2px solid rgba(var(--primary-rgb), 0.85);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -653,9 +1090,15 @@
     @apply overflow-hidden font-sans;
     transition: background-color 0.5s ease, color 0.5s ease;
 
-    background: var(--background);
+    background: var(--novo-canvas-background, var(--background));
+    border: var(--novo-canvas-border, 1px solid transparent);
+    box-shadow: var(--novo-canvas-box-shadow, none);
     color: var(--foreground);
     background-attachment: fixed;
+    /* Keep the negative fixed wallpaper pseudo-layers above this opaque base
+       color. Without a stacking context, Chromium can place them behind the
+       body on desktop, making a selected wallpaper appear to do nothing. */
+    isolation: isolate;
   }
 
   /* Ultra-smooth interaction defaults */
@@ -682,7 +1125,7 @@
   }
 
   .dark body {
-    background: var(--background);
+    background: var(--novo-canvas-background, var(--background));
     color: var(--foreground);
     background-attachment: fixed;
   }
@@ -703,31 +1146,6 @@
      never reveals an unblurred sliver at the viewport boundary. A
      separate ::after applies the dimness as a flat dark scrim on top,
      driven by --bg-dimness (0–1) independent of the blur amount. */
-  body.has-bg-image {
-    background-image: none;
-  }
-
-  body.has-bg-image::before {
-    content: '';
-    position: fixed;
-    inset: -40px;
-    z-index: -2;
-    background-image: var(--bg-image);
-    background-size: cover;
-    background-position: center;
-    filter: blur(var(--bg-blur-px, 0px));
-    pointer-events: none;
-  }
-
-  body.has-bg-image::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background: rgba(0, 0, 0, var(--bg-dimness, 0));
-    pointer-events: none;
-  }
-
   /* Scrollbar — Hidden for premium spatial layout where Capsule acts as scrollbar */
   ::-webkit-scrollbar {
     display: none;
@@ -778,23 +1196,39 @@
      is the most-used glass surface in the app. Relative hierarchy preserved. */
   .liquid-glass,
   .liquid-glass-subtle {
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(14px) saturate(150%) brightness(1.05);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.60),
-      0 4px 24px rgba(0, 0, 0, 0.06);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: var(--novo-focus-background);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
+    border: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
   }
+
+  .liquid-glass::before,
+  .liquid-glass-subtle::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: .10;
+    background-image: var(--glass-noise);
+    background-size: 180px 180px;
+    mix-blend-mode: soft-light;
+  }
+
+  .liquid-glass > *,
+  .liquid-glass-subtle > * { position: relative; z-index: 1; }
 
   /* Tier 2: Elevated — chromatic edge glow + heavier blur */
   .liquid-glass-elevated {
     position: relative;
-    background: rgba(255, 255, 255, 0.60);
-    backdrop-filter: blur(20px) saturate(170%) brightness(1.06);
-    border: 1px solid rgba(0, 0, 0, 0.10);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.70),
-      0 8px 40px rgba(0, 0, 0, 0.08);
+    background: var(--novo-focus-background);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
+    border: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
   }
   .liquid-glass-elevated::before {
     content: '';
@@ -830,12 +1264,10 @@
        panels, and premium full-page cards that require dark contrast regardless
        of the active theme. Light mode "glass" was rgba(255,255,255,0.65) which
        made the Cognitive Engine completely invisible (white content on white bg). */
-    background: rgba(10, 8, 18, 0.88);
-    backdrop-filter: blur(26px) saturate(160%) brightness(1.04);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.10),
-      0 16px 60px rgba(0, 0, 0, 0.45);
+    background: var(--novo-focus-background);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
+    border: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
     will-change: transform;
     transform: translateZ(0);
     isolation: isolate;
@@ -871,51 +1303,115 @@
      always-on blur per card compounds into real jank that a single card
      never shows. */
   .liquid-glass-hover {
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.60),
-      0 4px 24px rgba(0, 0, 0, 0.06);
+    background: var(--novo-focus-background);
+    border: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
     transition: backdrop-filter 0.2s ease, box-shadow 0.2s ease;
   }
   .liquid-glass-hover:hover {
-    backdrop-filter: blur(20px) saturate(150%) brightness(1.05);
-  }
-  .dark .liquid-glass-hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.10),
-      0 4px 24px rgba(0, 0, 0, 0.30);
+    box-shadow: var(--novo-focus-box-shadow);
   }
 
-  /* Dark mode overrides */
-  .dark .liquid-glass,
-  .dark .liquid-glass-subtle {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.10),
-      0 4px 24px rgba(0, 0, 0, 0.30);
-  }
-  .dark .liquid-glass-elevated {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.14),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      0 8px 40px rgba(0, 0, 0, 0.45);
-  }
   .dark .liquid-glass-elevated::before { opacity: 0.5; }
+  .dark .liquid-glass::before,
+  .dark .liquid-glass-subtle::before { opacity: .16; }
   .dark .liquid-glass-premium::before { opacity: 0.6; }
-  .dark .liquid-glass-premium {
-    background: rgba(10, 8, 18, 0.92);
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.14),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      0 16px 60px rgba(0, 0, 0, 0.60);
+}
+
+@layer components {
+  .novo-sidebar-material {
+    background: var(--novo-context-background);
+    backdrop-filter: var(--novo-context-backdrop-filter);
+    border: var(--novo-context-border);
+    box-shadow: var(--novo-context-box-shadow);
   }
+}
+
+.novo-context-glass {
+  background: var(--novo-context-background);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  border: var(--novo-context-border);
+  box-shadow: var(--novo-context-box-shadow);
+}
+
+.novo-focus-surface {
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
+}
+
+/* Cognitive Engine surfaces use a few legacy white-on-glass utilities. Keep
+   those components legible when the app switches to the light theme and avoid
+   the washed-out screenshot state without changing the dark visual language. */
+html:not(.dark) .cognitive-page [class*="text-white"] {
+  color: var(--foreground) !important;
+}
+html:not(.dark) .cognitive-page [class*="bg-black"] {
+  background-color: color-mix(in srgb, var(--background) 92%, var(--foreground) 8%) !important;
+}
+html:not(.dark) .cognitive-page [class*="border-white"] {
+  border-color: color-mix(in srgb, var(--foreground) 16%, transparent) !important;
+}
+html:not(.dark) .cognitive-page .liquid-glass,
+html:not(.dark) .cognitive-page .liquid-glass-elevated,
+html:not(.dark) .cognitive-page .liquid-glass-premium {
+  color: var(--foreground);
+}
+
+/* Cognitive dashboard field: one calm emerald/teal focal plane, inspired by
+   Stepbro's money dashboard. The noise stays low-contrast and never competes
+   with operational labels or chart data. */
+.cognitive-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 80% at 52% 8%, rgba(20, 184, 166, 0.10), transparent 68%),
+    linear-gradient(180deg, color-mix(in srgb, var(--background) 92%, #06351f 8%), var(--background));
+}
+
+.cognitive-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.12;
+  mix-blend-mode: soft-light;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+}
+
+.cognitive-page > * { position: relative; z-index: 1; }
+
+.dark .cognitive-page {
+  background:
+    radial-gradient(ellipse 72% 78% at 50% 5%, rgba(16, 185, 129, 0.14), transparent 67%),
+    radial-gradient(ellipse 54% 56% at 92% 96%, rgba(20, 184, 166, 0.08), transparent 72%),
+    linear-gradient(180deg, #06140c, #030805 88%);
+}
+
+.cognitive-shell {
+  backdrop-filter: blur(6px) saturate(112%);
+  -webkit-backdrop-filter: blur(6px) saturate(112%);
+}
+
+.cognitive-chart {
+  --chart-background: transparent;
+  --chart-foreground: rgba(245, 241, 232, 0.78);
+  --chart-foreground-muted: rgba(183, 243, 208, 0.45);
+  --chart-grid: rgba(183, 243, 208, 0.12);
+  --chart-label: rgba(183, 243, 208, 0.48);
+  --chart-crosshair: rgba(183, 243, 208, 0.75);
+}
+
+html:not(.dark) .cognitive-chart {
+  --chart-foreground: rgba(15, 23, 42, 0.78);
+  --chart-foreground-muted: rgba(15, 80, 50, 0.5);
+  --chart-grid: rgba(15, 80, 50, 0.13);
+  --chart-label: rgba(15, 80, 50, 0.55);
 }
 
 /* ── Smooth animated panel / modal GPU compositing ───────────────────────────
@@ -942,14 +1438,28 @@
   transform: translateZ(0);
 }
 
-
-
 @layer utilities {
 
   /* App Background - Silent Dark */
   .app-background {
     @apply fixed inset-0 z-[-1] pointer-events-none transition-all duration-500;
     background: #050505;
+  }
+
+  /* Keep the wallpaper visible while giving settings content a stable,
+     readable plane. This prevents transparent cards from becoming unreadable
+     when the user's wallpaper has high-frequency detail or bright areas. */
+  .settings-page-shell {
+    position: relative;
+    isolation: isolate;
+    border-radius: 2rem;
+    background: linear-gradient(180deg, rgba(4, 14, 9, 0.2), rgba(4, 14, 9, 0.5));
+    backdrop-filter: blur(5px) saturate(115%);
+    -webkit-backdrop-filter: blur(5px) saturate(115%);
+  }
+
+  html:not(.dark) .settings-page-shell {
+    background: linear-gradient(180deg, rgba(246, 249, 242, 0.34), rgba(238, 245, 235, 0.52));
   }
 
   /* Typography - Systemic Micro-copy */
@@ -967,7 +1477,12 @@
     opacity: 0.03;
     pointer-events: none;
     mix-blend-mode: overlay;
-    z-index: -1;
+    z-index: 0;
+  }
+
+  .glass-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   /* 4. TEXTO (Importante - Light Mode default handled by base, override for dark) */
@@ -1041,22 +1556,15 @@
   /* Sidebar - Frosted Glass (brand-protected — uses sidebar namespace exclusively) */
   .glass-sidebar {
     @apply transition-all duration-300 ease-out relative overflow-hidden;
-    background: rgba(255, 255, 255, 0.70);
-    backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
-    border-right: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
-  }
-
-  .dark .glass-sidebar {
-    background: rgba(255, 255, 255, var(--sidebar-opacity));
-    backdrop-filter: blur(var(--sidebar-blur-px)) saturate(120%) brightness(var(--sidebar-brightness));
-    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--novo-context-background);
+    backdrop-filter: var(--novo-context-backdrop-filter);
+    border-right: var(--novo-context-border);
+    box-shadow: var(--novo-context-box-shadow);
   }
 
   /* Novo Liquid Glass Tier System moved to @layer components above —
      several consumers rely on it losing to Tailwind's own utilities
      (fixed, absolute, etc.) on the same element. See that block for why. */
-
 
   /* Active Sidebar Item — clean glass accent with inset accent line */
   .sidebar-active-item,
@@ -1076,7 +1584,6 @@
     border-radius: 9999px !important;
     z-index: 10;
   }
-
 
   /* Section Transitions */
   .section-enter {
@@ -1139,11 +1646,11 @@
       @apply font-light tracking-tight;
       line-height: 1.1;
     }
-    
+
     h1 {
       font-size: clamp(2.5rem, 6vw, 4.5rem);
     }
-    
+
     h2 {
       font-size: clamp(1.5rem, 4vw, 2.5rem);
     }
@@ -1205,7 +1712,7 @@
        where a little spring is the domain-appropriate motion, not a "premium
        chrome" element. Toned down from 1.3 to 1.12 so it reads as a snap
        rather than a wobble. */
-    transition: transform var(--time) cubic-bezier(0.75, 0, 0.75, 1.12);
+    transition: transform var(--time) cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .liquid-switch:checked {
@@ -1662,7 +2169,7 @@ html.cognitive-fatigue [data-notification-center] {
 }
 
 .animate-dopamine-pulse {
-  animation: border-glow-dopamine 1.2s cubic-bezier(0.25, 0.8, 0.25, 1.25) forwards;
+  animation: border-glow-dopamine 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* ─── REDUCED_CAPACITY_MODE Cognitive Emergency Theming ───────────────────── */
@@ -1880,4 +2387,71 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
   outline: 2px dashed var(--primary) !important;
   outline-offset: -2px !important;
   transition: background 180ms ease, outline 180ms ease !important;
+}
+/* Novo's loading companion: one tiny, purposeful sprite cycle instead of
+   permanent blur/spinner layers. The sheet is a 4 × 2 frame grid. */
+.novo-sprite-loader {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  contain: paint;
+  isolation: isolate;
+  image-rendering: pixelated;
+}
+
+.novo-sprite-sheet {
+  position: absolute;
+  inset: 0;
+  width: 400%;
+  height: 200%;
+  background: url('/art/novo-companion-sprite.png') 0 0 / 100% 100% no-repeat;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  animation: novo-companion-build 1.12s steps(1, end) infinite;
+}
+
+/* Respect Novo's own animation preference as well as the operating system
+   reduced-motion preference below. The app setting can disable the sprite
+   without affecting its layout or final frame. */
+:root[data-animations="false"] .novo-sprite-sheet {
+  animation: none;
+  transform: translate3d(-75%, -50%, 0);
+}
+
+.novo-loader-orbit {
+  position: absolute;
+  width: 11rem;
+  height: 11rem;
+  border: 1px solid color-mix(in srgb, #b7f3d0 18%, transparent);
+  border-radius: 999px;
+  opacity: 0.55;
+  animation: novo-loader-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes novo-companion-build {
+  0%, 12.49% { transform: translate3d(0, 0, 0); }
+  12.5%, 24.99% { transform: translate3d(-25%, 0, 0); }
+  25%, 37.49% { transform: translate3d(-50%, 0, 0); }
+  37.5%, 49.99% { transform: translate3d(-75%, 0, 0); }
+  50%, 62.49% { transform: translate3d(0, -50%, 0); }
+  62.5%, 74.99% { transform: translate3d(-25%, -50%, 0); }
+  75%, 87.49% { transform: translate3d(-50%, -50%, 0); }
+  87.5%, 100% { transform: translate3d(-75%, -50%, 0); }
+}
+
+@keyframes novo-loader-breathe {
+  0%, 100% { opacity: 0.32; transform: scale(0.92); }
+  50% { opacity: 0.62; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .novo-sprite-sheet {
+    animation: none;
+    transform: translate3d(-75%, -50%, 0);
+  }
+
+  .novo-loader-orbit {
+    animation: none;
+    opacity: 0.42;
+  }
 }

@@ -1,7 +1,10 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { useSession } from 'next-auth/react'
+import { runAppearanceTransition } from '@/lib/appearance-transition'
+import { resolveMaterialContract } from '@/lib/material-contract'
 
 export interface AppSettings {
   // Appearance
@@ -96,7 +99,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Load settings from database when user logs in
-  useEffect(() => {
+  useLayoutEffect(() => {
     const loadSettings = async () => {
       if (status === 'loading') return
 
@@ -171,61 +174,38 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     // Sincronizar preferencia de animaciones/efectos en el DOM root
     root.setAttribute('data-animations', settings.showAnimations ? 'true' : 'false')
 
-    // Apply background settings. "Auto Contrast" was persisted and rendered
-    // as a real toggle but nothing ever read it - turning it on didn't
-    // change anything. With a bright, sharp wallpaper and the defaults
-    // (15% dimness, 0px blur), glass cards go nearly invisible. When it's
-    // on and a wallpaper is set, floor dimness/blur at legible minimums
-    // (raised further at night, reusing the same isDaytime() signal auto
-    // theme already uses) instead of only the user's raw slider values.
-    const hasWallpaper = !!settings.backgroundImage
-    const autoContrastActive = settings.autoContrast && hasWallpaper
-    const minDimness = autoContrastActive ? (isDaytime() ? 35 : 55) : 0
-    const minBlurPx = autoContrastActive ? 10 : 0
-    root.style.setProperty('--bg-dimness', `${Math.max(settings.backgroundDimness, minDimness) / 100}`)
-    root.style.setProperty('--bg-blur-px', `${Math.max(settings.backgroundBlur, minBlurPx)}px`)
+    // Resolve Canvas, Context Glass, and Focus Surface together so a setting
+    // change cannot leave one product region on a stale material alias.
+    const material = resolveMaterialContract({
+      theme: isDark ? 'dark' : 'light',
+      backgroundImage: settings.backgroundImage,
+      backgroundDimness: settings.backgroundDimness,
+      backgroundBlur: settings.backgroundBlur,
+      autoContrast: settings.autoContrast,
+      glassOpacity: settings.glassOpacity,
+      glassBlur: settings.glassBlur,
+      cardOpacity: settings.cardOpacity,
+      cardLiquidIntensity: settings.cardLiquidIntensity,
+    })
 
-    // Apply glass opacity & blur
-    const gOpacity = Math.max(0.05, settings.glassOpacity / 100)
-    const effectiveOpacity = isDark ? Math.max(0.35, gOpacity) : gOpacity
-    const gBlur = settings.glassBlur
-    const gBlurPx = `${settings.glassBlur}px`
+    const materialVariables = {
+      '--novo-canvas-background': material.canvas.background,
+      '--novo-canvas-backdrop-filter': material.canvas.backdropFilter,
+      '--novo-canvas-border': material.canvas.border,
+      '--novo-canvas-box-shadow': material.canvas.boxShadow,
+      '--novo-context-background': material.contextGlass.background,
+      '--novo-context-backdrop-filter': material.contextGlass.backdropFilter,
+      '--novo-context-border': material.contextGlass.border,
+      '--novo-context-box-shadow': material.contextGlass.boxShadow,
+      '--novo-focus-background': material.focusSurface.background,
+      '--novo-focus-backdrop-filter': material.focusSurface.backdropFilter,
+      '--novo-focus-border': material.focusSurface.border,
+      '--novo-focus-box-shadow': material.focusSurface.boxShadow,
+    }
 
-    const rgbBase = isDark ? '0, 0, 0' : '255, 255, 255'
-    const borderAlpha = isDark ? '0.08' : '0.12'
-
-    console.log(`[SettingsProvider] Apply: Opacity=${effectiveOpacity}, SidebarBlur=${gBlurPx}`);
-
-    // ── Sidebar Glass Layer (Frosted — brand-protected namespace) ──────────────
-    root.style.setProperty('--sidebar-blur-px', gBlurPx)
-    root.style.setProperty('--sidebar-opacity', `${effectiveOpacity}`)
-    document.body.style.setProperty('--sidebar-blur-px', gBlurPx)
-    document.body.style.setProperty('--sidebar-opacity', `${effectiveOpacity}`)
-
-    // ── Legacy alias — keep --glass-blur-px pointing to sidebar values ─────────
-    // (some components still reference the legacy var; sidebar and these stay in sync)
-    root.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
-    root.style.setProperty('--glass-blur', `${gBlur}`)
-    root.style.setProperty('--glass-blur-px', gBlurPx)
-    document.body.style.setProperty('--glass-opacity', `${effectiveOpacity}`)
-    document.body.style.setProperty('--glass-blur', `${gBlur}`)
-    document.body.style.setProperty('--glass-blur-px', gBlurPx)
-
-    // ── Liquid Glass Layer (Dashboard Cards — independent) ────────────────────
-    const cardOpacityVal = Math.max(0.03, settings.cardOpacity / 100)
-    const cardBlurPx = `${Math.max(4, settings.cardLiquidIntensity)}px`
-    const cardRefraction = Math.min(0.25, cardOpacityVal * 1.5)
-    root.style.setProperty('--card-liquid-opacity', `${cardOpacityVal}`)
-    root.style.setProperty('--card-blur-px', cardBlurPx)
-    root.style.setProperty('--card-refraction', `${cardRefraction}`)
-    document.body.style.setProperty('--card-liquid-opacity', `${cardOpacityVal}`)
-    document.body.style.setProperty('--card-blur-px', cardBlurPx)
-    document.body.style.setProperty('--card-refraction', `${cardRefraction}`)
-
-    root.style.setProperty('--card-rgb', rgbBase)
-    root.style.setProperty('--card-border-alpha', borderAlpha)
-    document.body.style.setProperty('--card-rgb', rgbBase)
-    document.body.style.setProperty('--card-border-alpha', borderAlpha)
+    Object.entries(materialVariables).forEach(([property, value]) => {
+      root.style.setProperty(property, value)
+    })
 
     // Apply accent color
     const colors: Record<string, string> = {
@@ -266,17 +246,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--primary-foreground', '#ffffff')
 
 
-    // Check if background image is present. The actual rendering (blurred
-    // via --bg-blur-px, dimmed via --bg-dimness) happens in a body::before/
-    // ::after pair in globals.css — body's own background-image is left
-    // alone on purpose now, since filter: blur() on body itself would blur
-    // real content, not just the wallpaper.
+    // The class controls whether the Canvas wallpaper layer participates in
+    // layout; all paint and filtering values come from the contract above.
     if (settings.backgroundImage) {
       document.body.classList.add('has-bg-image')
-      root.style.setProperty('--bg-image', `url(${settings.backgroundImage})`)
     } else {
       document.body.classList.remove('has-bg-image')
-      root.style.removeProperty('--bg-image')
     }
 
     // Set up listeners for auto themes
@@ -395,7 +370,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings, isLoaded, session?.user?.id, status])
 
   const updateSettings = (updates: Partial<AppSettings>) => {
-    setSettings((prev) => {
+    const commit = () => setSettings((prev) => {
       const next = { ...prev, ...updates }
 
       // Auto-track background image history (keep last 8, no duplicates)
@@ -406,10 +381,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       return next
     })
+
+    const affectsAppearance = [
+      'theme', 'autoThemeEnabled', 'autoThemeMode', 'backgroundImage',
+      'backgroundBlur', 'backgroundDimness', 'autoContrast', 'accentColor',
+      'glassOpacity', 'glassBlur', 'cardOpacity', 'cardLiquidIntensity',
+    ].some((key) => key in updates)
+
+    if (affectsAppearance) {
+      runAppearanceTransition(() => flushSync(commit))
+    } else {
+      commit()
+    }
   }
 
   const resetSettings = async () => {
-    setSettings(defaultSettings)
+    runAppearanceTransition(() => flushSync(() => setSettings(defaultSettings)))
     if (session?.user?.id) {
       try {
         await fetch('/api/user-settings', {

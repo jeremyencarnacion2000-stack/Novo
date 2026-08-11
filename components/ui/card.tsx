@@ -35,8 +35,9 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
         chromaticAberration={12}
         elevation="medium"
         contrastObserver
+        material="focus"
         className={cn(
-          'text-card-foreground gap-8 p-6 lg:p-10 transition-all duration-300',
+          'novo-focus-surface text-card-foreground gap-8 p-6 lg:p-10 transition-all duration-300',
           className,
         )}
         style={style}
@@ -52,11 +53,10 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
       data-slot="card"
       data-variant={variant}
       className={cn(
-        'text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative isolate shadow-none bg-transparent overflow-hidden border transition-all duration-300',
+        'novo-focus-surface text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative isolate overflow-hidden transition-all duration-300',
         variant === 'primary' && !hasLiquidGlassClass && 'glass-surface',
-        variant === 'secondary' && (hasLiquidGlassClass ? 'bg-foreground/[0.04]' : 'glass-surface bg-foreground/[0.04]'),
-        variant === 'tertiary' && (hasLiquidGlassClass ? 'bg-black/40 border-white/5' : 'glass-surface bg-black/40 border-white/5'),
-        variant === 'ghost' && 'border-transparent',
+        variant === 'secondary' && !hasLiquidGlassClass && 'glass-surface',
+        variant === 'tertiary' && !hasLiquidGlassClass && 'glass-surface',
         className,
       )}
       {...props}
