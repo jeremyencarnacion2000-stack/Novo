@@ -1,15 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, CheckSquare, FolderKanban, Activity, Dumbbell, Calendar } from 'lucide-react'
+import { CheckSquare, FolderKanban, Activity, Calendar } from 'lucide-react'
 import Link from 'next/link'
 
 const createActions = [
-  {
-    title: 'New Routine',
-    icon: Plus,
-    href: '/routines',
-    shortcut: '⌘R'
-  },
   {
     title: 'Add Task',
     icon: CheckSquare,
@@ -30,12 +24,6 @@ const registerActions = [
     icon: Activity,
     href: '/trackers',
     shortcut: '⌘L'
-  },
-  {
-    title: 'Start Workout',
-    icon: Dumbbell,
-    href: '/routines',
-    shortcut: '⌘W'
   },
   {
     title: 'Log Event',

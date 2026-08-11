@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { MobileNav } from '../mobile-nav'
 import { MobileOverlayProvider } from '../mobile-overlay-provider'
+import { AppSidebar } from '../app-sidebar'
+import { SidebarProvider } from '../ui/sidebar'
+import { QuickActions } from '../quick-actions'
 
 const push = jest.fn()
 let pathname = '/today'
@@ -20,8 +24,36 @@ jest.mock('@/lib/i18n', () => ({
       'sidebar.cognitive_engine': 'Cognitivo',
       'sidebar.chat': 'Chat',
       'sidebar.activity': 'Actividad',
+      'sidebar.overview': 'Overview',
+      'sidebar.today': 'Today',
+      'sidebar.workspace': 'Workspace',
+      'sidebar.more': 'More',
+      'sidebar.routines': 'Workout',
+      'sidebar.projects': 'Projects',
+      'sidebar.checklist': 'Checklist',
+      'sidebar.calendar': 'Calendar',
+      'sidebar.connectors': 'Connectors',
+      'sidebar.analytics': 'Analytics',
+      'sidebar.focus': 'Focus',
+      'sidebar.trackers': 'Trackers',
     }[key] ?? key),
   }),
+}))
+
+jest.mock('next-auth/react', () => ({
+  useSession: () => ({ data: null }),
+}))
+
+jest.mock('@/lib/settings-context', () => ({
+  useSettings: () => ({ isSettingsOpen: false, setSettingsOpen: jest.fn() }),
+}))
+
+jest.mock('@/lib/cognitive-twin-context', () => ({
+  useCognitiveTwin: () => ({ twin: {} }),
+}))
+
+jest.mock('@/components/smooth-scroll-provider', () => ({
+  SmoothScrollProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
 
 jest.mock('@/hooks/use-modal-flip', () => ({
@@ -30,14 +62,6 @@ jest.mock('@/hooks/use-modal-flip', () => ({
 
 jest.mock('@/components/ui/GlassSurface', () => ({
   GlassSurface: () => <div data-testid="glass-surface" />,
-}))
-
-jest.mock('@/components/mobile-section-drawer', () => ({
-  MobileSectionDrawer: ({ onClose }: { onClose: () => void }) => (
-    <div role="dialog" aria-label="Workspace menu">
-      <button onClick={onClose}>Cerrar workspace</button>
-    </div>
-  ),
 }))
 
 function renderMobileNav() {
@@ -49,6 +73,20 @@ function renderMobileNav() {
 }
 
 describe('MobileNav', () => {
+  beforeAll(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    })
+  })
+
   beforeEach(() => {
     pathname = '/today'
     push.mockReset()
@@ -76,13 +114,47 @@ describe('MobileNav', () => {
     expect(push).toHaveBeenNthCalledWith(3, '/activity')
   })
 
-  it('opens a secondary workspace layer without adding more primary destinations', async () => {
+  it('keeps Workout out of primary mobile navigation while preserving its More route', async () => {
     const user = userEvent.setup()
     renderMobileNav()
 
+    const primaryNavigation = screen.getByRole('navigation', { name: 'Primary mobile navigation' })
+    expect(within(primaryNavigation).getByRole('button', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(within(primaryNavigation).getByRole('button', { name: 'Cognitivo' })).toBeInTheDocument()
+    expect(within(primaryNavigation).getByRole('button', { name: 'Chat' })).toBeInTheDocument()
+    expect(within(primaryNavigation).getByRole('button', { name: 'Actividad' })).toBeInTheDocument()
+    expect(within(primaryNavigation).queryByRole('button', { name: 'Workout' })).not.toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button')).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
+    expect(push).toHaveBeenCalledWith('/routines')
+  })
+
+  it('keeps Workout out of the desktop Overview group', () => {
+    render(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>,
+    )
+
+    const overviewGroup = screen.getByText('Overview').closest('[data-sidebar="group"]')
+    expect(overviewGroup).not.toBeNull()
+    expect(within(overviewGroup!).getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(within(overviewGroup!).getByRole('link', { name: 'Today' })).toBeInTheDocument()
+    expect(within(overviewGroup!).getByRole('link', { name: 'Cognitivo' })).toBeInTheDocument()
+    expect(within(overviewGroup!).getByRole('link', { name: 'Chat' })).toBeInTheDocument()
+    expect(within(overviewGroup!).getByRole('link', { name: 'Actividad' })).toBeInTheDocument()
+    expect(within(overviewGroup!).queryByRole('link', { name: 'Workout' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Workout' })).toHaveAttribute('href', '/routines')
+  })
+
+  it('does not promote Workout as a critical quick action', () => {
+    render(<QuickActions />)
+
+    expect(screen.queryByText('New Routine')).not.toBeInTheDocument()
+    expect(screen.queryByText('Start Workout')).not.toBeInTheDocument()
   })
 
   it('uses Focus Surface without the legacy drawer blur override', () => {
