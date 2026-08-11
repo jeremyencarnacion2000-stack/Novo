@@ -2,8 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -90,6 +91,18 @@ model User {
   timeBlocks TimeBlock[]
   cognitiveTwinRecord CognitiveTwinRecord?
   twinAgentLogs       TwinAgentLog[]
+  cognitiveProfile    CognitiveProfile?
+  cognitiveStateSnapshots CognitiveStateSnapshot[]
+  actionPlans         ActionPlan[]
+  novoSignals         NovoSignalLedger[]
+  novoSignalSourcePreferences NovoSignalSourcePreference[]
+  recommendedActions  RecommendedAction[]
+  outcomeEvents       OutcomeEvent[]
+  integrationPermissions IntegrationPermission[]
+  aiActivityRuns   AiActivityRun[]
+  externalActionExecutions ExternalActionExecution[]
+  mcpPersonalAccessTokens McpPersonalAccessToken[]
+  mcpAuditLogs McpAuditLog[]
 
   // Social
   // Social
@@ -110,6 +123,8 @@ model User {
 
   // External Integrations (Notion, Drive, etc.)
   integrationAccounts IntegrationAccount[]
+  externalEntityMappings ExternalEntityMapping[]
+  ambientReconciliationClaims AmbientReconciliationClaim[]
 
   // Behavioral Intelligence Pilot (interruption-frequency experiment)
   experimentDays ExperimentDay[]
@@ -121,6 +136,65 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// Personal, revocable credentials for a user-owned external MCP client or
+// device. The raw secret is never persisted: only an HMAC digest is stored.
+model McpPersonalAccessToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  tokenPrefix String
+  tokenHash   String    @unique
+  scopes      String[]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, revokedAt, expiresAt])
+  @@map("mcp_personal_access_tokens")
+}
+
+// Safe, durable record of MCP activity. It deliberately excludes bearer
+// secrets, request bodies and private task content; mutations are deduplicated
+// at this boundary using the user/client/idempotency tuple.
+model McpAuditLog {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenId        String?
+  clientId       String
+  tool           String
+  action         String
+  resourceType   String
+  resourceId     String?
+  resultStatus   String   @default("running") // running|succeeded|failed|rejected
+  safeErrorCode  String?
+  resultSummary  String?
+  idempotencyKey String?
+  requestId      String
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  @@unique([userId, clientId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([tokenId, createdAt])
+  @@map("mcp_audit_logs")
+}
+
+model McpSecurityEvent {
+  id        String   @id @default(cuid())
+  eventType String
+  clientId  String?
+  reason    String?
+  requestId String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([eventType, createdAt])
+  @@map("mcp_security_events")
 }
 
 model UserSettings {
@@ -160,6 +234,8 @@ model ChecklistItem {
 
   @@index([userId])
   @@index([userId, completed])
+  @@index([userId, updatedAt])
+  @@index([userId, source, sourceId])
   @@map("checklist_items")
 }
 
@@ -334,6 +410,8 @@ model Task {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, updatedAt])
+  @@index([userId, status, updatedAt])
   @@map("tasks")
 }
 
@@ -397,6 +475,7 @@ model AnalyticsEvent {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, timestamp])
   @@map("analytics_events")
 }
 
@@ -410,6 +489,7 @@ model UserSession {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, startTime])
   @@map("user_sessions")
 }
 
@@ -586,14 +666,270 @@ model Goal {
   status      String   // 'active' | 'completed' | 'paused'
   timeframe   String   @default("year") // 'year' | 'quarter' | 'month'
   deadline    String?
+  priority    String   @default("medium") // 'low' | 'medium' | 'high'
+  successCondition String?
+  source      String   @default("manual") // 'manual' | 'onboarding' | 'import'
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   progress    Float    @default(0)
+  createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   version     Int      @default(1)
+  actionPlans ActionPlan[]
 
   @@index([userId])
   @@map("goals")
+}
+
+// Explicit user-controlled operating preferences. Keep sensitive free-text
+// constraints separate from telemetry and never send it to analytics.
+model CognitiveProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  preferredWorkPeriods  Json     @default("[]")
+  typicalSessionMinutes Int?
+  planningPreference    String?  // 'guided' | 'compact' | 'detailed'
+  interruptionTolerance String?  // 'low' | 'medium' | 'high'
+  notificationPreference String? // 'none' | 'important' | 'all'
+  constraints           Json     @default("[]")
+  proactiveEnabled      Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("cognitive_profiles")
+}
+
+// Append-only self-reported operational state. This is not a medical record.
+model CognitiveStateSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  energy          Int?     // 1-5, user reported
+  focus           Int?     // 1-5, user reported
+  availableMinutes Int?
+  workload        Int?     // 1-5, user reported
+  currentContext  String?
+  source          String   @default("checkin")
+  completeness    Float    @default(0)
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionPlans     ActionPlan[]
+
+  @@index([userId, createdAt])
+  @@map("cognitive_state_snapshots")
+}
+
+model ActionPlan {
+  id              String   @id @default(cuid())
+  userId          String
+  goalId          String?
+  stateSnapshotId String?
+  planningDate    DateTime
+  timezone        String
+  status          String   @default("active") // 'active' | 'superseded' | 'completed'
+  reasoningSummary String
+  inputs          Json
+  algorithmVersion String
+  generatedBy     String   @default("deterministic")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal            Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  stateSnapshot   CognitiveStateSnapshot? @relation(fields: [stateSnapshotId], references: [id], onDelete: SetNull)
+  actions         RecommendedAction[]
+  outcomes        OutcomeEvent[]
+
+  @@index([userId, planningDate])
+  @@index([goalId])
+  @@map("action_plans")
+}
+
+model RecommendedAction {
+  id              String   @id @default(cuid())
+  planId          String
+  userId          String
+  taskId          String?
+  title           String
+  nextStep        String
+  priority        Int
+  estimatedMinutes Int?
+  confidence      Float
+  explanation     String
+  facts           Json
+  inferences      Json
+  status          String   @default("proposed") // proposed|accepted|modified|postponed|dismissed|completed
+  responseNote    String?
+  responseAt      DateTime?
+  statusAt        DateTime @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  terminalReason  String?
+  lastActor       String   @default("user")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  plan            ActionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outcomes        OutcomeEvent[]
+  externalExecutions ExternalActionExecution[]
+
+  @@index([userId, status, createdAt])
+  @@index([planId, priority])
+  @@map("recommended_actions")
+}
+
+// Durable idempotency boundary for provider writes. A unique operation key is
+// claimed before dispatch so concurrent client requests cannot create twins.
+model ExternalActionExecution {
+  id                    String   @id @default(cuid())
+  userId                String
+  recommendedActionId   String
+  provider              String
+  operation             String
+  idempotencyKey        String
+  requestFingerprint    String
+  status                String   @default("pending") // pending|running|succeeded|failed|uncertain|cancelled
+  externalResourceId    String?
+  safeErrorCode         String?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  failedAt              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendedAction     RecommendedAction @relation(fields: [recommendedActionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, operation, idempotencyKey])
+  @@index([recommendedActionId, status])
+  @@index([status, updatedAt])
+  @@map("external_action_executions")
+}
+
+model OutcomeEvent {
+  id                  String   @id @default(cuid())
+  userId              String
+  planId              String?
+  recommendedActionId String?
+  type                String   // accepted|modified|postponed|dismissed|completed|helpful|unhelpful
+  metadata            Json?
+  idempotencyKey      String?  @unique
+  createdAt           DateTime @default(now())
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                ActionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  recommendedAction   RecommendedAction? @relation(fields: [recommendedActionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type, createdAt])
+  @@index([recommendedActionId, createdAt])
+  @@map("outcome_events")
+}
+
+// Auditable planning evidence. Values are deliberately a short safe summary,
+// never private source bodies. Users can correct or exclude a signal without
+// deleting its provenance.
+model NovoSignalLedger {
+  id              String   @id @default(cuid())
+  userId          String
+  fingerprint     String
+  source          String   // checkin|goal|task|calendar|outcome
+  sourceRef       String?
+  signalType      String
+  label           String
+  observedAt      DateTime
+  reliability     String   @default("direct") // user_reported|direct|deterministic|inference
+  excludedAt      DateTime?
+  exclusionReason String?
+  correctedAt     DateTime?
+  correction      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fingerprint])
+  @@index([userId, excludedAt, observedAt])
+  @@index([userId, source, sourceRef])
+  @@map("novo_signal_ledger")
+}
+
+// A source-level opt-out survives new observations from that source. This is
+// deliberately separate from individual signal corrections so restoring one
+// fact never silently re-enables a source the user excluded.
+model NovoSignalSourcePreference {
+  id          String   @id @default(cuid())
+  userId      String
+  source      String
+  excludedAt  DateTime?
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, source])
+  @@index([userId, excludedAt])
+  @@map("novo_signal_source_preferences")
+}
+
+model IntegrationPermission {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String
+  grantedScopes   Json     @default("[]")
+  allowedReads    Json     @default("[]")
+  allowedWrites   Json     @default("[]")
+  revokedAt       DateTime?
+  lastSuccessfulSync DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, revokedAt])
+  @@map("integration_permissions")
+}
+
+// Operational AI run state. Deliberately excludes prompts, chain-of-thought,
+// tokens and raw tool arguments; it exists only for recovery and auditability.
+model AiActivityRun {
+  id                  String   @id
+  userId              String
+  surface             String   // 'novo_loop' | 'chat'
+  phase               String
+  sequence            Int      @default(0)
+  status              String   @default("running") // running|awaiting_confirmation|completed|failed|cancelled|expired
+  startedAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  completedAt         DateTime?
+  expiresAt           DateTime
+  currentTool         String?
+  pendingConfirmation Json?
+  resultRef           String?
+  resultSummary       String?
+  errorCode           String?
+  errorMessage        String?
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events              AiActivityEvent[]
+
+  @@index([userId, updatedAt])
+  @@index([status, expiresAt])
+  @@map("ai_activity_runs")
+}
+
+model AiActivityEvent {
+  id                  String   @id
+  runId               String
+  sequence            Int
+  phase               String
+  label               String
+  detail              String?
+  timestamp           DateTime @default(now())
+  sourceCount         Int?
+  toolName            String?
+  requiresConfirmation Boolean  @default(false)
+  recoverable         Boolean  @default(false)
+  terminal            Boolean  @default(false)
+  run                 AiActivityRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+  @@index([runId, timestamp])
+  @@map("ai_activity_events")
 }
 
 model Client {
@@ -739,6 +1075,7 @@ model FocusSession {
 
   @@index([userId])
   @@index([userId, startTime])
+  @@index([userId, sessionType])
   @@map("focus_sessions")
 }
 
@@ -944,7 +1281,7 @@ model AiActionLog {
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   actionType      String   // 'CREATE_TASK' | 'UPDATE_PROJECT' | 'DELETE_ROUTINE' | ... (AIActionType)
-  payload         String   // JSON string of the action payload the model produced
+  payload         String   // Sanitized JSON metadata only (field names, never action values)
   success         Boolean
   errorMessage    String?
   triggeredBy     String   @default("ai_chat") // 'ai_chat' | 'cron' — autonomous cron run vs in-chat action
@@ -1078,7 +1415,9 @@ model CognitiveTwinRecord {
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  confidenceScore  Float    @default(42)
+  // A new Twin has no calibrated confidence. The historical 42 bootstrap was
+  // decorative and must never be presented as an observed measurement.
+  confidenceScore  Float    @default(0)
   trustLevel       String   @default("initial") // 'initial' | 'learning' | 'adapted' | 'validated'
   isInitialized    Boolean  @default(false)
   onboardingCompletedAt DateTime?              // Set once when onboarding finishes; never mutated by Evolution Engine
@@ -1144,6 +1483,7 @@ model TwinEvolutionLog {
 
   @@index([userId, createdAt])
   @@index([twinId, createdAt])
+  @@index([twinId, changeType, createdAt])
   @@map("twin_evolution_logs")
 }
 
@@ -1215,13 +1555,83 @@ model IntegrationAccount {
   expiresAt     DateTime?
   // Provider-specific metadata (workspaceId, botId, selectedDatabaseIds, etc.)
   metadata      Json?
+  // Durable incremental-sync state. Provider adapters own cursor semantics.
+  syncCursor            String?
+  syncCursorUpdatedAt   DateTime?
+  lastSyncRunId         String?
+  lastSyncedAt          DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalEntityMappings ExternalEntityMapping[]
 
   @@unique([userId, provider])
   @@index([userId])
   @@map("integration_accounts")
+}
+
+// Stable identity mapping between a provider entity and a Novo-owned entity.
+// The tuple is intentionally scoped to the concrete connection/account so
+// reconnecting or switching provider accounts cannot alias prior data.
+model ExternalEntityMapping {
+  id                    String   @id @default(cuid())
+  userId                String
+  integrationAccountId  String
+  provider              String
+  providerAccountId     String
+  entityType            String
+  sourceEntityId        String
+  internalType          String
+  internalId            String
+  status                String   @default("active") // active|unlinked|quarantined
+  canonicalBaseline     Json?
+  sourceRevision        String?
+  lastObservedAt        DateTime?
+  unlinkedAt            DateTime?
+  unlinkReason          String?
+  correctedAt           DateTime?
+  correctionReason      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrationAccount    IntegrationAccount @relation(fields: [integrationAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, providerAccountId, entityType, sourceEntityId])
+  @@index([userId, internalType, internalId])
+  @@index([integrationAccountId, entityType, status])
+  @@map("external_entity_mappings")
+}
+
+// Idempotent durable work claim for provider reconciliation deliveries.
+// No provider payloads are stored here; only safe identity/order metadata.
+model AmbientReconciliationClaim {
+  id                    String   @id @default(cuid())
+  userId                String
+  provider              String
+  providerAccountId     String
+  entityType            String
+  sourceEntityId        String
+  sourceEventId         String?
+  deliveryId            String?
+  idempotencyKey        String
+  providerRevision      String?
+  syncRunId             String?
+  status                String   @default("pending") // pending|processing|completed|failed
+  attempts              Int      @default(0)
+  claimedAt             DateTime?
+  claimExpiresAt        DateTime?
+  completedAt           DateTime?
+  failedAt              DateTime?
+  failureCode            String?
+  failureMessage         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status, createdAt])
+  @@index([provider, providerAccountId, entityType, sourceEntityId])
+  @@map("ambient_reconciliation_claims")
 }
 
 // ── Twin Agent Action Log — records every autonomous action the Twin takes ───
