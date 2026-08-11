@@ -30,7 +30,7 @@ CREATE TABLE "external_entity_mappings" (
 CREATE UNIQUE INDEX "external_entity_mappings_identity_key" ON "external_entity_mappings" ("userId","provider","providerAccountId","entityType","sourceEntityId");
 CREATE INDEX "external_entity_mappings_internal_idx" ON "external_entity_mappings" ("userId","internalType","internalId");
 CREATE INDEX "external_entity_mappings_account_idx" ON "external_entity_mappings" ("integrationAccountId","entityType","status");
-ALTER TABLE "external_entity_mappings" ADD CONSTRAINT "external_entity_mappings_user_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "external_entity_mappings" ADD CONSTRAINT "external_entity_mappings_user_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "external_entity_mappings" ADD CONSTRAINT "external_entity_mappings_account_fkey" FOREIGN KEY ("integrationAccountId") REFERENCES "integration_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE TABLE "ambient_reconciliation_claims" (
@@ -60,4 +60,4 @@ CREATE TABLE "ambient_reconciliation_claims" (
 CREATE UNIQUE INDEX "ambient_reconciliation_claims_idempotency_key" ON "ambient_reconciliation_claims" ("userId","idempotencyKey");
 CREATE INDEX "ambient_reconciliation_claims_status_idx" ON "ambient_reconciliation_claims" ("userId","status","createdAt");
 CREATE INDEX "ambient_reconciliation_claims_identity_idx" ON "ambient_reconciliation_claims" ("provider","providerAccountId","entityType","sourceEntityId");
-ALTER TABLE "ambient_reconciliation_claims" ADD CONSTRAINT "ambient_reconciliation_claims_user_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ambient_reconciliation_claims" ADD CONSTRAINT "ambient_reconciliation_claims_user_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
