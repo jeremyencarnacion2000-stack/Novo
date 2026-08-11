@@ -49,8 +49,7 @@ describe('SettingsPersonalization material preview', () => {
     })
 
     const preview = screen.getByTestId('material-preview')
-    expect(preview).toHaveClass('bg-[var(--novo-canvas-background)]')
-    expect(preview).not.toHaveAttribute('style')
+    expect(preview.style.background).toContain('/wallpapers/bright.jpg')
     expect(preview.querySelector('canvas')).toBeNull()
     expect(preview.querySelector('img')).toBeNull()
     expect(within(preview).getByTestId('preview-context-glass')).toHaveClass('novo-context-glass')

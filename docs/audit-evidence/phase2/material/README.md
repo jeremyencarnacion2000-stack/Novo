@@ -8,8 +8,9 @@ Recorded: 2026-08-10
 personalization screen through the real `SettingsProvider`, selects a wallpaper,
 and verifies all of the following without saving or reloading:
 
-- The preview canvas consumes `--novo-canvas-background` rather than a local
-  wallpaper style object.
+- The preview canvas applies the selected `backgroundImage` through the CSS
+  `background` shorthand, so the selected URL is an actual renderable image
+  value rather than an invalid `background-color` value.
 - The preview contains the shared `GlassSurface` Context Glass role
   (`novo-context-glass`) and the shared `Card` Focus Surface role
   (`novo-focus-surface`).

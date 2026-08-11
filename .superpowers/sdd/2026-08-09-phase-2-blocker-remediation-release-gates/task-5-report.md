@@ -30,3 +30,12 @@ No authenticated Preview/dev-session credentials were available. No external
 screenshots or accessibility-tool measurements were attempted; the material
 stress gate remains OPEN pending desktop and 390px captures for all required
 wallpaper and theme conditions.
+
+## Review fix — round 1
+
+- Replaced the Preview Canvas `bg-[var(--novo-canvas-background)]` utility,
+  which compiles to the image-incompatible `background-color` property, with
+  an explicit `background` shorthand that receives the selected wallpaper URL.
+- The regression now asserts that the rendered Preview Canvas has a background
+  value containing `/wallpapers/bright.jpg`; the old color-only implementation
+  leaves that property empty and fails this assertion.

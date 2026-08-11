@@ -269,7 +269,8 @@ export function SettingsPersonalization() {
         <div
           data-testid="material-preview"
           aria-label="Live material preview"
-          className="bg-[var(--novo-canvas-background)] relative min-h-64 overflow-hidden rounded-2xl border border-foreground/10 bg-cover bg-center p-4 shadow-inner"
+          className="relative min-h-64 overflow-hidden rounded-2xl border border-foreground/10 bg-cover bg-center p-4 shadow-inner"
+          style={{ background: settings.backgroundImage ? `url("${settings.backgroundImage}")` : 'var(--novo-canvas-background)' }}
         >
           <GlassSurface
             data-testid="preview-context-glass"
