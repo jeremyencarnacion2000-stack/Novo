@@ -1,23 +1,52 @@
 'use client'
 
-import React, { useState } from 'react'
-import { LayoutDashboard, BarChart3, Calendar, Bot, Plus } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { House, Brain, MessageCircle, Activity, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { useQuickCapture } from '@/lib/quick-capture-context'
 import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
-import { MobileChatSheet } from '@/components/ai/modern-chatbot/mobile-chat-sheet'
 import { motion, LayoutGroup } from 'framer-motion'
 import { springConfig } from '@/lib/design-tokens'
 import { useModalFlip } from '@/hooks/use-modal-flip'
 import { GlassSurface } from '@/components/ui/GlassSurface'
+import { useTranslation } from '@/lib/i18n'
 
 export function MobileNav() {
     const router = useRouter()
     const pathname = usePathname()
-    const { onOpen } = useQuickCapture()
+    const { t } = useTranslation()
     const [drawerOpen, setDrawerOpen] = useState(false)
-    const [chatOpen, setChatOpen] = useState(false)
+    const [keyboardOpen, setKeyboardOpen] = useState(false)
+
+    // A fixed navigation bar competes with the composer on short mobile
+    // viewports. VisualViewport gives us the real keyboard state while an
+    // editable control has focus; resize alone is not enough because browser
+    // chrome can also change the viewport height.
+    useEffect(() => {
+        const viewport = window.visualViewport
+        if (!viewport) return
+
+        const updateKeyboardState = () => {
+            const activeElement = document.activeElement
+            const editing = activeElement instanceof HTMLInputElement ||
+                activeElement instanceof HTMLTextAreaElement ||
+                activeElement instanceof HTMLElement && activeElement.isContentEditable
+            const keyboardObscuresViewport = window.innerHeight - viewport.height > 140
+            setKeyboardOpen(editing && keyboardObscuresViewport)
+        }
+
+        const deferUpdate = () => window.setTimeout(updateKeyboardState, 0)
+        viewport.addEventListener('resize', updateKeyboardState)
+        viewport.addEventListener('scroll', updateKeyboardState)
+        window.addEventListener('focusin', deferUpdate)
+        window.addEventListener('focusout', deferUpdate)
+        return () => {
+            viewport.removeEventListener('resize', updateKeyboardState)
+            viewport.removeEventListener('scroll', updateKeyboardState)
+            window.removeEventListener('focusin', deferUpdate)
+            window.removeEventListener('focusout', deferUpdate)
+        }
+    }, [])
 
     // Container-transform: the panel physically grows from the NAV BAR's own
     // rect/radius (matching the reference's shared-element demo) instead of
@@ -34,25 +63,19 @@ export function MobileNav() {
         else setDrawerOpen(true)
     }
 
-    // AI doesn't navigate to /ai on mobile — a real route swap can't do a
-    // physical shared-element transform (the destination doesn't exist until
-    // after navigation). Instead it flies a persistent fullscreen sheet up
-    // from the AI button itself, same engine, no route change involved. The
-    // nav bar stays exactly where it is throughout — "esa división elegante
-    // entre el nav bar... y la página."
-    const closeChatFlip = useModalFlip('mobile-ai-panel', false)
-    const handleCloseChat = () => {}
-
-    const isActive = (path: string) => pathname === path || pathname === path + '/'
+    const isActive = (path: string) => {
+        const currentPath = pathname ?? ''
+        return currentPath === path || currentPath === path + '/' || currentPath.startsWith(path + '/')
+    }
 
     const navItems = [
-        { icon: LayoutDashboard, path: '/', label: 'Home' },
-        { icon: BarChart3, path: '/analytics', label: 'Stats' },
-        { icon: Calendar, path: '/calendar', label: 'Calendar' },
-        { icon: Bot, path: '/ai', label: 'AI' },
+        { icon: House, path: '/', label: t('sidebar.dashboard') },
+        { icon: Brain, path: '/cognitive', label: t('sidebar.cognitive_engine') },
+        { icon: MessageCircle, path: '/chat', label: t('sidebar.chat') },
+        { icon: Activity, path: '/activity', label: t('sidebar.activity') },
     ]
 
-    const isCompactPath = pathname === '/ai' || pathname === '/music' || !!pathname?.startsWith('/music/') || pathname === '/cognitive'
+    const isCompactPath = pathname === '/ai' || pathname === '/chat' || pathname === '/music' || !!pathname?.startsWith('/music/') || pathname === '/cognitive'
 
     return (
         <>
@@ -62,7 +85,8 @@ export function MobileNav() {
                 off-screen (the reported "se buggea"). A persistent bar is
                 simpler and never strands the user without navigation. */}
             <div className={cn(
-                "fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3"
+                "fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3 transition-[opacity,transform] duration-150",
+                keyboardOpen && "pointer-events-none translate-y-24 opacity-0"
             )}>
                 {/* Nav bar — left side, pill-shaped. This is the flip origin:
                     it physically grows into the section panel, not the FAB. */}
@@ -78,13 +102,11 @@ export function MobileNav() {
                     <LayoutGroup>
                         {navItems.map((item) => {
                             const Icon = item.icon
-                            const isAI = item.path === '/ai'
-                            const active = isAI ? (chatOpen || isActive(item.path)) : isActive(item.path)
+                            const active = isActive(item.path)
 
                             return (
                                 <motion.button
                                     key={item.path}
-                                    data-flip-from={isAI ? 'mobile-ai-panel' : undefined}
                                     aria-label={item.label}
                                     aria-current={active ? 'page' : undefined}
                                     onClick={() => {
@@ -93,7 +115,7 @@ export function MobileNav() {
                                     }}
                                     className={cn(
                                         "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] h-[44px]",
-                                        active ? "text-foreground" : "text-foreground/30",
+                                        active ? "text-foreground" : "text-foreground/65",
                                         active && "px-4"
                                     )}
                                     whileTap={{ scale: 0.82 }}
@@ -122,11 +144,13 @@ export function MobileNav() {
                                         className={cn("relative z-10", isCompactPath ? "h-[18px] w-[18px]" : "h-[20px] w-[20px]")}
                                         strokeWidth={active ? 2.2 : 1.5}
                                     />
-                                    {active && !isCompactPath && (
+                                    {/* Icons preserve four 44px touch targets at 320px. The active
+                                        label appears once the available width can accommodate it. */}
+                                    {active && (
                                         <motion.span
                                             initial={{ opacity: 0, width: 0 }}
                                             animate={{ opacity: 1, width: 'auto' }}
-                                            className="text-[10px] font-semibold tracking-wide relative z-10 ml-1.5 whitespace-nowrap"
+                                            className="hidden min-[390px]:inline text-[10px] font-semibold tracking-wide relative z-10 ml-1.5 whitespace-nowrap"
                                         >
                                             {item.label}
                                         </motion.span>
@@ -143,8 +167,7 @@ export function MobileNav() {
                 <motion.button
                     onClick={handleFabClick}
                     aria-label={drawerOpen ? "Close menu" : "Open menu"}
-                    className="pointer-events-auto h-[52px] w-[52px] rounded-full border border-foreground/10 flex items-center justify-center shadow-[0_8px_40px_rgba(0,0,0,0.5)] glass-blur"
-                    style={{ background: 'color-mix(in srgb, var(--background) 85%, transparent)' }}
+                    className="novo-context-glass pointer-events-auto h-[52px] w-[52px] rounded-full flex items-center justify-center"
                     whileTap={{ scale: 0.85 }}
                     transition={springConfig.snappy}
                 >

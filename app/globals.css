@@ -788,16 +788,17 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 @utility card--hero {
-  background: var(--card-hero-bg);
-  border: 1px solid var(--card-hero-border);
-  backdrop-filter: blur(calc(var(--card-blur-px) + 8px)) saturate(180%);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 @utility card--primary {
-  background: var(--card-primary-bg);
-  border: 1px solid var(--card-primary-border);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(calc(var(--card-blur-px) + 4px)) saturate(180%);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 @utility card--secondary {
@@ -808,14 +809,15 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 @utility card--tertiary {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(max(4px, calc(var(--card-blur-px) - 4px))) saturate(140%);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 /* Glass Blur Utility — heavier for 'milky' look */
 @utility glass-blur {
-  backdrop-filter: blur(var(--glass-blur-px, 32px)) saturate(180%);
+  backdrop-filter: var(--novo-context-backdrop-filter);
 }
 
 @utility glass-blur-sm {
@@ -855,29 +857,23 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 @utility glass-floating {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 @utility glass-active {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--cognitive-card-border, rgba(0, 0, 0, 0.12));
-  box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
 }
 
 .dark .glass-floating {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .dark .glass-active {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--cognitive-card-border, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 0 16px var(--cognitive-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* Bloom Levels */
@@ -946,9 +942,9 @@ html[data-appearance-transition] body.has-bg-image::before {
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
-    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    background: var(--novo-focus-background);
+    border-color: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
     transform: translateY(-2px);
   }
 }
@@ -960,17 +956,18 @@ html[data-appearance-transition] body.has-bg-image::before {
 .glass-card-list {
   position: relative;
   overflow: hidden;
-  background: rgba(255, 255, 255, var(--glass-opacity));
-  border: 1px solid var(--glass-border);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
   border-radius: var(--glass-radius);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--novo-focus-box-shadow);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
-    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
+    background: var(--novo-focus-background);
+    border-color: var(--novo-focus-border);
+    box-shadow: var(--novo-focus-box-shadow);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
   }
 }
 
@@ -978,17 +975,17 @@ html[data-appearance-transition] body.has-bg-image::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 1.5));
-  border: 1px solid var(--glass-border);
+  background: var(--novo-focus-background);
+  border: var(--novo-focus-border);
   border-radius: 999px;
-  backdrop-filter: blur(var(--glass-blur-px)) var(--glass-background-sampling);
-  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-focus-box-shadow);
   padding: 8px 16px;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), box-shadow 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
   color: var(--foreground);
 
   &:hover {
-    background: rgba(255, 255, 255, calc(var(--glass-opacity) * 2));
+    background: var(--novo-focus-background);
     transform: scale(1.02);
   }
 
@@ -1038,13 +1035,11 @@ html[data-appearance-transition] body.has-bg-image::before {
 /* 5. GENERIC GLASS (Crystalline look) */
 @utility glass {
   @apply relative overflow-hidden;
-  background: var(--glass-panel-bg);
-  backdrop-filter: blur(var(--glass-blur-px, 20px)) saturate(140%);
+  background: var(--novo-context-background);
+  backdrop-filter: var(--novo-context-backdrop-filter);
   border-radius: 24px;
-  border: 1px solid var(--glass-panel-border);
-  box-shadow:
-    var(--glass-panel-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: var(--novo-context-border);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 /* 3. BUTTONS (Soft Capsule) */
@@ -1527,11 +1522,11 @@ html:not(.dark) .cognitive-chart {
     position: relative;
     padding: var(--space-6);
     /* Defaulting to small card style as base */
-    background: var(--card-primary-bg);
-    backdrop-filter: blur(calc(var(--glass-blur) * 0.6px));
-    border: 1px solid var(--card-primary-border);
+    background: var(--novo-focus-background);
+    backdrop-filter: var(--novo-focus-backdrop-filter);
+    border: var(--novo-focus-border);
     border-radius: 20px;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--novo-focus-box-shadow);
   }
 
   /* Cognitive Pulse Animation */

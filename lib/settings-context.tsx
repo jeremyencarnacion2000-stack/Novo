@@ -165,47 +165,48 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     }
 
-    if (isDark) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
+    const applyEffectiveTheme = (nextIsDark: boolean) => {
+      root.classList.toggle('dark', nextIsDark)
+
+      // Inline custom properties outrank the .dark fallbacks in globals.css,
+      // so every system/time theme transition must refresh the complete
+      // contract instead of only toggling the class.
+      const material = resolveMaterialContract({
+        theme: nextIsDark ? 'dark' : 'light',
+        backgroundImage: settings.backgroundImage,
+        backgroundDimness: settings.backgroundDimness,
+        backgroundBlur: settings.backgroundBlur,
+        autoContrast: settings.autoContrast,
+        glassOpacity: settings.glassOpacity,
+        glassBlur: settings.glassBlur,
+        cardOpacity: settings.cardOpacity,
+        cardLiquidIntensity: settings.cardLiquidIntensity,
+      })
+
+      const materialVariables = {
+        '--novo-canvas-background': material.canvas.background,
+        '--novo-canvas-backdrop-filter': material.canvas.backdropFilter,
+        '--novo-canvas-border': material.canvas.border,
+        '--novo-canvas-box-shadow': material.canvas.boxShadow,
+        '--novo-context-background': material.contextGlass.background,
+        '--novo-context-backdrop-filter': material.contextGlass.backdropFilter,
+        '--novo-context-border': material.contextGlass.border,
+        '--novo-context-box-shadow': material.contextGlass.boxShadow,
+        '--novo-focus-background': material.focusSurface.background,
+        '--novo-focus-backdrop-filter': material.focusSurface.backdropFilter,
+        '--novo-focus-border': material.focusSurface.border,
+        '--novo-focus-box-shadow': material.focusSurface.boxShadow,
+      }
+
+      Object.entries(materialVariables).forEach(([property, value]) => {
+        root.style.setProperty(property, value)
+      })
     }
+
+    applyEffectiveTheme(isDark)
 
     // Sincronizar preferencia de animaciones/efectos en el DOM root
     root.setAttribute('data-animations', settings.showAnimations ? 'true' : 'false')
-
-    // Resolve Canvas, Context Glass, and Focus Surface together so a setting
-    // change cannot leave one product region on a stale material alias.
-    const material = resolveMaterialContract({
-      theme: isDark ? 'dark' : 'light',
-      backgroundImage: settings.backgroundImage,
-      backgroundDimness: settings.backgroundDimness,
-      backgroundBlur: settings.backgroundBlur,
-      autoContrast: settings.autoContrast,
-      glassOpacity: settings.glassOpacity,
-      glassBlur: settings.glassBlur,
-      cardOpacity: settings.cardOpacity,
-      cardLiquidIntensity: settings.cardLiquidIntensity,
-    })
-
-    const materialVariables = {
-      '--novo-canvas-background': material.canvas.background,
-      '--novo-canvas-backdrop-filter': material.canvas.backdropFilter,
-      '--novo-canvas-border': material.canvas.border,
-      '--novo-canvas-box-shadow': material.canvas.boxShadow,
-      '--novo-context-background': material.contextGlass.background,
-      '--novo-context-backdrop-filter': material.contextGlass.backdropFilter,
-      '--novo-context-border': material.contextGlass.border,
-      '--novo-context-box-shadow': material.contextGlass.boxShadow,
-      '--novo-focus-background': material.focusSurface.background,
-      '--novo-focus-backdrop-filter': material.focusSurface.backdropFilter,
-      '--novo-focus-border': material.focusSurface.border,
-      '--novo-focus-box-shadow': material.focusSurface.boxShadow,
-    }
-
-    Object.entries(materialVariables).forEach(([property, value]) => {
-      root.style.setProperty(property, value)
-    })
 
     // Apply accent color
     const colors: Record<string, string> = {
@@ -265,7 +266,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           if (settings.autoThemeMode === 'both') {
             newIsDark = newIsDark || !isDaytime()
           }
-          root.classList.toggle('dark', newIsDark)
+          applyEffectiveTheme(newIsDark)
         }
         mediaQuery.addEventListener('change', handleSystemChange)
         listeners.push(() => mediaQuery.removeEventListener('change', handleSystemChange))
@@ -279,7 +280,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
             newIsDark = systemDark || newIsDark
           }
-          root.classList.toggle('dark', newIsDark)
+          applyEffectiveTheme(newIsDark)
         }
         let timeInterval: ReturnType<typeof setInterval> | null = setInterval(applyTimeTheme, 60000)
         const onVisibility = () => {
@@ -302,7 +303,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } else if (settings.theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       const handleChange = (e: MediaQueryListEvent) => {
-        root.classList.toggle('dark', e.matches)
+        applyEffectiveTheme(e.matches)
       }
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
