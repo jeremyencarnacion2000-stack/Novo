@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { House, Brain, MessageCircle, Activity, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -10,43 +10,14 @@ import { springConfig } from '@/lib/design-tokens'
 import { useModalFlip } from '@/hooks/use-modal-flip'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { useTranslation } from '@/lib/i18n'
+import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
 export function MobileNav() {
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
-    const [drawerOpen, setDrawerOpen] = useState(false)
-    const [keyboardOpen, setKeyboardOpen] = useState(false)
-
-    // A fixed navigation bar competes with the composer on short mobile
-    // viewports. VisualViewport gives us the real keyboard state while an
-    // editable control has focus; resize alone is not enough because browser
-    // chrome can also change the viewport height.
-    useEffect(() => {
-        const viewport = window.visualViewport
-        if (!viewport) return
-
-        const updateKeyboardState = () => {
-            const activeElement = document.activeElement
-            const editing = activeElement instanceof HTMLInputElement ||
-                activeElement instanceof HTMLTextAreaElement ||
-                activeElement instanceof HTMLElement && activeElement.isContentEditable
-            const keyboardObscuresViewport = window.innerHeight - viewport.height > 140
-            setKeyboardOpen(editing && keyboardObscuresViewport)
-        }
-
-        const deferUpdate = () => window.setTimeout(updateKeyboardState, 0)
-        viewport.addEventListener('resize', updateKeyboardState)
-        viewport.addEventListener('scroll', updateKeyboardState)
-        window.addEventListener('focusin', deferUpdate)
-        window.addEventListener('focusout', deferUpdate)
-        return () => {
-            viewport.removeEventListener('resize', updateKeyboardState)
-            viewport.removeEventListener('scroll', updateKeyboardState)
-            window.removeEventListener('focusin', deferUpdate)
-            window.removeEventListener('focusout', deferUpdate)
-        }
-    }, [])
+    const { activeOverlay, closeOverlay, openOverlay, suppressSecondary } = useMobileOverlay()
+    const drawerOpen = activeOverlay === 'navigation'
 
     // Container-transform: the panel physically grows from the NAV BAR's own
     // rect/radius (matching the reference's shared-element demo) instead of
@@ -56,11 +27,12 @@ export function MobileNav() {
     // deferred-unmount pattern every other flip dialog in this app uses —
     // only flipping false in the flight's onDone.
     const closeDrawerFlip = useModalFlip('mobile-nav-panel', drawerOpen)
-    const handleCloseDrawer = () => closeDrawerFlip(() => setDrawerOpen(false))
+    const handleCloseDrawer = () => closeDrawerFlip(closeOverlay)
+    const handleOpenVoice = () => closeDrawerFlip(() => openOverlay('voice'))
     const handleFabClick = () => {
         navigator.vibrate?.(10)
         if (drawerOpen) handleCloseDrawer()
-        else setDrawerOpen(true)
+        else openOverlay('navigation')
     }
 
     const isActive = (path: string) => {
@@ -77,6 +49,10 @@ export function MobileNav() {
 
     const isCompactPath = pathname === '/ai' || pathname === '/chat' || pathname === '/music' || !!pathname?.startsWith('/music/') || pathname === '/cognitive'
 
+    // When the software keyboard or a different modal/sheet owns the mobile
+    // surface, remove every background navigation target from the a11y tree.
+    if (suppressSecondary && activeOverlay !== 'navigation') return null
+
     return (
         <>
             {/* Nav bar stays put — it used to auto-hide on scroll-down via
@@ -84,10 +60,11 @@ export function MobileNav() {
                 direction state would get stuck and leave the bar hidden
                 off-screen (the reported "se buggea"). A persistent bar is
                 simpler and never strands the user without navigation. */}
-            <div className={cn(
-                "fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3 transition-[opacity,transform] duration-150",
-                keyboardOpen && "pointer-events-none translate-y-24 opacity-0"
-            )}>
+            <nav
+                aria-label="Primary mobile navigation"
+                className="fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3"
+                style={{ paddingBottom: 'var(--mobile-safe-area-bottom)' }}
+            >
                 {/* Nav bar — left side, pill-shaped. This is the flip origin:
                     it physically grows into the section panel, not the FAB. */}
                 <motion.div
@@ -107,6 +84,7 @@ export function MobileNav() {
                             return (
                                 <motion.button
                                     key={item.path}
+                                    data-testid="mobile-primary-target"
                                     aria-label={item.label}
                                     aria-current={active ? 'page' : undefined}
                                     onClick={() => {
@@ -114,7 +92,7 @@ export function MobileNav() {
                                         router.push(item.path)
                                     }}
                                     className={cn(
-                                        "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] h-[44px]",
+                                        "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] min-h-[44px] h-[44px]",
                                         active ? "text-foreground" : "text-foreground/65",
                                         active && "px-4"
                                     )}
@@ -166,8 +144,9 @@ export function MobileNav() {
                     panel grows from the nav bar's rect, not this button's. */}
                 <motion.button
                     onClick={handleFabClick}
+                    data-testid="mobile-primary-target"
                     aria-label={drawerOpen ? "Close menu" : "Open menu"}
-                    className="novo-context-glass pointer-events-auto h-[52px] w-[52px] rounded-full flex items-center justify-center"
+                    className="novo-context-glass pointer-events-auto min-w-[44px] min-h-[44px] h-[52px] w-[52px] rounded-full flex items-center justify-center"
                     whileTap={{ scale: 0.85 }}
                     transition={springConfig.snappy}
                 >
@@ -178,11 +157,16 @@ export function MobileNav() {
                         <Plus className="h-5 w-5 text-foreground/60" strokeWidth={2} />
                     </motion.div>
                 </motion.button>
-            </div>
+            </nav>
 
             {/* Section Drawer — mounted only while open; unmounts in the
                 close flight's onDone, not on click (see handleCloseDrawer) */}
-            {drawerOpen && <MobileSectionDrawer onClose={handleCloseDrawer} />}
+            {drawerOpen && (
+                <MobileSectionDrawer
+                    onClose={handleCloseDrawer}
+                    onOpenVoice={handleOpenVoice}
+                />
+            )}
         </>
     )
 }

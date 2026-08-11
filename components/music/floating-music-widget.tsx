@@ -16,6 +16,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NowPlayingFullscreen } from '@/components/music/now-playing-fullscreen';
+import { useMobileOverlay } from '@/components/mobile-overlay-provider';
 
 interface Particle {
   id: number;
@@ -26,6 +27,7 @@ interface Particle {
 }
 
 const FloatingMusicWidgetComponent = () => {
+  const { suppressSecondary } = useMobileOverlay();
   const pathname = usePathname();
 
   const {
@@ -77,6 +79,8 @@ const FloatingMusicWidgetComponent = () => {
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
+  if (suppressSecondary) return null;
+
   const isMusicPage = !!pathname?.startsWith('/music');
 
   const formatTime = (ms: number) => {
@@ -100,7 +104,7 @@ const FloatingMusicWidgetComponent = () => {
         // offset) is what the reference mockup does, and it's the only way
         // the two don't visually and hit-test overlap (they used to, almost
         // completely, on the same `bottom-4` band).
-        className="fixed bottom-[84px] md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-[680px] h-[68px] md:h-[85px] rounded-full bg-gradient-to-r from-[#0d0f0d]/95 via-[#141a14]/95 to-[#0b0c0a]/95 backdrop-blur-2xl border border-white/10 px-3 md:px-8 flex items-center justify-between gap-2 shadow-[0_8px_32px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 transition-all overflow-hidden"
+        className="fixed bottom-[calc(5.25rem+var(--mobile-safe-area-bottom,env(safe-area-inset-bottom)))] md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-[680px] h-[68px] md:h-[85px] rounded-full bg-gradient-to-r from-[#0d0f0d]/95 via-[#141a14]/95 to-[#0b0c0a]/95 backdrop-blur-2xl border border-white/10 px-3 md:px-8 flex items-center justify-between gap-2 shadow-[0_8px_32px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 transition-all overflow-hidden"
       >
         {/* Left: Track Info with Rotating Vinyl Cover — tap opens fullscreen */}
         <div

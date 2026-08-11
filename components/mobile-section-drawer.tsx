@@ -7,7 +7,7 @@ import {
     Calendar, BarChart3, Timer,
     ListChecks, CheckSquare, KanbanSquare, TrendingUp,
     BookOpen, Music,
-    Settings, User, Search, Plug
+    Settings, User, Search, Plug, Mic
 } from 'lucide-react'
 
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
@@ -15,9 +15,10 @@ import { useTranslation } from '@/lib/i18n'
 
 interface MobileSectionDrawerProps {
     onClose: () => void
+    onOpenVoice?: () => void
 }
 
-export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
+export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawerProps) {
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
@@ -58,6 +59,7 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
             {/* Backdrop — opacity driven by the same GSAP timeline as the panel */}
             <div
                 data-flip-overlay="mobile-nav-panel"
+                aria-hidden="true"
                 className="modal-flip-overlay fixed inset-0 z-[5000] bg-black/60 md:hidden"
                 onClick={onClose}
             />
@@ -69,7 +71,12 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
             <div
                 ref={dragSurfaceRef}
                 data-flip-to="mobile-nav-panel"
-                className="modal-flip-target novo-focus-surface fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-[5001] pointer-events-auto rounded-[32px] overflow-hidden md:hidden"
+                data-mobile-overlay="navigation"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Workspace menu"
+                className="modal-flip-target novo-focus-surface fixed left-4 right-4 z-[5001] pointer-events-auto rounded-[32px] overflow-hidden md:hidden"
+                style={{ bottom: 'var(--mobile-navigation-bottom)' }}
             >
                     {/* Handle — drag down from here to dismiss with native physics */}
                     <div
@@ -126,27 +133,36 @@ export function MobileSectionDrawer({ onClose }: MobileSectionDrawerProps) {
                         ))}
 
                         {/* Footer actions */}
-                        <div className="flex gap-2.5 mt-3 pt-4 border-t border-foreground/[0.04]">
+                        <div className="grid grid-cols-2 gap-2.5 mt-3 pt-4 border-t border-foreground/[0.04]">
+                            {onOpenVoice && (
+                                <button
+                                    onClick={onOpenVoice}
+                                    className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                >
+                                    <Mic className="h-[18px] w-[18px]" strokeWidth={1.4} />
+                                    <span className="text-[11px] font-medium tracking-wide">Voz</span>
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     window.dispatchEvent(new CustomEvent('open-command-palette'))
                                     onClose()
                                 }}
-                                className="flex-1 flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <Search className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">Buscar</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/settings')}
-                                className="flex-1 flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <Settings className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.settings')}</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/profile')}
-                                className="flex-1 flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <User className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.profile')}</span>

@@ -26,6 +26,7 @@ import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-co
 import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 import { PageTransition } from '@/components/ui/page-transition'
+import { MobileOverlayProvider } from '@/components/mobile-overlay-provider'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -251,15 +252,17 @@ export default function ClientLayout({
     <AppProviders>
       <CognitiveThemeSyncer />
       <CognitiveTwinProvider>
-        <GlobalPlayer>
-          <AuthWrapper>
-            <>
-              {children}
-              <QuickCapture />
-            </>
-          </AuthWrapper>
-        </GlobalPlayer>
-        <AuthenticatedWidgets />
+        <MobileOverlayProvider>
+          <GlobalPlayer>
+            <AuthWrapper>
+              <>
+                {children}
+                <QuickCapture />
+              </>
+            </AuthWrapper>
+          </GlobalPlayer>
+          <AuthenticatedWidgets />
+        </MobileOverlayProvider>
       </CognitiveTwinProvider>
       <OfflineIndicator />
       <SyncQueueInit />

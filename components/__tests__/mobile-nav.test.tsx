@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import fs from 'node:fs'
 import path from 'node:path'
 import { MobileNav } from '../mobile-nav'
+import { MobileOverlayProvider } from '../mobile-overlay-provider'
 
 const push = jest.fn()
 let pathname = '/today'
@@ -39,6 +40,14 @@ jest.mock('@/components/mobile-section-drawer', () => ({
   ),
 }))
 
+function renderMobileNav() {
+  return render(
+    <MobileOverlayProvider>
+      <MobileNav />
+    </MobileOverlayProvider>,
+  )
+}
+
 describe('MobileNav', () => {
   beforeEach(() => {
     pathname = '/today'
@@ -47,7 +56,7 @@ describe('MobileNav', () => {
 
   it('returns to the real Dashboard root instead of the Today subpage', async () => {
     const user = userEvent.setup()
-    render(<MobileNav />)
+    renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Dashboard' }))
 
@@ -56,7 +65,7 @@ describe('MobileNav', () => {
 
   it('keeps the Cognitive Twin core destinations reachable with canonical routes', async () => {
     const user = userEvent.setup()
-    render(<MobileNav />)
+    renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Cognitivo' }))
     await user.click(screen.getByRole('button', { name: 'Chat' }))
@@ -69,7 +78,7 @@ describe('MobileNav', () => {
 
   it('opens a secondary workspace layer without adding more primary destinations', async () => {
     const user = userEvent.setup()
-    render(<MobileNav />)
+    renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()

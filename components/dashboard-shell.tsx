@@ -14,6 +14,7 @@ import { VoiceCommandHub } from '@/components/ai/VoiceCommandHub'
 import { usePeakTaskOrchestrator } from '@/hooks/use-peak-task-orchestrator'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -22,6 +23,7 @@ interface DashboardShellProps {
 function DashboardShellInner({ children }: DashboardShellProps) {
   const { settings } = useSettings()
   const pathname = usePathname()
+  const { activeOverlay, closeOverlay, openOverlay } = useMobileOverlay()
   const isFullScreenPage =
     pathname?.startsWith('/music') ||
     pathname?.startsWith('/ai') ||
@@ -30,7 +32,8 @@ function DashboardShellInner({ children }: DashboardShellProps) {
     pathname?.startsWith('/social')
 
   // Voice hub drawer state
-  const [voiceOpen, setVoiceOpen] = useState(false)
+  const [desktopVoiceOpen, setDesktopVoiceOpen] = useState(false)
+  const mobileVoiceOpen = activeOverlay === 'voice'
 
   // Proactive cognitive orchestrator — single unified insight surface (see
   // hooks/use-peak-task-orchestrator.ts for why the old separate DB-polled
@@ -44,21 +47,33 @@ function DashboardShellInner({ children }: DashboardShellProps) {
 
   // Close voice panel when navigating to full-screen routes
   useEffect(() => {
-    if (isFullScreenPage) setVoiceOpen(false)
-  }, [isFullScreenPage])
+    if (!isFullScreenPage) return
+    setDesktopVoiceOpen(false)
+    if (mobileVoiceOpen) closeOverlay()
+  }, [closeOverlay, isFullScreenPage, mobileVoiceOpen])
 
   // Listen to toggle-voice-command-hub custom event
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const handleToggle = () => {
-        setVoiceOpen(prev => !prev)
+        if (window.matchMedia('(max-width: 767px)').matches) {
+          if (activeOverlay === 'voice') closeOverlay()
+          else openOverlay('voice')
+          return
+        }
+        setDesktopVoiceOpen(prev => !prev)
       }
       window.addEventListener('toggle-voice-command-hub', handleToggle)
       return () => {
         window.removeEventListener('toggle-voice-command-hub', handleToggle)
       }
     }
-  }, [])
+  }, [activeOverlay, closeOverlay, openOverlay])
+
+  const handleCloseVoice = () => {
+    if (mobileVoiceOpen) closeOverlay()
+    else setDesktopVoiceOpen(false)
+  }
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -107,38 +122,48 @@ function DashboardShellInner({ children }: DashboardShellProps) {
           </div>
 
           {/* ── Floating Voice Button ──────────────────────────────────── */}
+          {!isFullScreenPage && mobileVoiceOpen && (
+            <div
+              data-mobile-overlay="voice"
+              aria-hidden="true"
+              className="fixed inset-0 z-[5000] bg-black/60 md:hidden"
+              onClick={handleCloseVoice}
+            />
+          )}
           {!isFullScreenPage && (
-            <div className="fixed bottom-40 right-6 z-[150] flex flex-col items-end gap-3">
-
-              {/* Voice drawer panel */}
-              <AnimatePresence>
-                {voiceOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 16, scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="
-                      fixed bottom-24 right-6 z-[160] w-80 rounded-[28px] border border-foreground/10 p-5
-                      backdrop-blur-[28px] bg-background/95
-                      shadow-[0_20px_80px_rgba(0,0,0,0.6)]
-                    "
-                  >
-                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-foreground/5">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</span>
-                      <button
-                        onClick={() => setVoiceOpen(false)}
-                        className="p-1 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
-                        title="Cerrar panel"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <VoiceCommandHub className="w-full" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <AnimatePresence>
+              {(desktopVoiceOpen || mobileVoiceOpen) && (
+                <motion.div
+                  data-mobile-overlay="voice"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Hub de Comandos"
+                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 16, scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  className="
+                    fixed right-4 z-[5001] w-[calc(100vw-2rem)] max-w-80 rounded-[28px] border border-foreground/10 p-5
+                    md:bottom-24 md:right-6 md:z-[160] md:w-80
+                    backdrop-blur-[28px] bg-background/95
+                    shadow-[0_20px_80px_rgba(0,0,0,0.6)]
+                  "
+                  style={mobileVoiceOpen ? { bottom: 'var(--mobile-navigation-bottom)' } : undefined}
+                >
+                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-foreground/5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</span>
+                    <button
+                      onClick={handleCloseVoice}
+                      className="min-h-[44px] min-w-[44px] p-1 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
+                      title="Cerrar panel"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <VoiceCommandHub className="w-full" />
+                </motion.div>
+              )}
+            </AnimatePresence>
           )}
         </main>
       </div>

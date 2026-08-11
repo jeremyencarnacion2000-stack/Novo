@@ -25,6 +25,7 @@ import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-exec
 import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { useFocus } from '@/lib/focus-context'
 import { eventBus } from '@/lib/events/event-bus'
+import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
 type MicState = 'idle' | 'recording' | 'processing' | 'result' | 'error'
 
@@ -38,6 +39,7 @@ const FOCUS_MODE_COLOR: Record<'work' | 'shortBreak' | 'longBreak', string> = {
 }
 
 export function GeminiLiveOrb() {
+  const { suppressSecondary } = useMobileOverlay()
   const { bioState } = useCognitiveEngine()
   // Live Activity-style state: when idle (nothing voice-related happening)
   // and a focus session is actually running, the hub shows that instead of
@@ -212,12 +214,14 @@ export function GeminiLiveOrb() {
   const showPanel = micState === 'recording' || micState === 'processing' || micState === 'result' || micState === 'error'
   const showFocusPill = micState === 'idle' && focusActive
 
+  if (suppressSecondary) return null
+
   return (
     <div
       className="flex flex-col items-end gap-3 pointer-events-none"
       style={{
         position: 'fixed',
-        bottom: '5rem',
+        bottom: 'var(--mobile-utility-bottom, calc(5rem + env(safe-area-inset-bottom)))',
         right: '1rem',
         zIndex: 150,
         contain: 'layout style',
