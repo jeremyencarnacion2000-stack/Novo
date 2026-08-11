@@ -81,6 +81,10 @@ function isInWindows(hour: number, windows: Array<[number, number]>): boolean {
   return windows.some(w => hourInRange(hour, w))
 }
 
+function isLegacyPresentationPhase(phase: CognitivePhase): boolean {
+  return phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE'
+}
+
 /**
  * Compute the accumulated energy cost for habits completed TODAY before `now`.
  * Each habit deducts from the attentional reservoir.
@@ -143,7 +147,7 @@ export interface EngineInput {
   completedHabits?: HabitEntry[]
   /** Assumed wake hour (24h) — defaults to chronotype anchor */
   wakeHour?: number
-  /** Real-time user stress score from biometrics */
+  /** Verified user stress score from a connected biometric provider */
   userStressScore?: number
 }
 
@@ -156,7 +160,7 @@ export function computeBioState({
   chronotype = 'intermediate',
   completedHabits = [],
   wakeHour,
-  userStressScore = 50,
+  userStressScore: _userStressScore,
 }: EngineInput): BioState {
   const hour = now.getHours()
   const minute = now.getMinutes()
@@ -169,8 +173,6 @@ export function computeBioState({
   const wake = wakeHour ?? defaultWakeHour[chronotype]
 
   // ── 1. Late-night absolute override ───────────────────────────────────────
-  const isLateNight = hourInRange(hour, LATE_NIGHT_HOURS)
-
   // ── 2. Fatigue from completed habits ─────────────────────────────────────
   const fatigueLoad = computeDailyFatigueLoad(completedHabits, now)
 
@@ -191,9 +193,7 @@ export function computeBioState({
   // ── 6. Phase classification ───────────────────────────────────────────────
   let phase: CognitivePhase
 
-  if (isLateNight || fatigueLoad >= FATIGUE_THRESHOLD || attentionRaw < 0.25) {
-    phase = 'SYNAPTIC_FATIGUE'
-  } else if (
+  if (
     isInWindows(hour, PEAK_WINDOWS[chronotype]) &&
     !inUltradianDip &&
     attentionRaw >= 0.60
@@ -201,22 +201,16 @@ export function computeBioState({
     phase = 'PEAK_FOCUS'
   } else if (isInWindows(hour, LINEAR_WINDOWS[chronotype]) && attentionRaw >= 0.35) {
     phase = 'LINEAR_EXECUTION'
-  } else if (inUltradianDip || attentionRaw < 0.40) {
-    phase = 'SYNAPTIC_FATIGUE'
   } else {
     phase = 'LINEAR_EXECUTION'
   }
 
   // ── 6b. Real-time stress degradation override ────────────────────────────
-  if (phase === 'PEAK_FOCUS' && userStressScore > 80) {
-    phase = 'REDUCED_CAPACITY_MODE'
-  }
-
   // ── 7. Minutes to next phase boundary ────────────────────────────────────
   const minutesRemaining = ULTRADIAN_MINUTES - minutesIntoCycle
   let minutesToNextPhase: number
-  if (phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE') {
-    if (isLateNight) {
+  if (isLegacyPresentationPhase(phase)) {
+    if (hour < 5) {
       // Count minutes until 5:00 AM (end of forced late-night fatigue)
       const targetHour = 5
       const minsUntilTarget = ((targetHour - hour + 24) % 24) * 60 - minute
@@ -240,12 +234,10 @@ export function computeBioState({
   }
 
   // ── 8. Blue light + audio recommendation ─────────────────────────────────
-  const blueLight = phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE' || hour >= 20 || hour < 6
+  const blueLight = hour >= 20 || hour < 6
 
   let recommendedAudioCategory: BioState['recommendedAudioCategory']
-  if (phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE') {
-    recommendedAudioCategory = isLateNight ? 'sleep' : 'ambient'
-  } else if (phase === 'PEAK_FOCUS') {
+  if (phase === 'PEAK_FOCUS') {
     recommendedAudioCategory = 'focus'
   } else {
     recommendedAudioCategory = 'none'

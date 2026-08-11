@@ -1,7 +1,14 @@
 // OpenRouter API Integration
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
-if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY env var is not set')
+
+// Resolve credentials only when a request is made. Throwing at module import
+// time makes Next.js fail while collecting route data in environments where
+// the optional provider is intentionally disabled (for example a Preview).
+function getOpenRouterApiKey(): string {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error('OPENROUTER_API_KEY env var is not set');
+    return apiKey;
+}
 
 export const openRouterAPI = {
     generateResponse: async (
@@ -21,6 +28,7 @@ export const openRouterAPI = {
         // before assuming the fix regressed.
         model: string = 'openai/gpt-oss-20b:free'
     ) => {
+        const apiKey = getOpenRouterApiKey();
         // Build messages array
         const messages: any[] = [];
 
@@ -58,7 +66,7 @@ export const openRouterAPI = {
             const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                    'Authorization': `Bearer ${apiKey}`,
                     'HTTP-Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000', // Site URL for rankings on openrouter.ai.
                     'X-Title': 'Novo Desktop', // Site title for rankings on openrouter.ai.
                     'Content-Type': 'application/json',

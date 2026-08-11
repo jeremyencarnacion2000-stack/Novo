@@ -1,6 +1,9 @@
 import { inngest } from '../client'
 import { prisma } from '@/lib/prisma'
 import { runTwinAgent } from '@/lib/cognitive/twin-agent'
+import { appendActivityEvent, createActivityRun, finishActivityRun } from '@/lib/ai/activity'
+import { getTwinInferenceStage, type TwinInferenceStageId } from '@/lib/cognitive/twin-inference-stages'
+import { inferTwinAdaptationProposals } from '@/lib/cognitive/twin-adaptation'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -59,12 +62,36 @@ export async function processTwinSignalHandler(
       quality?: number
     }
 
+    const userSettings = await prisma.userSettings.findUnique({ where: { userId }, select: { settings: true } })
+    const settings = userSettings?.settings && typeof userSettings.settings === 'object' && !Array.isArray(userSettings.settings)
+      ? userSettings.settings as Record<string, unknown>
+      : {}
+    if (settings.cognitiveLearningPaused === true) return { paused: true as const }
+
+    const inferenceRun = await step.run('start-twin-inference-activity', async () => {
+      try { return await createActivityRun(userId, 'twin_inference') } catch { return null }
+    })
+    const inferenceRunId = inferenceRun?.id
+    const emitInferenceStage = async (stageId: TwinInferenceStageId, detail?: string, sourceCount?: number) => {
+      if (!inferenceRunId) return
+      const stage = getTwinInferenceStage(stageId)
+      await step.run(`twin-inference-${stageId}`, async () => {
+        try {
+          await appendActivityEvent(userId, { runId: inferenceRunId, phase: stage.phase, label: stage.label, detail: detail ?? stage.detail, sourceCount })
+        } catch { /* telemetry must not block learning */ }
+      })
+    }
+
     // ── Step 1: Get or create CognitiveTwinRecord ────────────────────────────
+    // Keep the visible activity lifecycle truthful when a durable inference
+    // step fails. The error is rethrown for Inngest retry semantics, while the
+    // terminal event lets the client recover instead of displaying a forever-running Twin.
+    try {
     const twin = await step.run('get-or-create-twin', async () => {
       let record = await prisma.cognitiveTwinRecord.findUnique({ where: { userId } })
       if (!record) {
         record = await prisma.cognitiveTwinRecord.create({
-          data: { userId, confidenceScore: 42, trustLevel: 'initial', isInitialized: false, totalSignals: 0 },
+          data: { userId, confidenceScore: 0, trustLevel: 'initial', isInitialized: false, totalSignals: 0 },
         })
       }
       return record
@@ -83,6 +110,7 @@ export async function processTwinSignalHandler(
         },
       })
     })
+    await emitInferenceStage('observe', `Señal recibida: ${signal}.`)
 
     // ── Step 3: Load 14-day signal window for inference ──────────────────────
     // Inngest checkpoints step results as JSON, so occurredAt comes back as a
@@ -97,6 +125,7 @@ export async function processTwinSignalHandler(
       })
       return signals.map(s => ({ ...s, occurredAt: s.occurredAt.toISOString() }))
     }).then(signals => signals.map(s => ({ ...s, occurredAt: new Date(s.occurredAt) })))
+    await emitInferenceStage('understand', `${recentSignals.length} señales observables en la ventana de inferencia.`, recentSignals.length)
 
     // ── Step 4: Run Inference Rules ──────────────────────────────────────────
     const changes = await step.run('run-inference-rules', async () => {
@@ -333,6 +362,7 @@ export async function processTwinSignalHandler(
 
       return { newEnergy, newBottlenecks, newMetrics, logs, patternBonus }
     })
+    await emitInferenceStage('propose', changes.logs.length ? `${changes.logs.length} cambio(s) respaldado(s) por reglas deterministas.` : 'No hay un cambio de estado suficiente para proponer.', recentSignals.length)
 
     // ── Step 5: Calculate new confidence + trustLevel ────────────────────────
     const newConfidence = await step.run('update-confidence', async () => {
@@ -342,11 +372,42 @@ export async function processTwinSignalHandler(
     })
 
     const newTrustLevel = deriveTrustLevel(newConfidence)
+    await emitInferenceStage('verify', `Confianza calculada: ${newConfidence.toFixed(1)}%; nivel ${newTrustLevel}.`)
+    const adaptationProposals = inferTwinAdaptationProposals({
+      confidenceScore: newConfidence,
+      trustLevel: newTrustLevel,
+      energyCurve: changes.newEnergy as Record<string, unknown>,
+      bottlenecks: changes.newBottlenecks as Record<string, unknown>,
+    })
+    // Event counts can describe workload patterns, but they are not a
+    // measurement of fatigue, burnout, or mental capacity. Clear legacy
+    // health-like composites before they reach persisted Twin/UI state.
+    const safeMetrics = {
+      ...changes.newMetrics,
+      currentCognitiveLoad: 0,
+      decisionFatigueRisk: 'unknown',
+      burnoutIndex: 0,
+    }
+    const safeLogs = changes.logs.filter((log) => ![
+      'decision_fatigue_raised',
+      'burnout_risk_raised',
+    ].includes(log.changeType))
 
     // ── Step 6: Persist updated twin ─────────────────────────────────────────
     await step.run('persist-twin', async () => {
       const prevTrust = twin.trustLevel as TrustLevel
       const trustUpgraded = newTrustLevel !== prevTrust
+      const currentIdentity = twin.identity && typeof twin.identity === 'object' && !Array.isArray(twin.identity)
+        ? twin.identity as Record<string, unknown>
+        : {}
+      const previousPolicy = currentIdentity.adaptationPolicy && typeof currentIdentity.adaptationPolicy === 'object' && !Array.isArray(currentIdentity.adaptationPolicy)
+        ? currentIdentity.adaptationPolicy as Record<string, unknown>
+        : {}
+      const previousProposalIds = Array.isArray(previousPolicy.proposals)
+        ? previousPolicy.proposals.flatMap((proposal) => proposal && typeof proposal === 'object' && 'id' in proposal && typeof proposal.id === 'string' ? [proposal.id] : [])
+        : []
+      const nextProposalIds = adaptationProposals.map((proposal) => proposal.id)
+      const policyChanged = JSON.stringify(previousProposalIds) !== JSON.stringify(nextProposalIds)
 
       await prisma.cognitiveTwinRecord.update({
         where: { id: twin.id },
@@ -355,15 +416,22 @@ export async function processTwinSignalHandler(
           trustLevel: newTrustLevel,
           energyCurve: changes.newEnergy as object,
           bottlenecks: changes.newBottlenecks as object,
-          metrics: changes.newMetrics as object,
+          metrics: safeMetrics as object,
+          identity: {
+            ...currentIdentity,
+            adaptationPolicy: {
+              proposals: adaptationProposals,
+              updatedAt: new Date().toISOString(),
+            },
+          },
           totalSignals: { increment: 1 },
         },
       })
 
       // Write all inference logs
-      if (changes.logs.length > 0) {
+      if (safeLogs.length > 0) {
         await prisma.twinEvolutionLog.createMany({
-          data: changes.logs.map(l => ({
+          data: safeLogs.map(l => ({
             twinId: twin.id,
             userId,
             changeType: l.changeType,
@@ -387,16 +455,30 @@ export async function processTwinSignalHandler(
           },
         })
       }
+      if (policyChanged) {
+        await prisma.twinEvolutionLog.create({
+          data: {
+            twinId: twin.id,
+            userId,
+            changeType: 'adaptation_policy_updated',
+            description: `Adaptation policy updated with ${adaptationProposals.length} bounded proposal(s).`,
+            prevValue: previousProposalIds.join(','),
+            newValue: nextProposalIds.join(','),
+          },
+        })
+      }
     })
 
     // ── Step 7: Daily Snapshot (idempotent — one per day) ────────────────────
+    await emitInferenceStage('learn', 'La evolución, confianza y evidencia quedaron persistidas.')
+
     await step.run('write-daily-snapshot', async () => {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
       const energy = changes.newEnergy as Record<string, unknown>
       const bottlenecks = changes.newBottlenecks as Record<string, unknown>
-      const metrics = changes.newMetrics as Record<string, unknown>
+      const metrics = safeMetrics as Record<string, unknown>
 
       try {
         await prisma.twinSnapshot.upsert({
@@ -406,7 +488,7 @@ export async function processTwinSignalHandler(
             userId,
             confidenceScore: newConfidence,
             trustLevel: newTrustLevel,
-            cognitiveLoad: (metrics.currentCognitiveLoad as number) ?? 30,
+            cognitiveLoad: (metrics.currentCognitiveLoad as number) ?? 0,
             burnoutIndex: (metrics.burnoutIndex as number) ?? 0,
             chronotype: (energy.chronotype as string) ?? '',
             mainFrictionPoint: (bottlenecks.mainFrictionPoint as string) ?? '',
@@ -418,7 +500,7 @@ export async function processTwinSignalHandler(
           update: {
             confidenceScore: newConfidence,
             trustLevel: newTrustLevel,
-            cognitiveLoad: (metrics.currentCognitiveLoad as number) ?? 30,
+            cognitiveLoad: (metrics.currentCognitiveLoad as number) ?? 0,
             burnoutIndex: (metrics.burnoutIndex as number) ?? 0,
             chronotype: (energy.chronotype as string) ?? '',
             mainFrictionPoint: (bottlenecks.mainFrictionPoint as string) ?? '',
@@ -462,7 +544,20 @@ export async function processTwinSignalHandler(
     })
 
     // ── Twin Agent: fire proactive actions (non-blocking) ──────────────────
-    step.run('run-twin-agent', () => runTwinAgent(userId)).catch(() => {/* non-critical */})
+    await step.run('run-twin-agent', () => runTwinAgent(userId)).catch(() => undefined)
+    await emitInferenceStage('adapt', adaptationProposals.length
+      ? `${adaptationProposals.length} propuesta(s): ${adaptationProposals.map((proposal) => proposal.behavior).join(' ')}`
+      : 'No hay una adaptación segura respaldada por evidencia.')
+    if (inferenceRunId) {
+      await step.run('finish-twin-inference-activity', async () => {
+        try {
+          await finishActivityRun(userId, inferenceRunId, 'completed', {
+            resultRef: twin.id,
+            resultSummary: `${changes.logs.length} cambio(s) de estado procesado(s).`,
+          })
+        } catch { /* telemetry must not block learning */ }
+      })
+    }
 
     return {
       success: true,
@@ -470,6 +565,20 @@ export async function processTwinSignalHandler(
       newConfidence,
       newTrustLevel,
       patternsDetected: changes.logs.length,
+      inferenceRunId,
+    }
+    } catch (error) {
+      if (inferenceRunId) {
+        await step.run('fail-twin-inference-activity', async () => {
+          try {
+            await finishActivityRun(userId, inferenceRunId, 'failed', {
+              errorCode: 'twin_inference_failed',
+              errorMessage: 'La inferencia del Twin no pudo completarse; se reintentarÃ¡ de forma segura.',
+            })
+          } catch { /* telemetry must not mask the original failure */ }
+        }).catch(() => undefined)
+      }
+      throw error
     }
 }
 

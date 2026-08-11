@@ -134,26 +134,34 @@ export async function syncTodoistPlugin(userId: string): Promise<TodoistSyncResu
       }
     }
 
-    // Sync overdue tasks into Novo checklist
-    for (const task of overdueTasks.slice(0, 15)) {
-      const existing = await prisma.checklistItem.findFirst({
-        where: { userId, sourceId: task.id, source: 'todoist' },
+    // Sync overdue tasks with two database round trips instead of one pair
+    // of queries for each task.
+    const overdueToSync = overdueTasks.slice(0, 15);
+    const existingItems = await prisma.checklistItem.findMany({
+      where: {
+        userId,
+        source: 'todoist',
+        sourceId: { in: overdueToSync.map((task) => task.id) },
+      },
+      select: { sourceId: true },
+    });
+    const existingSourceIds = new Set(existingItems.map((item) => item.sourceId));
+    const newItems = overdueToSync.filter((task) => !existingSourceIds.has(task.id));
+
+    if (newItems.length > 0) {
+      await prisma.checklistItem.createMany({
+        data: newItems.map((task) => ({
+          userId,
+          text: task.content,
+          completed: false,
+          priority: task.priority >= 3 ? 'high' : task.priority === 2 ? 'medium' : 'low',
+          source: 'todoist',
+          sourceId: task.id,
+          dueDate: task.due?.datetime
+            ? new Date(task.due.datetime)
+            : task.due?.date ? new Date(task.due.date) : null,
+        })),
       });
-      if (!existing) {
-        await prisma.checklistItem.create({
-          data: {
-            userId,
-            text: task.content,
-            completed: false,
-            priority: task.priority >= 3 ? 'high' : task.priority === 2 ? 'medium' : 'low',
-            source: 'todoist',
-            sourceId: task.id,
-            dueDate: task.due?.datetime
-              ? new Date(task.due.datetime)
-              : task.due?.date ? new Date(task.due.date) : null,
-          },
-        });
-      }
     }
 
     return {

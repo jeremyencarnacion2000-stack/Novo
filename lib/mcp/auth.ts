@@ -1,6 +1,6 @@
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
-import { getOidcProvider } from './oidc-provider'
 import { getIssuer, getMcpResourceUri } from './resource'
+import { validateMcpPersonalAccessToken } from './personal-access-token'
 
 export type McpAuthResult =
   | { ok: true; userId: string; authInfo: AuthInfo }
@@ -22,6 +22,24 @@ export async function validateMcpBearerToken(req: Request): Promise<McpAuthResul
   }
   const token = match[1]
 
+  // Device tokens are deliberately checked before OIDC storage. They are
+  // self-contained credentials managed by the user in Novo and carry only
+  // their explicitly granted task scopes.
+  const personalToken = await validateMcpPersonalAccessToken(token)
+  if (personalToken.ok) {
+    return {
+      ok: true,
+      userId: personalToken.userId,
+      authInfo: personalToken.authInfo,
+    }
+  }
+  if (token.startsWith('novo_mcp_')) {
+    return { ok: false, status: 401, error: 'invalid_token', description: 'Device token is invalid, expired, or revoked' }
+  }
+
+  // Keep the OAuth provider lazy: a device-token request neither needs nor
+  // initializes the heavier OIDC implementation.
+  const { getOidcProvider } = await import('./oidc-provider')
   const provider = getOidcProvider()
   const accessToken = await provider.AccessToken.find(token)
   if (!accessToken || !accessToken.isValid || !accessToken.accountId) {

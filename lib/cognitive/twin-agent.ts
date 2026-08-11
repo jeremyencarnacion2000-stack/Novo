@@ -19,6 +19,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { google } from 'googleapis';
+import { inferTaskPriority, type RankedTask } from '@/lib/cognitive/task-priority';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,49 @@ async function isOnCooldown(ctx: AgentContext, capability: CapabilityId): Promis
     (l) => l.capability === capability && l.createdAt > since,
   );
   return !!last;
+}
+
+async function adaptExistingTaskQueue(ctx: AgentContext, reason: string) {
+  const [tasks, checklistItems] = await Promise.all([
+    prisma.task.findMany({
+    where: { userId: ctx.userId, status: { in: ['todo', 'in-progress'] } },
+    select: { id: true, title: true, status: true, priority: true, dueDate: true, tags: true },
+    orderBy: [{ updatedAt: 'desc' }],
+    take: 50,
+    }),
+    prisma.checklistItem.findMany({
+      where: { userId: ctx.userId, completed: false },
+      select: { id: true, text: true, completed: true, priority: true, dueDate: true, source: true },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 50,
+    }),
+  ])
+  const changes: Array<{ id: string; title: string; priority: string }> = []
+  for (const task of tasks) {
+    const inferred = inferTaskPriority(task, new Date())
+    if (inferred !== task.priority) {
+      await prisma.task.update({
+        where: { id: task.id },
+        data: { priority: inferred, scheduledReason: `Twin: ${reason}; prioridad inferida desde prioridad declarada, fecha límite y estado.` },
+      })
+      changes.push({ id: task.id, title: task.title, priority: inferred })
+    }
+  }
+  for (const item of checklistItems) {
+    const inferred = inferTaskPriority({
+      id: item.id,
+      title: item.text,
+      status: item.completed ? 'done' : 'todo',
+      priority: item.priority,
+      dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
+      tags: item.source,
+    }, new Date())
+    if (inferred !== item.priority) {
+      await prisma.checklistItem.update({ where: { id: item.id }, data: { priority: inferred } })
+      changes.push({ id: `checklist:${item.id}`, title: item.text, priority: inferred })
+    }
+  }
+  return { considered: tasks.length + checklistItems.length, changes }
 }
 
 async function logAction(
@@ -163,7 +207,7 @@ async function createGoogleCalendarEvent(
 
 // ── Capabilities ──────────────────────────────────────────────────────────────
 
-/** 1. Procrastination / friction — creates a catchup task */
+/** 1. Procrastination / friction — adapts the existing queue */
 async function runCreateCatchupTask(ctx: AgentContext): Promise<CapabilityResult> {
   const cap: CapabilityId = 'create_catchup_task';
 
@@ -178,25 +222,18 @@ async function runCreateCatchupTask(ctx: AgentContext): Promise<CapabilityResult
   }
 
   try {
-    const dueDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
-    await prisma.task.create({
-      data: {
-        userId: ctx.userId,
-        title: `🔄 Twin Agent: Retomar "${friction ?? 'tareas diferidas'}"`,
-        status: 'todo',
-        priority: 'high',
-        dueDate: dueDate.toISOString().split('T')[0],
-        tags: JSON.stringify(['twin-agent', 'catchup']),
-      },
-    });
+    const adaptation = await adaptExistingTaskQueue(ctx, `bloqueo ${friction ?? 'detectado'}`);
+    if (adaptation.considered === 0) {
+      return { capability: cap, result: 'skipped', description: 'No existing tasks to adapt', metadata: { friction, deferCount } };
+    }
 
     await postSlackMessage(
       ctx.userId,
-      `🧠 *Tu Twin detectó procrastinación.*\n> Bloqueo: _${friction ?? 'múltiples tareas diferidas'}_\nCreé una tarea de recuperación con prioridad alta.`,
+      `🧠 *Tu Twin detectó una señal de bloqueo.*\n> Contexto: _${friction ?? 'múltiples tareas diferidas'}_\nReorganicé ${adaptation.considered} tareas existentes según prioridad inferida; no creé tareas duplicadas.`,
     );
 
-    await logAction(ctx, cap, 'success', 'Catchup task created', { friction, deferCount });
-    return { capability: cap, result: 'success', description: 'Catchup task created', metadata: { friction, deferCount } };
+    await logAction(ctx, cap, 'success', 'Existing task queue adapted', { friction, deferCount, ...adaptation });
+    return { capability: cap, result: 'success', description: 'Existing task queue adapted', metadata: { friction, deferCount, ...adaptation } };
   } catch (err) {
     await logAction(ctx, cap, 'failed', String(err));
     return { capability: cap, result: 'failed', description: String(err) };
@@ -243,24 +280,15 @@ async function runTriageOverdueTasks(ctx: AgentContext): Promise<CapabilityResul
       ...overdueChecklist.map((c) => `• ${c.text} (${c.source})`),
     ].slice(0, 8);
 
-    await prisma.task.create({
-      data: {
-        userId: ctx.userId,
-        title: `📋 Twin Agent: Triage de ${total} tareas vencidas`,
-        status: 'todo',
-        priority: 'high',
-        dueDate: new Date().toISOString().split('T')[0],
-        tags: JSON.stringify(['twin-agent', 'triage']),
-      },
-    });
+    const adaptation = await adaptExistingTaskQueue(ctx, `${total} tareas vencidas`);
 
     await postSlackMessage(
       ctx.userId,
-      `⚠️ *${total} tareas vencidas detectadas.*\n${titles.join('\n')}\n\nCreé una tarea de triage para revisarlas hoy.`,
+      `⚠️ *${total} tareas vencidas detectadas.*\n${titles.join('\n')}\n\nReorganicé las tareas existentes para priorizar la revisión; no añadí una tarea de triage duplicada.`,
     );
 
-    await logAction(ctx, cap, 'success', `Triaged ${total} overdue tasks`, { total });
-    return { capability: cap, result: 'success', description: `Triaged ${total} overdue tasks`, metadata: { total } };
+    await logAction(ctx, cap, 'success', `Adapted ${total} overdue tasks`, { total, ...adaptation });
+    return { capability: cap, result: 'success', description: `Adapted ${total} overdue tasks`, metadata: { total, ...adaptation } };
   } catch (err) {
     await logAction(ctx, cap, 'failed', String(err));
     return { capability: cap, result: 'failed', description: String(err) };
@@ -501,15 +529,11 @@ export async function runTwinAgent(userId: string): Promise<CapabilityResult[]> 
       recentLogs: recentAgentLogs,
     };
 
-    // Run all capabilities in parallel (each guards itself with cooldown checks)
-    const results = await Promise.all([
-      runCreateCatchupTask(ctx),
-      runTriageOverdueTasks(ctx),
-      runNotifyBurnoutRisk(ctx),
-      runSuggestFocusBlock(ctx),
-      runRescheduleOverload(ctx),
-      runSuggestRecoveryRoutine(ctx),
-    ]);
+    // Legacy capabilities derived health-like conditions from heuristics and
+    // performed writes or sent external messages without confirmation. Keep
+    // context loading for a future proposal flow, but do not execute them.
+    // Confirmed Novo Loop actions are the only allowed mutation path.
+    const results: CapabilityResult[] = [];
 
     const acted = results.filter((r) => r.result === 'success');
     if (acted.length > 0) {

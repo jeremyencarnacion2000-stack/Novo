@@ -28,6 +28,10 @@ export async function createLemonSqueezyCheckout(params: {
   variantId: string
   userId: string
   email: string
+  redirectUrl: string
+  source?: string
+  receiptButtonText: string
+  receiptThankYouNote: string
 }): Promise<string> {
   const res = await fetch(`${LEMONSQUEEZY_API_BASE}/checkouts`, {
     method: 'POST',
@@ -36,9 +40,27 @@ export async function createLemonSqueezyCheckout(params: {
       data: {
         type: 'checkouts',
         attributes: {
+          product_options: {
+            enabled_variants: [Number(params.variantId)],
+            redirect_url: params.redirectUrl,
+            receipt_button_text: params.receiptButtonText,
+            receipt_link_url: params.redirectUrl,
+            receipt_thank_you_note: params.receiptThankYouNote,
+          },
+          checkout_options: {
+            media: false,
+            logo: true,
+            desc: true,
+            discount: true,
+            subscription_preview: true,
+            button_color: '#86efac',
+          },
           checkout_data: {
             email: params.email,
-            custom: { user_id: params.userId },
+            custom: {
+              user_id: params.userId,
+              paywall_source: params.source ?? 'settings',
+            },
           },
         },
         relationships: {

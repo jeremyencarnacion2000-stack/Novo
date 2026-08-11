@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { toCognitiveTwinSyncPayload } from '@/lib/cognitive-twin-sync'
 
 export type TrustLevel = 'initial' | 'learning' | 'adapted' | 'validated'
 
@@ -20,6 +21,10 @@ export interface CognitiveTwin {
     industry: string
     focusStyle: 'deep_builder' | 'reactive_communicator' | 'frantic_juggler' | 'consistent_planner' | ''
     deepWorkCapacity: number
+    adaptationPolicy?: {
+      proposals: Array<{ id: string; reason: string; behavior: string }>
+      updatedAt: string
+    }
   }
 
   energyCurve: {
@@ -31,7 +36,7 @@ export interface CognitiveTwin {
 
   metrics: {
     currentCognitiveLoad: number
-    decisionFatigueRisk: 'low' | 'moderate' | 'high' | 'critical'
+    decisionFatigueRisk: 'unknown' | 'low' | 'moderate' | 'high' | 'critical'
     burnoutIndex: number
   }
 
@@ -55,12 +60,14 @@ const defaultTwin: CognitiveTwin = {
   version: 1,
   isInitialized: false,
   onboardingCompletedAt: null,
-  confidenceScore: 42,
+  // No observed evidence exists before onboarding/activity is recorded.
+  confidenceScore: 0,
   trustLevel: 'initial',
   longTermGoal: '',
   identity: { role: '', industry: '', focusStyle: '', deepWorkCapacity: 3.5 },
   energyCurve: { chronotype: '', peakFocusStart: '', peakFocusEnd: '', typicalSlumpHour: 14 },
-  metrics: { currentCognitiveLoad: 30, decisionFatigueRisk: 'low', burnoutIndex: 10 },
+  // No biometric or behavioural baseline exists before owned data arrives.
+  metrics: { currentCognitiveLoad: 0, decisionFatigueRisk: 'unknown', burnoutIndex: 0 },
   bottlenecks: { mainFrictionPoint: '', motivationDrivers: [], planningPreference: '' },
   workspaceLayout: {
     enabledModules: ['today', 'ai', 'cognitive', 'focus'],
@@ -71,7 +78,7 @@ const defaultTwin: CognitiveTwin = {
 
 interface CognitiveTwinContextType {
   twin: CognitiveTwin
-  initializeTwin: (data: Partial<CognitiveTwin>) => void
+  initializeTwin: (data: Partial<CognitiveTwin>) => Promise<boolean>
   updateTwin: (data: Partial<CognitiveTwin>) => void
   resetTwin: () => void
   isLoading: boolean
@@ -146,8 +153,10 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
 
     // status === 'authenticated'
     async function bootFromServer() {
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 10_000)
       try {
-        const res = await fetch('/api/cognitive-twin/sync')
+        const res = await fetch('/api/cognitive-twin/sync', { signal: controller.signal })
         if (res.ok) {
           const { twin: serverTwin } = await res.json()
           if (serverTwin) {
@@ -172,6 +181,7 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
           if (cached) setTwin(JSON.parse(cached))
         } catch {}
       } finally {
+        window.clearTimeout(timeout)
         setIsLoading(false)
       }
     }
@@ -179,7 +189,41 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
     bootFromServer()
   }, [status, session?.user?.id])
 
-  const initializeTwin = (data: Partial<CognitiveTwin>) => {
+  // Keep all surfaces aligned after an asynchronous Twin inference run. The
+  // server remains authoritative; this poll only makes persisted adaptation
+  // visible without requiring a full navigation or a second client model.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let active = true
+    const refreshFromServer = async () => {
+      try {
+        const response = await fetch('/api/cognitive-twin/sync', { cache: 'no-store' })
+        if (!response.ok || !active) return
+        const payload = await response.json() as { twin?: Record<string, unknown> | null }
+        if (payload.twin && active) {
+          const hydrated = serverToTwin(payload.twin, defaultTwin)
+          setTwin(hydrated)
+          try { localStorage.setItem('novo_cognitive_twin', JSON.stringify(hydrated)) } catch {}
+        }
+      } catch { /* degraded clients retain their last authoritative snapshot */ }
+    }
+    const timer = window.setInterval(() => void refreshFromServer(), 15_000)
+    const source = typeof EventSource !== 'undefined' ? new EventSource('/api/events') : null
+    if (source) {
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as { type?: string }
+          if (payload.type === 'twin.updated') {
+            void refreshFromServer()
+            window.dispatchEvent(new CustomEvent('novo:twin-updated'))
+          }
+        } catch { /* malformed event cannot invalidate the current Twin */ }
+      }
+    }
+    return () => { active = false; window.clearInterval(timer); source?.close() }
+  }, [status, session?.user?.id])
+
+  const initializeTwin = async (data: Partial<CognitiveTwin>): Promise<boolean> => {
     const now = new Date().toISOString()
     const newTwin: CognitiveTwin = {
       ...defaultTwin,
@@ -198,22 +242,20 @@ export function CognitiveTwinProvider({ children }: { children: React.ReactNode 
     // silent, and the profile survived only via this device's localStorage.
     // One retry closes the common transient-failure case without turning
     // onboarding into a hard network dependency.
-    const persistTwin = (attempt: number): void => {
-      fetch('/api/cognitive-twin/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTwin),
-      })
-        .then(res => {
-          if (!res.ok && attempt === 0) persistTwin(1)
-          else if (!res.ok) console.error('[CognitiveTwin] Failed to persist twin to server after retry:', res.status)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await fetch('/api/cognitive-twin/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toCognitiveTwinSyncPayload(newTwin)),
         })
-        .catch(() => {
-          if (attempt === 0) persistTwin(1)
-          else console.error('[CognitiveTwin] Failed to persist twin to server after retry: network error')
-        })
+        if (response.ok) return true
+        console.error('[CognitiveTwin] Failed to persist twin:', response.status)
+      } catch {
+        console.error('[CognitiveTwin] Failed to persist twin: network error')
+      }
     }
-    persistTwin(0)
+    return false
   }
 
   const updateTwin = (data: Partial<CognitiveTwin>) => {

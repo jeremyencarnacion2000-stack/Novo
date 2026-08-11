@@ -86,6 +86,29 @@ describe('validateMcpBearerToken', () => {
       expect(result.authInfo.scopes.sort()).toEqual(['tasks:read', 'tasks:write'])
     }
   })
+
+  it('accepts a valid user-managed device token without consulting OAuth storage', async () => {
+    const authInfo = {
+      token: 'novo_mcp_device-token-for-test-000000000000',
+      clientId: 'novo-device:token-1',
+      scopes: ['tasks:read'],
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    }
+    jest.doMock('@/lib/mcp/personal-access-token', () => ({
+      validateMcpPersonalAccessToken: jest.fn().mockResolvedValue({ ok: true, userId: 'device-owner', authInfo, tokenId: 'token-1' }),
+    }))
+    jest.doMock('@/lib/mcp/oidc-provider', () => ({
+      getOidcProvider: jest.fn(() => { throw new Error('OAuth must not be consulted') }),
+    }))
+    const { validateMcpBearerToken } = await import('../auth')
+    const result = await validateMcpBearerToken(new Request('http://localhost/api/mcp', { headers: { authorization: `Bearer ${authInfo.token}` } }))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.userId).toBe('device-owner')
+      expect(result.authInfo.scopes).toEqual(['tasks:read'])
+    }
+  })
 })
 
 describe('GET /api/mcp (no token)', () => {

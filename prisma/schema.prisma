@@ -1549,6 +1549,7 @@ model IntegrationAccount {
   id            String    @id @default(cuid())
   userId        String
   provider      String    // "notion" | "drive"
+  providerAccountId String?
   accessToken   String
   refreshToken  String?
   tokenType     String?

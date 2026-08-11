@@ -8,36 +8,15 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import { rateLimit } from '@/lib/rate-limit'
 
-console.log('Auth config - NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
-console.log('Auth config - GOOGLE_CLIENT_ID present:', !!process.env.GOOGLE_CLIENT_ID)
-console.log('Auth config - GOOGLE_CLIENT_SECRET present:', !!process.env.GOOGLE_CLIENT_SECRET)
-console.log('Auth config - NEXTAUTH_SECRET present:', !!process.env.NEXTAUTH_SECRET)
-console.log('Auth config - SPOTIFY_CLIENT_ID present:', !!process.env.SPOTIFY_CLIENT_ID)
-console.log('Auth config - SPOTIFY_CLIENT_SECRET present:', !!process.env.SPOTIFY_CLIENT_SECRET)
-
-// Validate required environment variables
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-  console.error('Google OAuth credentials are missing. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.')
-}
-if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-  console.error('Spotify OAuth credentials are missing. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.')
-}
-if (!process.env.NEXTAUTH_SECRET) {
-  console.error('NEXTAUTH_SECRET is missing. Please set it.')
-}
-
 /**
  * Type-Safe function with Exponential Backoff retry to refresh Google OAuth Access Token.
  */
 async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
   try {
-    console.log('⏰ [OAuth Refresh] Starting Google token rotation for user ID:', token.id)
-
     let refreshToken = token.refreshToken as string | undefined
 
     // Fallback: Query the database if the refresh token is missing from the JWT session
     if (!refreshToken && token.id) {
-      console.log('🔍 [OAuth Refresh] Refresh token missing in JWT. Querying Prisma DB Account model...')
       const dbAccount = await prisma.account.findFirst({
         where: {
           userId: token.id,
@@ -48,7 +27,6 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
     }
 
     if (!refreshToken) {
-      console.error('❌ [OAuth Refresh] Critical: No Google refresh token found.')
       throw new Error('GoogleRefreshMissing')
     }
 
@@ -69,13 +47,13 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
           body,
         })
         return response
-      } catch (err) {
+      } catch (error) {
         if (retries > 0) {
-          console.warn(`⚠️ [OAuth Refresh] Network error during token rotation. Retrying in ${delay}ms... Error:`, err)
+          console.warn('[Auth] Google token refresh retry')
           await new Promise((resolve) => setTimeout(resolve, delay))
           return fetchWithBackoff(retries - 1, delay * 2)
         }
-        throw err
+        throw error
       }
     }
 
@@ -83,16 +61,13 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
     const refreshedTokens = await response.json()
 
     if (!response.ok) {
-      console.error('❌ [OAuth Refresh] Google returned token rotation error:', refreshedTokens)
-      
       // If client has revoked access or refresh token is invalid (invalid_grant), trigger custom error code
       if (refreshedTokens.error === 'invalid_grant' || response.status === 400 || response.status === 401) {
-        console.error('🚫 [OAuth Refresh] Credentials revoked/invalid. Forcing login redirection.')
+        console.warn('[Auth] Google token refresh rejected')
       }
       throw refreshedTokens
     }
 
-    console.log('✅ [OAuth Refresh] Google token successfully rotated.')
     const expiresAt = Math.floor(Date.now() / 1000 + refreshedTokens.expires_in)
 
     // Synchronize and update the new tokens in our Prisma database Account model
@@ -113,10 +88,9 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
               refresh_token: refreshedTokens.refresh_token ?? refreshToken,
             }
           })
-          console.log('💾 [OAuth Refresh] Prisma DB Account synchronized successfully.')
         }
-      } catch (dbError) {
-        console.error('⚠️ [OAuth Refresh] Failed to update Prisma DB Account:', dbError)
+      } catch {
+        console.error('[Auth] Google token persistence failed')
       }
     }
 
@@ -127,8 +101,8 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
       refreshToken: refreshedTokens.refresh_token ?? refreshToken,
       error: undefined,
     }
-  } catch (error) {
-    console.error('💥 [OAuth Refresh] Unhandled exception during Google token refresh:', error)
+  } catch {
+    console.error('[Auth] Google token refresh failed')
     return {
       ...token,
       error: 'RefreshAccessTokenError',
@@ -141,8 +115,6 @@ async function refreshGoogleAccessToken(token: JWT): Promise<JWT> {
  */
 async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
   try {
-    console.log('⏰ [OAuth Refresh] Starting Spotify token rotation for user ID:', token.id)
-
     let refreshToken = token.refreshToken as string | undefined
 
     if (!refreshToken && token.id) {
@@ -177,7 +149,6 @@ async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
       throw refreshedTokens
     }
 
-    console.log('✅ [OAuth Refresh] Spotify token successfully rotated.')
     const expiresAt = Math.floor(Date.now() / 1000 + refreshedTokens.expires_in)
 
     // Synchronize DB
@@ -198,10 +169,9 @@ async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
               refresh_token: refreshedTokens.refresh_token ?? refreshToken,
             }
           })
-          console.log('💾 [OAuth Refresh] Prisma DB synchronized for Spotify.')
         }
-      } catch (dbError) {
-        console.error('⚠️ [OAuth Refresh] Failed to update Prisma DB for Spotify:', dbError)
+      } catch {
+        console.error('[Auth] Spotify token persistence failed')
       }
     }
 
@@ -212,8 +182,8 @@ async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
       refreshToken: refreshedTokens.refresh_token ?? refreshToken,
       error: undefined,
     }
-  } catch (error) {
-    console.error('💥 [OAuth Refresh] Unhandled exception during Spotify token refresh:', error)
+  } catch {
+    console.error('[Auth] Spotify token refresh failed')
     return {
       ...token,
       error: 'RefreshAccessTokenError',
@@ -291,10 +261,10 @@ export const authOptions: NextAuthOptions = {
             ...(account.id_token ? { id_token: account.id_token } : {}),
           },
         })
-      } catch (error) {
+      } catch {
         // Never block a sign-in over this - worst case the scope stays
         // stale for one more grant attempt.
-        console.error('[Auth] Failed to refresh Account OAuth fields on sign-in:', (error as Error).message)
+        console.error('[Auth] OAuth account synchronization failed')
       }
     },
   },
@@ -342,9 +312,9 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             image: user.image,
           }
-        } catch (error) {
+        } catch {
           // Log the failure type only — never credentials, emails, or hashes.
-          console.error('[Authorize] Authentication error:', (error as Error).message)
+          console.error('[Auth] Credential authorization failed')
           return null
         }
       },
@@ -436,24 +406,25 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      console.log('🔄 [Redirect Callback] Called at:', new Date().toISOString())
-      console.log('📋 [Redirect Callback] Params:', { url, baseUrl })
-
       // The MCP OAuth consent screen sends unauthenticated users here via
       // ?callbackUrl=/oauth/consent/<uid> and needs that resumed exactly —
       // bouncing to '/' like every other sign-in would silently break the
       // in-progress authorization flow.
       if (url.includes('/oauth/consent/')) {
         const redirectUrl = url.startsWith(baseUrl) ? url : `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`
-        console.log('✅ [Redirect Callback] Resuming OAuth consent flow:', redirectUrl)
         return redirectUrl
       }
+
+      // Preserve an explicit same-origin callback from sign-in/sign-up. The
+      // previous implementation always collapsed every provider login to `/`,
+      // which discarded the onboarding and Pro purchase intent from landing.
+      if (url.startsWith('/') && !url.startsWith('//')) return `${baseUrl}${url}`
+      if (url.startsWith(baseUrl)) return url
 
       // Redirect Spotify users to /music, others to dashboard
       const redirectUrl = url.includes('spotify') || url.includes('/music')
         ? baseUrl + '/music'
         : baseUrl + '/';
-      console.log('✅ [Redirect Callback] Redirecting to:', redirectUrl)
       return redirectUrl;
     },
   },

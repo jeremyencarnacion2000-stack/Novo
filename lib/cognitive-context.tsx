@@ -43,6 +43,7 @@ import { usePlayerStore } from '@/lib/player-store'
 import { eventBus } from '@/lib/events/event-bus'
 import { startMorphTransition } from '@/lib/morphing-engine'
 import { sileo } from '@/lib/sileo-bell'
+import { normalizeCognitivePresentation } from '@/lib/cognitive/presentation-state'
 
 // ─── Event Bus → Engine energy cost table ────────────────────────────────────
 // These calibrated weights translate behavioral signals into attentional depletion.
@@ -69,7 +70,7 @@ export interface CognitiveStateValue {
   bioState:           BioState
   chronotype:         Chronotype
   navigationWarning:  string | null
-  userStressScore:    number
+  userStressScore:    number | null
   phaseOverride:      CognitivePhase | null
 }
 
@@ -98,9 +99,16 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   const [chronotype, setChronotype]     = useState<Chronotype>('intermediate')
   const [phaseOverride, setPhaseOverride] = useState<CognitivePhase | null>(null)
   const [habits, setHabits]             = useState<HabitEntry[]>([])
-  const [userStressScore, setUserStressScore] = useState<number>(50)
+  // A neutral-looking default would still be a fabricated biometric claim.
+  // Until Google Fit has verified data, no physiological stress value enters
+  // the ambient presentation calculation.
+  const [userStressScore, setUserStressScore] = useState<number | null>(null)
+  // Normalize the first render too; otherwise a legacy fatigue phase can
+  // flash before the first refreshed state reaches the presentation boundary.
   const [bioState, setBioState]         = useState<BioState>(() =>
-    computeBioState({ now: new Date(), chronotype: 'intermediate', userStressScore: 50 })
+    normalizeCognitivePresentation(
+      computeBioState({ now: new Date(), chronotype: 'intermediate' })
+    )
   )
   const [navigationWarning, setNavigationWarning] = useState<string | null>(null)
 
@@ -114,10 +122,11 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       if (savedChronotype) {
         setChronotype(savedChronotype)
       }
-      const savedOverride = localStorage.getItem('cognitive:phase-override') as CognitivePhase | null
-      if (savedOverride) {
-        setPhaseOverride(savedOverride)
-      }
+      // Phase Override was a temporary development control. The control was
+      // removed from the UI, but old installations could still restore its
+      // localStorage value here and remain in SYNAPTIC_FATIGUE forever. The
+      // current phase must always be calculated by the Twin's live model.
+      localStorage.removeItem('cognitive:phase-override')
     }
   }, [])
 
@@ -126,7 +135,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
     fetch('/api/cognitive/biometrics')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data && typeof data.userStressScore === 'number') {
+        if (data?.hasGoogleFitData && typeof data.userStressScore === 'number') {
           setUserStressScore(data.userStressScore)
         }
       })
@@ -168,7 +177,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       now: new Date(),
       chronotype,
       completedHabits: habits,
-      userStressScore,
+      ...(userStressScore == null ? {} : { userStressScore }),
     })
 
     if (phaseOverride) {
@@ -193,6 +202,8 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
         recommendedAudioCategory: recommendedAudioCategoryMap[phaseOverride],
       }
     }
+
+    next = normalizeCognitivePresentation(next)
 
     startMorphTransition(() => {
       setBioState(next)
@@ -248,7 +259,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
     }
     if (bioState.phase === 'REDUCED_CAPACITY_MODE' && prev !== 'REDUCED_CAPACITY_MODE') {
       window.dispatchEvent(new CustomEvent('cognitive:reduced-capacity-onset', {
-        detail: { attentionScore: bioState.attentionScore, userStressScore, label: bioState.label }
+        detail: { attentionScore: bioState.attentionScore, label: bioState.label }
       }))
       sileo.action({
         title: 'Adaptive Protection Enabled',
@@ -344,11 +355,9 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       setPhaseOverride(p)
     })
     if (typeof window !== 'undefined') {
-      if (p) {
-        localStorage.setItem('cognitive:phase-override', p)
-      } else {
-        localStorage.removeItem('cognitive:phase-override')
-      }
+      // Do not persist a development override. A stale value must never
+      // supersede the cognitive algorithm on a subsequent app launch.
+      localStorage.removeItem('cognitive:phase-override')
     }
   }, [])
 
@@ -438,7 +447,11 @@ function FatigueNavigationWarning({
   attentionScore: number
   minutesToRecover: number
 }) {
-  return (
+  // This phase is inferred, not a verified biometric measurement. Keep it
+  // available to the decision engine without covering the user's page with a
+  // diagnostic-looking warning.
+  return null
+  /* return (
     <div
       // top-[104px] cleared the bell's own dropdown (fixed top-16 right-4),
       // but not the Pomodoro widget's compact pill (components/pomodoro-
@@ -504,7 +517,7 @@ function FatigueNavigationWarning({
         </div>
       </div>
     </div>
-  )
+  ) */
 }
 
 // ─── Granular hooks ───────────────────────────────────────────────────────────

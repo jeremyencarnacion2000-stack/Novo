@@ -15,23 +15,25 @@ export async function persistNewPlatformSignals(
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const newlyPersisted: PlatformSignal[] = [];
+  const uniqueSignals = Array.from(
+    new Map(signals.map((signal) => [signal.type, signal])).values()
+  );
+  const existing = await prisma.twinEvolutionLog.findMany({
+    where: { twinId, createdAt: { gte: todayStart } },
+    select: { changeType: true },
+  });
+  const existingTypes = new Set(existing.map((log) => log.changeType));
+  const newlyPersisted = uniqueSignals.filter((signal) => !existingTypes.has(signal.type));
 
-  for (const signal of signals) {
-    const existing = await prisma.twinEvolutionLog.findFirst({
-      where: { twinId, changeType: signal.type, createdAt: { gte: todayStart } },
-    });
-    if (existing) continue;
-
-    await prisma.twinEvolutionLog.create({
-      data: {
+  if (newlyPersisted.length > 0) {
+    await prisma.twinEvolutionLog.createMany({
+      data: newlyPersisted.map((signal) => ({
         twinId,
         userId,
         changeType: signal.type,
         description: `${signal.headline} — ${signal.detail}`,
-      },
+      })),
     });
-    newlyPersisted.push(signal);
   }
 
   const warnings = newlyPersisted.filter(s => s.severity === 'warning');

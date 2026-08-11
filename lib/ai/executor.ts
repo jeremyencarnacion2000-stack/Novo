@@ -122,15 +122,11 @@ export async function executeAIAction(
     prismaClient: typeof prisma = prisma
 ): Promise<AIActionResult> {
     const startTime = Date.now();
-    console.log(`[AI Executor] Executing action: ${action.type} for user: ${userId}`);
 
     const context: ExecutionContext = {
         userId,
         prisma: prismaClient,
     };
-
-    console.log(`[AI Executor] Context: UserID=${userId}`);
-    console.log(`[AI Executor] Action Payload:`, JSON.stringify(action.payload, null, 2));
 
     // Programmatic ID Verification Layer to prevent LLM ID hallucinations
     if (action.payload) {
@@ -208,14 +204,13 @@ export async function executeAIAction(
             
             if (!exists) {
                 const targetId = idToVerify || payload.workoutLogId || 'N/A';
-                console.warn(`[AI Executor] ID verification failed: ${entityType} with ID ${targetId} not found under userId ${userId}`);
+                console.warn(`[AI Executor] ownership verification failed for ${actionType}`);
                 return {
                     success: false,
                     error: `Database verification failed: ${entityType} con ID "${targetId}" no encontrado. Por favor, verifica el ID o consulta la lista antes de continuar.`,
                     message: `No se pudo encontrar la ${entityType.toLowerCase()} solicitada para modificar o eliminar. Por favor, asegúrate de que el elemento exista.`
                 };
             }
-            console.log(`[AI Executor] ID verification passed for ${entityType}: ${idToVerify || payload.workoutLogId}`);
         }
     }
 
@@ -239,7 +234,6 @@ export async function executeAIAction(
         if (gateError) return gateError;
 
         const result = await handler(action, context);
-        console.log(`[AI Executor] Handler Result:`, JSON.stringify(result, null, 2));
 
         const executionTime = Date.now() - startTime;
         await logAiAction(prismaClient, userId, actionType, action.payload, result.success, undefined, executionTime);
@@ -252,7 +246,7 @@ export async function executeAIAction(
             },
         };
     } catch (error) {
-        console.error(`[AI Executor] Error executing ${action.type}:`, error);
+        console.error(`[AI Executor] action execution failed: ${action.type}`);
         const errorMessage = error instanceof Error ? error.message : 'Unknown execution error';
         const executionTime = Date.now() - startTime;
         await logAiAction(prismaClient, userId, action.type, action.payload, false, errorMessage, executionTime);
@@ -283,15 +277,22 @@ async function logAiAction(
             data: {
                 userId,
                 actionType,
-                payload: JSON.stringify(payload ?? {}),
+                payload: JSON.stringify(sanitizeAuditPayload(payload)),
                 success,
-                errorMessage,
+                errorMessage: errorMessage ? 'action_execution_failed' : undefined,
                 executionTimeMs,
             },
         });
-    } catch (logError) {
-        console.warn('[AI Executor] Failed to write AiActionLog:', logError);
+    } catch {
+        console.warn('[AI Executor] failed to write action audit');
     }
+}
+
+function sanitizeAuditPayload(payload: unknown) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { fieldNames: [] as string[] }
+    }
+    return { fieldNames: Object.keys(payload as Record<string, unknown>).sort().slice(0, 30) }
 }
 
 export const FREE_PLAN_MONTHLY_ACTION_LIMIT = 20;
@@ -1184,5 +1185,4 @@ registerActionHandler('COGNITIVE_PIPELINE', async (action: any, ctx) => {
         }
     };
 });
-
 

@@ -6,6 +6,7 @@ import { CalendarAggregator } from '@/lib/calendar-aggregator';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
 import { buildTwinContextSummary, type TwinContextSummary } from '@/lib/cognitive/twin-context';
+import { getContextSource, NOVO_CONTEXT_SOURCE, type ContextSource } from '@/lib/ai/source-attribution';
 
 export interface CognitiveContext {
     system: {
@@ -40,6 +41,7 @@ export interface CognitiveContext {
     activeSignal: ActiveSignal | null;
     twinContext: TwinContextSummary | null;
     activePlugins?: string[];
+    sources: ContextSource[];
 }
 
 export interface UserContext {
@@ -129,6 +131,19 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             }))
         ];
 
+        // These are the sources that were actually placed in the prompt. A
+        // connected account alone is not cited: it must have contributed a
+        // synced record, calendar event, or active signal to this response.
+        const sourceById = new Map<string, ContextSource>([[NOVO_CONTEXT_SOURCE.id, NOVO_CONTEXT_SOURCE]]);
+        const addSource = (provider?: string | null) => {
+            if (!provider) return;
+            const source = getContextSource(provider);
+            if (source) sourceById.set(source.id, source);
+        };
+        checklistItems.forEach((item) => addSource(item.source));
+        todayEvents.forEach((event: any) => addSource(event.source));
+        addSource((activeSignal as any)?.metadata?.source);
+
         const structuredContext: CognitiveContext = {
             system: {
                 timestamp: now.toISOString(),
@@ -142,7 +157,9 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             metrics: {
                 focusTimeToday: snapshot?.focusTimeToday || 0,
                 productivityScore: snapshot?.productivityScore || 0,
-                fatigueEstimate: snapshot?.fatigueEstimate || 'low',
+                // A persisted legacy string is an unverified model inference,
+                // not a physiological observation. Absence must stay absent.
+                fatigueEstimate: snapshot?.fatigueEstimate || 'unavailable',
             },
             state: {
                 overdueTasks: overdueTaskCount,
@@ -161,7 +178,8 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             },
             activeSignal,
             twinContext,
-            activePlugins: (integrationAccounts || []).map(a => a.provider)
+            activePlugins: (integrationAccounts || []).map(a => a.provider),
+            sources: Array.from(sourceById.values()),
         };
 
         const summary = JSON.stringify(structuredContext, null, 2);
@@ -170,18 +188,21 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             summary,
             structured: structuredContext
         };
-    } catch (error) {
-        console.error('[Context Builder] Error:', error);
+    } catch {
+        // Errors here can include provider/database diagnostics. Preserve the
+        // resilient context fallback without sending raw details to logs.
+        console.error('[Context Builder] Context retrieval failed.');
 
         // Fallback simple context
         const fallback: CognitiveContext = {
             system: { timestamp: new Date().toISOString(), timezone: 'UTC' },
             todaySchedule: [],
-            metrics: { focusTimeToday: 0, productivityScore: 0, fatigueEstimate: 'low' },
+            metrics: { focusTimeToday: 0, productivityScore: 0, fatigueEstimate: 'unavailable' },
             state: { overdueTasks: 0, activeTasks: 0, activeRoutines: 0, activeProjects: 0 },
             preferences: { language: 'en', theme: 'system', compactMode: false },
             activeSignal: null,
             twinContext: null,
+            sources: [NOVO_CONTEXT_SOURCE],
         };
 
         return {

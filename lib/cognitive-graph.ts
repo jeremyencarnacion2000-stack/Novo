@@ -63,7 +63,6 @@ const CHANGE_TYPE_NODE: Record<string, string> = {
   chronotype_updated: 'chronotype',
   peak_window_detected: 'peak-window',
   friction_detected: 'bottleneck',
-  burnout_risk_raised: 'burnout',
   trust_level_up: 'root',
 };
 
@@ -74,8 +73,8 @@ export const CHANGE_TYPE_LABEL: Record<string, string> = {
   chronotype_updated: 'Cronotipo detectado',
   peak_window_detected: 'Ventana pico detectada',
   friction_detected: 'Bloqueo detectado',
-  decision_fatigue_raised: 'Fatiga de decisión',
-  burnout_risk_raised: 'Riesgo de burnout elevado',
+  decision_fatigue_raised: 'Señal histórica no utilizada',
+  burnout_risk_raised: 'Señal histórica no utilizada',
   trust_level_up: 'Confianza del twin subió',
 };
 
@@ -166,15 +165,8 @@ export function buildCognitiveGraph(
   }
 
   if (typeof metrics.currentCognitiveLoad === 'number') {
-    nodes.push({ id: 'load', label: `${Math.round(metrics.currentCognitiveLoad)}%`, detail: 'Carga cognitiva', kind: 'metric', weight: 4 + metrics.currentCognitiveLoad / 20 });
+    nodes.push({ id: 'load', label: `${Math.round(metrics.currentCognitiveLoad)}%`, detail: 'Carga operativa estimada (no biométrica)', kind: 'metric', weight: 4 + metrics.currentCognitiveLoad / 20 });
     edges.push({ source: 'root', target: 'load', kind: 'structure' });
-  }
-  if (typeof metrics.burnoutIndex === 'number') {
-    nodes.push({ id: 'burnout', label: `${Math.round(metrics.burnoutIndex)}%`, detail: 'Índice de burnout', kind: 'metric', weight: 4 + metrics.burnoutIndex / 20 });
-    edges.push({ source: 'root', target: 'burnout', kind: 'structure' });
-    if (metrics.burnoutIndex > 50 && mainFriction) {
-      edges.push({ source: 'burnout', target: 'bottleneck', kind: 'insight' });
-    }
   }
 
   // Top behavioral signals by frequency (last 30 days) — real, observed behavior.

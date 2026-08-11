@@ -237,6 +237,20 @@ describe('AI Executor', () => {
                 data: expect.objectContaining({ title: 'Comprar leche' }),
             }));
         });
+
+        it('persists only sanitized audit metadata, never private task content', async () => {
+            (prisma.task.create as jest.Mock).mockResolvedValue({ id: 'task-private', title: 'Preparar propuesta confidencial' });
+
+            await executeAIAction({
+                type: 'CREATE_TASK',
+                payload: { title: 'Preparar propuesta confidencial', description: 'Notas privadas que no deben entrar en auditoría', priority: 'high' },
+            } as any, userId);
+
+            const auditWrite = (prisma.aiActionLog.create as jest.Mock).mock.calls.at(-1)?.[0]?.data
+            expect(auditWrite.payload).toBe(JSON.stringify({ fieldNames: ['description', 'priority', 'title'] }))
+            expect(auditWrite.payload).not.toContain('confidencial')
+            expect(auditWrite.payload).not.toContain('privadas')
+        });
     });
 
     // SEND_EMAIL is irreversible and externally visible, so unlike the

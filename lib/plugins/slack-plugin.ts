@@ -80,12 +80,11 @@ export async function syncSlackPlugin(userId: string): Promise<SlackSyncResult> 
 
     // Fetch history from top 5 channels
     const topChannels = channels.slice(0, 5);
-    const allMessages: SlackMessage[] = [];
-
-    for (const channel of topChannels) {
-      const msgs = await fetchChannelHistory(account.accessToken, channel.id);
-      allMessages.push(...msgs);
-    }
+    const allMessages = (
+      await Promise.all(
+        topChannels.map((channel) => fetchChannelHistory(account.accessToken, channel.id))
+      )
+    ).flat();
 
     // Filter to messages sent BY this user
     const myMessages = allMessages.filter((m) => m.user === slackUserId && m.type === 'message');

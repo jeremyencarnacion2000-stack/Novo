@@ -158,7 +158,7 @@ export const modalFlip = {
 
     // Hide origin instantly so it doesn't remain visible under flying clones
     origin.classList.add('modal-flip-source-active')
-    gsap.set(origin, { opacity: 0 })
+    gsap.set(origin, { opacity: 0, filter: 'blur(8px)' })
 
     const originRect   = origin.getBoundingClientRect()
     const originRadius = getComputedStyle(origin).borderRadius
@@ -214,7 +214,7 @@ export const modalFlip = {
     })
 
     // Measure shared-item destinations BEFORE squashing target to origin size
-    flyingItems.forEach(({ el, targetEl }) => flyTo(tl, el, targetEl, OPEN_DURATION, 0))
+    flyingItems.forEach(({ el, targetEl }) => flyTo(tl, el, targetEl, OPEN_DURATION, 0, { blur: 0 }))
 
     // The container's surface is visible from frame one; only content waits.
     gsap.set(target, {
@@ -325,7 +325,7 @@ export const modalFlip = {
         target.classList.remove('modal-flip-active')
         if (overlay) overlay.classList.remove('modal-flip-active')
         cleanupFlying(id)
-        gsap.set([origin, ...sharedPairs.map((p) => p.originEl)], { opacity: 1 })
+        gsap.set([origin, ...sharedPairs.map((p) => p.originEl)], { opacity: 1, clearProps: 'filter' })
         activeTimelines.delete(id)
         safeDone()
       },
@@ -365,7 +365,10 @@ export const modalFlip = {
     if (overlay) tl.to(overlay, { opacity: 0, duration: CLOSE_BACKDROP_DURATION }, 0)
 
     // Flying clones return to origin
-    flyingItems.forEach(({ el, originEl }) => flyTo(tl, el, originEl, CLOSE_DURATION, 0))
+    // Let the source button materialize beneath the returning clone with a
+    // brief blur settle, so the trigger never pops in as a sharp duplicate.
+    tl.to(origin, { opacity: 1, filter: 'blur(0px)', duration: 0.14, ease: EASE_ENTRANCE }, CLOSE_DURATION - 0.14)
+    flyingItems.forEach(({ el, originEl }) => flyTo(tl, el, originEl, CLOSE_DURATION, 0, { blur: 8 }))
 
     activeTimelines.set(id, tl)
 

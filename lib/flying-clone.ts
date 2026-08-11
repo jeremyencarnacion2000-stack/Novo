@@ -40,7 +40,10 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
     zIndex: String(zIndex),
     pointerEvents: 'none',
     transition: 'none',
-    willChange: 'left, top, width, height, border-radius, background-color',
+    // A short blur at the leading edge makes the shared element read as
+    // motion, not as a sharp duplicate teleporting between surfaces.
+    filter: 'blur(8px)',
+    willChange: 'left, top, width, height, border-radius, background-color, filter',
   } as CSSStyleDeclaration)
 
   if (!isBoxSized(originEl)) {
@@ -57,7 +60,14 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
 }
 
 /** Adds a tween animating a flying clone to match `destEl`'s current rect/style. */
-export function flyTo(tl: gsap.core.Timeline, el: HTMLElement, destEl: HTMLElement, duration: number, position: number) {
+export function flyTo(
+  tl: gsap.core.Timeline,
+  el: HTMLElement,
+  destEl: HTMLElement,
+  duration: number,
+  position: number,
+  options: { blur?: number } = {},
+) {
   const rect = destEl.getBoundingClientRect()
   const cs = getComputedStyle(destEl)
   
@@ -67,6 +77,7 @@ export function flyTo(tl: gsap.core.Timeline, el: HTMLElement, destEl: HTMLEleme
     width: rect.width,
     height: rect.height,
     duration,
+    filter: `blur(${options.blur ?? 0}px)`,
   }
 
   if (cs.borderRadius && cs.borderRadius !== '0px') {

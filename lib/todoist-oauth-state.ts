@@ -16,13 +16,15 @@ export function createTodoistOAuthState(userId: string): string {
 }
 export function parseTodoistOAuthState(value: string | null): TodoistOAuthPayload | null {
   if (!value) return null
-  const [body, sig] = value.split('.')
+  const parts = value.split('.')
+  if (parts.length !== 2) return null
+  const [body, sig] = parts
   if (!body || !sig) return null
   try {
     const expected = crypto.createHmac('sha256', secret()).update(body).digest('base64url')
     if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
     const p = JSON.parse(Buffer.from(body, 'base64url').toString()) as TodoistOAuthPayload
-    if (p.provider !== 'todoist' || typeof p.nonce !== 'string' || typeof p.userId !== 'string') return null
+    if (p.provider !== 'todoist' || typeof p.nonce !== 'string' || !/^[A-Za-z0-9_-]{32,}$/.test(p.nonce) || typeof p.userId !== 'string' || !p.userId || !Number.isFinite(p.issuedAt)) return null
     if (Date.now() - p.issuedAt > TODOIST_OAUTH_STATE_TTL_MS || p.issuedAt - Date.now() > 30_000) return null
     return p
   } catch { return null }

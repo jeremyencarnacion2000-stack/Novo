@@ -9,7 +9,8 @@ export async function getOrCreateTwin(userId: string) {
     record = await prisma.cognitiveTwinRecord.create({
       data: {
         userId,
-        confidenceScore: 42,
+        // Explicitly uncalibrated until owned signals have been observed.
+        confidenceScore: 0,
         trustLevel: 'initial',
         isInitialized: false,
         totalSignals: 0,
