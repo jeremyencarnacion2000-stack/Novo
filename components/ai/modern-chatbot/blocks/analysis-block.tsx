@@ -1,6 +1,9 @@
+'use client';
+
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useTranslation } from '@/lib/i18n';
 
 interface AnalysisBlockProps {
     content: string;
@@ -8,6 +11,8 @@ interface AnalysisBlockProps {
 
 export function AnalysisBlock({ content }: AnalysisBlockProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const { language } = useTranslation();
+    const label = language === 'es' ? 'Enfoque de la propuesta' : language === 'fr' ? 'Approche proposée' : language === 'de' ? 'Vorgeschlagener Ansatz' : 'Proposed approach';
 
     return (
         <div className="border border-white/5 rounded-xl bg-white/[0.02] overflow-hidden mb-3 transition-all duration-300">
@@ -17,7 +22,7 @@ export function AnalysisBlock({ content }: AnalysisBlockProps) {
             >
                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 <Brain className="w-3.5 h-3.5 text-primary/70" />
-                <span className="tracking-wide uppercase text-[10px]">Proceso de Pensamiento</span>
+                <span className="tracking-wide uppercase text-[10px]">{label}</span>
             </button>
 
             {isExpanded && (

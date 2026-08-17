@@ -11,6 +11,7 @@ import { buildUserContext } from '@/lib/ai/context-builder';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { appendActivityEvent, createActivityRun, finishActivityRun, isActivityCancelled, recordFirstVisibleActivityContent } from '@/lib/ai/activity';
 
 export const runtime = 'nodejs';
 
@@ -105,12 +106,17 @@ function selectModelForIntent(
 }
 
 export async function POST(request: NextRequest) {
+    let activeRun: { userId: string; runId: string } | null = null;
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user?.id) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
         }
         const userId = session.user.id;
+        const activityRun = await createActivityRun(userId, 'chat');
+        const activityRunId = activityRun.id;
+        activeRun = { userId, runId: activityRunId };
+        await appendActivityEvent(userId, { runId: activityRunId, phase: 'retrieving_context', label: 'Recuperando tu contexto' });
 
         // Twin Mode is Pro-only — re-verify server-side on every request,
         // never trust the client's requested value directly.
@@ -153,7 +159,7 @@ export async function POST(request: NextRequest) {
         let webSearchContext = '';
         if (webSearchEnabled && message) {
             try {
-                console.log('[Novo Brain] Performing web search for:', message);
+                console.log('[Novo Brain] Performing web search');
                 const searchResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/ai/web-search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -170,13 +176,14 @@ export async function POST(request: NextRequest) {
                             '\n[END OF SEARCH RESULTS]\n\nUse the above search results to provide accurate, up-to-date information. Cite sources when appropriate.';
                     }
                 }
-            } catch (searchError) {
-                console.error('[Novo Brain] Web search error:', searchError);
+            } catch {
+                console.error('[Novo Brain] Web search failed');
             }
         }
 
         // 3. MEMORY LAYER (3-Layer Context)
         const context = await buildUserContext(userId, { twinMode });
+        await appendActivityEvent(userId, { runId: activityRunId, phase: 'interpreting_signals', label: 'Interpretando las señales disponibles', sourceCount: context.structured.sources?.length ?? 0 });
         const userContext = context.summary;
 
         // 4. MODEL ORCHESTRA — Route to the best model for the task
@@ -232,9 +239,11 @@ export async function POST(request: NextRequest) {
         const hasAnyKey = Boolean(groqKey || cerebrasKey || geminiKey || openRouterKey);
 
         if (!hasAnyKey) {
+            await finishActivityRun(userId, activityRunId, 'failed', { errorCode: 'provider_not_configured', errorMessage: 'No hay un proveedor AI configurado.' });
             return new Response(new ReadableStream({
                 start(controller) {
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: "El asistente está en modo de demostración. Configura tus claves de API (GROQ_API_KEY, GEMINI_API_KEY o OPENROUTER_API_KEY) en Vercel o en tu archivo .env.local para respuestas en vivo." })}\n\n`));
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ meta: { runId: activityRunId, label: 'Proveedor no configurado', fallback: false } })}\n\n`));
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: "El servicio de IA no está disponible en este momento. Inténtalo de nuevo más tarde." })}\n\n`));
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
                 }
@@ -285,10 +294,10 @@ export async function POST(request: NextRequest) {
                     visualAnalysis = visionData.choices?.[0]?.message?.content || '';
                     console.log(`[Novo Brain] Visual analysis complete (${visualAnalysis.length} chars)`);
                 } else {
-                    console.error('[Novo Brain] Vision analysis failed:', await visionResponse.text());
+                    console.error('[Novo Brain] Vision analysis failed');
                 }
-            } catch (err) {
-                console.error('[Novo Brain] Vision analysis error:', err);
+            } catch {
+                console.error('[Novo Brain] Vision analysis request failed');
             }
         }
 
@@ -300,7 +309,10 @@ export async function POST(request: NextRequest) {
             ? `\n\nPERFIL COMPLETO DEL TWIN (Modo Twin activo):\n${JSON.stringify(context.structured.twinContext, null, 2)}`
             : '';
 
-        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}`;
+        const agentModeGuidance = twinMode
+            ? `\n\nAGENT MODE:\nYou may use the approved Twin profile to make a small, grounded plan and propose the next useful action. Keep the plan legible: state the outcome, the steps, and what will change. Never execute updates, deletions, calendar changes, external messages, or multi-step pipelines without returning an action for the app's explicit approval flow. Do not invent data or capabilities; use only the supplied context.`
+            : '';
+        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}${agentModeGuidance}`;
 
         const cleanHistory = normalizeHistory(history || []);
 
@@ -341,8 +353,10 @@ Generate the complete HTML/CSS code that matches this visual specification exact
 
         let finalModel = model;
         let isFallbackUsed = false;
-        let originalErrorMsg = '';
 
+        if (await isActivityCancelled(userId, activityRunId)) {
+            return new Response(JSON.stringify({ error: 'Run cancelled' }), { status: 409 });
+        }
         let groqResponse: Response;
         if (groqKey) {
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -364,8 +378,8 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         }
 
         if (!groqResponse.ok && groqKey && finalModel !== 'llama-3.3-70b-versatile') {
-            originalErrorMsg = await groqResponse.text();
-            console.warn(`[Novo Brain] Primary model ${finalModel} failed: ${originalErrorMsg}. Retrying with Llama 3.3 70B fallback...`);
+            await groqResponse.text();
+            console.warn('[Novo Brain] Primary model failed; retrying fallback');
 
             finalModel = 'llama-3.3-70b-versatile';
             isFallbackUsed = true;
@@ -506,21 +520,23 @@ Generate the complete HTML/CSS code that matches this visual specification exact
 
         if (!groqResponse.ok) {
             const errorText = await groqResponse.text();
-            console.error('[Novo Brain] Groq API Error:', errorText);
+            console.error('[Novo Brain] AI provider request failed');
 
-            let errorMessage = 'AI service is currently unavailable';
+            let errorCode = 'provider_unavailable';
+            let errorMessage = 'El servicio de IA no está disponible en este momento. Inténtalo de nuevo.';
             try {
                 const errorJson = JSON.parse(errorText);
                 if (errorJson.error?.code === 'rate_limit_exceeded') {
-                    errorMessage = 'Rate limit exceeded. Please try again in 30-60 seconds or simplify your message.';
-                } else if (errorJson.error?.message) {
-                    errorMessage = `Groq error: ${errorJson.error.message}`;
+                    errorCode = 'provider_rate_limited';
+                    errorMessage = 'El servicio de IA está ocupado. Inténtalo de nuevo en un momento.';
                 }
-            } catch (e) { }
+            } catch { }
+            await finishActivityRun(userId, activityRunId, 'failed', { errorCode, errorMessage });
 
             // Return 200 but send the error in the stream so the UI can display it
             return new Response(new ReadableStream({
                 start(controller) {
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ meta: { runId: activityRunId, label: 'Servicio de IA no disponible', fallback: false } })}\n\n`));
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: `⚠️ ${errorMessage}` })}\n\n`));
                     controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
                     controller.close();
@@ -543,6 +559,8 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 let buffer = '';
                 let cognitiveCoreResponse = '';
                 let insideThink = false;
+                let streamFailed = false;
+                let firstVisibleContentRecorded = false;
 
                 // Emit model metadata as first SSE event. thinking-steps.tsx already
                 // renders this (via the `meta` event's `label`/`fallback` fields) as a
@@ -555,12 +573,22 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 // with a permanent, alarming, technical note baked into the chat
                 // transcript itself, as if the assistant were apologizing.
                 const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚡ Llama 3.1 8B (Respaldo Estable)' : '⚡ Llama 3.3 70B (Respaldo)') : modelLabel);
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed } })}\n\n`));
+                await appendActivityEvent(userId, { runId: activityRunId, phase: 'composing_response', label: 'Preparando la respuesta', toolName: finalModel.includes('llama') || finalModel.includes('qwen') ? 'groq' : undefined });
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { runId: activityRunId, model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed, sources: context.structured.sources } })}\n\n`));
 
                 try {
+                    if (await isActivityCancelled(userId, activityRunId)) {
+                        await finishActivityRun(userId, activityRunId, 'cancelled', { errorCode: 'user_cancelled', errorMessage: 'La ejecución fue detenida antes de completar la respuesta.' });
+                        return;
+                    }
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
+                        if (await isActivityCancelled(userId, activityRunId)) {
+                            await reader.cancel();
+                            await finishActivityRun(userId, activityRunId, 'cancelled', { errorCode: 'user_cancelled', errorMessage: 'La transmisión fue detenida por el usuario.' });
+                            return;
+                        }
 
                         buffer += decoder.decode(value, { stream: true });
                         const lines = buffer.split('\n');
@@ -587,6 +615,10 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                                     if (!insideThink) {
                                         content = content.replace(/<\/?think>/g, '');
                                         if (content) {
+                                            if (!firstVisibleContentRecorded) {
+                                                firstVisibleContentRecorded = true;
+                                                await recordFirstVisibleActivityContent(userId, activityRunId);
+                                            }
                                             cognitiveCoreResponse += content;
                                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                                         }
@@ -618,8 +650,8 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                                 body: JSON.stringify({
                                     model: 'llama-3.3-70b-versatile',
                                     messages: [
-                                        { role: 'system', content: SYSTEM_AGENT_PROMPT },
-                                        { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}` }
+                                        { role: 'system', content: `${SYSTEM_AGENT_PROMPT}\n\nAGENCY SAFETY: Return a proposal, never claim an action has already happened. The client will show a clear review before sensitive or multi-step changes are executed. For any mutation, describe the intended outcome in the message and return exactly one valid action object.` },
+                                        { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}${twinMode ? `\n\nApproved Twin Context: ${JSON.stringify(context.structured.twinContext)}` : ''}` }
                                     ],
                                     temperature: 0.1,
                                     max_tokens: 1024,
@@ -642,12 +674,13 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                             } else {
                                 console.warn('[Novo Brain] System Agent failed but stream preserved.');
                             }
-                        } catch (agentErr) {
-                            console.error('[Novo Brain] System Agent fetch error:', agentErr);
+                        } catch {
+                            console.error('[Novo Brain] System Agent request failed');
                         }
                     }
-                } catch (error) {
-                    console.error('[Novo Brain] Stream Error:', error);
+                } catch {
+                    streamFailed = true;
+                    console.error('[Novo Brain] Stream failed');
                     // Mirror the !groqResponse.ok branch above (line ~410) — without
                     // this, a read error here (Groq connection drop, timeout, etc.)
                     // closed the stream with meta already sent but zero content
@@ -656,6 +689,11 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     const partial = cognitiveCoreResponse ? '\n\n' : '';
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `${partial}⚠️ La respuesta se interrumpió inesperadamente. Intenta de nuevo.` })}\n\n`));
                 } finally {
+                    if (!(await isActivityCancelled(userId, activityRunId))) {
+                        await finishActivityRun(userId, activityRunId, streamFailed ? 'failed' : 'completed', streamFailed
+                            ? { errorCode: 'chat_stream_interrupted', errorMessage: 'La transmisión de la respuesta se interrumpió.' }
+                            : { resultSummary: 'Respuesta generada.' });
+                    }
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
                 }
@@ -670,8 +708,14 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             }
         });
 
-    } catch (error) {
-        console.error('[Novo Brain] POST Error:', error);
+    } catch {
+        if (activeRun) {
+            await finishActivityRun(activeRun.userId, activeRun.runId, 'failed', {
+                errorCode: 'chat_request_failed',
+                errorMessage: 'No se pudo completar la solicitud de IA.',
+            }).catch(() => undefined);
+        }
+        console.error('[Novo Brain] request failed');
         return new Response(JSON.stringify({ error: 'El asistente no está disponible en este momento' }), { status: 500 });
     }
 }

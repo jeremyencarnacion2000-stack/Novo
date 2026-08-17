@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import {
-  Download, RefreshCw, Trash2, RotateCcw, Database, Wifi, Upload, XCircle
+  Download, RefreshCw, Trash2, RotateCcw, Database, Wifi, Upload, XCircle, KeyRound, ArrowRight
 } from 'lucide-react'
 import { useSettings } from '@/lib/settings-context'
 import { useSession, signOut } from 'next-auth/react'
@@ -16,8 +16,17 @@ import { useTranslation } from '@/lib/i18n'
 import { Section, SafeAction, DangerAction } from './settings-shared'
 import { clearApiCache } from '@/lib/register-sw'
 
-export function SettingsAdvanced() {
-  const { t } = useTranslation()
+const MCP_ACCESS_COPY = {
+  es: { section: 'MCP y acceso de dispositivos', title: 'Conectar agentes y dispositivos', description: 'Crea tokens revocables para consultar o actualizar tareas desde MCP.' },
+  en: { section: 'MCP and device access', title: 'Connect agents and devices', description: 'Create revocable tokens to read or update tasks through MCP.' },
+  fr: { section: 'MCP et accès aux appareils', title: 'Connecter des agents et appareils', description: 'Créez des jetons révocables pour lire ou mettre à jour des tâches via MCP.' },
+  de: { section: 'MCP- und Gerätezugriff', title: 'Agenten und Geräte verbinden', description: 'Erstelle widerrufbare Tokens, um Aufgaben über MCP zu lesen oder zu ändern.' },
+} as const
+
+export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
+  const { t, language } = useTranslation()
+  const locale = language === 'es' || language === 'fr' || language === 'de' ? language : 'en'
+  const mcpCopy = MCP_ACCESS_COPY[locale]
   const { toast } = useToast()
   const { settings, resetSettings } = useSettings()
   const { data: session } = useSession()
@@ -220,6 +229,15 @@ export function SettingsAdvanced() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      <Section title={mcpCopy.section}>
+        <button type="button" onClick={onOpenMcp} className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/[0.05] p-5 text-left transition-colors hover:bg-primary/[0.09]">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><KeyRound className="size-4" /></span>
+            <span><span className="block text-sm font-semibold text-foreground/85">{mcpCopy.title}</span><span className="mt-0.5 block text-xs text-foreground/45">{mcpCopy.description}</span></span>
+          </div>
+          <ArrowRight className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
+        </button>
+      </Section>
       <Section title="Local backups & restoring">
         <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
           <div className="space-y-2">

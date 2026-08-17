@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import React from 'react'
 import Script from 'next/script'
+import { headers } from 'next/headers'
 import './globals.css'
-import ClientLayout from './client-layout'
+import ClientLayoutRouter from './client-layout-router'
 
 const GA_MEASUREMENT_ID = 'G-429617187'
 
@@ -50,17 +51,37 @@ export const metadata: Metadata = {
   },
 }
 
+// The root layout needs the request path to keep the public review page out
+// of the authenticated client shell. This is intentionally dynamic: a static
+// client-shell placeholder would hide the landing HTML from JS-disabled
+// reviewers and automated agents.
+export const dynamic = 'force-dynamic'
+
 // ─── Font Strategy: Self-hosted via CSS variable ─────────────────────────────
 // next/font/google requires network access to fonts.googleapis.com at build time.
 // To make builds resilient in offline/CI environments, we use a CSS variable
 // defined in globals.css that loads Inter via a local @font-face declaration.
 // The className below matches what Inter({ variable: '--font-sans' }) would produce.
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const requestHeaders = await headers()
+  const requestPath = requestHeaders.get('x-novo-path') ?? requestHeaders.get('x-matched-path') ?? ''
+  // OAuth consent is a browser hand-off surface, not part of the authenticated
+  // product shell. Keeping it outside ClientLayoutRouter prevents the sidebar,
+  // wallpaper and app-level navigation from appearing behind the authorization
+  // request opened by an external client.
+  const isStandalonePage =
+    requestPath === '/landing' ||
+    requestPath.startsWith('/landing/') ||
+    requestPath === '/oauth/consent' ||
+    requestPath.startsWith('/oauth/consent/') ||
+    requestPath === '/docs' ||
+    requestPath.startsWith('/docs/')
+
   return (
     <html lang="en" className="h-full">
       <head>
@@ -91,34 +112,11 @@ export default function RootLayout({
         `}
       </Script>
 
-      <body className="font-sans h-full antialiased relative">
-        {/* Background Image is now applied directly to the body in settings-context.tsx */}
-
-        {/* Dynamic Background Overlay - Level 0 (Gradients) — desktop only */}
-        <div
-          className="bg-overlay fixed inset-0 z-[-2] pointer-events-none hidden md:block"
-          style={{
-            backdropFilter: 'blur(var(--bg-blur-px, 0px))',
-            WebkitBackdropFilter: 'blur(var(--bg-blur-px, 0px))',
-          }}
-        />
-
-        <div
-          className="bg-gradient-overlay fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-500 ease-in-out hidden md:block"
-          style={{
-            background: 'var(--app-bg-overlay)'
-          }}
-        />
-
-        {/* Dynamic Dimness Overlay — desktop only */}
-        <div
-          className="dimness-overlay fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-500 ease-in-out hidden md:block"
-          style={{
-            background: '#000000',
-            opacity: 'var(--bg-dimness, 0.2)'
-          }}
-        />
-        <ClientLayout>{children}</ClientLayout>
+      <body className={`font-sans h-full antialiased relative ${isStandalonePage ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
+        {/* Wallpaper and dimness are rendered by the body pseudo-layers in
+            globals.css. A single owner avoids competing negative stacking
+            contexts on desktop Chromium. */}
+        {isStandalonePage ? children : <ClientLayoutRouter>{children}</ClientLayoutRouter>}
 
         {/* Global SVG Filters */}
         <svg

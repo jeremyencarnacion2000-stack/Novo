@@ -179,7 +179,7 @@ export function CommandPalette() {
             title: 'AI Assistant',
             subtitle: 'Chat with AI',
             icon: <Bot className="h-4 w-4" />,
-            onSelect: () => navigate('/ai'),
+            onSelect: () => navigate('/chat'),
             keywords: ['chat', 'assistant'],
         },
         {

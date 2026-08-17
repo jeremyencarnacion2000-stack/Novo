@@ -19,12 +19,11 @@ import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 
 // ── Mobile drag handle for notifications panel ─────────────────────────────
-function MobileNotifDragHandle({ onDismiss }: { onDismiss: () => void }) {
-  const ref = useDragToDismiss<HTMLDivElement>({ onDismiss })
+function MobileNotifDragHandle() {
   return (
     <div
-      ref={ref}
-      className="flex sm:hidden justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none select-none shrink-0 -mx-1"
+      aria-hidden="true"
+      className="flex sm:hidden justify-center pt-3 pb-1 pointer-events-none select-none shrink-0 -mx-1"
     >
       <motion.div
         className="w-10 h-[5px] rounded-full bg-foreground/20"
@@ -311,9 +310,18 @@ export function NotificationCenter() {
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(false)
   const [prevUnread, setPrevUnread] = useState(0)
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const bellControls = useAnimation()
+  const dismissPanel = useCallback(() => setIsOpen(false), [])
+  const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    onDismiss: dismissPanel,
+    enabled: isOpen,
+  })
+  const setPanelRef = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node
+    dragSurfaceRef.current = node
+  }, [dragSurfaceRef])
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -502,8 +510,8 @@ export function NotificationCenter() {
         whileTap={{ scale: 0.95 }}
         className={
           sileoToast
-            ? "fixed top-4 right-16 z-[200] h-12 max-w-[min(360px,calc(100vw-2rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
-            : "fixed top-4 right-16 z-[200] w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
+            ? "fixed top-4 right-3 sm:right-6 z-[200] h-11 max-w-[min(360px,calc(100vw-1.5rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
+            : "fixed top-4 right-3 sm:right-6 z-[200] size-9 rounded-full flex items-center justify-center shadow-lg"
         }
         style={{ isolation: 'isolate' }}
       >
@@ -590,7 +598,7 @@ export function NotificationCenter() {
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              ref={panelRef}
+              ref={setPanelRef}
               key="notification-panel"
               // Desktop: dropdown from top-right. Mobile: bottom sheet rising from bottom
               initial={typeof window !== 'undefined' && window.innerWidth < 640
@@ -623,7 +631,7 @@ export function NotificationCenter() {
                   style={{ background: 'linear-gradient(90deg, transparent, rgba(var(--primary-rgb),0.4), transparent)' }}
                 />
                 {/* Mobile drag handle — above header */}
-                <MobileNotifDragHandle onDismiss={() => setIsOpen(false)} />
+                <MobileNotifDragHandle />
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07] shrink-0">
                   <div className="flex items-center gap-2.5">

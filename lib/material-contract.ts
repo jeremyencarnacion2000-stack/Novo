@@ -32,6 +32,8 @@ interface ThemeTokens {
   surfaceRgb: readonly [number, number, number]
   criticalTextHex: string
   boundaryHex: string
+  contextBorder: string
+  focusBorder: string
   contextWallpaperAlpha: number
   focusWallpaperAlpha: number
   autoContrastDimness: number
@@ -45,6 +47,11 @@ const THEME_TOKENS: Record<MaterialContractInput['theme'], ThemeTokens> = {
     surfaceRgb: [255, 255, 255],
     criticalTextHex: '#09090b',
     boundaryHex: '#767676',
+    // Keep material edges optically quiet. Contrast comes from the fill,
+    // blur and shadow; a dark hairline reads as an unintended outline on
+    // wallpaper and light surfaces.
+    contextBorder: '1px solid transparent',
+    focusBorder: '1px solid transparent',
     contextWallpaperAlpha: 0.68,
     focusWallpaperAlpha: 0.78,
     autoContrastDimness: 0.35,
@@ -52,10 +59,15 @@ const THEME_TOKENS: Record<MaterialContractInput['theme'], ThemeTokens> = {
     focusShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 12px 36px rgba(15, 23, 42, 0.18)',
   },
   dark: {
-    surfaceHex: '#0a0e14',
-    surfaceRgb: [10, 14, 20],
+    // Dark materials stay neutral and let the wallpaper show through. The
+    // previous blue-black RGB fill made every card look opaque and bypassed
+    // the user's card opacity setting once a wallpaper was present.
+    surfaceHex: '#050505',
+    surfaceRgb: [255, 255, 255],
     criticalTextHex: '#fafafa',
     boundaryHex: '#737a84',
+    contextBorder: '1px solid transparent',
+    focusBorder: '1px solid transparent',
     contextWallpaperAlpha: 0.56,
     focusWallpaperAlpha: 0.68,
     autoContrastDimness: 0.55,
@@ -127,20 +139,19 @@ export function resolveMaterialContract(input: MaterialContractInput): MaterialC
 
   const requestedContextAlpha = alphaFromPercentage(input.glassOpacity)
   const requestedFocusAlpha = alphaFromPercentage(input.cardOpacity)
-  const contextAlpha = hasWallpaper
+  const contextAlpha = hasWallpaper && input.autoContrast
     ? Math.max(requestedContextAlpha, tokens.contextWallpaperAlpha)
     : requestedContextAlpha
-  const focusAlpha = hasWallpaper
+  const focusAlpha = hasWallpaper && input.autoContrast
     ? Math.max(requestedFocusAlpha, tokens.focusWallpaperAlpha)
     : requestedFocusAlpha
-  const contextBlur = hasWallpaper
+  const contextBlur = hasWallpaper && input.autoContrast
     ? Math.max(clamp(input.glassBlur, 0, 100), 12)
     : clamp(input.glassBlur, 0, 100)
-  const focusBlur = hasWallpaper
+  const focusBlur = hasWallpaper && input.autoContrast
     ? Math.max(clamp(input.cardLiquidIntensity, 0, 100), 18)
     : clamp(input.cardLiquidIntensity, 0, 100)
 
-  const boundary = `1px solid ${tokens.boundaryHex}`
   const canvasBackground = hasWallpaper
     ? `linear-gradient(${rgba([0, 0, 0], canvasDimness)}, ${rgba([0, 0, 0], canvasDimness)}), url("${escapeCssUrl(wallpaper)}")`
     : tokens.surfaceHex
@@ -154,13 +165,13 @@ export function resolveMaterialContract(input: MaterialContractInput): MaterialC
   const contextGlass: MaterialSurface = {
     background: rgba(tokens.surfaceRgb, contextAlpha),
     backdropFilter: `blur(${formatNumber(contextBlur)}px) saturate(160%) brightness(1.04)`,
-    border: boundary,
+    border: tokens.contextBorder,
     boxShadow: tokens.contextShadow,
   }
   const focusSurface: MaterialSurface = {
     background: rgba(tokens.surfaceRgb, focusAlpha),
     backdropFilter: `blur(${formatNumber(focusBlur)}px) saturate(160%) brightness(1.04)`,
-    border: boundary,
+    border: tokens.focusBorder,
     boxShadow: tokens.focusShadow,
   }
 

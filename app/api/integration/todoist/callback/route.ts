@@ -27,19 +27,13 @@ export async function GET(req: NextRequest) {
         return NextResponse.redirect(`${settingsUrl}error&reason=unauthenticated`);
     }
 
-    let providerAccountId: string;
-    try {
-        providerAccountId = (await fetchTodoistProviderIdentity(tokenData.access_token)).providerAccountId;
-    } catch {
-        return NextResponse.redirect(`${settingsUrl}error&reason=identity_verification`);
-    }
-
     // ── 2. Validate OAuth code ─────────────────────────────────────────────────
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
-    const storedState = cookies().get('novo_todoist_oauth_state')?.value;
-    cookies().delete('novo_todoist_oauth_state');
+    const cookieStore = await cookies();
+    const storedState = cookieStore.get('novo_todoist_oauth_state')?.value;
+    cookieStore.delete('novo_todoist_oauth_state');
     const payload = parseTodoistOAuthState(state);
     if (!storedState || state !== storedState || !payload || payload.userId !== session.user.id) {
         return NextResponse.redirect(`${settingsUrl}error&reason=invalid_state`);
@@ -75,19 +69,28 @@ export async function GET(req: NextRequest) {
         });
 
         if (!tokenRes.ok) {
-            const errBody = await tokenRes.text();
-            console.error('[Todoist Callback] Token exchange failed:', errBody);
+            const errBody = await tokenRes.text().catch(() => '');
+            console.error('[Todoist Callback] Token exchange failed:', { status: tokenRes.status, bodyLength: errBody.length });
             return NextResponse.redirect(`${settingsUrl}error&reason=token_exchange`);
         }
 
         tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
-            console.error('[Todoist Callback] Token response missing access_token:', tokenData);
+            console.error('[Todoist Callback] Token response missing access_token');
             return NextResponse.redirect(`${settingsUrl}error&reason=token_exchange`);
         }
     } catch (err) {
-        console.error('[Todoist Callback] Network error during token exchange:', err);
+        console.error('[Todoist Callback] Network error during token exchange:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=network`);
+    }
+
+    // Verify the authorized provider account from Todoist itself. Never infer
+    // identity from OAuth state, email, task ids, or client input.
+    let providerAccountId: string;
+    try {
+        providerAccountId = (await fetchTodoistProviderIdentity(String(tokenData.access_token))).providerAccountId;
+    } catch {
+        return NextResponse.redirect(`${settingsUrl}error&reason=identity_verification`);
     }
 
     // ── 4. Upsert IntegrationAccount ───────────────────────────────────────────
@@ -115,6 +118,8 @@ export async function GET(req: NextRequest) {
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
                 providerAccountId,
+                refreshToken: typeof tokenData.refresh_token === 'string' ? tokenData.refresh_token : undefined,
+                expiresAt: typeof tokenData.expires_in === 'number' ? new Date(Date.now() + tokenData.expires_in * 1000) : undefined,
                 metadata: {
                     // No projects selected yet — user picks them from settings UI
                     projectIds: [],
@@ -134,7 +139,7 @@ export async function GET(req: NextRequest) {
 
         console.log(`✅ [Todoist] Connected for user ${session.user.id}`);
     } catch (err) {
-        console.error('[Todoist Callback] Failed to upsert IntegrationAccount:', err);
+        console.error('[Todoist Callback] Failed to upsert IntegrationAccount:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);
     }
 

@@ -1,14 +1,21 @@
-import React from 'react';
-import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle, Activity, Mail } from 'lucide-react';
+'use client';
+
+import React, { useState } from 'react';
+import { Check, X, AlertTriangle, ListTodo, Calendar, StickyNote, Play, AlertCircle, Activity, Mail, ShieldCheck } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useTranslation } from '@/lib/i18n';
 
 interface ConfirmationBlockProps {
     onConfirm: () => void;
     onCancel: () => void;
-    status: 'waiting' | 'confirmed' | 'cancelled' | 'pending';
+    status: 'waiting' | 'confirmed' | 'cancelled' | 'pending' | 'executing';
     action?: any;
 }
 
 export function ConfirmationBlock({ onConfirm, onCancel, status, action }: ConfirmationBlockProps) {
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const { language } = useTranslation();
+    const consentCopy = getConsentCopy(language);
     const renderActionDetails = () => {
         if (!action) return null;
 
@@ -185,6 +192,15 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
         }
     };
 
+    if (status === 'executing') {
+        return (
+            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-indigo-300/15 bg-indigo-400/[0.045] p-4 text-sm text-indigo-100/80">
+                <div className="size-4 animate-spin rounded-full border-2 border-indigo-200/20 border-t-indigo-200" />
+                <span>{consentCopy.executing}</span>
+            </div>
+        );
+    }
+
     if (status !== 'waiting' && status !== 'pending') {
         const isConfirmed = status === 'confirmed';
         return (
@@ -235,20 +251,66 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
 
             <div className="flex gap-3 mt-4">
                 <button
-                    onClick={onConfirm}
+                    onClick={() => setReviewOpen(true)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold transition-all active:scale-[0.97] hover:shadow-[0_0_15px_rgba(99,102,241,0.25)] shadow-md border border-primary/30"
                 >
                     <Check className="w-3.5 h-3.5" />
-                    Confirmar
+                    {consentCopy.title}
                 </button>
                 <button
                     onClick={onCancel}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-white/80 rounded-xl text-xs font-bold transition-all active:scale-[0.97] border border-white/[0.08] hover:border-white/15"
                 >
                     <X className="w-3.5 h-3.5" />
-                    Cancelar
+                    {consentCopy.cancel}
                 </button>
             </div>
+            <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+                <DialogContent className="max-w-md border-white/[0.12] bg-[#111116]/95 p-0 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.9)] backdrop-blur-3xl">
+                    <div className="border-b border-white/[0.08] px-6 pb-5 pt-6">
+                        <div className="mb-4 flex size-10 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-400/10 text-amber-200">
+                            <ShieldCheck className="size-5" strokeWidth={1.7} />
+                        </div>
+                        <DialogHeader className="gap-2 text-left">
+                            <DialogTitle className="text-left text-xl font-medium tracking-[-0.03em] text-white">{consentCopy.title}</DialogTitle>
+                            <DialogDescription className="text-left text-sm leading-relaxed text-white/54">{consentCopy.description}</DialogDescription>
+                        </DialogHeader>
+                    </div>
+                    <div className="space-y-3 px-6 py-5">
+                        <div className="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4">
+                            <p className="text-[10px] font-semibold tracking-[0.13em] text-white/42 uppercase">{consentCopy.change}</p>
+                            <p className="mt-1.5 text-sm font-medium leading-relaxed text-white/88">{describeAction(action, consentCopy)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-300/12 bg-emerald-400/[0.045] p-3 text-xs leading-relaxed text-emerald-50/70">{consentCopy.control}</div>
+                    </div>
+                    <DialogFooter className="border-t border-white/[0.08] bg-black/10 px-6 py-4 sm:justify-between">
+                        <button onClick={() => setReviewOpen(false)} className="h-10 rounded-xl px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white">{consentCopy.back}</button>
+                        <button onClick={() => { setReviewOpen(false); onConfirm(); }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black transition-[transform,background] duration-150 hover:bg-white/90 active:scale-[0.97]">
+                            <Check className="size-4" />{consentCopy.approve}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
+}
+
+type ConsentCopy = { title: string; description: string; change: string; control: string; back: string; cancel: string; approve: string; executing: string; fallback: string }
+
+function getConsentCopy(language: string): ConsentCopy {
+    const copy: Record<string, ConsentCopy> = {
+        en: { title: 'Review this change', description: 'The Twin only performs the action shown below after your approval.', change: 'WHAT WILL CHANGE', control: 'You stay in control. This action runs once and its result stays visible in the conversation.', back: 'Go back', cancel: 'Cancel', approve: 'Approve and run', executing: 'Running the approved action…', fallback: 'The Twin will perform this requested action.' },
+        es: { title: 'Revisa este cambio', description: 'El Gemelo solo realizará la acción mostrada después de tu aprobación.', change: 'QUÉ VA A CAMBIAR', control: 'Tú mantienes el control. Esta acción se ejecuta una sola vez y verás el resultado en la conversación.', back: 'Volver', cancel: 'Cancelar', approve: 'Aprobar y ejecutar', executing: 'Ejecutando la acción aprobada…', fallback: 'El Gemelo realizará esta acción solicitada.' },
+        fr: { title: 'Vérifiez ce changement', description: 'Le Jumeau n’effectuera l’action affichée qu’après votre accord.', change: 'CE QUI VA CHANGER', control: 'Vous gardez le contrôle. Cette action ne s’exécute qu’une fois et son résultat reste visible dans la conversation.', back: 'Retour', cancel: 'Annuler', approve: 'Approuver et lancer', executing: 'Exécution de l’action approuvée…', fallback: 'Le Jumeau effectuera cette action demandée.' },
+        de: { title: 'Diese Änderung prüfen', description: 'Der Zwilling führt die gezeigte Aktion erst nach deiner Zustimmung aus.', change: 'WAS SICH ÄNDERT', control: 'Du behältst die Kontrolle. Diese Aktion läuft nur einmal und das Ergebnis bleibt im Gespräch sichtbar.', back: 'Zurück', cancel: 'Abbrechen', approve: 'Bestätigen und ausführen', executing: 'Die bestätigte Aktion wird ausgeführt…', fallback: 'Der Zwilling führt diese angeforderte Aktion aus.' },
+    };
+    return copy[language] || copy.en;
+}
+
+function describeAction(action: any, copy: ConsentCopy) {
+    const payload = action?.payload || {};
+    const type = String(action?.name || action?.type || '').replaceAll('_', ' ').toLowerCase();
+    const target = payload.title || payload.name || payload.to || payload.id;
+    if (!type) return copy.fallback;
+    return target ? `${type.charAt(0).toUpperCase()}${type.slice(1)}: ${target}` : `${type.charAt(0).toUpperCase()}${type.slice(1)}.`;
 }

@@ -1,10 +1,19 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { usePathname } from 'next/navigation'
 import { useSettings } from '@/lib/settings-context'
 
 export default function Template({ children }: { children: React.ReactNode }) {
     const { settings } = useSettings()
+    const pathname = usePathname()
+
+    // The public landing owns its own authored reveals. Keeping it inside the
+    // app-wide opacity/scale template can leave the entire page invisible when
+    // hydration is delayed or unavailable, even though the server HTML exists.
+    if (pathname?.startsWith('/landing')) {
+        return <>{children}</>
+    }
 
     if (!settings.showAnimations) {
         return <>{children}</>

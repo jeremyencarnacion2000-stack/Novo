@@ -39,8 +39,9 @@ export function ConfidenceGauge({ score, size = 'md', showLabel = true, classNam
   const color = score >= 80 ? '#6366f1' : score >= 60 ? '#8b5cf6' : score >= 40 ? '#a78bfa' : '#d946ef'
   const glowColor = score >= 80 ? 'rgba(99,102,241,0.4)' : 'rgba(139,92,246,0.3)'
 
-  // Rotation so arc starts at ~225deg (bottom-left)
-  const rotateAngle = 135
+  // Keep the readout upright. The gauge is an indicator, not a dial whose
+  // text should rotate with the arc.
+  const rotateAngle = 0
 
   return (
     <div className={cn('relative flex items-center justify-center', className)}>
@@ -73,7 +74,7 @@ export function ConfidenceGauge({ score, size = 'md', showLabel = true, classNam
         />
       </svg>
       {showLabel && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ transform: `rotate(${-rotateAngle}deg)` }}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={cn(
             'font-black tabular-nums',
             size === 'sm' && 'text-[13px]',
@@ -452,12 +453,12 @@ export function CognitiveStateHero({
         {/* Telemetry bar — full width, prominent */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <TelemetryPill label="Cognitive Clarity" value={attentionScore} unit="%" status={attentionScore >= 70 ? 'good' : attentionScore >= 50 ? 'warning' : 'critical'} icon={Brain} />
-          <TelemetryPill label="Burnout Risk" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
-          <TelemetryPill label="Recovery Reserve" value={100 - fatigueScore} unit="%" status={100 - fatigueScore >= 60 ? 'good' : 'warning'} icon={Battery} />
+          <TelemetryPill label="Carga operativa" value={fatigueScore} unit="%" status={fatigueScore < 40 ? 'good' : fatigueScore < 75 ? 'warning' : 'critical'} icon={Activity} />
+          <TelemetryPill label="Reserva disponible" value={100 - fatigueScore} unit="%" status={100 - fatigueScore >= 60 ? 'good' : 'warning'} icon={Battery} />
           {typeof twinConfidence === 'number' && (
             <TelemetryPill label="Twin Confidence" value={twinConfidence} unit="%" status={twinConfidence >= 70 ? 'good' : twinConfidence >= 40 ? 'warning' : 'critical'} icon={Zap} />
           )}
-          <TelemetryPill label="Biological Clock" value={minutesToNextPhase} unit=" min" status="normal" icon={Clock} />
+          <TelemetryPill label="Ritmo estimado" value={minutesToNextPhase} unit=" min" status="normal" icon={Clock} />
         </div>
       </div>
     </motion.div>
@@ -658,4 +659,3 @@ export function InsightCard({ insight, onActionClick, className }: InsightCardPr
     </div>
   )
 }
-

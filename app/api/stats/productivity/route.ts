@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
                 startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
-        // Fetch all relevant data
+        // Fetch all relevant data with column projections
         const [
             tasks,
             projects,
@@ -59,16 +59,28 @@ export async function GET(request: NextRequest) {
                     userId: user.id,
                     updatedAt: { gte: startDate },
                 },
+                select: {
+                    id: true,
+                    completed: true,
+                    updatedAt: true,
+                    dueDate: true,
+                },
             }),
             // Projects
             prisma.project.findMany({
                 where: {
                     userId: user.id,
                 },
-                include: {
+                select: {
+                    id: true,
+                    status: true,
                     tasks: {
                         where: {
                             updatedAt: { gte: startDate },
+                        },
+                        select: {
+                            id: true,
+                            status: true,
                         },
                     },
                 },
@@ -76,17 +88,24 @@ export async function GET(request: NextRequest) {
             // Routines
             prisma.routine.findMany({
                 where: { userId: user.id },
-                include: {
-                    tasks: true,
+                select: {
+                    id: true,
+                    isActive: true,
                 },
             }),
             // Habits (trackers)
             prisma.tracker.findMany({
                 where: { userId: user.id },
-                include: {
+                select: {
+                    id: true,
+                    name: true,
                     entries: {
                         where: {
                             updatedAt: { gte: startDate.toISOString() }, // TrackerEntry date is string
+                        },
+                        select: {
+                            id: true,
+                            value: true,
                         },
                     },
                 },
@@ -97,10 +116,23 @@ export async function GET(request: NextRequest) {
                     userId: user.id,
                     startTime: { gte: startDate },
                 },
+                select: {
+                    id: true,
+                    completed: true,
+                    duration: true,
+                    actualDuration: true,
+                    focusQuality: true,
+                    startTime: true,
+                },
             }),
             // Goals
             prisma.goal.findMany({
                 where: { userId: user.id },
+                select: {
+                    id: true,
+                    title: true,
+                    progress: true,
+                },
             }),
         ]);
 
@@ -113,7 +145,7 @@ export async function GET(request: NextRequest) {
         const activeProjects = projects.filter((p: any) => p.status === 'in-progress').length;
         const completedProjects = projects.filter((p: any) => p.status === 'completed').length;
         const projectTasks = projects.flatMap((p: any) => p.tasks);
-        const completedProjectTasks = projectTasks.filter((t: any) => t.completed).length;
+        const completedProjectTasks = projectTasks.filter((t: any) => t.status === 'done').length;
 
         // Calculate focus statistics
         const totalFocusMinutes = focusSessions
@@ -127,7 +159,7 @@ export async function GET(request: NextRequest) {
         // Calculate habit statistics
         const habitCompletionRates = habits.map(h => {
             const entries = h.entries;
-            const completedEntries = entries.filter((e: any) => e.completed).length;
+            const completedEntries = entries.filter((e: any) => e.value > 0).length;
             return {
                 name: h.name,
                 rate: entries.length > 0 ? (completedEntries / entries.length) * 100 : 0,

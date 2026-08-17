@@ -102,8 +102,8 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
                                                 "px-3 py-2 flex items-center justify-between",
                                                 isToday ? "bg-primary/20" : "bg-secondary/30"
                                             )}>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-sm truncate" title={day.name}>{day.name}</span>
+                                                <div data-testid="routine-day-header" className="flex min-w-0 items-center gap-2">
+                                                    <span className="min-w-0 font-semibold text-sm truncate" title={day.name}>{day.name}</span>
                                                     {isToday && (
                                                         <Badge className="h-4 px-1 text-[8px] uppercase bg-primary text-primary-foreground border-0">Today</Badge>
                                                     )}
@@ -114,10 +114,10 @@ export function RoutineCard({ routine, onEdit, onDelete, onView, isActiveTransit
                                             </div>
                                             <div className="px-3 py-2 space-y-1">
                                                 {day.exercises.slice(0, 2).map((ex, i) => (
-                                                    <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <div key={i} className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                                                         <div className={cn("h-1 w-1 rounded-full", isToday ? "bg-primary" : "bg-primary/50")} />
-                                                        <span className="truncate">{ex.name}</span>
-                                                        <span className="ml-auto font-mono text-[10px] opacity-50">{ex.sets}x{ex.reps}</span>
+                                                        <span data-testid="routine-exercise-preview" className="min-w-0 flex-1 truncate">{ex.name}</span>
+                                                        <span data-testid="routine-exercise-preview-meta" className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10px] tabular-nums opacity-70">{ex.sets}x{ex.reps}</span>
                                                     </div>
                                                 ))}
                                                 {day.exercises.length > 2 && (

@@ -17,6 +17,7 @@ import { sileo } from "@/lib/sileo-bell"
 import { TiltCard } from "@/components/ui/tilt-card"
 import { useCognitiveTwin } from "@/lib/cognitive-twin-context"
 import { FRICTION_TIP } from "@/components/dashboard/now-hero"
+import { ChecklistTaskDetail } from "@/components/checklist-task-detail"
 
 export default function ChecklistClient() {
   const { data: session } = useSession()
@@ -25,6 +26,7 @@ export default function ChecklistClient() {
   const [items, setItems] = useState<IntegratedTask[]>([])
   const [newItemText, setNewItemText] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedTask, setSelectedTask] = useState<IntegratedTask | null>(null)
   useEffect(() => {
     setIsClient(true)
   }, [])
@@ -306,15 +308,27 @@ export default function ChecklistClient() {
             {sortedItems.map(item => (
               <TiltCard
                 key={item.id}
-                className="flex items-center justify-between p-4 rounded-[20px] bg-foreground/[0.03] border border-foreground/[0.04] hover:bg-foreground/[0.06] transition-colors duration-300"
+                data-flip-from={`checklist-task-${item.id}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Ver detalles: ${item.text}`}
+                onClick={() => setSelectedTask(item)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    setSelectedTask(item)
+                  }
+                }}
+                className="flex cursor-pointer items-center justify-between rounded-[20px] border border-foreground/[0.04] bg-foreground/[0.03] p-4 transition-colors duration-300 hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
               >
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={item.completed}
                     onCheckedChange={() => handleToggleComplete(item)}
+                    onClick={(event) => event.stopPropagation()}
                   />
                   <div className="flex flex-col">
-                    <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
+                    <span data-shared-item="title" className={item.completed ? 'line-through text-muted-foreground' : ''}>
                       {item.text}
                     </span>
                     <div className="flex items-center gap-2 mt-1">
@@ -326,7 +340,10 @@ export default function ChecklistClient() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDelete(item.id)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleDelete(item.id)
+                    }}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -363,6 +380,7 @@ export default function ChecklistClient() {
           </div>
         </CardContent>
       </Card>
+      <ChecklistTaskDetail task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   )
 }

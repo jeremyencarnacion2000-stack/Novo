@@ -179,7 +179,10 @@ function HabitCard({
   };
 
   return (
-    <Card className="relative overflow-hidden border border-foreground/5 bg-foreground/[0.02] backdrop-blur-2xl transition-all duration-300 hover:border-foreground/10 hover:bg-foreground/[0.03]">
+    <Card
+      data-card-material="focus"
+      className="liquid-glass relative overflow-hidden transition-all duration-300 hover:shadow-[var(--novo-focus-box-shadow)]"
+    >
       {/* Dynamic Crystal Particles Container */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
         <AnimatePresence>

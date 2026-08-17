@@ -3,18 +3,11 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence } from 'framer-motion'
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-} from '@/components/ui/sheet'
 import { Routine } from '@/types/routine'
 import { Project } from '@/types/project'
 import { RoutineDetailView } from '@/components/routines/routine-detail-view'
 import { ActiveWorkoutSession } from '@/components/routines/active-workout-session'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ContextualModal } from '@/components/ui/contextual-modal'
 import { cn } from '@/lib/utils'
 
 type ViewType = 'routine' | 'project' | 'task'
@@ -24,10 +17,11 @@ interface DashboardQuickViewProps {
     onClose: () => void
     type: ViewType | null
     data: any | null
+    anchorRect?: DOMRect | null
     onUpdate?: () => void
 }
 
-export function DashboardQuickView({ open, onClose, type, data, onUpdate }: DashboardQuickViewProps) {
+export function DashboardQuickView({ open, onClose, type, data, anchorRect }: DashboardQuickViewProps) {
     const [isWorkoutActive, setIsWorkoutActive] = useState(false)
 
     if (!type || !data) return null
@@ -113,20 +107,11 @@ export function DashboardQuickView({ open, onClose, type, data, onUpdate }: Dash
     return (
         <>
             {workoutPortal}
-            <Sheet open={open} onOpenChange={onClose}>
-                <SheetContent side="right" className="w-full sm:max-w-xl bg-black/60 glass-blur border-l border-foreground/10 p-0 overflow-hidden outline-none">
-                    <ScrollArea className="h-full">
-                        <div className="p-10">
-                            <SheetHeader className="mb-10">
-                                <SheetTitle className="text-4xl font-black tracking-tighter uppercase italic text-foreground/10">
-                                    Quick View
-                                </SheetTitle>
-                            </SheetHeader>
-                            {renderContent()}
-                        </div>
-                    </ScrollArea>
-                </SheetContent>
-            </Sheet>
+            <ContextualModal open={open} onClose={onClose} anchorRect={anchorRect ?? null} title="Quick View">
+                <div className="max-h-[min(70dvh,38rem)] overflow-y-auto pt-6">
+                    {renderContent()}
+                </div>
+            </ContextualModal>
         </>
     )
 }

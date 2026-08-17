@@ -34,7 +34,6 @@ import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { useFocus } from '@/lib/focus-context'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import type { CognitivePhase } from '@/lib/cognitive-engine'
-import type { BurnoutPrediction } from '@/lib/cognitive-memory'
 import type { TwinInsight } from '@/lib/cognitive/insight-types'
 import { emitTwinNotification } from '@/components/ContextHub'
 
@@ -53,7 +52,6 @@ interface OrchestratorState {
   isOrchestrating: boolean
   currentPhase: CognitivePhase | null
   lastPhase: CognitivePhase | null
-  burnoutRisk: BurnoutPrediction['risk'] | null
   insight: TwinInsight | null
 }
 
@@ -73,7 +71,6 @@ export function usePeakTaskOrchestrator() {
     isOrchestrating: false,
     currentPhase: null,
     lastPhase: null,
-    burnoutRisk: null,
     insight: null,
   })
 
@@ -133,6 +130,19 @@ export function usePeakTaskOrchestrator() {
       }))
 
       let finalQueue = queue
+
+      if (queue.length === 0) {
+        // A clock-derived peak window is not permission to create a plan or
+        // mutate the user's tasks. The verified Loop creates proposals from
+        // persisted objectives/check-ins and waits for an explicit response.
+        setState(s => ({ ...s, focusQueue: [] }))
+        pushInsight({
+          id: `peak-focus-empty-${Date.now()}`,
+          message: 'No hay tareas prioritarias pendientes para esta ventana.',
+          tone: 'info',
+        })
+        return
+      }
 
       if (queue.length > 0) {
         setState(s => ({ ...s, focusQueue: queue }))
@@ -209,8 +219,8 @@ export function usePeakTaskOrchestrator() {
               tone: 'info',
             })
           }
-        } catch (error) {
-          console.error('[Orchestrator] Continuous day-plan generation failed:', error)
+        } catch {
+          console.error('[Orchestrator] Continuous day-plan generation failed.')
           pushInsight({
             id: `peak-focus-empty-${Date.now()}`,
             message: '🧠 Peak Focus window open. No high-priority tasks pending.',
@@ -339,10 +349,11 @@ export function usePeakTaskOrchestrator() {
         const res = await fetch('/api/cognitive/patterns')
         if (!res.ok) return
 
-        const profile = await res.json()
-        const risk: BurnoutPrediction['risk'] = profile?.burnoutPrediction?.risk ?? 'none'
-
-        setState(s => ({ ...s, burnoutRisk: risk }))
+        await res.json()
+        // A productivity-derived "burnout" score is not an observed health
+        // signal. Keep this legacy poll inert until it is replaced by an
+        // explicit, source-led user check-in flow.
+        const risk: string = 'none'
 
         if (risk === 'high' || risk === 'critical') {
           // FYI only, deliberately no action — "take a lighter day" isn't a
@@ -411,7 +422,6 @@ export function usePeakTaskOrchestrator() {
     focusQueue: state.focusQueue,
     isOrchestrating: state.isOrchestrating,
     currentPhase: state.currentPhase,
-    burnoutRisk: state.burnoutRisk,
     insight: state.insight,
     /** Manually re-trigger peak task pull */
     refresh: pullPeakFocusTasks,

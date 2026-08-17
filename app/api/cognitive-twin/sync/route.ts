@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const jsonObject = z.record(z.any())
+const cognitiveTwinSyncSchema = z.object({
+  identity: jsonObject.optional(),
+  energyCurve: jsonObject.optional(),
+  metrics: jsonObject.optional(),
+  bottlenecks: jsonObject.optional(),
+  workspaceLayout: jsonObject.optional(),
+  confidenceScore: z.number().finite().min(0).max(100).optional(),
+  isInitialized: z.boolean().optional(),
+  onboardingCompletedAt: z.string().datetime().nullable().optional(),
+  longTermGoal: z.string().trim().max(4_000).optional(),
+}).strict()
 
 /**
  * GET /api/cognitive-twin/sync
@@ -63,7 +77,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const parsed = cognitiveTwinSyncSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid Cognitive Twin payload', details: parsed.error.flatten() }, { status: 400 })
+    }
+    const body = parsed.data
     const {
       identity,
       energyCurve,
@@ -84,8 +102,7 @@ export async function POST(request: NextRequest) {
     // never overwrite it once it has been set.
     const shouldSetOnboardingDate =
       isInitialized === true &&
-      !existing?.onboardingCompletedAt &&
-      !existing?.isInitialized
+      !existing?.onboardingCompletedAt
 
     const data = {
       ...(identity !== undefined && { identity }),

@@ -40,10 +40,17 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
     zIndex: String(zIndex),
     pointerEvents: 'none',
     transition: 'none',
-    // A short blur at the leading edge makes the shared element read as
-    // motion, not as a sharp duplicate teleporting between surfaces.
-    filter: 'blur(8px)',
-    willChange: 'left, top, width, height, border-radius, background-color, filter',
+    // Geometry is already captured from getBoundingClientRect. Do not copy a
+    // trigger's live transform and then add a second transform on top of it.
+    transform: 'none',
+    transformOrigin: 'top left',
+    // Keep the shared element crisp. A blurred clone stacked over a blurred
+    // source reads as a discontinuity rather than motion on dense surfaces.
+    filter: 'none',
+    // The bridge is composited with transforms. Animating layout properties
+    // here forces a reflow on every frame and is the source of the visible
+    // hitch when a shared element crosses into a dialog.
+    willChange: 'transform, border-radius, background-color',
   } as CSSStyleDeclaration)
 
   if (!isBoxSized(originEl)) {
@@ -68,14 +75,15 @@ export function flyTo(
   position: number,
   options: { blur?: number } = {},
 ) {
+  const sourceRect = el.getBoundingClientRect()
   const rect = destEl.getBoundingClientRect()
   const cs = getComputedStyle(destEl)
   
   const vars: gsap.TweenVars = {
-    left: rect.left,
-    top: rect.top,
-    width: rect.width,
-    height: rect.height,
+    x: rect.left - sourceRect.left,
+    y: rect.top - sourceRect.top,
+    scaleX: sourceRect.width ? rect.width / sourceRect.width : 1,
+    scaleY: sourceRect.height ? rect.height / sourceRect.height : 1,
     duration,
     filter: `blur(${options.blur ?? 0}px)`,
   }

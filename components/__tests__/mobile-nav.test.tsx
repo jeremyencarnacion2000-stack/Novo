@@ -132,6 +132,43 @@ describe('MobileNav', () => {
     expect(push).toHaveBeenCalledWith('/routines')
   })
 
+  it('navigates from the workspace drawer without undoing the selected route', async () => {
+    const user = userEvent.setup()
+    const backSpy = jest.spyOn(window.history, 'back').mockImplementation(() => undefined)
+    const replaceSpy = jest.spyOn(window.history, 'replaceState').mockImplementation(() => undefined)
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Projects' }))
+
+    expect(push).toHaveBeenCalledWith('/projects')
+    expect(backSpy).not.toHaveBeenCalled()
+    expect(replaceSpy).not.toHaveBeenCalled()
+
+    backSpy.mockRestore()
+    replaceSpy.mockRestore()
+  })
+
+  it('never mutates history while opening or navigating from the drawer', async () => {
+    // Regression: synthetic overlay history entries raced with Next.js'
+    // pushState during in-drawer navigation and bounced users back to the
+    // route they came from. The drawer must not touch history at all.
+    const user = userEvent.setup()
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => undefined)
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation(() => undefined)
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    expect(push).toHaveBeenCalledWith('/calendar')
+    expect(pushStateSpy).not.toHaveBeenCalled()
+    expect(replaceStateSpy).not.toHaveBeenCalled()
+
+    pushStateSpy.mockRestore()
+    replaceStateSpy.mockRestore()
+  })
+
   it('keeps Workout out of the desktop Overview group', () => {
     render(
       <SidebarProvider>
@@ -141,13 +178,27 @@ describe('MobileNav', () => {
 
     const overviewGroup = screen.getByText('Overview').closest('[data-sidebar="group"]')
     expect(overviewGroup).not.toBeNull()
-    expect(within(overviewGroup!).getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(within(overviewGroup!).getByRole('link', { name: 'Today' })).toBeInTheDocument()
-    expect(within(overviewGroup!).getByRole('link', { name: 'Cognitivo' })).toBeInTheDocument()
-    expect(within(overviewGroup!).getByRole('link', { name: 'Chat' })).toBeInTheDocument()
-    expect(within(overviewGroup!).getByRole('link', { name: 'Actividad' })).toBeInTheDocument()
-    expect(within(overviewGroup!).queryByRole('link', { name: 'Workout' })).not.toBeInTheDocument()
+    if (!(overviewGroup instanceof HTMLElement)) {
+      throw new Error('Overview sidebar group was not found')
+    }
+
+    expect(within(overviewGroup).getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(within(overviewGroup).getByRole('link', { name: 'Today' })).toBeInTheDocument()
+    expect(within(overviewGroup).getByRole('link', { name: 'Cognitivo' })).toBeInTheDocument()
+    expect(within(overviewGroup).getByRole('link', { name: 'Chat' })).toBeInTheDocument()
+    expect(within(overviewGroup).getByRole('link', { name: 'Actividad' })).toBeInTheDocument()
+    expect(within(overviewGroup).queryByRole('link', { name: 'Workout' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Workout' })).toHaveAttribute('href', '/routines')
+  })
+
+  it('keeps the shared-element nav origin mounted while the workspace menu is open', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    expect(document.querySelector('[data-flip-from="mobile-nav-panel"]')).not.toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
   })
 
   it('does not promote Workout as a critical quick action', () => {

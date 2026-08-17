@@ -20,6 +20,21 @@ describe('cognitive graph contract', () => {
     expect(assignStablePositions([node('goal:one', 'objective')])).toEqual(assignStablePositions([node('goal:one', 'objective')]))
   })
 
+  it('places core nodes near the center and learning nodes into the right hemisphere', () => {
+    const positioned = assignStablePositions([
+      node('twin:1', 'twin'),
+      node('goal:1', 'objective'),
+      node('pattern:1', 'pattern'),
+      node('memory:1', 'memory'),
+      node('strategy:1', 'strategy'),
+    ])
+
+    expect(positioned.find((item) => item.id === 'twin:1')?.position).toEqual({ x: 0.5, y: 0.5, z: 0 })
+    expect(positioned.find((item) => item.id === 'pattern:1')?.position?.x ?? 0).toBeGreaterThan(0.5)
+    expect(positioned.find((item) => item.id === 'memory:1')?.position?.x ?? 0).toBeGreaterThan(0.5)
+    expect(positioned.find((item) => item.id === 'goal:1')?.position?.x ?? 1).toBeLessThan(0.5)
+  })
+
   it('filters goals and preserves their connected context', () => {
     const result = applyGraphLens({
       nodes: [node('twin:1', 'twin'), node('goal:1', 'objective'), node('task:1', 'action'), node('memory:1', 'memory')],

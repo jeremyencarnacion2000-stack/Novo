@@ -39,7 +39,7 @@ export default async function MobileAuthBridge() {
                     <p className="text-sm mb-4">Click below if the app doesn't open automatically</p>
                     <a
                         href={`novoapp://auth?token=${token}`}
-                        className="inline-block px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all"
+                        className="inline-block px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all"
                     >
                         Return to App
                     </a>

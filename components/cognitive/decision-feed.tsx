@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { CHANGE_TYPE_LABEL, CHANGE_TYPE_KIND } from '@/lib/cognitive-graph';
-import { KIND_COLOR } from '@/components/cognitive/cognitive-graph-view';
+import { useSWRWithConfig } from '@/hooks/use-swr';
+
+const KIND_COLOR: Record<string, string> = {
+  root: '#b7f3d0', identity: '#b7f3d0', energy: '#8ed8bd', bottleneck: '#e6a38f', signal: '#74d1b1', metric: '#9db8d8',
+}
 
 interface DecisionLog {
   id: string;
@@ -25,14 +29,8 @@ function timeAgo(date: string) {
 // TwinEvolutionLog — the "why did the graph just pulse" answer, sitting next
 // to the graph it explains.
 export function DecisionFeed() {
-  const [logs, setLogs] = useState<DecisionLog[] | null>(null);
-
-  useEffect(() => {
-    fetch('/api/cognitive/decisions')
-      .then(r => (r.ok ? r.json() : []))
-      .then(setLogs)
-      .catch(() => setLogs([]));
-  }, []);
+  const { data, error } = useSWRWithConfig<DecisionLog[]>('/api/cognitive/decisions');
+  const logs = error ? [] : data ?? null;
 
   if (!logs) {
     return (

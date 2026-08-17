@@ -118,11 +118,11 @@ export default function SocialPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="absolute inset-0 p-0 sm:p-3 lg:p-5 flex flex-col">
-      <div className="w-full h-full bg-[#09090e]/90 backdrop-blur-2xl border-0 sm:border sm:border-white/[0.07] rounded-none sm:rounded-[28px] flex overflow-hidden shadow-2xl">
+      <div className="w-full h-full bg-card/90 backdrop-blur-2xl border-0 sm:border sm:border-border/70 rounded-none sm:rounded-[28px] flex overflow-hidden shadow-2xl">
 
         {/* ─── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
         <div className={cn(
-          'flex-col w-full sm:w-[300px] bg-black/25 border-r border-white/[0.05] shrink-0',
+          'flex-col w-full sm:w-[300px] bg-muted/45 border-r border-border/60 shrink-0',
           selectedFriend ? 'hidden sm:flex' : 'flex',
         )}>
           {/* Header */}
@@ -132,16 +132,16 @@ export default function SocialPage() {
                 <div className="w-7 h-7 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
                   <Users className="h-3.5 w-3.5 text-primary" />
                 </div>
-                <h2 className="text-sm font-bold text-white tracking-tight">Social</h2>
+                <h2 className="text-sm font-bold text-foreground tracking-tight">Social</h2>
               </div>
               {friends.length > 0 && (
-                <span className="text-[10px] text-white/25 font-medium">{friends.length} friends</span>
+                <span className="text-[10px] text-muted-foreground font-medium">{friends.length} friends</span>
               )}
             </div>
 
             {/* Search input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input
                 value={searchQuery}
                 onChange={e => {
@@ -150,12 +150,12 @@ export default function SocialPage() {
                 }}
                 onFocus={() => setActiveTab('search')}
                 placeholder="Find people…"
-                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl pl-9 pr-9 h-9 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:bg-white/[0.05] transition-all"
+                className="w-full bg-muted/60 border border-border rounded-2xl pl-9 pr-9 h-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 focus:bg-muted transition-colors"
               />
               {searchQuery && (
                 <button
                   onClick={() => { setSearchQuery(''); setSearchResults([]) }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -172,8 +172,8 @@ export default function SocialPage() {
                 className={cn(
                   'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[11px] font-bold transition-all',
                   activeTab === tab.id
-                    ? 'bg-white/[0.07] text-white border border-white/[0.08]'
-                    : 'text-white/25 hover:text-white/50 hover:bg-white/[0.03]',
+                    ? 'bg-muted text-foreground border border-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                 )}
               >
                 {tab.label}
@@ -184,7 +184,7 @@ export default function SocialPage() {
                       ? tab.id === 'requests'
                         ? 'bg-red-500/20 text-red-400'
                         : 'bg-primary/20 text-primary'
-                      : 'bg-white/10 text-white/40',
+                      : 'bg-muted text-muted-foreground',
                   )}>
                     {tab.count}
                   </span>
@@ -212,7 +212,7 @@ export default function SocialPage() {
                 >
                   {friends.length === 0 ? (
                     <EmptyState
-                      icon={<Users className="h-5 w-5 text-white/20" />}
+                      icon={<Users className="h-5 w-5 text-muted-foreground" />}
                       text="No friends yet. Use Discover to find people."
                     />
                   ) : friends.map(friend => (
@@ -224,8 +224,8 @@ export default function SocialPage() {
                       className={cn(
                         'flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all text-left w-full',
                         selectedFriend?.id === friend.id
-                          ? 'bg-white/[0.07] border border-white/[0.08]'
-                          : 'hover:bg-white/[0.04]',
+                          ? 'bg-muted border border-border'
+                          : 'hover:bg-muted/60',
                       )}
                     >
                       <div className="relative shrink-0">
@@ -238,8 +238,8 @@ export default function SocialPage() {
                         <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#09090e]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{friend.name}</p>
-                        <p className="text-[11px] text-white/30 truncate">Online</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{friend.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">Online</p>
                       </div>
                       {selectedFriend?.id === friend.id && (
                         <MessageCircle className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -261,23 +261,23 @@ export default function SocialPage() {
                 >
                   {requests.length === 0 ? (
                     <EmptyState
-                      icon={<Check className="h-5 w-5 text-white/20" />}
+                      icon={<Check className="h-5 w-5 text-muted-foreground" />}
                       text="No pending requests."
                     />
                   ) : requests.map((req: any) => (
                     <div
                       key={req.id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.05]"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-muted/60 border border-border/70"
                     >
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarImage src={req.requester.image} />
-                        <AvatarFallback className="bg-white/10 text-white/60 text-xs">
+                        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                           {req.requester.name?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{req.requester.name}</p>
-                        <p className="text-[10px] text-white/30">Friend request</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{req.requester.name}</p>
+                        <p className="text-[10px] text-muted-foreground">Friend request</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
@@ -312,27 +312,27 @@ export default function SocialPage() {
                 >
                   {searchQuery.length < 2 ? (
                     <EmptyState
-                      icon={<Search className="h-5 w-5 text-white/20" />}
+                      icon={<Search className="h-5 w-5 text-muted-foreground" />}
                       text="Type at least 2 characters to search."
                     />
                   ) : searchResults.length === 0 ? (
-                    <p className="text-xs text-white/25 text-center py-10">
+                    <p className="text-xs text-muted-foreground text-center py-10">
                       No results for &quot;{searchQuery}&quot;
                     </p>
                   ) : searchResults.map(user => (
                     <div
                       key={user.id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.05]"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-muted/60 border border-border/70"
                     >
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarImage src={user.image} />
-                        <AvatarFallback className="bg-white/10 text-white/60 text-xs">
+                        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                           {user.name?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{user.name}</p>
-                        <p className="text-[10px] text-white/30 truncate">{user.bio || 'Novo user'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{user.bio || 'Novo user'}</p>
                       </div>
                       <button
                         onClick={() => sendRequest(user.id)}
@@ -366,12 +366,12 @@ export default function SocialPage() {
                 className="flex flex-col h-full"
               >
                 {/* Chat header */}
-                <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.05] shrink-0">
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-border/60 shrink-0">
                   <button
                     onClick={() => setSelectedFriend(null)}
-                    className="sm:hidden w-8 h-8 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0"
+                    className="sm:hidden w-8 h-8 rounded-xl bg-muted/60 border border-border flex items-center justify-center shrink-0"
                   >
-                    <ArrowLeft className="h-4 w-4 text-white/50" />
+                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                   </button>
                   <div className="relative shrink-0">
                     <Avatar className="h-9 w-9">
@@ -383,7 +383,7 @@ export default function SocialPage() {
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#09090e]" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white leading-tight">{selectedFriend.name}</p>
+                    <p className="text-sm font-bold text-foreground leading-tight">{selectedFriend.name}</p>
                     <p className="text-[10px] text-emerald-400 font-semibold">Online</p>
                   </div>
                 </div>
@@ -403,11 +403,11 @@ export default function SocialPage() {
                         <motion.div
                           animate={{ y: [0, -5, 0] }}
                           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                          className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center"
+                          className="w-14 h-14 rounded-2xl bg-muted/60 border border-border/70 flex items-center justify-center"
                         >
-                          <MessageCircle className="h-6 w-6 text-white/15" />
+                          <MessageCircle className="h-6 w-6 text-muted-foreground" />
                         </motion.div>
-                        <p className="text-sm text-white/25 font-medium">
+                        <p className="text-sm text-muted-foreground font-medium">
                           Start a conversation with {selectedFriend.name}
                         </p>
                       </motion.div>
@@ -428,7 +428,7 @@ export default function SocialPage() {
                             {!isMe && (
                               <Avatar className="h-6 w-6 shrink-0 mb-0.5">
                                 <AvatarImage src={selectedFriend.image} />
-                                <AvatarFallback className="text-[9px] bg-white/10 text-white/50">
+                                <AvatarFallback className="text-[9px] bg-muted text-muted-foreground">
                                   {selectedFriend.name?.[0]}
                                 </AvatarFallback>
                               </Avatar>
@@ -436,8 +436,8 @@ export default function SocialPage() {
                             <div className={cn(
                               'px-4 py-2.5 rounded-2xl text-sm leading-relaxed',
                               isMe
-                                ? 'bg-primary/75 text-white rounded-br-sm shadow-[0_2px_12px_rgba(var(--primary-rgb),0.25)]'
-                                : 'bg-white/[0.05] border border-white/[0.07] text-white/90 rounded-bl-sm',
+                                ? 'bg-primary/75 text-primary-foreground rounded-br-sm shadow-[0_2px_12px_rgba(var(--primary-rgb),0.25)]'
+                                : 'bg-muted/70 border border-border text-foreground rounded-bl-sm',
                             )}>
                               <p>{msg.content}</p>
                               {msg.createdAt && (
@@ -458,21 +458,21 @@ export default function SocialPage() {
                 </div>
 
                 {/* Input bar */}
-                <div className="px-4 sm:px-6 py-4 border-t border-white/[0.05] shrink-0">
+                <div className="px-4 sm:px-6 py-4 border-t border-border/60 shrink-0">
                   <div className="flex items-center gap-2">
                     <input
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder={`Message ${selectedFriend.name}…`}
-                      className="flex-1 bg-white/[0.04] border border-white/[0.07] rounded-2xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:bg-white/[0.06] transition-all"
+                      className="flex-1 bg-muted/60 border border-border rounded-2xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 focus:bg-muted transition-colors"
                     />
                     <motion.button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || sending}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shrink-0 transition-opacity"
+                      className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shrink-0 transition-opacity"
                     >
                       <Send className="h-4 w-4" />
                     </motion.button>
@@ -491,13 +491,13 @@ export default function SocialPage() {
                 <motion.div
                   animate={{ y: [0, -6, 0] }}
                   transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center"
+                  className="w-16 h-16 rounded-3xl bg-muted/60 border border-border/70 flex items-center justify-center"
                 >
-                  <MessageCircle className="h-7 w-7 text-white/15" />
+                  <MessageCircle className="h-7 w-7 text-muted-foreground" />
                 </motion.div>
                 <div>
-                  <p className="text-sm font-semibold text-white/35">Select a conversation</p>
-                  <p className="text-xs text-white/20 mt-1 max-w-[200px]">
+                  <p className="text-sm font-semibold text-muted-foreground">Select a conversation</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
                     Choose a friend from the list to start chatting
                   </p>
                 </div>
@@ -515,10 +515,10 @@ export default function SocialPage() {
 function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center">
+      <div className="w-12 h-12 rounded-2xl bg-muted/60 border border-border/70 flex items-center justify-center">
         {icon}
       </div>
-      <p className="text-xs text-white/25 max-w-[180px] leading-relaxed">{text}</p>
+      <p className="text-xs text-muted-foreground max-w-[180px] leading-relaxed">{text}</p>
     </div>
   )
 }

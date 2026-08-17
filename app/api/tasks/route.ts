@@ -6,6 +6,7 @@ import { isSameDay, parseISO } from 'date-fns'
 import { taskSchema } from '@/lib/schemas/task'
 import { z } from 'zod'
 import { emitTwinSignal } from '@/lib/twin-signal'
+import { syncTaskToCalendars } from '@/lib/task-calendar-sync'
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,6 +81,19 @@ export async function POST(request: NextRequest) {
         userId: session.user.id
       }
     })
+
+    try {
+      await syncTaskToCalendars({
+        userId: session.user.id,
+        taskId: task.id,
+        title: task.title,
+        dueDate: task.dueDate,
+        priority: task.priority,
+        accessToken: session.accessToken,
+      })
+    } catch (calendarError) {
+      console.warn('[tasks] Calendar sync skipped:', calendarError)
+    }
 
     // If task has dueDate today, create a linked checklist item
     if (dueDate && isSameDay(parseISO(dueDate), new Date())) {

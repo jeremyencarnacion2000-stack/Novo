@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { updateTaskSchema } from '@/lib/schemas/task'
 import { z } from 'zod'
 import { emitTwinSignal } from '@/lib/twin-signal'
+import { syncTaskToCalendars } from '@/lib/task-calendar-sync'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -46,6 +47,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(tags !== undefined && { tags: JSON.stringify(tags) })
       }
     })
+
+    if (dueDate !== undefined || title !== undefined || priority !== undefined) {
+      try {
+        await syncTaskToCalendars({
+          userId: session.user.id,
+          taskId: updatedTask.id,
+          title: updatedTask.title,
+          dueDate: updatedTask.dueDate,
+          priority: updatedTask.priority,
+          accessToken: session.accessToken,
+        })
+      } catch (calendarError) {
+        console.warn('[tasks] Calendar sync skipped:', calendarError)
+      }
+    }
 
     // Emit behavioral signal based on status transition (fire-and-forget)
     if (status === 'done' && existingTask.status !== 'done') {

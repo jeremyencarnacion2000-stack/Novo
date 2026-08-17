@@ -53,10 +53,17 @@ export default function DashboardClient() {
     return t('greeting.evening')
   }, [t])
 
+  const phaseLabel = phase === 'PEAK_FOCUS'
+    ? t('dashboard.phase.peak')
+    : phase === 'SYNAPTIC_FATIGUE'
+      ? t('dashboard.phase.recovery')
+      : t('dashboard.phase.stress')
+
   // Quick View State
   const [quickViewOpen, setQuickViewOpen] = useState(false)
   const [quickViewType, setQuickViewType] = useState<'routine' | 'project' | 'task' | null>(null)
   const [quickViewData, setQuickViewData] = useState<any>(null)
+  const [quickViewAnchor, setQuickViewAnchor] = useState<DOMRect | null>(null)
 
   // Refresh metrics when user returns to the tab (vs. aggressive 2-min polling)
   useEffect(() => {
@@ -69,9 +76,10 @@ export default function DashboardClient() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  const handleActivityClick = (type: 'routine' | 'project' | 'task', data: any) => {
+  const handleActivityClick = (type: 'routine' | 'project' | 'task', data: any, anchorRect: DOMRect) => {
     setQuickViewType(type)
     setQuickViewData(data)
+    setQuickViewAnchor(anchorRect)
     setQuickViewOpen(true)
   }
 
@@ -97,19 +105,19 @@ export default function DashboardClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className={cn(
-                    "text-[9px] font-mono font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border shadow-sm inline-flex items-center gap-1.5",
+                    "text-[9px] font-semibold uppercase tracking-[0.12em] px-2.5 py-1 rounded-full border shadow-sm inline-flex items-center gap-1.5",
                     phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/5",
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5",
                     phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5"
                   )}
                 >
                   <Shield className="w-3 h-3" />
-                  <span>Adaptive Shield: {phase === 'PEAK_FOCUS' ? 'Peak Focus' : phase === 'SYNAPTIC_FATIGUE' ? 'Recovery Mode' : 'Stress Adapt'}</span>
+                  <span>{t('dashboard.shield')} · {phaseLabel}</span>
                 </motion.span>
               )}
             </h2>
             <p className="subtitle-technical">
-              System status · live pulse · encrypted
+              {t('dashboard.systemStatus')} <span aria-hidden="true">·</span> {t('dashboard.livePulse')}
             </p>
           </div>
         </motion.div>
@@ -155,19 +163,19 @@ export default function DashboardClient() {
               {phase !== 'LINEAR_EXECUTION' && (
                 <span
                   className={cn(
-                    "text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded-full border leading-none inline-flex items-center gap-1",
+                    "text-[8px] font-semibold uppercase tracking-[0.1em] px-2 py-1 rounded-full border leading-none inline-flex items-center gap-1",
                     phase === 'PEAK_FOCUS' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                     phase === 'SYNAPTIC_FATIGUE' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
                     phase === 'REDUCED_CAPACITY_MODE' && "bg-red-500/10 text-red-400 border-red-500/20"
                   )}
                 >
                   <Shield className="w-2.5 h-2.5" />
-                  <span>Shield Active</span>
+                  <span>{t('dashboard.shield')} · {phaseLabel}</span>
                 </span>
               )}
             </h2>
             <p className="subtitle-technical text-[8px]">
-              System status · live pulse
+              {t('dashboard.systemStatus')} <span aria-hidden="true">·</span> {t('dashboard.livePulse')}
             </p>
           </div>
         </motion.div>
@@ -200,6 +208,7 @@ export default function DashboardClient() {
         onClose={() => setQuickViewOpen(false)}
         type={quickViewType}
         data={quickViewData}
+        anchorRect={quickViewAnchor}
       />
     </motion.div>
   )

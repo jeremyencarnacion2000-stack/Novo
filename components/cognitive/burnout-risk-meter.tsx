@@ -13,31 +13,31 @@ interface BurnoutRiskMeterProps {
 
 function getRiskLevel(risk: number) {
   if (risk >= 75) return {
-    label: 'CRITICAL', color: '#ef4444', bg: 'bg-red-500', textColor: 'text-red-400',
+    label: 'CRÍTICA', color: '#ef4444', bg: 'bg-red-500', textColor: 'text-red-400',
     glow: 'rgba(239,68,68,0.5)', border: 'border-red-500/30',
     shadow: '0_0_30px_rgba(239,68,68,0.25)', track: 'rgba(239,68,68,0.08)',
   };
   if (risk >= 50) return {
-    label: 'WARNING', color: '#f59e0b', bg: 'bg-amber-500', textColor: 'text-amber-400',
+    label: 'ALTA', color: '#f59e0b', bg: 'bg-amber-500', textColor: 'text-amber-400',
     glow: 'rgba(245,158,11,0.5)', border: 'border-amber-500/30',
     shadow: '0_0_30px_rgba(245,158,11,0.2)', track: 'rgba(245,158,11,0.06)',
   };
   if (risk >= 25) return {
-    label: 'MODERATE', color: '#f97316', bg: 'bg-orange-500', textColor: 'text-orange-400',
+    label: 'MEDIA', color: '#f97316', bg: 'bg-orange-500', textColor: 'text-orange-400',
     glow: 'rgba(249,115,22,0.4)', border: 'border-orange-500/20',
     shadow: '0_0_30px_rgba(249,115,22,0.15)', track: 'rgba(249,115,22,0.06)',
   };
   return {
-    label: 'SAFE', color: '#22c55e', bg: 'bg-green-500', textColor: 'text-green-400',
+    label: 'BAJA', color: '#22c55e', bg: 'bg-green-500', textColor: 'text-green-400',
     glow: 'rgba(34,197,94,0.4)', border: 'border-green-500/20',
     shadow: '0_0_30px_rgba(34,197,94,0.15)', track: 'rgba(34,197,94,0.06)',
   };
 }
 
 const FACTORS = [
-  { key: 'workloadDensity', label: 'Workload Density', desc: 'Overdue + today task pressure' },
-  { key: 'focusFragmentation', label: 'Focus Fragmentation', desc: 'Interrupted session ratio' },
-  { key: 'overduePressure', label: 'Overdue Pressure', desc: 'Unresolved deadline count' },
+  { key: 'workloadDensity', label: 'Carga de trabajo', desc: 'Tareas vencidas y presión de hoy' },
+  { key: 'focusFragmentation', label: 'Fragmentación del foco', desc: 'Proporción de sesiones interrumpidas' },
+  { key: 'overduePressure', label: 'Presión por plazos', desc: 'Fechas límite sin resolver' },
 ];
 
 const clampPct = (n: number) => Math.min(100, Math.max(0, n));
@@ -60,8 +60,8 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-foreground/50">Burnout Risk</h3>
-          <p className="text-[10px] text-foreground/25 mt-0.5 tracking-wide">workload · fragmentation · pressure</p>
+          <h3 className="text-xs font-black tracking-[0.25em] uppercase text-foreground/50">Carga operativa estimada</h3>
+          <p className="text-[10px] text-foreground/45 mt-0.5 tracking-wide">Estimación basada en tareas y sesiones; no es una medición médica.</p>
         </div>
         <div className="flex items-center gap-2.5">
           <span
@@ -115,7 +115,7 @@ export function BurnoutRiskMeter({ risk, workloadDensity, focusFragmentation, ov
 
       {/* Zone labels */}
       <div className="flex justify-between text-[8px] text-foreground/20 font-bold tracking-wider mb-5 px-0.5">
-        <span>SAFE</span><span>MODERATE</span><span>WARNING</span><span>CRITICAL</span>
+        <span>BAJA</span><span>MEDIA</span><span>ALTA</span><span>CRÍTICA</span>
       </div>
 
       {/* Factor breakdown with glass bars */}

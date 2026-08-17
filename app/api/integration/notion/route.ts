@@ -13,6 +13,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { notionService } from '@/lib/notion';
+import { z } from 'zod';
+
+const notionActionSchema = z.enum(['databases', 'save_databases', 'sync']);
+const saveDatabasesSchema = z.object({
+    databaseIds: z.array(z.string().min(1).max(200)).max(500),
+});
 
 // ── GET — Connection status ─────────────────────────────────────────────────
 
@@ -74,7 +80,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const action = searchParams.get('action') ?? 'sync';
+    const actionParsed = notionActionSchema.safeParse(searchParams.get('action') ?? 'sync');
+    if (!actionParsed.success) {
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+    const action = actionParsed.data;
 
     const account = await prisma.integrationAccount.findUnique({
         where: {
@@ -93,16 +103,20 @@ export async function POST(req: NextRequest) {
         try {
             const databases = await notionService.listDatabases(account.accessToken);
             return NextResponse.json({ databases });
-        } catch (err: any) {
-            console.error('[Notion] Failed to list databases:', err);
-            return NextResponse.json({ error: 'Failed to fetch databases', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Notion] Failed to list databases:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Failed to fetch databases' }, { status: 502 });
         }
     }
 
     // ── action=save_databases — persist chosen database IDs ──────────────────
     if (action === 'save_databases') {
         const body = await req.json().catch(() => ({}));
-        const databaseIds: string[] = body.databaseIds ?? [];
+        const parsed = saveDatabasesSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'databaseIds inválido' }, { status: 400 });
+        }
+        const databaseIds = parsed.data.databaseIds;
         await prisma.integrationAccount.update({
             where: { userId_provider: { userId: session.user.id, provider: 'notion' } },
             data: {
@@ -166,11 +180,11 @@ export async function POST(req: NextRequest) {
                 created,
                 updated,
             });
-        } catch (err: any) {
-            console.error('[Notion] Sync error:', err);
-            return NextResponse.json({ error: 'Sync failed', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Notion] Sync error:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Sync failed' }, { status: 502 });
         }
     }
 
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }

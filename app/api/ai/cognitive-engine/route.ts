@@ -316,7 +316,7 @@ export async function GET(req: NextRequest) {
     );
     const avgFocusQuality = todayFocusSessions.length > 0
       ? todayFocusSessions.reduce((acc, s) => acc + (s.focusQuality ?? 3), 0) / todayFocusSessions.length
-      : 3;
+      : null;
     const interruptions = todayFocusSessions.reduce((acc, s) => acc + s.interruptions, 0);
 
     // Estimated Recovery State (inferred from earliest session today)
@@ -339,11 +339,15 @@ export async function GET(req: NextRequest) {
     // Real sleep/stress overrides the time-of-day heuristic above whenever it
     // indicates something WORSE — either signal pointing at trouble should be
     // believed, not averaged away.
-    if (biometrics) {
+    const hasVerifiedBiometricSignals = Boolean(
+      biometrics?.hasGoogleFitData &&
+      (biometrics.sleep.hasData || biometrics.heartRate.hasData)
+    );
+    if (hasVerifiedBiometricSignals && biometrics) {
       let biometricRecovery: RecoveryState = 'optimal';
-      if (biometrics.userStressScore >= 80 || biometrics.sleep.totalSleepMinutes < 300) biometricRecovery = 'critical';
-      else if (biometrics.userStressScore >= 65 || biometrics.sleep.totalSleepMinutes < 360) biometricRecovery = 'impaired';
-      else if (biometrics.userStressScore >= 50 || biometrics.sleep.totalSleepMinutes < 420) biometricRecovery = 'moderate';
+      if ((biometrics.userStressScore ?? 0) >= 80 || (biometrics.sleep.hasData && biometrics.sleep.totalSleepMinutes < 300)) biometricRecovery = 'critical';
+      else if ((biometrics.userStressScore ?? 0) >= 65 || (biometrics.sleep.hasData && biometrics.sleep.totalSleepMinutes < 360)) biometricRecovery = 'impaired';
+      else if ((biometrics.userStressScore ?? 0) >= 50 || (biometrics.sleep.hasData && biometrics.sleep.totalSleepMinutes < 420)) biometricRecovery = 'moderate';
 
       if (RECOVERY_SEVERITY[biometricRecovery] > RECOVERY_SEVERITY[recoveryState]) {
         recoveryState = biometricRecovery;
@@ -396,7 +400,7 @@ export async function GET(req: NextRequest) {
     // Historical patterns from daily analytics
     const avgProductivity = dailyAnalytics.length > 0
       ? dailyAnalytics.reduce((acc, d) => acc + d.productivityScore, 0) / dailyAnalytics.length
-      : 50;
+      : null;
 
     // Focus fragmentation (many short interrupted sessions = fragmented)
     const fragmentedSessions = todayFocusSessions.filter(s => s.interrupted).length;
@@ -424,7 +428,7 @@ export async function GET(req: NextRequest) {
       currentEnergy * 0.35 +
       (100 - cognitiveLoad) * 0.25 +
       (100 - procrastinationScore) * 0.2 +
-      (avgFocusQuality / 5 * 100) * 0.1 +
+      (avgFocusQuality == null ? 0 : (avgFocusQuality / 5 * 100) * 0.1) +
       recoveryBonus * 0.1
     )));
 
@@ -497,8 +501,8 @@ ${calendarSignal.connected
 - Largest free block today (${WAKING_HOURS_START}:00-${WAKING_HOURS_END}:00): ${calendarSignal.largestFreeGapMinutes} minutes — do NOT schedule reorganizedDay tasks outside this window if it's small`
   : '- Not connected — schedule purely off task/energy signals'}
 
-## Biometrics (${biometrics?.meta.sleepDataSource === 'google_fit' ? 'Google Fit' : 'estimated from activity data'})
-${biometrics
+## Biometrics (${hasVerifiedBiometricSignals ? 'Google Fit' : 'not connected or insufficient'})
+${hasVerifiedBiometricSignals && biometrics
   ? `- Sleep last night: ${biometrics.sleep.totalSleepMinutes} minutes (efficiency ${biometrics.sleep.sleepEfficiency}%)
 - Resting heart rate: ${biometrics.heartRate.hasData ? `${biometrics.heartRate.averageBpm} bpm avg` : 'no data'}
 - Stress score: ${biometrics.userStressScore}/100 (${biometrics.stressLevel})`
@@ -511,7 +515,7 @@ ${biometrics
 - Focus Fragmentation: ${focusFragmentation}%
 - Focus sessions today: ${todayFocusSessions.length} (${totalFocusMinutesToday} minutes total)
 - Interruptions today: ${interruptions}
-- Avg 7-day productivity score: ${Math.round(avgProductivity)}
+- Avg 7-day productivity score: ${avgProductivity == null ? 'no observed history yet' : Math.round(avgProductivity)}
 
 ## Pending Tasks (for day reorganization)
 ${taskContext.length > 0 ? JSON.stringify(taskContext, null, 2) : 'None — the user has no pending tasks right now. Leave reorganizedDay empty and base the recommendation on their energy/recovery state instead of inventing tasks.'}
@@ -785,7 +789,7 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       notionTaskCount: notionItems.length,
       todoistTaskCount: todoistItems.length,
       calendar: calendarSignal,
-      biometrics: biometrics ? {
+      biometrics: hasVerifiedBiometricSignals && biometrics ? {
         sleepMinutes: biometrics.sleep.totalSleepMinutes,
         sleepEfficiency: biometrics.sleep.sleepEfficiency,
         stressScore: biometrics.userStressScore,

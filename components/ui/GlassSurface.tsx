@@ -272,13 +272,13 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
           activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
             ? 'rgba(20, 20, 23, 0.06)'
             : backgroundColor
-          activeBorder = '1px solid rgba(255, 255, 255, 0.10)'
+          activeBorder = '1px solid transparent'
           activeShadow = '0 24px 80px rgba(0,0,0,0.45), inset 1px 1px 0 rgba(255,255,255,0.18)'
         } else {
           activeBg = backgroundColor.includes('--md-sys-color-neutral-background')
             ? 'rgba(255, 255, 255, 0.10)'
             : backgroundColor
-          activeBorder = '1px solid rgba(255, 255, 255, 0.30)'
+          activeBorder = '1px solid transparent'
           activeShadow = '0 12px 40px rgba(0,0,0,0.08), inset 1px 1px 0 rgba(255,255,255,0.6)'
         }
       }

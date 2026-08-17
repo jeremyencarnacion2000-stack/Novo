@@ -6,6 +6,7 @@
 
 import { after } from 'next/server'
 import { processTwinSignalHandler } from '@/lib/inngest/functions/process-twin-signal'
+import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime'
 
 export type SignalType =
   | 'task_created'
@@ -44,7 +45,9 @@ export async function emitTwinSignal(payload: SignalPayload): Promise<void> {
   // Restore the queue (set INNGEST_* keys + swap this for inngest.send) if it
   // ever needs durable retries.
   const run = () =>
-    processTwinSignalHandler({ event: { data }, step: inlineStep }).catch(() => {})
+    processTwinSignalHandler({ event: { data }, step: inlineStep })
+      .then(() => runAmbientTwinForUser(payload.userId, { trigger: payload.signal === 'task_completed' ? 'task_completed' : payload.signal === 'focus_finished' ? 'focus_completed' : 'task_created' }))
+      .catch(() => {})
 
   try {
     after(run)

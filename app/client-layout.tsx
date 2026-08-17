@@ -2,21 +2,16 @@
 
 import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { SessionProvider, useSession } from 'next-auth/react'
+import { getSession, SessionProvider, useSession } from 'next-auth/react'
+import { MotionConfig } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
 import { SettingsProvider } from '@/lib/settings-context'
 import { NotificationProvider } from '@/lib/notification-context'
 import { PomodoroProvider } from '@/lib/pomodoro-context'
-import { PomodoroWidget } from '@/components/pomodoro-widget'
 import '@/lib/storage'
-import { GlobalPlayer } from '@/components/music/global-player'
-import { QuickCapture } from '@/components/quick-capture'
-import { DashboardShell } from '@/components/dashboard-shell'
-import { ChatbotProvider } from '@/components/ai/modern-chatbot/context'
 import { useSessionTracking } from '@/hooks/use-session-tracking'
-import { WelcomeCarousel } from '@/components/onboarding/welcome-screen'
 import { QuickCaptureProvider } from '@/lib/quick-capture-context'
 import { registerServiceWorker } from '@/lib/register-sw'
 import { OfflineIndicator } from '@/components/offline-indicator'
@@ -26,7 +21,10 @@ import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-co
 import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 import { PageTransition } from '@/components/ui/page-transition'
+import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader'
+import { redirectWhenSessionMissing } from '@/lib/auth-navigation'
 import { MobileOverlayProvider } from '@/components/mobile-overlay-provider'
+import { CognitiveRouteShell } from '@/components/cognitive/cognitive-route-shell'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -43,7 +41,6 @@ const AppProviders = composeProviders(
   NotificationProvider,
   PomodoroProvider,
   FocusProvider,
-  ChatbotProvider,
   QuickCaptureProvider,
   ScrollContainerProvider,
   CognitiveProvider,
@@ -79,14 +76,58 @@ const SettingsModal = dynamic(
   () => import('@/components/settings/settings-modal').then(m => ({ default: m.SettingsModal })),
   { ssr: false }
 )
-const GeminiLiveOrb = dynamic(
-  () => import('@/components/ai/GeminiLiveOrb').then(m => ({ default: m.GeminiLiveOrb })),
-  { ssr: false }
-)
 const FloatingMusicWidget = dynamic(
   () => import('@/components/music/floating-music-widget').then(m => ({ default: m.FloatingMusicWidget })),
   { ssr: false }
 )
+const DashboardShell = dynamic(
+  () => import('@/components/dashboard-shell').then(m => ({ default: m.DashboardShell })),
+  { ssr: false }
+)
+const GlobalPlayer = dynamic(
+  () => import('@/components/music/global-player').then(m => ({ default: m.GlobalPlayer })),
+  { ssr: false }
+)
+const QuickCapture = dynamic(
+  () => import('@/components/quick-capture').then(m => ({ default: m.QuickCapture })),
+  { ssr: false }
+)
+const PomodoroWidget = dynamic(
+  () => import('@/components/pomodoro-widget').then(m => ({ default: m.PomodoroWidget })),
+  { ssr: false }
+)
+const WelcomeCarousel = dynamic(
+  () => import('@/components/onboarding/welcome-screen').then(m => ({ default: m.WelcomeCarousel })),
+  { ssr: false }
+)
+const ChatbotProvider = dynamic(
+  () => import('@/components/ai/modern-chatbot/context').then(m => ({ default: m.ChatbotProvider })),
+  { ssr: false }
+)
+
+function RouteChatbotBoundary({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/cognitive')) return <>{children}</>
+  return <ChatbotProvider>{children}</ChatbotProvider>
+}
+
+function RouteAppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/cognitive')) return <CognitiveRouteShell>{children}</CognitiveRouteShell>
+  return <DashboardShell>{children}</DashboardShell>
+}
+
+function RoutePlayerBoundary({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/cognitive')) return <>{children}</>
+  return <GlobalPlayer>{children}</GlobalPlayer>
+}
+
+function RouteQuickCapture() {
+  const pathname = usePathname()
+  if (pathname?.startsWith('/cognitive')) return null
+  return <QuickCapture />
+}
 // ─── Auth wrapper ────────────────────────────────────────────────────────────
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
@@ -96,29 +137,53 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   useSessionTracking()
 
-  const isPublicPage = pathname?.startsWith('/auth/') || pathname?.startsWith('/welcome') || pathname?.startsWith('/onboarding') || pathname?.startsWith('/landing') || pathname?.startsWith('/privacy') || pathname?.startsWith('/terms')
+  const isPublicPage = pathname?.startsWith('/auth/') || pathname?.startsWith('/welcome') || pathname?.startsWith('/onboarding') || pathname?.startsWith('/landing') || pathname?.startsWith('/privacy') || pathname?.startsWith('/terms') || pathname?.startsWith('/refunds')
   const isAuthFormPage = pathname?.startsWith('/auth/')
 
   useEffect(() => {
     if (status === 'unauthenticated' && !isPublicPage) {
-      // A cold mount right after an external redirect (Google OAuth,
-      // Stripe Checkout) can report 'unauthenticated' for one tick before
+      // A cold mount right after credentials or an external redirect can
+      // report 'unauthenticated' before the new cookie reaches this provider.
       // the session cookie's fetch actually resolves — bail out if a
       // fast re-render flips us back to 'authenticated' or 'loading'
       // before this fires, instead of bouncing to /landing on a false read.
       const timeout = setTimeout(() => {
-        router.push('/landing')
+        void redirectWhenSessionMissing(getSession, (path) => router.replace(path))
       }, 800)
       return () => clearTimeout(timeout)
     } else if (status === 'authenticated' && isAuthFormPage) {
       // Already signed in but stuck on a login/signup route (stale bookmark,
       // back-button, or the SlideToSignIn push('/') racing this render) —
       // bounce out instead of leaving the fixed-overlay login stuck on screen.
-      router.push('/')
+      const rawCallback = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('callbackUrl')
+        : null
+      const callback = rawCallback && rawCallback.startsWith('/') && !rawCallback.startsWith('//')
+        ? rawCallback
+        : '/'
+      router.push(callback)
     } else if (status === 'authenticated' && !isTwinLoading && !twin.isInitialized && pathname !== '/onboarding') {
       router.push('/onboarding')
     }
   }, [status, router, pathname, isPublicPage, isAuthFormPage, twin.isInitialized, isTwinLoading])
+
+  // Public review and acquisition pages must render their server-provided
+  // content immediately. They do not need a session or Cognitive Twin to
+  // become useful, and blocking them behind the auth loading state leaves
+  // crawlers/JS-disabled reviewers with only a blank loading shell.
+  if (isPublicPage) {
+    return (
+      <SessionProvider>
+        <SettingsProvider>
+          <CognitiveProvider>
+            <CognitiveTwinProvider>
+              {children}
+            </CognitiveTwinProvider>
+            </CognitiveProvider>
+        </SettingsProvider>
+      </SessionProvider>
+    )
+  }
 
   if (status === 'loading' || isTwinLoading) {
     // Renders before SettingsProvider has resolved the user's theme/accent
@@ -129,32 +194,27 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     // a one-off shape invented just for this screen.
     return (
       <div className="h-screen w-full flex items-center justify-center" style={{ background: '#050505' }}>
-        <div className="flex flex-col items-center gap-5">
-          <img
-            src="/icon.svg"
-            alt="Novo"
-            width={40}
-            height={40}
-            className="animate-pulse"
-            style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.35))' }}
-          />
-          <span className="text-white/30 text-[11px] font-black tracking-[0.25em] uppercase">Cargando</span>
-        </div>
+        <NovoSpriteLoader
+          size="md"
+          label="Preparando Novo"
+          className="text-white"
+        />
       </div>
     )
   }
 
-  if (isPublicPage) {
-    return <>{children}</>
-  }
-
   if (status === 'authenticated') {
     return (
-      <DashboardShell>
-        <PageTransition>
-          {children}
-        </PageTransition>
-      </DashboardShell>
+      <RouteChatbotBoundary>
+        <RouteAppShell>
+          {/* Full-screen routes such as /cognitive need a measurable parent.
+              Without this, an absolutely-positioned page can leave the route
+              transition at zero height and only the header remains visible. */}
+          <PageTransition className="h-full min-h-0">
+            {children}
+          </PageTransition>
+        </RouteAppShell>
+      </RouteChatbotBoundary>
     )
   }
 
@@ -162,7 +222,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Authenticated floating widgets (all lazy) ──────────────────────────────
-// MiniChatbot REMOVED — superseded by GeminiLiveOrb
+// MiniChatbot REMOVED — voice commands now live in ContextHub
 // FloatingQuickNotes REMOVED — function migrated to OmniHub State 2 pill shortcuts
 // ChatbotSidebar (OmniHub v2 right-docked panel) REMOVED — it and the /ai page's
 // history-drawer toggle shared the same context field (sidebarCollapsed), so
@@ -171,16 +231,25 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 // (mobile), both rendering the same ModernChatbot component.
 function AuthenticatedWidgets() {
   const { status } = useSession()
+  const pathname = usePathname()
   if (status !== 'authenticated') return null
+  const isCognitiveRoute = pathname?.startsWith('/cognitive')
+  // The Cognitive Center owns its own attention/recommendation surface.
+  // Mounting the global notification/chat/music motion stack here caused a
+  // transition promise to be interrupted during hydration, preventing the
+  // Center's data effects from starting. Keep the flagship route focused and
+  // let the surrounding app retain the shared widgets everywhere else.
+  const isChatRoute = pathname?.startsWith('/ai') || pathname?.startsWith('/chat')
+  const isOnboardingRoute = pathname?.startsWith('/onboarding')
+  if (isOnboardingRoute) return null
   return (
     <>
-      <CommandPalette />
-      <ContextHub />
-      <PomodoroWidget />
-      <NotificationCenter />
+      {!isCognitiveRoute && <CommandPalette />}
+      {!isCognitiveRoute && <ContextHub />}
+      {!isCognitiveRoute && <PomodoroWidget />}
+      {!isCognitiveRoute && !isChatRoute && <NotificationCenter />}
       <SettingsModal />
-      <GeminiLiveOrb />
-      <FloatingMusicWidget />
+      {!isCognitiveRoute && <FloatingMusicWidget />}
     </>
   )
 }
@@ -243,33 +312,36 @@ export default function ClientLayout({
   }, [])
 
   if (!mounted) {
-    // Render a stable non-null placeholder during SSR/hydration to avoid white flash.
-    // The body background is already set by globals.css, so this is essentially invisible.
+    // The public review route bypasses this component in app/layout.tsx, so
+    // authenticated routes can retain their stable provider-free hydration
+    // placeholder without exposing private UI before auth resolves.
     return <div className="h-screen w-full bg-background" aria-hidden />
   }
 
   return (
-    <AppProviders>
-      <CognitiveThemeSyncer />
-      <CognitiveTwinProvider>
-        <MobileOverlayProvider>
-          <GlobalPlayer>
-            <AuthWrapper>
-              <>
-                {children}
-                <QuickCapture />
-              </>
-            </AuthWrapper>
-          </GlobalPlayer>
-          <AuthenticatedWidgets />
-        </MobileOverlayProvider>
-      </CognitiveTwinProvider>
-      <OfflineIndicator />
-      <SyncQueueInit />
-      <NetworkStatus />
-      {/* No standalone Toaster mount — all sileo.* calls route through
-          lib/sileo-bell.ts into the notification bell's physical morph
-          (see components/notification-center.tsx) */}
-    </AppProviders>
+    <MotionConfig reducedMotion="user">
+      <AppProviders>
+        <CognitiveThemeSyncer />
+        <CognitiveTwinProvider>
+          <MobileOverlayProvider>
+            <RoutePlayerBoundary>
+              <AuthWrapper>
+                <>
+                  {children}
+                  <RouteQuickCapture />
+                </>
+              </AuthWrapper>
+            </RoutePlayerBoundary>
+            <AuthenticatedWidgets />
+          </MobileOverlayProvider>
+        </CognitiveTwinProvider>
+        <OfflineIndicator />
+        <SyncQueueInit />
+        <NetworkStatus />
+        {/* No standalone Toaster mount — all sileo.* calls route through
+            lib/sileo-bell.ts into the notification bell's physical morph
+            (see components/notification-center.tsx) */}
+      </AppProviders>
+    </MotionConfig>
   )
 }

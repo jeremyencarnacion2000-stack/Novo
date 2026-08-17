@@ -43,8 +43,7 @@ interface PageWrapperProps {
 export function PageWrapper({ children, className, isFullScreen = false }: PageWrapperProps) {
   const pathname = usePathname() ?? '/'
   const { setScrollContainer } = useScrollContainer()
-  let phase = 'LINEAR_EXECUTION'
-  try { phase = useCognitivePhase() } catch {}
+  const phase = useCognitivePhase()
   const SPRING = useMemo(() => ({
     type: 'spring' as const,
     ...(PHASE_SPRINGS[phase] || PHASE_SPRINGS.LINEAR_EXECUTION),
@@ -123,7 +122,7 @@ export function PageWrapper({ children, className, isFullScreen = false }: PageW
                 doesn't clear, so it overlapped the last visible content on
                 pages like /checklist and /business. md:pb-8 is unchanged —
                 the orb isn't a clearance problem at desktop's larger heights. */}
-            <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-40 md:pb-8 flex-1 w-full">
+            <div className="container py-6 px-4 md:py-8 md:px-6 lg:px-8 pb-[calc(10rem+env(safe-area-inset-bottom))] md:pb-8 flex-1 w-full">
               {children}
             </div>
           </SmoothScrollProvider>

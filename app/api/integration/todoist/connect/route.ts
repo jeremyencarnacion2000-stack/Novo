@@ -16,7 +16,7 @@ import { createTodoistOAuthState, hashTodoistNonce, parseTodoistOAuthState } fro
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
-export async function GET() {
+export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,17 +26,21 @@ export async function GET() {
     const redirectUri = process.env.TODOIST_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
-        return NextResponse.json(
-            { error: 'Todoist integration is not configured. Set TODOIST_CLIENT_ID and TODOIST_REDIRECT_URI.' },
-            { status: 503 },
-        );
+        // A connect button is a browser navigation, so returning raw JSON leaves
+        // the user on an opaque error page. Keep the failure fail-closed while
+        // returning them to the product with a recoverable, non-sensitive state.
+        const url = new URL('/connectors', request.url);
+        url.searchParams.set('integrationStatus', 'unconfigured');
+        url.searchParams.set('provider', 'todoist');
+        return NextResponse.redirect(url);
     }
 
     const state = createTodoistOAuthState(session.user.id);
     const payload = parseTodoistOAuthState(state);
     if (!payload) return NextResponse.json({ error: 'Unable to create OAuth state' }, { status: 503 });
     await prisma.todoistOAuthState.create({ data: { provider: 'todoist', userId: session.user.id, nonceHash: hashTodoistNonce(payload.nonce), expiresAt: new Date(payload.issuedAt + 600000) } });
-    cookies().set('novo_todoist_oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 600, path: '/' });
+    const cookieStore = await cookies();
+    cookieStore.set('novo_todoist_oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 600, path: '/' });
     const params = new URLSearchParams({
         client_id: clientId,
         scope: 'data:read_write',

@@ -7,19 +7,12 @@ import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 
-function MobileSheetDragHandle({ side, onDismiss }: { side: string; onDismiss?: () => void }) {
-  const ref = useDragToDismiss<HTMLDivElement>({
-    onDismiss: onDismiss ?? (() => {
-      const closeBtn = document.querySelector<HTMLElement>('[data-slot="sheet-close"]')
-      closeBtn?.click()
-    }),
-    enabled: side === 'bottom',
-  })
+function MobileSheetDragHandle({ side }: { side: string }) {
   if (side !== 'bottom') return null
   return (
     <div
-      ref={ref}
-      className="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
+      aria-hidden="true"
+      className="flex justify-center pt-3 pb-1 select-none pointer-events-none shrink-0"
     >
       <div className="w-10 h-[5px] rounded-full bg-foreground/20 hover:bg-foreground/40 transition-colors" />
     </div>
@@ -72,13 +65,19 @@ function SheetContent({
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
 }) {
+  const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    enabled: side === 'bottom',
+    onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="sheet-close"]')?.click(),
+  })
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
+        ref={dragSurfaceRef}
         data-slot="sheet-content"
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-[cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:duration-[240ms] data-[state=open]:duration-[380ms] will-change-transform',
           side === 'right' &&
             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm',
           side === 'left' &&

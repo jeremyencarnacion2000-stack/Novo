@@ -40,6 +40,9 @@ export interface CognitiveContext {
     };
     activeSignal: ActiveSignal | null;
     twinContext: TwinContextSummary | null;
+    /** Canonical durable work state used by Today/Chat/Cognitive surfaces. */
+    currentPlan?: { id: string; recommendation?: { id: string; taskId: string | null; title: string; status: string } } | null;
+    recentOutcomes?: { id: string; type: string; taskId: string | null; createdAt: string }[];
     activePlugins?: string[];
     sources: ContextSource[];
 }
@@ -68,7 +71,9 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             projectsList,
             activeSignal,
             checklistItems,
-            integrationAccounts
+            integrationAccounts,
+            currentPlan,
+            recentOutcomes
         ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
             prisma.userCognitiveSnapshot.findUnique({ where: { userId } }),
@@ -114,7 +119,9 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             prisma.integrationAccount.findMany({
                 where: { userId },
                 select: { provider: true, createdAt: true }
-            })
+            }),
+            prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: { where: { status: { in: ['proposed', 'accepted', 'modified', 'started'] } }, orderBy: { priority: 'desc' }, take: 1 } } }),
+            prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } })
         ]);
 
         const twinContext = options?.twinMode ? await buildTwinContextSummary(userId) : null;
@@ -178,6 +185,8 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             },
             activeSignal,
             twinContext,
+            currentPlan: currentPlan ? { id: currentPlan.id, recommendation: currentPlan.actions[0] ? { id: currentPlan.actions[0].id, taskId: currentPlan.actions[0].taskId, title: currentPlan.actions[0].title, status: currentPlan.actions[0].status } : undefined } : null,
+            recentOutcomes: recentOutcomes.map((outcome) => ({ id: outcome.id, type: outcome.type, taskId: outcome.recommendedAction?.taskId ?? null, createdAt: outcome.createdAt.toISOString() })),
             activePlugins: (integrationAccounts || []).map(a => a.provider),
             sources: Array.from(sourceById.values()),
         };
@@ -202,6 +211,8 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             preferences: { language: 'en', theme: 'system', compactMode: false },
             activeSignal: null,
             twinContext: null,
+            currentPlan: null,
+            recentOutcomes: [],
             sources: [NOVO_CONTEXT_SOURCE],
         };
 

@@ -8,10 +8,11 @@ import { ChatInput } from './chat-input';
 import { DesktopHero, MobileHero, VoiceListeningOverlay } from './welcome-hero';
 import {
   Maximize2, Minimize2, Plus,
-  X, Home, PanelLeft, Brain
+  X, Home, PanelLeft
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
+import { useTranslation } from '@/lib/i18n';
 
 interface ModernChatbotProps {
     // Provided when this is rendered inside the mobile fullscreen chat sheet
@@ -31,7 +32,11 @@ export function ModernChatbot({ onMobileClose }: ModernChatbotProps = {}) {
 }
 
 function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
-    const { createConversation, sendMessage, messages, streamingMessage } = useChatbot();
+    const { createConversation, sendMessage, messages, streamingMessage, twinMode, setTwinMode, twinModeAvailable } = useChatbot();
+    const { language } = useTranslation();
+    const agentLabel = language === 'es' ? 'Modo agente' : language === 'fr' ? 'Mode agent' : language === 'de' ? 'Agentenmodus' : 'Agent mode';
+    const assistantLabel = language === 'es' ? 'Asistente' : language === 'fr' ? 'Assistant' : language === 'de' ? 'Assistent' : 'Assistant';
+    const agentHint = language === 'es' ? 'El Twin puede planificar y proponer acciones; siempre pedirá aprobación antes de cambios sensibles.' : language === 'fr' ? 'Le Jumeau peut planifier et proposer des actions ; il demandera toujours votre accord avant les changements sensibles.' : language === 'de' ? 'Der Zwilling kann planen und Aktionen vorschlagen; bei sensiblen Änderungen fragt er immer nach deiner Zustimmung.' : 'The Twin can plan and propose actions; it always asks before sensitive changes.';
     const containerRef = useRef<HTMLDivElement>(null)
     const composerRef = useRef<HTMLDivElement>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -122,7 +127,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.22 }}
                                 onClick={() => setIsDrawerOpen(false)}
-                                className="absolute inset-0 bg-black/50 backdrop-blur-sm z-40"
+                                className="fixed inset-0 bg-background/92 dark:bg-black/85 backdrop-blur-md z-[590]"
                             />
                             {/* Panel */}
                             <motion.div
@@ -131,7 +136,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                 animate={{ x: 0 }}
                                 exit={{ x: '-100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                                className="absolute top-0 left-0 bottom-0 w-[85%] max-w-[320px] bg-[var(--background)]/98 z-50 flex flex-col border-r border-white/[0.06] shadow-2xl backdrop-blur-3xl"
+                                className="fixed inset-0 w-full bg-background z-[600] flex flex-col shadow-2xl backdrop-blur-3xl"
                             >
                                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
                                     <div className="flex items-center gap-2">
@@ -175,20 +180,14 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                             {/* Back on mobile — closes the flip sheet if we're inside
                                 one, otherwise (direct /ai visit) navigates home */}
                             {onMobileClose ? (
-                                <button onClick={onMobileClose} className="md:hidden p-1.5 text-white/30 hover:text-white transition-colors">
+                                <button onClick={onMobileClose} className="hidden md:block p-1.5 text-white/30 hover:text-white transition-colors">
                                     <Home className="w-4 h-4" />
                                 </button>
                             ) : (
-                                <Link href="/" className="md:hidden p-1.5 text-white/30 hover:text-white transition-colors">
+                                <Link href="/" className="hidden md:block p-1.5 text-white/30 hover:text-white transition-colors">
                                     <Home className="w-4 h-4" />
                                 </Link>
                             )}
-                            <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center">
-                                    <Brain className="w-3.5 h-3.5 text-primary" />
-                                </div>
-                                <span className="text-xs font-bold tracking-widest uppercase text-white/70">Novo AI</span>
-                            </div>
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -200,11 +199,20 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                                 <Plus className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Nuevo chat</span>
                             </button>
-                            {/* Cognitive mode pill */}
-                            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/5 border border-primary/10">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                                <span className="text-[10px] font-bold tracking-tight text-primary uppercase">Modo Cognitivo</span>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => twinModeAvailable && setTwinMode(!twinMode)}
+                                aria-pressed={twinMode}
+                                title={twinModeAvailable ? agentHint : `${agentLabel} Pro`}
+                                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold tracking-tight uppercase transition-[background,border-color,transform] duration-150 active:scale-[0.97] ${
+                                    twinMode
+                                        ? 'bg-primary/12 border-primary/30 text-primary'
+                                        : 'bg-white/[0.03] border-white/[0.08] text-white/45 hover:border-white/15 hover:text-white/70'
+                                } ${!twinModeAvailable ? 'cursor-not-allowed opacity-60' : ''}`}
+                            >
+                                <span className={`size-1.5 rounded-full ${twinMode ? 'bg-primary shadow-[0_0_8px_var(--primary)] animate-pulse' : 'bg-white/30'}`} />
+                                {twinMode ? agentLabel : assistantLabel}
+                            </button>
                             {/* Fullscreen */}
                             <button
                                 onClick={toggleFullscreen}
@@ -266,7 +274,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                         into an edge-to-edge bar. */}
                     <div ref={composerRef} className="flex-shrink-0 z-20 relative">
                         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent pointer-events-none" />
-                        <div className="relative px-3 sm:px-6 pt-4 pb-6 md:pb-4">
+                        <div className="relative px-3 sm:px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-4">
                             <ChatInput variant="bottom" />
                         </div>
                     </div>

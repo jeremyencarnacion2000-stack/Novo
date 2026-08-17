@@ -196,10 +196,41 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         '--novo-focus-backdrop-filter': material.focusSurface.backdropFilter,
         '--novo-focus-border': material.focusSurface.border,
         '--novo-focus-box-shadow': material.focusSurface.boxShadow,
+        // Settings owns the appearance of its own backdrop too. Keeping the
+        // overlay values on the same root contract prevents DialogOverlay's
+        // default black/blur treatment from masking Background Dimness/Blur.
+        '--novo-dialog-overlay-opacity': `${Math.max(0, Math.min(0.8, settings.backgroundDimness / 100))}`,
+        '--novo-dialog-overlay-blur': `${Math.max(0, settings.backgroundBlur)}px`,
       }
 
       Object.entries(materialVariables).forEach(([property, value]) => {
         root.style.setProperty(property, value)
+      })
+
+      // Preserve the original Novo variable namespaces used by the restored
+      // sidebar and card primitives. The material contract remains the source
+      // of wallpaper safety; these aliases keep the existing Settings controls
+      // connected to the historical presentation instead of replacing it.
+      const sidebarOpacity = Math.max(0, settings.glassOpacity / 100)
+      const effectiveSidebarOpacity = sidebarOpacity
+      const sidebarBlur = `${settings.glassBlur}px`
+      const cardOpacity = Math.max(0, settings.cardOpacity / 100)
+      const cardBlur = `${Math.max(0, settings.cardLiquidIntensity)}px`
+      const cardRefraction = Math.min(0.25, cardOpacity * 1.5)
+      const legacyVariables = {
+        '--sidebar-blur-px': sidebarBlur,
+        '--sidebar-opacity': `${effectiveSidebarOpacity}`,
+        '--glass-opacity': `${effectiveSidebarOpacity}`,
+        '--glass-blur': `${settings.glassBlur}`,
+        '--glass-blur-px': sidebarBlur,
+        '--card-liquid-opacity': `${cardOpacity}`,
+        '--card-blur-px': cardBlur,
+        '--card-refraction': `${cardRefraction}`,
+      }
+
+      Object.entries(legacyVariables).forEach(([property, value]) => {
+        root.style.setProperty(property, value)
+        document.body.style.setProperty(property, value)
       })
     }
 

@@ -74,7 +74,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
 
     return (
         <div
-            className={`relative h-full bg-[var(--background)]/95 border-r border-white/5 transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : 'w-full md:w-72 lg:w-80'
+            className={`relative h-full bg-background border-border transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : 'w-full md:w-72 lg:w-80'
                 }`}
         >
             {/* Header — the embedded drawer supplies its own title/close button */}
@@ -83,12 +83,12 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                     {!sidebarCollapsed && (
                         <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
-                            <h2 className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase">Historial</h2>
+                            <h2 className="text-[10px] font-bold text-muted-foreground tracking-[0.25em] uppercase">Historial</h2>
                         </div>
                     )}
                     <button
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className="p-1.5 hover:bg-white/[0.04] rounded-lg transition-all text-white/40 hover:text-white"
+                        className="p-1.5 hover:bg-white/[0.04] rounded-lg transition-all text-muted-foreground hover:text-foreground"
                         aria-label={sidebarCollapsed ? 'Expandir' : 'Colapsar'}
                     >
                         {sidebarCollapsed ? (
@@ -118,7 +118,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                         {/* Trash clear all button */}
                         <button
                             onClick={handleClearAll}
-                            className="p-2 bg-white/[0.02] hover:bg-red-500/15 border border-white/5 hover:border-red-500/30 text-white/40 hover:text-red-400 rounded-xl transition-all duration-300"
+                            className="p-2 bg-white/[0.02] hover:bg-red-500/15 border border-white/5 hover:border-red-500/30 text-muted-foreground hover:text-red-400 rounded-xl transition-all duration-300"
                             title="Limpiar historial"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -135,7 +135,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                         </button>
                         <button
                             onClick={handleClearAll}
-                            className="p-3 bg-white/[0.02] hover:bg-red-500/15 border border-white/5 hover:border-red-500/30 text-white/40 hover:text-red-400 rounded-xl transition-all"
+                            className="p-3 bg-white/[0.02] hover:bg-red-500/15 border border-white/5 hover:border-red-500/30 text-muted-foreground hover:text-red-400 rounded-xl transition-all"
                             title="Limpiar Historial"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -146,13 +146,13 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                 {/* Search */}
                 {!sidebarCollapsed && (
                     <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-primary transition-colors" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
                             placeholder="Buscar chats..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-black/40 border border-white/5 rounded-xl text-xs text-white placeholder-white/20 focus:outline-none focus:border-primary/30 transition-all font-sans"
+                            className="w-full pl-9 pr-4 py-2 bg-muted/60 border border-white/5 rounded-xl text-xs text-foreground placeholder-white/20 focus:outline-none focus:border-primary/30 transition-all font-sans"
                         />
                     </div>
                 )}
@@ -163,7 +163,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                 <div className="space-y-4">
                 {groupedConversations.length === 0 ? (
                     !sidebarCollapsed && (
-                        <div className="text-center py-12 text-white/10 text-xs italic">
+                        <div className="text-center py-12 text-muted-foreground/50 text-xs italic">
                             {searchQuery ? 'Sin resultados' : 'Sin chats recientes'}
                         </div>
                     )
@@ -171,7 +171,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                     groupedConversations.map(([groupName, items]) => (
                         <div key={groupName} className="space-y-1.5 animate-in fade-in duration-300">
                             {!sidebarCollapsed && (
-                                <div className="text-[9px] font-bold tracking-[0.15em] text-white/20 uppercase pl-2 mb-1">
+                                <div className="text-[9px] font-bold tracking-[0.15em] text-muted-foreground/60 uppercase pl-2 mb-1">
                                     {groupName}
                                 </div>
                             )}
@@ -182,8 +182,8 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                                     data-conversation-item
                                     className={`group relative flex items-center gap-3 rounded-xl cursor-pointer transition-all duration-300 border min-w-0 ${sidebarCollapsed ? 'p-3 justify-center' : 'px-3 py-2.5'
                                         } ${currentConversationId === conv.id
-                                            ? 'bg-primary/[0.04] text-white border-primary/20 shadow-[0_0_20px_rgba(var(--primary-rgb),0.06)]'
-                                            : 'text-white/40 hover:bg-white/[0.02] hover:text-white/80 border-transparent'
+                                            ? 'bg-primary/[0.04] text-foreground border-primary/20 shadow-[0_0_20px_rgba(var(--primary-rgb),0.06)]'
+                                            : 'text-muted-foreground hover:bg-white/[0.02] hover:text-foreground border-transparent'
                                         }`}
                                     onClick={() => setCurrentConversationId(conv.id)}
                                     title={sidebarCollapsed ? conv.title : undefined}
@@ -202,7 +202,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                                                 className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-all"
                                                 aria-label="Eliminar"
                                             >
-                                                <MoreHorizontal className="w-3.5 h-3.5 text-white/30 hover:text-red-400" />
+                                                <MoreHorizontal className="w-3.5 h-3.5 text-foreground/30 hover:text-red-400" />
                                             </button>
                                         </>
                                     )}

@@ -143,15 +143,15 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
                         <TabsContent key={day.id} value={day.id} className="space-y-6 animate-in fade-in-50">
 
                             {/* Weekday Selector */}
-                            <div className="flex items-center justify-between bg-muted/30 p-3 rounded-lg border">
+                            <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-lg border sm:flex-row sm:items-center sm:justify-between">
                                 <span className="text-sm font-medium text-muted-foreground">Assigned Day:</span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex w-full items-center gap-2 sm:w-auto">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <Select
                                         value={dayWeekdays[day.id] || ''}
                                         onValueChange={(val) => handleWeekdayChange(day.id, val)}
                                     >
-                                        <SelectTrigger className="w-[140px] h-8 text-xs">
+                                        <SelectTrigger className="h-9 w-full text-xs sm:w-[140px]">
                                             <SelectValue placeholder="Select Day" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -175,11 +175,11 @@ export function RoutineDetailView({ routine, onStartWorkout }: RoutineDetailView
                                                 className="!p-3 !md:p-4 !gap-2 !py-3 !rounded-2xl border-l-4 border-l-primary/20 hover:border-l-primary transition-colors bg-card/50 overflow-hidden"
                                             >
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="flex justify-between items-start gap-3">
-                                                        <h4 className="font-bold text-sm md:text-base leading-tight break-words flex-1">
+                                                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
+                                                        <h4 className="min-w-0 font-bold text-sm md:text-base leading-tight break-words">
                                                             {exercise.name}
                                                         </h4>
-                                                        <div className="flex flex-wrap gap-1.5 shrink-0 justify-end">
+                                                        <div className="flex flex-wrap gap-1.5 sm:shrink-0 sm:justify-end">
                                                             <Badge variant="secondary" className="font-bold text-[10px] md:text-xs">
                                                                 {exercise.sets} Sets
                                                             </Badge>

@@ -4,6 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity } from 'lucide-react';
 import { GlowingOrb } from './glowing-orb';
+import { useTranslation } from '@/lib/i18n';
 
 const INTENT_LABEL: Record<string, string> = {
     TASK: 'Gestión de tareas',
@@ -27,11 +28,20 @@ export function ThinkingSteps({
     modelLabel,
     intent,
     fallback,
+    agentMode = false,
 }: {
     modelLabel: string | null;
     intent: string | null;
     fallback: boolean;
+    agentMode?: boolean;
 }) {
+    const { language } = useTranslation();
+    const copy = {
+        en: { analyze: 'Understanding your message', context: 'Reviewing the Twin context you approved', processing: 'Working' },
+        es: { analyze: 'Analizando tu mensaje', context: 'Revisando el contexto aprobado del Gemelo', processing: 'Procesando' },
+        fr: { analyze: 'Analyse de votre message', context: 'Vérification du contexte approuvé du Jumeau', processing: 'Traitement' },
+        de: { analyze: 'Deine Nachricht wird analysiert', context: 'Der freigegebene Kontext des Zwillings wird geprüft', processing: 'Verarbeitung' },
+    }[language] || { analyze: 'Understanding your message', context: 'Reviewing the Twin context you approved', processing: 'Working' };
     // Every rescue-tier modelLabel from the route already carries its own
     // "(Respaldo)"/"(Rescate)" wording (app/api/ai/stream/route.ts) -
     // appending fallback's own " (respaldo)" here doubled up on every
@@ -41,7 +51,8 @@ export function ThinkingSteps({
         : null;
 
     const steps = [
-        { id: 'analyze', label: 'Analizando tu mensaje' },
+        { id: 'analyze', label: copy.analyze },
+        ...(agentMode ? [{ id: 'context', label: copy.context }] : []),
         ...(routeLabel ? [{ id: 'route', label: routeLabel }] : []),
     ];
     const activeIndex = steps.length - 1;
@@ -52,7 +63,7 @@ export function ThinkingSteps({
             <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
                     <Activity className="w-3 h-3 text-primary animate-pulse" />
-                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">Procesando</span>
+                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">{copy.processing}</span>
                 </div>
                 <AnimatePresence mode="popLayout">
                     {steps.map((step, i) => (

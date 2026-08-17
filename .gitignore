@@ -2,6 +2,9 @@ node_modules
 # Keep environment variables out of version control
 .env
 .env.local
+.env.*.local
+.env.test
+.env.test.local
 
 /lib/generated/prisma
 
@@ -13,3 +16,4 @@ node_modules
 .superpowers
 .gstack/
 *.tsbuildinfo
+.env*

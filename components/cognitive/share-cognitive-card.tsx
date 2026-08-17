@@ -1,9 +1,18 @@
 'use client'
 
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Share2, Copy, Check, Sparkles, Brain, X } from 'lucide-react'
+import { Copy, Check, Brain, X } from 'lucide-react'
 import { ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useModalFlip } from '@/hooks/use-modal-flip'
+import { useTranslation } from '@/lib/i18n'
+
+const SHARE_COPY = {
+  en: { title: 'Novo planning summary', subtitle: 'Shareable operational context', accuracy: 'Profile confidence', optimal: 'Planning context', peak: 'Preferred focus window', style: 'Work style', load: 'Estimated operational workload', fatigue: '', copied: 'Copied to clipboard', copy: 'Copy summary', helper: 'Share only the planning context you choose.', close: 'Close' },
+  es: { title: 'Sistema cognitivo Novo', subtitle: 'Resumen cognitivo para compartir', accuracy: 'Precisión', optimal: 'Estable', peak: 'Ventana pico', style: 'Estilo de foco', load: 'Carga cognitiva', fatigue: 'Riesgo de fatiga', copied: 'Copiado al portapapeles', copy: 'Copiar resumen', helper: 'Comparte tus métricas de foco con tu equipo o red profesional.', close: 'Cerrar' },
+  fr: { title: 'Système cognitif Novo', subtitle: 'Résumé cognitif à partager', accuracy: 'Précision', optimal: 'Stable', peak: 'Fenêtre optimale', style: 'Style de concentration', load: 'Charge cognitive', fatigue: 'Risque de fatigue', copied: 'Copié dans le presse-papiers', copy: 'Copier le résumé', helper: 'Partagez vos mesures de concentration avec votre équipe.', close: 'Fermer' },
+  de: { title: 'Novo Kognitivsystem', subtitle: 'Teilbare kognitive Zusammenfassung', accuracy: 'Genauigkeit', optimal: 'Stabil', peak: 'Hochphase', style: 'Fokusstil', load: 'Kognitive Last', fatigue: 'Ermüdungsrisiko', copied: 'In die Zwischenablage kopiert', copy: 'Zusammenfassung kopieren', helper: 'Teile deine Fokuswerte mit deinem Team oder Netzwerk.', close: 'Schließen' },
+} as const
 
 interface ShareCognitiveCardProps {
   isOpen: boolean
@@ -20,25 +29,34 @@ interface ShareCognitiveCardProps {
 export function ShareCognitiveCard({
   isOpen,
   onClose,
-  twinScore = 88,
-  trustLevel = 'high',
+  twinScore = 0,
+  trustLevel = 'initial',
   chronotype = 'Búho Nocturno',
-  peakWindow = '20:00 - 23:00',
-  focusStyle = 'Constructor Profundo',
-  cognitiveLoad = 35,
-  burnoutRisk = 12,
+  peakWindow = 'Sin estimar',
+  focusStyle = 'Sin calibrar',
+  cognitiveLoad = 0,
+  burnoutRisk: _burnoutRisk = 0,
 }: ShareCognitiveCardProps) {
   const [copied, setCopied] = useState(false)
+  const { language } = useTranslation()
+  const copy = SHARE_COPY[language as keyof typeof SHARE_COPY] ?? SHARE_COPY.en
+  const operationalLoadLabel = language === 'es'
+    ? 'Carga operativa estimada'
+    : language === 'fr'
+      ? 'Charge opérationnelle estimée'
+      : language === 'de'
+        ? 'Geschätzte operative Auslastung'
+        : copy.load
+  const closeFlip = useModalFlip('cognitive-share', isOpen)
+  const handleClose = () => closeFlip(onClose)
 
-  if (!isOpen) return null
-
-  const shareText = `Mi Cognitive Twin en Novo OS:
+  const shareText = `Mi resumen de planificación en Novo:
 - Precisión Cognitiva: ${twinScore}%
 - Ventana de Foco Pico: ${peakWindow}
 - Estilo de Foco: ${focusStyle}
-- Carga Cognitiva: ${cognitiveLoad}% | Riesgo de Fatiga: ${burnoutRisk}%
+- Carga operativa estimada: ${cognitiveLoad}%
 
-Optimiza tu rendimiento cognitivo sin burnout con Novo -> https://productivitynovo.vercel.app`
+Organiza tu siguiente paso con Novo -> https://productivitynovo.vercel.app`
 
   const handleCopyText = async () => {
     try {
@@ -51,66 +69,62 @@ Optimiza tu rendimiento cognitivo sin burnout con Novo -> https://productivityno
   }
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-md rounded-3xl bg-[#09090e] border border-indigo-500/30 p-6 md:p-8 shadow-[0_0_50px_rgba(99,102,241,0.2)] text-white overflow-hidden"
-        >
-          {/* Background Glow Accents */}
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+    <Dialog open={isOpen} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
+      <DialogContent
+        data-flip-to="cognitive-share"
+        showCloseButton={false}
+        className="max-w-[min(28rem,calc(100%-1.5rem))] overflow-hidden rounded-[28px] border-foreground/[0.1] bg-background/96 p-5 text-foreground shadow-[0_28px_90px_-36px_rgba(0,0,0,0.75)] sm:p-7"
+      >
+        <div data-modal-content>
 
           {/* Close Button */}
           <button
-            onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+            onClick={handleClose}
+            aria-label={copy.close}
+            className="absolute right-5 top-5 rounded-full p-2 text-foreground/50 transition-[color,background-color,transform] duration-150 hover:bg-foreground/[0.07] hover:text-foreground active:scale-[0.97]"
           >
             <X className="w-4 h-4" />
           </button>
 
           {/* Header */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-indigo-400" />
+          <DialogHeader className="mb-6 flex-row items-center gap-2 space-y-0 pr-10 text-left">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
+              <Brain className="w-4 h-4 text-primary" strokeWidth={1.7} />
             </div>
             <div>
-              <h3 className="text-xs font-black tracking-[0.2em] uppercase text-white/90">Novo Cognitive System</h3>
-              <p className="text-[10px] text-white/40">Tarjeta de Resumen Cognitivo</p>
+              <DialogTitle className="text-xs font-black uppercase tracking-[0.2em] text-foreground/90">{copy.title}</DialogTitle>
+              <p className="text-[10px] text-foreground/45">{copy.subtitle}</p>
             </div>
-          </div>
+          </DialogHeader>
 
           {/* Shareable Glass Card Surface */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl mb-6 relative overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+          <div className="relative mb-6 overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/[0.025] p-5">
+            <div className="mb-4 flex items-center justify-between border-b border-foreground/10 pb-4">
               <div className="flex items-center gap-4">
                 <ConfidenceGauge score={twinScore} size="sm" />
                 <div>
-                  <p className="text-[9px] font-black tracking-widest text-white/40 uppercase">ACCURACY</p>
+                  <p className="text-[9px] font-black tracking-widest text-foreground/45 uppercase">{copy.accuracy}</p>
                   <TrustBadge level={trustLevel as any} />
                 </div>
               </div>
               <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                OPTIMAL
+                {copy.optimal}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-[9px] font-black tracking-wider uppercase text-white/40 block mb-1">Ventana Pico</span>
-                <span className="text-xs font-bold text-indigo-400">{peakWindow}</span>
+              <div className="rounded-xl border border-foreground/[0.07] bg-foreground/[0.018] p-3">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-foreground/45">{copy.peak}</span>
+                <span className="text-xs font-bold text-primary">{peakWindow}</span>
               </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-[9px] font-black tracking-wider uppercase text-white/40 block mb-1">Estilo de Foco</span>
-                <span className="text-xs font-bold text-white capitalize">{focusStyle}</span>
+              <div className="rounded-xl border border-foreground/[0.07] bg-foreground/[0.018] p-3">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-foreground/45">{copy.style}</span>
+                <span className="text-xs font-bold text-foreground capitalize">{focusStyle}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-white/60 pt-2 border-t border-white/5">
-              <span>Carga Cognitiva: <strong className="text-white">{cognitiveLoad}%</strong></span>
-              <span>Riesgo Fatiga: <strong className="text-emerald-400">{burnoutRisk}%</strong></span>
+            <div className="flex items-center justify-between border-t border-foreground/[0.07] pt-2 text-xs text-foreground/60">
+              <span>{operationalLoadLabel}: <strong className="text-foreground">{cognitiveLoad}%</strong></span>
             </div>
           </div>
 
@@ -118,26 +132,26 @@ Optimiza tu rendimiento cognitivo sin burnout con Novo -> https://productivityno
           <div className="space-y-3">
             <button
               onClick={handleCopyText}
-              className="w-full h-12 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-98 text-white font-bold text-xs tracking-wide transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(99,102,241,0.3)]"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-bold tracking-wide text-primary-foreground transition-[filter,transform] duration-150 hover:brightness-105 active:scale-[0.98]"
             >
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-emerald-300" />
-                  ¡Copiado al portapapeles!
+                  {copy.copied}
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4" />
-                  Copiar Tarjeta para Redes / Slack
+                  {copy.copy}
                 </>
               )}
             </button>
-            <p className="text-[10px] text-center text-white/40">
-              Comparte tus métricas de foco con tu equipo o red profesional.
+            <p className="text-center text-[10px] text-foreground/45">
+              {copy.helper}
             </p>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

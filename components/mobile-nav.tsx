@@ -27,7 +27,8 @@ export function MobileNav() {
     // deferred-unmount pattern every other flip dialog in this app uses —
     // only flipping false in the flight's onDone.
     const closeDrawerFlip = useModalFlip('mobile-nav-panel', drawerOpen)
-    const handleCloseDrawer = () => closeDrawerFlip(closeOverlay)
+    const handleCloseDrawer = (options?: { historyAction?: 'back' | 'replace' | 'none' }) =>
+        closeDrawerFlip(() => closeOverlay(options))
     const handleOpenVoice = () => closeDrawerFlip(() => openOverlay('voice'))
     const handleFabClick = () => {
         navigator.vibrate?.(10)
@@ -52,7 +53,41 @@ export function MobileNav() {
     // When the software keyboard or a different modal/sheet owns the mobile
     // surface, remove every background navigation target from the a11y tree.
     if (suppressSecondary && activeOverlay !== 'navigation') return null
-    const navigationOpen = activeOverlay === 'navigation'
+
+    if (drawerOpen) {
+        return (
+            <>
+                <div
+                    className="fixed bottom-4 left-4 right-4 z-[100] md:hidden pointer-events-none"
+                    style={{ paddingBottom: 'var(--mobile-safe-area-bottom)' }}
+                >
+                    <motion.div
+                        data-flip-from="mobile-nav-panel"
+                        className="relative isolate flex items-center gap-1 rounded-full novo-mobile-nav-shell px-3 py-1.5"
+                        layout
+                    >
+                        <GlassSurface
+                            aria-hidden
+                            radius={9999}
+                            depth={4}
+                            blur={1}
+                            strength={24}
+                            chromaticAberration={2.5}
+                            backgroundColor="rgba(255,255,255,0.055)"
+                            elevation="low"
+                            className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+                            style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+                        />
+                    </motion.div>
+                </div>
+
+                <MobileSectionDrawer
+                    onClose={handleCloseDrawer}
+                    onOpenVoice={handleOpenVoice}
+                />
+            </>
+        )
+    }
 
     return (
         <>
@@ -61,7 +96,7 @@ export function MobileNav() {
                 direction state would get stuck and leave the bar hidden
                 off-screen (the reported "se buggea"). A persistent bar is
                 simpler and never strands the user without navigation. */}
-            {!navigationOpen && <nav
+            <nav
                 aria-label="Primary mobile navigation"
                 className="fixed bottom-4 left-4 right-4 z-[100] md:hidden flex items-end justify-between pointer-events-none gap-3"
                 style={{ paddingBottom: 'var(--mobile-safe-area-bottom)' }}
@@ -71,12 +106,27 @@ export function MobileNav() {
                 <motion.div
                     data-flip-from="mobile-nav-panel"
                     className={cn(
-                        "flex items-center gap-1 rounded-full border border-foreground/10 shadow-[0_8px_40px_rgba(0,0,0,0.55)] pointer-events-auto",
+                        "relative isolate flex items-center gap-1 rounded-full pointer-events-auto novo-mobile-nav-shell",
                         isCompactPath ? "px-3 py-1.5" : "px-2 py-2"
                     )}
-                    style={{ background: 'color-mix(in srgb, var(--background) 90%, transparent)' }}
                     layout
                 >
+                    {/* One low-aberration lens for the rail. Active items get a
+                        second, tighter lens below so the navigation still has a
+                        clear focal state without stacking heavy filters on every
+                        button. */}
+                    <GlassSurface
+                        aria-hidden
+                        radius={9999}
+                        depth={4}
+                        blur={1}
+                        strength={24}
+                        chromaticAberration={2.5}
+                        backgroundColor="rgba(255,255,255,0.055)"
+                        elevation="low"
+                        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+                        style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+                    />
                     <LayoutGroup>
                         {navItems.map((item) => {
                             const Icon = item.icon
@@ -93,10 +143,11 @@ export function MobileNav() {
                                         router.push(item.path)
                                     }}
                                     className={cn(
-                                        "relative flex items-center justify-center rounded-full transition-colors min-w-[44px] min-h-[44px] h-[44px]",
+                                        "relative z-10 flex items-center justify-center rounded-full transition-colors min-w-[44px] min-h-[44px] h-[44px] novo-nav-glass-control",
                                         active ? "text-foreground" : "text-foreground/65",
                                         active && "px-4"
                                     )}
+                                    data-active={active}
                                     whileTap={{ scale: 0.82 }}
                                     transition={springConfig.snappy}
                                     layout
@@ -111,8 +162,8 @@ export function MobileNav() {
                                                 radius={9999}
                                                 depth={6}
                                                 blur={1}
-                                                strength={30}
-                                                chromaticAberration={6}
+                                                strength={28}
+                                                chromaticAberration={3.5}
                                                 backgroundColor="rgba(255,255,255,0.1)"
                                                 elevation="low"
                                                 className="h-full w-full"
@@ -142,23 +193,39 @@ export function MobileNav() {
 
                 {/* FAB — right side, opens/closes drawer. Stays in place the
                     whole time as a persistent trigger (rotates +/X); the
-                    panel grows from the nav bar's rect, not this button's. */}
+                    panel grows from the nav bar's rect, not this button's.
+                    The base is the Settings-driven focus surface so the FAB
+                    keeps real contrast over any wallpaper instead of the
+                    near-invisible 7% white wash it shipped with. */}
                 <motion.button
                     onClick={handleFabClick}
                     data-testid="mobile-primary-target"
                     aria-label={drawerOpen ? "Close menu" : "Open menu"}
-                    className="novo-context-glass pointer-events-auto min-w-[44px] min-h-[44px] h-[52px] w-[52px] rounded-full flex items-center justify-center"
+                    className="relative isolate novo-mobile-nav-fab novo-focus-surface pointer-events-auto min-w-[44px] min-h-[44px] h-[52px] w-[52px] rounded-full flex items-center justify-center"
                     whileTap={{ scale: 0.85 }}
                     transition={springConfig.snappy}
                 >
+                    <GlassSurface
+                        aria-hidden
+                        radius={9999}
+                        depth={4}
+                        blur={1}
+                        strength={24}
+                        chromaticAberration={2.25}
+                        backgroundColor="rgba(255,255,255,0.14)"
+                        elevation="low"
+                        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+                        style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+                    />
                     <motion.div
+                        className="relative z-10"
                         animate={{ rotate: drawerOpen ? 45 : 0 }}
                         transition={springConfig.snappy}
                     >
-                        <Plus className="h-5 w-5 text-foreground/60" strokeWidth={2} />
+                        <Plus className="h-5 w-5 text-foreground" strokeWidth={2.25} />
                     </motion.div>
                 </motion.button>
-            </nav>}
+            </nav>
 
             {/* Section Drawer — mounted only while open; unmounts in the
                 close flight's onDone, not on click (see handleCloseDrawer) */}

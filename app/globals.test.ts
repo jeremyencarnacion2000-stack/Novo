@@ -61,12 +61,22 @@ const utilityDeclarationFor = (root: Root, name: string, property: string) => {
 }
 
 describe('liquid glass card tiers', () => {
-  it('maps every liquid card tier to Focus Surface', () => {
+  it('feeds everyday liquid cards from the card Settings controls (Focus)', () => {
     const root = stylesheet()
 
+    // Settings labels these sliders "Dashboard Card Glass Opacity" and
+    // "Dashboard Card Refraction Blur" (cardOpacity/cardLiquidIntensity),
+    // which the material contract resolves into --novo-focus-*. Cards must
+    // therefore read Focus — reading Context (the sidebar glass sliders)
+    // made the card sliders change nothing, reported as "se dañó".
     expect(backdropFilterFor(root, '.liquid-glass,\n  .liquid-glass-subtle')).toBe(
       'var(--novo-focus-backdrop-filter)',
     )
+    expect(declarationFor(root, '.liquid-glass,\n  .liquid-glass-subtle', 'background')).toBe(
+      'var(--novo-focus-background)',
+    )
+    expect(backdropFilterFor(root, '.liquid-glass-hover')).toBe('var(--novo-focus-backdrop-filter)')
+    expect(declarationFor(root, '.liquid-glass-hover', 'background')).toBe('var(--novo-focus-background)')
     expect(backdropFilterFor(root, '.liquid-glass-elevated')).toBe(
       'var(--novo-focus-backdrop-filter)',
     )
@@ -75,33 +85,31 @@ describe('liquid glass card tiers', () => {
     )
   })
 
-  it('maps standard card surfaces to Focus Surface', () => {
+  it('keeps the established card hierarchy instead of forcing every tier to Focus', () => {
     const root = stylesheet()
 
-    for (const utility of ['card--hero', 'card--primary', 'card--secondary', 'card--tertiary', 'glass-surface']) {
+    for (const utility of ['card--hero', 'card--primary', 'glass-surface']) {
       expect(utilityDeclarationFor(root, utility, 'background')).toBe('var(--novo-focus-background)')
       expect(utilityDeclarationFor(root, utility, 'backdrop-filter')).toBe('var(--novo-focus-backdrop-filter)')
     }
 
-    expect(utilityDeclarationFor(root, 'glass-surface', 'backdrop-filter')).toBe(
-      'var(--novo-focus-backdrop-filter)',
-    )
-    expect(utilityDeclarationFor(root, 'card--secondary', 'backdrop-filter')).toBe(
-      'var(--novo-focus-backdrop-filter)',
-    )
+    for (const utility of ['card--secondary', 'card--tertiary']) {
+      expect(utilityDeclarationFor(root, utility, 'background')).toBe('var(--novo-context-background)')
+      expect(utilityDeclarationFor(root, utility, 'backdrop-filter')).toBe('var(--novo-context-backdrop-filter)')
+    }
   })
 
-  it('keeps shared glass cards inside Focus Surface', () => {
+  it('keeps repeated shared glass cards inside Context Glass', () => {
     const root = stylesheet()
 
-    expect(backdropFilterFor(root, '.glass-card')).toBe('var(--novo-focus-backdrop-filter)')
+    expect(backdropFilterFor(root, '.glass-card')).toBe('var(--novo-context-backdrop-filter)')
     expect(declarationFor(root, '.glass-card', 'isolation')).toBe('isolate')
+    expect(backdropFilterFor(root, '.glass-card-list')).toBe('var(--novo-context-backdrop-filter)')
   })
 
   it('maps retained generic card and navigation utilities to contract roles', () => {
     const root = stylesheet()
 
-    expect(backdropFilterFor(root, '.glass-card-list')).toBe('var(--novo-focus-backdrop-filter)')
     expect(utilityDeclarationFor(root, 'glass', 'backdrop-filter')).toBe('var(--novo-context-backdrop-filter)')
     expect(utilityDeclarationFor(root, 'glass-blur', 'backdrop-filter')).toBe('var(--novo-context-backdrop-filter)')
   })

@@ -11,10 +11,10 @@ interface FocusScoreRingProps {
 }
 
 const COLORS = {
-  high: { stroke: '#22c55e', glow: 'rgba(34,197,94,0.35)', text: '#22c55e', label: 'OPTIMAL' },
-  medium: { stroke: '#f59e0b', glow: 'rgba(245,158,11,0.35)', text: '#f59e0b', label: 'MODERATE' },
-  low: { stroke: '#f97316', glow: 'rgba(249,115,22,0.35)', text: '#f97316', label: 'LOW' },
-  critical: { stroke: '#ef4444', glow: 'rgba(239,68,68,0.4)', text: '#ef4444', label: 'CRITICAL' },
+  high: { stroke: '#22c55e', glow: 'rgba(34,197,94,0.35)', text: '#22c55e', label: 'FAVORABLE' },
+  medium: { stroke: '#f59e0b', glow: 'rgba(245,158,11,0.35)', text: '#f59e0b', label: 'MODERADO' },
+  low: { stroke: '#f97316', glow: 'rgba(249,115,22,0.35)', text: '#f97316', label: 'LIMITADO' },
+  critical: { stroke: '#ef4444', glow: 'rgba(239,68,68,0.4)', text: '#ef4444', label: 'ELEVADO' },
 };
 
 export function FocusScoreRing({ score, energyLevel, animated = true }: FocusScoreRingProps) {
@@ -137,7 +137,10 @@ export function FocusScoreRing({ score, energyLevel, animated = true }: FocusSco
         </motion.div>
         
         <span className="text-[9px] font-black tracking-[0.35em] uppercase text-foreground/30 mt-2 leading-none">
-          FOCUS VALUE
+          ÍNDICE OPERATIVO ESTIMADO
+        </span>
+        <span className="mt-1 max-w-36 text-[8px] leading-tight text-foreground/45">
+          Basado en tareas y sesiones, no en una medición mental.
         </span>
 
         {/* Crystalline dynamic recovery pill */}
@@ -169,4 +172,3 @@ export function FocusScoreRing({ score, energyLevel, animated = true }: FocusSco
     </motion.div>
   );
 }
-

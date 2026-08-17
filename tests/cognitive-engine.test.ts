@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+import { computeBioState } from '@/lib/cognitive-engine';
+
 // Circadian curve values from the Cognitive Engine model:
 // Peak: 10am -> 95% | Valley: 2am -> 8% | Dip: 2pm (14:00) -> 45%
 function getCircadianEnergyAt(hour: number): number {
@@ -19,6 +21,22 @@ function getCognitiveWeight(priority: string): number {
 }
 
 describe('Cognitive Engine - Circadian & Metrics Logic', () => {
+  test('time and in-app workload do not publish a diagnostic fatigue phase', () => {
+    const lateNight = computeBioState({
+      now: new Date(2026, 6, 29, 3, 0),
+      chronotype: 'intermediate',
+      userStressScore: 50,
+    });
+    const daytimePeak = computeBioState({
+      now: new Date(2026, 6, 29, 10, 0),
+      chronotype: 'intermediate',
+      userStressScore: 50,
+    });
+
+    expect(lateNight.phase).toBe('LINEAR_EXECUTION');
+    expect(daytimePeak.phase).toBe('PEAK_FOCUS');
+  });
+
   test('Circadian Curve math should match science-backed hourly metrics', () => {
     // Peak window limits
     expect(getCircadianEnergyAt(10)).toBe(95);

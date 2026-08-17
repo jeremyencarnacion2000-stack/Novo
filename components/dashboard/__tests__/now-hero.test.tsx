@@ -31,6 +31,14 @@ describe('NowHero calendar override', () => {
     global.fetch = jest.fn();
   });
 
+  it('uses the original Ahora gradient instead of the global premium material', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: () => Promise.resolve([]) })
+    const { container } = renderNowHero()
+
+    await waitFor(() => expect(container.querySelector('.bg-gradient-to-br')).not.toBeNull())
+    expect(container.querySelector('.novo-premium-field')).toBeNull()
+  })
+
   it('shows a calendar signal headline when no urgent task exists but a calendar signal was logged today', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/tasks')) {
@@ -50,7 +58,7 @@ describe('NowHero calendar override', () => {
     renderNowHero()
 
     await waitFor(() => {
-      expect(screen.getByText(/3 reuniones seguidas/i)).toBeInTheDocument()
+      expect(screen.getByText('Tienes reuniones muy seguidas. Reserva un margen antes de tu siguiente bloque.')).toBeInTheDocument()
     })
   });
 
@@ -82,6 +90,29 @@ describe('NowHero calendar override', () => {
     })
   });
 
+  it('uses a pending checklist item when the task endpoint is empty', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/tasks')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.includes('/api/checklist')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            { id: 'c1', text: 'Preparar la demo', priority: 'high', dueDate: null, completed: false },
+          ]),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ signal: null }) });
+    });
+
+    renderNowHero();
+
+    await waitFor(() => {
+      expect(screen.getByText('Preparar la demo')).toBeInTheDocument();
+    });
+  });
+
   it('prefers a calendar signal over a non-urgent task', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/tasks')) {
@@ -106,7 +137,7 @@ describe('NowHero calendar override', () => {
     renderNowHero()
 
     await waitFor(() => {
-      expect(screen.getByText(/3 reuniones seguidas/i)).toBeInTheDocument()
+      expect(screen.getByText('Tienes reuniones muy seguidas. Reserva un margen antes de tu siguiente bloque.')).toBeInTheDocument()
     })
     expect(screen.queryByText('Tarea de baja prioridad')).not.toBeInTheDocument()
   });
@@ -168,8 +199,32 @@ describe('NowHero calendar override', () => {
     renderNowHero()
 
     await waitFor(() => {
-      expect(screen.getByText('Una reunión cae dentro de tu ventana pico.')).toBeInTheDocument()
+      expect(screen.getByText('Una reunión cae dentro de tu ventana de mayor enfoque. Considera mover el trabajo profundo.')).toBeInTheDocument()
     })
     expect(screen.queryByText('Reorganizar mi día')).not.toBeInTheDocument()
+  });
+
+  it('never renders a raw signal payload or emojis in the Ahora headline', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/tasks')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.includes('/api/cognitive/active-signal')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            signal: { id: '1', changeType: 'switch_context', description: '{switch_context} 🧠', createdAt: new Date().toISOString(), platform: 'notion' },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    renderNowHero()
+
+    await waitFor(() => {
+      expect(screen.getByText('Has cambiado de contexto varias veces. Elige una sola tarea para los próximos minutos.')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('{switch_context} 🧠')).not.toBeInTheDocument()
   });
 });

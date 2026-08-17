@@ -34,7 +34,7 @@ export async function GET() {
 
     // Check provider — if not Google, compute real-world metrics from the database instead of falling back to mock 50!
     if (session.provider && session.provider !== 'google') {
-      console.log(`[Biometrics] Provider is not google (${session.provider}). Fetching real user metrics from database...`)
+      console.info('[Biometrics] Google Fit is not connected; returning the operational fallback.')
       const payload = await fetchDbBiometricPayload(session.user.id)
       return NextResponse.json(payload, {
         status: 200,
@@ -50,7 +50,7 @@ export async function GET() {
     )
 
     if (!accessToken) {
-      console.warn('[Biometrics] No valid Google access token available. Using real user metrics from database.')
+      console.warn('[Biometrics] Google Fit token is unavailable; returning the operational fallback.')
       const payload = await fetchDbBiometricPayload(session.user.id)
       return NextResponse.json(payload, {
         status: 200,
@@ -66,12 +66,7 @@ export async function GET() {
       session.user.id
     )
 
-    console.log(
-      `[Biometrics] ✅ Payload computed for user ${session.user.id}:`,
-      `stress=${payload.userStressScore} (${payload.stressLevel}),`,
-      `sleep=${payload.sleep.totalSleepMinutes}min,`,
-      `hr=${payload.heartRate.hasData ? payload.heartRate.averageBpm + 'bpm' : 'no-data'}`
-    )
+    console.info('[Biometrics] Google Fit payload normalized.')
 
     return NextResponse.json(payload, {
       status: 200,
@@ -80,8 +75,8 @@ export async function GET() {
         'Cache-Control': 'private, max-age=300, stale-while-revalidate=600',
       },
     })
-  } catch (error: any) {
-    console.error('[Biometrics] Unhandled error:', error)
+  } catch {
+    console.error('[Biometrics] Request failed.')
     try {
       const session = await getServerSession(authOptions)
       if (session?.user?.id) {
@@ -93,10 +88,8 @@ export async function GET() {
     return NextResponse.json(
       {
         error: 'InternalError',
-        message: error?.message ?? 'Failed to compute biometric payload.',
+        message: 'Biometric data is temporarily unavailable.',
         hasGoogleFitData: false,
-        userStressScore: 50,
-        stressLevel: 'moderate',
       },
       { status: 500 }
     )
@@ -121,7 +114,7 @@ export async function POST(request: NextRequest) {
     const { forceFallback } = body as { forceFallback?: boolean }
 
     if (forceFallback) {
-      console.log('[Biometrics POST] forceFallback is active. Loading real database-driven payload.')
+      console.info('[Biometrics POST] Returning the operational fallback.')
       const payload = await fetchDbBiometricPayload(session.user.id)
       return NextResponse.json(payload)
     }
@@ -139,10 +132,10 @@ export async function POST(request: NextRequest) {
 
     const payload = await fetchDbBiometricPayload(session.user.id)
     return NextResponse.json(payload)
-  } catch (error: any) {
-    console.error('[Biometrics POST] Error:', error)
+  } catch {
+    console.error('[Biometrics POST] Request failed.')
     return NextResponse.json(
-      { error: 'InternalError', message: error?.message },
+      { error: 'InternalError', message: 'Biometric data is temporarily unavailable.' },
       { status: 500 }
     )
   }

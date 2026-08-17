@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { NovoLoopCard } from '@/components/cognitive/novo-loop-card';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface IntegratedTask {
@@ -139,8 +140,8 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
                 <AnimatePresence>
                     {task.completed && (
                         <motion.div
-                            initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                            initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.88 }}
+                            transition={{ type: 'spring', duration: 0.2, bounce: 0.15 }}
                         >
                             <CheckCircle2 className="w-3.5 h-3.5 text-white fill-white" />
                         </motion.div>
@@ -231,10 +232,10 @@ function SectionCard({
                 <AnimatePresence>
                     {open && (
                         <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                            initial={{ height: 0, opacity: 0, y: -4 }}
+                            animate={{ height: 'auto', opacity: 1, y: 0 }}
+                            exit={{ height: 0, opacity: 0, y: -2 }}
+                            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
                             className="overflow-hidden"
                         >
                             <div className="px-2 pb-3 flex flex-col gap-0.5">
@@ -257,12 +258,14 @@ function UrgentBanner({ items }: { items: UrgentItem[] }) {
         high:     'bg-orange-500/8 border-orange-500/20 text-orange-400',
         medium:   'bg-amber-500/8 border-amber-500/20 text-amber-400',
     };
+    // liquid-glass keeps the Settings-driven blur/fill; the red tint rides
+    // on top via the utilities-layer bg class so the card material controls
+    // still apply underneath.
     return (
         <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-3xl border border-red-500/15 overflow-hidden"
-            style={{ background: 'rgba(239,68,68,0.04)', backdropFilter: 'blur(12px)' }}
+            className="liquid-glass bg-red-500/[0.05] rounded-3xl border border-red-500/15 overflow-hidden"
         >
             <div className="flex items-center gap-2.5 px-5 py-4 border-b border-red-500/10">
                 <Flame className="w-4 h-4 text-red-400 animate-pulse" />
@@ -370,6 +373,7 @@ export default function TodayPage() {
 
     return (
         <div className="flex flex-col gap-5 max-w-2xl mx-auto">
+            <NovoLoopCard />
 
             {/* ── Header ─────────────────────────────────────────────────── */}
             <motion.div
@@ -400,10 +404,10 @@ export default function TodayPage() {
                 >
                     <motion.div
                         className="absolute inset-y-0 left-0 rounded-full bg-primary"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
+                        initial={{ transform: 'scaleX(0)' }}
+                        animate={{ transform: `scaleX(${progress / 100})` }}
                         transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
-                        style={{ boxShadow: '0 0 8px var(--primary)' }}
+                        style={{ transformOrigin: 'left center', boxShadow: '0 0 8px var(--primary)' }}
                     />
                 </motion.div>
             )}
@@ -424,7 +428,6 @@ export default function TodayPage() {
                         <div
                             key={stat.label}
                             className="liquid-glass flex flex-col gap-1 px-4 py-3 rounded-2xl border border-foreground/[0.06]"
-                            style={{ background: 'rgba(255,255,255,0.015)' }}
                         >
                             <span className="text-muted-foreground flex items-center gap-1">{stat.icon}
                                 <span className="text-[9px] font-black tracking-widest uppercase">{stat.label}</span>

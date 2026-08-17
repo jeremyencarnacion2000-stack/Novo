@@ -15,8 +15,11 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
+import { createIntegrationOAuthState, hashOAuthNonce, INTEGRATION_OAUTH_STATE_TTL_MS, parseIntegrationOAuthState } from '@/lib/todoist-oauth-state';
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
-export async function GET() {
+export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,17 +29,39 @@ export async function GET() {
     const redirectUri = process.env.SLACK_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
-        return NextResponse.json(
-            { error: 'Slack integration is not configured. Set SLACK_CLIENT_ID and SLACK_REDIRECT_URI.' },
-            { status: 503 },
-        );
+        const url = new URL('/connectors', request.url);
+        url.searchParams.set('integrationStatus', 'unconfigured');
+        url.searchParams.set('provider', 'slack');
+        return NextResponse.redirect(url);
     }
+
+    const state = createIntegrationOAuthState(session.user.id, 'slack');
+    const payload = parseIntegrationOAuthState(state, 'slack');
+    if (!payload) return NextResponse.json({ error: 'Unable to create OAuth state' }, { status: 503 });
+
+    await prisma.todoistOAuthState.create({
+        data: {
+            provider: 'slack',
+            userId: session.user.id,
+            nonceHash: hashOAuthNonce(payload.nonce),
+            expiresAt: new Date(payload.issuedAt + INTEGRATION_OAUTH_STATE_TTL_MS),
+        },
+    });
+
+    const cookieStore = await cookies();
+    cookieStore.set('novo_slack_oauth_state', state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: INTEGRATION_OAUTH_STATE_TTL_MS / 1000,
+        path: '/',
+    });
 
     const params = new URLSearchParams({
         client_id: clientId,
         scope: 'chat:write,channels:read,groups:read',
         redirect_uri: redirectUri,
-        state: session.user.id,
+        state,
     });
 
     return NextResponse.redirect(`https://slack.com/oauth/v2/authorize?${params.toString()}`);

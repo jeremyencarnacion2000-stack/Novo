@@ -333,7 +333,7 @@ export async function POST(request: NextRequest) {
     }
     const userId = session.user.id;
     const body = await request.json();
-    console.log('[AI API] Payload:', JSON.stringify(body));
+    console.log('[AI API] Authenticated generation request received.');
     const { message, history, webSearchEnabled, model: requestedModel } = body;
 
     if (!message) {
@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
 
     // Classify Intent using the deterministic router
     const classification = await routeIntent(message);
-    console.log('[AI] Intent:', classification.type, '| Confidence:', classification.confidence, '| Reason:', classification.reasoning);
+    console.log('[AI] Intent classified:', classification.type);
 
     // =========================================================================
     // GENERATE_FILE SHORT-CIRCUIT: Skip AI model, auto-execute, return SSE
@@ -422,8 +422,8 @@ export async function POST(request: NextRequest) {
               'Connection': 'keep-alive',
             }
           });
-        } catch (e) {
-          console.error('[AI] GENERATE_FILE short-circuit failed:', e);
+        } catch {
+          console.error('[AI] GENERATE_FILE short-circuit failed.');
         }
       }
     }
@@ -433,7 +433,7 @@ export async function POST(request: NextRequest) {
     try {
       const context = await buildUserContext(userId);
       userContextStr = context.summary;
-    } catch (e) { console.error('[AI] Context error:', e); }
+    } catch { console.error('[AI] Context retrieval failed.'); }
 
     // Select Prompt based on intent (unified 3-layer system)
     let selectedPrompt: string;
@@ -478,7 +478,7 @@ export async function POST(request: NextRequest) {
             });
           }
         }
-      } catch (e) { console.error('[AI] Web search error:', e); }
+      } catch { console.error('[AI] Web search failed.'); }
     }
 
     // Build final prompt
@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
     if (classification.type === 'CONVERSATION' || classification.type === 'KNOWLEDGE_RAG') {
       return NextResponse.json({
         content,
-        metadata: { intentType: classification.type, model: result.model, reasoning: classification.reasoning }
+        metadata: { intentType: classification.type, model: result.model }
       });
     }
 
@@ -507,8 +507,8 @@ export async function POST(request: NextRequest) {
         const i = content.indexOf('{'), j = content.lastIndexOf('}');
         if (i !== -1 && j > i) parsed = JSON.parse(content.substring(i, j + 1));
       }
-    } catch (e) {
-      console.error("Failed to parse expected structured output", content);
+    } catch {
+      console.error('[AI] Structured output parsing failed.');
     }
 
     if (classification.type === 'COMPLEX_PLANNING' && parsed && parsed.phases) {
@@ -529,8 +529,10 @@ export async function POST(request: NextRequest) {
 
       const actionType = (parsed.action?.type || '').toUpperCase();
 
-      // 2. Auto-execute GENERATE_FILE or COGNITIVE_AUTOMATION actions
-      if (actionType === 'GENERATE_FILE' || actionType === 'UPDATE_COGNITIVE_STATE' || actionType === 'COGNITIVE_PIPELINE' || classification.type === 'COGNITIVE_AUTOMATION') {
+      // Only file generation is safe to execute from a model response. A
+      // cognitive inference can create tasks, change persisted state or imply
+      // health facts, so it must remain a visible user-confirmed proposal.
+      if (actionType === 'GENERATE_FILE') {
         try {
           const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
           const execResult = await executeAIAction(parsed.action, userId);
@@ -548,8 +550,8 @@ export async function POST(request: NextRequest) {
             ].filter(Boolean),
             metadata: { intentType: classification.type, model: result.model }
           });
-        } catch (e) {
-          console.error('[AI] Auto-execute failed:', e);
+        } catch {
+          console.error('[AI] Automatic file generation failed.');
         }
       }
 
@@ -597,8 +599,8 @@ export async function POST(request: NextRequest) {
           ],
           metadata: { intentType: classification.type, model: result.model }
         });
-      } catch (e) {
-        console.error('[AI] Auto-execute GENERATE_FILE fallback failed:', e);
+      } catch {
+        console.error('[AI] Auto-execute GENERATE_FILE fallback failed.');
         return NextResponse.json({
           content: 'Generando archivo...',
           blocks: [
@@ -614,12 +616,11 @@ export async function POST(request: NextRequest) {
       metadata: { intentType: classification.type, model: result.model }
     });
 
-  } catch (error) {
-    console.error('[AI] Error:', error);
+  } catch {
+    console.error('[AI] Request failed.');
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal error' },
+      { error: 'InternalError', message: 'No se pudo completar la solicitud de IA.' },
       { status: 500 }
     );
   }
 }
-

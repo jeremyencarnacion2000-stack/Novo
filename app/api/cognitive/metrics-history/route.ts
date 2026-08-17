@@ -21,7 +21,6 @@ export async function GET() {
     select: {
       snapshotDate: true,
       cognitiveLoad: true,
-      burnoutIndex: true,
       confidenceScore: true,
     },
   })
@@ -29,7 +28,6 @@ export async function GET() {
   const history = snapshots.map((s) => ({
     date: s.snapshotDate.toISOString().split('T')[0],
     cognitiveLoad: Math.round(s.cognitiveLoad),
-    recoveryReserve: Math.round(100 - s.burnoutIndex),
     confidence: Math.round(s.confidenceScore),
   }))
 

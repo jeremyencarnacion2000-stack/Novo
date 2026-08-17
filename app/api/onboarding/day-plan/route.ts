@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { generateAndExecuteDayPlan, type DayPlanTrigger } from '@/lib/ai/day-plan-generator'
+import { trackNovoLoopEvent } from '@/lib/cognitive/events'
 
 // Called from the onboarding page right after the Twin analysis resolves
 // (trigger='onboarding', the default) — and also from the peak-focus
@@ -18,6 +19,12 @@ export async function POST(req: Request) {
   try {
     const { twin, trigger } = await req.json()
     const result = await generateAndExecuteDayPlan(session.user.id, twin || {}, (trigger as DayPlanTrigger) || 'onboarding')
+    if ((trigger as DayPlanTrigger | undefined) === 'onboarding') {
+      await trackNovoLoopEvent(session.user.id, 'first_plan_generated', {
+        taskCount: result.tasks.length,
+        hasCalendarBlock: Boolean(result.event),
+      })
+    }
     return NextResponse.json(result)
   } catch (error: any) {
     console.error('[Onboarding Day Plan]', error)

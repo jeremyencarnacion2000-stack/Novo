@@ -9,6 +9,15 @@ import { prisma } from '@/lib/prisma'
 export class PrismaOidcAdapter {
   constructor(private name: string) {}
 
+  private payloadForModel(payload: Record<string, unknown>): Record<string, unknown> {
+    // The authorization endpoint and the App Router consent page are bundled
+    // independently by Next. oidc-provider's generated model class names can
+    // therefore differ between invocations, even though the persisted record
+    // is the same logical entity. Normalize the kind at the adapter boundary
+    // so BaseModel can safely instantiate it in either bundle.
+    return { ...payload, kind: this.name }
+  }
+
   async upsert(id: string, payload: Record<string, unknown>, expiresIn?: number) {
     const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null
     const data = {
@@ -27,26 +36,29 @@ export class PrismaOidcAdapter {
   }
 
   async find(id: string) {
+    // Some Prisma drivers have intermittently missed the compound unique lookup
+    // across warm serverless connections. Fall back to the globally opaque
+    // modelId; oidc-provider validates the payload kind during instantiation.
     const row = await prisma.oAuthModel.findUnique({
       where: { type_modelId: { type: this.name, modelId: id } },
-    })
+    }) ?? await prisma.oAuthModel.findFirst({ where: { modelId: id } })
     if (!row) return undefined
     if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return undefined
-    return row.payload as Record<string, unknown>
+    return this.payloadForModel(row.payload as Record<string, unknown>)
   }
 
   async findByUserCode(userCode: string) {
     const row = await prisma.oAuthModel.findFirst({ where: { type: this.name, userCode } })
     if (!row) return undefined
     if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return undefined
-    return row.payload as Record<string, unknown>
+    return this.payloadForModel(row.payload as Record<string, unknown>)
   }
 
   async findByUid(uid: string) {
     const row = await prisma.oAuthModel.findFirst({ where: { type: this.name, uid } })
     if (!row) return undefined
     if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return undefined
-    return row.payload as Record<string, unknown>
+    return this.payloadForModel(row.payload as Record<string, unknown>)
   }
 
   async consume(id: string) {

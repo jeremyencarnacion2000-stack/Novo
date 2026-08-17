@@ -32,9 +32,9 @@ const TWIN_MODE_KEY = 'modern-chatbot-twin-mode';
 // walk back.
 const AUTO_EXECUTE_ACTION_TYPES = new Set([
     'CREATE_TASK', 'CREATE_TASKS', 'CREATE_PROJECT', 'CREATE_ROUTINE',
-    'CREATE_NOTE', 'CREATE_EVENT', 'CREATE_TRACKER', 'CREATE_COURSE',
+    'CREATE_NOTE', 'CREATE_TRACKER', 'CREATE_COURSE',
     'ADD_GRADE', 'START_WORKOUT', 'FINISH_WORKOUT', 'GENERATE_FILE',
-    'UPDATE_COGNITIVE_STATE', 'COGNITIVE_PIPELINE', 'ANALYZE_PROGRESS', 'SYSTEM_QUERY'
+    'ANALYZE_PROGRESS', 'SYSTEM_QUERY'
 ]);
 
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
@@ -540,6 +540,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             let activeModelLabel = 'Cognitive Core';
             let activeIntent: string | undefined;
             let activeFallback = false;
+            let activeSources: Message['sources'];
+            let activeActivityRunId: string | undefined;
 
             // SSE frames don't align with network chunk boundaries — see
             // lib/ai/sse-buffer.ts for why this needs a carry-over buffer.
@@ -561,14 +563,18 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
                             // Parse model metadata from orchestra
                             if (json.meta) {
+                                activeActivityRunId = json.meta.runId;
                                 activeModelLabel = json.meta.label || activeModelLabel;
                                 activeIntent = json.meta.intent;
                                 activeFallback = !!json.meta.fallback;
+                                activeSources = Array.isArray(json.meta.sources) ? json.meta.sources : undefined;
                                 setStreamingMessage(prev => prev ? {
                                     ...prev,
                                     model: activeModelLabel,
                                     intent: activeIntent,
-                                    fallback: activeFallback
+                                    fallback: activeFallback,
+                                    sources: activeSources,
+                                    activityRunId: activeActivityRunId,
                                 } : prev);
                                 continue;
                             }
@@ -582,7 +588,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     timestamp: new Date().toISOString(),
                                     model: activeModelLabel,
                                     intent: activeIntent,
-                                    fallback: activeFallback
+                                    fallback: activeFallback,
+                                    sources: activeSources,
+                                    activityRunId: activeActivityRunId,
                                 });
                             }
                         } catch (e) { }
@@ -811,6 +819,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                             })
                                         });
                                         const execResult = await execResponse.json();
+                                        if (execResult.code === 'Free plan monthly AI action limit reached') {
+                                            window.dispatchEvent(new CustomEvent('novo:open-paywall', { detail: { source: 'limit' } }));
+                                        }
                                         blocks.push({
                                             id: crypto.randomUUID(),
                                             type: 'result',
@@ -845,10 +856,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     id: crypto.randomUUID(),
                                     type: 'cognitive_update',
                                     content: {
-                                        focusScore: p.focusTimeToday !== undefined ? Math.min(100, Math.round(p.focusTimeToday * 10)) : 75,
-                                        fatigueEstimate: p.fatigueEstimate || 'medium',
-                                        burnoutRisk: p.productivityScore !== undefined ? Math.round(100 - p.productivityScore) : 35,
-                                        energyLevel: p.fatigueEstimate === 'low' ? 'alta' : p.fatigueEstimate === 'medium' ? 'media' : 'baja',
+                                        focusScore: p.focusTimeToday !== undefined ? Math.min(100, Math.round(p.focusTimeToday * 10)) : undefined,
+                                        fatigueEstimate: p.fatigueEstimate,
+                                        burnoutRisk: p.productivityScore !== undefined ? Math.round(100 - p.productivityScore) : undefined,
+                                        energyLevel: p.fatigueEstimate ? (p.fatigueEstimate === 'low' ? 'alta' : p.fatigueEstimate === 'medium' ? 'media' : 'baja') : undefined,
                                         recommendation: p.styleRecommendation?.suggestion || p.musicRecommendation?.mood || 'Considera tomar un breve descanso.'
                                     }
                                 });
@@ -919,7 +930,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 content: finalContent,
                 blocks: blocks.length > 0 ? blocks : undefined,
                 timestamp: new Date().toISOString(),
-                model: activeModelLabel
+                model: activeModelLabel,
+                sources: activeSources,
             };
 
             setConversations(prev => prev.map(c =>
@@ -970,7 +982,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         if (!block || block.type !== 'confirmation') return;
 
         const updatedBlocks = message.blocks.map(b =>
-            b.id === blockId ? { ...b, status: 'confirmed' as const } : b
+            b.id === blockId ? { ...b, status: 'executing' as const } : b
         );
 
         const executingBlock: MessageBlock = {
@@ -1002,6 +1014,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             });
 
             const result = await response.json();
+            if (result.code === 'Free plan monthly AI action limit reached') {
+                window.dispatchEvent(new CustomEvent('novo:open-paywall', { detail: { source: 'limit' } }));
+            }
             const resultBlock: MessageBlock = {
                 id: executingBlock.id,
                 type: 'result',
@@ -1011,6 +1026,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             };
 
             const finalBlocks = updatedBlocks.map(b => {
+                if (b.id === blockId) {
+                    return { ...b, status: result.success ? ('confirmed' as const) : ('waiting' as const) };
+                }
                 if (b.type === 'plan' && Array.isArray(b.content)) {
                     return {
                         ...b,
@@ -1149,7 +1167,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 content: 'Failed to execute action. Please try again.',
                 status: 'failed' as const
             };
-            const finalBlocks = [...updatedBlocks, errorBlock];
+            const finalBlocks = [
+                ...updatedBlocks.map(block => block.id === blockId ? { ...block, status: 'waiting' as const } : block),
+                errorBlock,
+            ];
             const finalMessages = conversation.messages.map(m =>
                 m.id === messageId ? { ...m, blocks: finalBlocks } : m
             );

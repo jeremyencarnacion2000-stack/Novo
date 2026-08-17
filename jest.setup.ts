@@ -9,27 +9,30 @@ if (!globalThis.fetch) {
   (globalThis as any).Headers = (fetch as any).Headers;
 }
 
-// Mock Prisma
-jest.mock('./lib/prisma', () => ({
-  prisma: {
-    task: {
-      create: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Mock Task' }),
-      update: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Updated Task' }),
-      deleteMany: jest.fn().mockResolvedValue({ count: 5 }),
-    },
-    routine: {
-      create: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
-      findUnique: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
-    },
-    quickNote: {
-      create: jest.fn().mockResolvedValue({ id: 'mock-note-id', content: 'Mock Note' }),
-    },
-    workoutLog: {
-      create: jest.fn().mockResolvedValue({ id: 'mock-log-id' }),
-      count: jest.fn().mockResolvedValue(10),
+// Keep the historical lightweight mock for unit tests, but never mock Prisma
+// in the explicitly isolated database E2E process.
+if (process.env.NOVO_ISOLATED_E2E !== 'true') {
+  jest.mock('./lib/prisma', () => ({
+    prisma: {
+      task: {
+        create: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Mock Task' }),
+        update: jest.fn().mockResolvedValue({ id: 'mock-task-id', title: 'Updated Task' }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 5 }),
+      },
+      routine: {
+        create: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'mock-routine-id', name: 'Mock Routine', days: [] }),
+      },
+      quickNote: {
+        create: jest.fn().mockResolvedValue({ id: 'mock-note-id', content: 'Mock Note' }),
+      },
+      workoutLog: {
+        create: jest.fn().mockResolvedValue({ id: 'mock-log-id' }),
+        count: jest.fn().mockResolvedValue(10),
+      }
     }
-  }
-}));
+  }));
+}
 
 // Global fetch mock for AI tests
 const originalFetch = globalThis.fetch;

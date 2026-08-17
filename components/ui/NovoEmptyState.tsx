@@ -35,7 +35,7 @@ export function NovoEmptyState({
       )}
       style={{
         boxShadow: isHovered 
-          ? "0 20px 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.04)" 
+          ? "0 20px 40px rgba(var(--primary-rgb), 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
           : "inset 0 1px 0 rgba(255, 255, 255, 0.02)",
       }}
       onMouseEnter={() => setIsHovered(true)}
@@ -43,7 +43,7 @@ export function NovoEmptyState({
     >
       {/* Slow-moving breathing radial ambient aura gradient */}
       <div 
-        className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.05)_0%,transparent_70%)] opacity-80 pointer-events-none"
+        className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(var(--primary-rgb),0.08)_0%,transparent_70%)] opacity-80 pointer-events-none"
         style={{
           transform: isHovered ? "scale(1.15)" : "scale(1.0)",
           transition: "transform 1.2s cubic-bezier(0.25, 0.8, 0.25, 1)",
@@ -53,7 +53,7 @@ export function NovoEmptyState({
       {/* Decorative moving light ring element */}
       {isHovered && (
         <motion.div
-          className="absolute inset-0 border border-violet-500/10 rounded-2xl pointer-events-none"
+          className="absolute inset-0 border border-primary/15 rounded-2xl pointer-events-none"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
@@ -79,7 +79,7 @@ export function NovoEmptyState({
         className={cn(
           "relative z-10 mt-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border transition-all duration-500",
           isHovered
-            ? "bg-violet-500/15 border-violet-500/30 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.2)]"
+            ? "bg-primary/15 border-primary/30 text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
             : "bg-foreground/[0.03] border-foreground/10 text-zinc-400 hover:text-foreground"
         )}
       >

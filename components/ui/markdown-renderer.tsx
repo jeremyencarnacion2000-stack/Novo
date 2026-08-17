@@ -2,7 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,16 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
     const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
+    const [isDark, setIsDark] = React.useState(true);
+
+    React.useEffect(() => {
+        const root = document.documentElement;
+        const syncTheme = () => setIsDark(root.classList.contains('dark'));
+        syncTheme();
+        const observer = new MutationObserver(syncTheme);
+        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
 
     const handleCopy = (code: string, index: number) => {
         navigator.clipboard.writeText(code);
@@ -33,15 +43,15 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
 
                         if (!inline && match) {
                             return (
-                                <div className="relative my-4 rounded-lg overflow-hidden border border-border bg-[#1e1e1e]">
-                                    <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-border/50">
-                                        <span className="text-xs font-medium text-gray-400 lowercase">
+                                <div className="relative my-4 rounded-lg overflow-hidden border border-border bg-muted/65 dark:bg-[#1e1e1e]">
+                                    <div className="flex items-center justify-between px-4 py-2 bg-muted/90 dark:bg-[#2d2d2d] border-b border-border/70">
+                                        <span className="text-xs font-medium text-muted-foreground lowercase">
                                             {match[1]}
                                         </span>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-6 w-6 text-gray-400 hover:text-white"
+                                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
                                             onClick={() => handleCopy(code, index)}
                                         >
                                             {copiedIndex === index ? (
@@ -53,7 +63,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
                                     </div>
                                     <SyntaxHighlighter
                                         {...props}
-                                        style={vscDarkPlus}
+                                        style={isDark ? vscDarkPlus : oneLight}
                                         language={match[1]}
                                         PreTag="div"
                                         customStyle={{

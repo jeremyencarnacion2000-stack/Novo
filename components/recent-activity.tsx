@@ -16,7 +16,7 @@ interface Activity {
 }
 
 interface RecentActivityProps {
-  onActivityClick?: (type: 'routine' | 'project' | 'task', data: any) => void
+  onActivityClick?: (type: 'routine' | 'project' | 'task', data: any, anchorRect: DOMRect) => void
 }
 
 export function RecentActivity({ onActivityClick }: RecentActivityProps) {
@@ -73,7 +73,7 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
   }
 
   return (
-    <Card className="transition-all hover:shadow-s h-full">
+    <Card id="actividad" className="transition-all hover:shadow-s h-full scroll-mt-8">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="subtitle-technical">Recent Activity</CardTitle>
@@ -89,7 +89,7 @@ export function RecentActivity({ onActivityClick }: RecentActivityProps) {
             return (
               <div
                 key={index}
-                onClick={() => isClickable && onActivityClick?.(activity.type as any, activity.raw)}
+                onClick={(event) => isClickable && onActivityClick?.(activity.type as any, activity.raw, event.currentTarget.getBoundingClientRect())}
                 className={cn(
                   "flex items-center gap-4 group p-3.5 rounded-2xl transition-all duration-300 border border-foreground/[0.04]",
                   isClickable ? "cursor-pointer bg-foreground/[0.03] hover:bg-foreground/[0.08] hover:border-foreground/[0.1] hover:scale-[1.02] active:scale-[0.98]" : "bg-transparent"

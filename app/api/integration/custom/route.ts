@@ -19,6 +19,13 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const customConnectorSchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    baseUrl: z.string().trim().url().max(2048),
+    apiKey: z.string().trim().max(500).optional().default(''),
+});
 
 function slugify(name: string) {
     return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -56,13 +63,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl.trim() : '';
-    const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-
-    if (!name || !baseUrl) {
+    const parsed = customConnectorSchema.safeParse(body);
+    if (!parsed.success) {
         return NextResponse.json({ error: 'name y baseUrl son obligatorios' }, { status: 400 });
     }
+    const { name, baseUrl, apiKey } = parsed.data;
 
     const slug = slugify(name) || `custom-${Date.now()}`;
     const provider = `custom:${slug}`;

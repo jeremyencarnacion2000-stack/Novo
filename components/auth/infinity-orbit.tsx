@@ -17,10 +17,10 @@ export function InfinityOrbit() {
         animate={{ rotate: 360 }}
         transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
       >
-        <div className="absolute inset-0 rotate-45 rounded-md bg-gradient-to-br from-indigo-300/80 via-white/60 to-purple-400/80 blur-[1px] shadow-[0_0_40px_rgba(165,180,252,0.6)]" />
-        <div className="absolute inset-2 rotate-12 rounded-sm bg-gradient-to-tr from-white/70 to-indigo-200/50" />
+        <div className="absolute inset-0 rotate-45 rounded-md bg-gradient-to-br from-emerald-300/80 via-white/60 to-teal-400/80 blur-[1px] shadow-[0_0_40px_rgba(74,222,128,0.5)]" />
+        <div className="absolute inset-2 rotate-12 rounded-sm bg-gradient-to-tr from-white/70 to-emerald-200/50" />
       </motion.div>
-      <div className="absolute h-20 w-20 rounded-full bg-indigo-400/20 blur-2xl" />
+      <div className="absolute h-20 w-20 rounded-full bg-emerald-400/20 blur-2xl" />
 
       {/* Orbiting icon chips along a figure-8 path */}
       {ORBIT_ICONS.map((Icon, i) => {

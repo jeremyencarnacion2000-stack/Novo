@@ -3,13 +3,23 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { buildCognitiveGraph } from '@/lib/cognitive-graph';
+import { buildCognitiveGraphSnapshot } from '@/lib/cognitive-graph/projection';
+import type { CognitiveLens } from '@/lib/cognitive-graph/types';
 
-export async function GET() {
+const lenses = new Set<CognitiveLens>(['now', 'goals', 'patterns', 'memory', 'sources']);
+
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const userId = session.user.id;
+  const url = new URL(request.url);
+  const requestedLens = url.searchParams.get('lens') as CognitiveLens | null;
+  const lens: CognitiveLens = requestedLens && lenses.has(requestedLens) ? requestedLens : 'now';
+  const focusNodeId = url.searchParams.get('focus') || undefined;
+  const parsedDepth = Number(url.searchParams.get('depth') || '2');
+  const depth = Number.isFinite(parsedDepth) ? Math.max(1, Math.min(parsedDepth, 3)) : 2;
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
   if (user?.plan !== 'pro') {
@@ -40,6 +50,9 @@ export async function GET() {
 
   const signalCounts = signalGroups.map(g => ({ signal: g.signal, count: g._count.signal }));
   const graph = buildCognitiveGraph(twinRecord, signalCounts, recentLogs.map(l => l.changeType));
+  const snapshot = await buildCognitiveGraphSnapshot({ userId, lens, focusNodeId, depth });
 
-  return NextResponse.json(graph);
+  // Keep the legacy graph shape for existing embeds while exposing the
+  // bounded, evidence-backed snapshot to the new Cognitive Command Center.
+  return NextResponse.json({ ...graph, snapshot });
 }

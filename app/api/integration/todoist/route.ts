@@ -12,6 +12,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { todoistService } from '@/lib/todoist';
+import { z } from 'zod';
+
+const todoistActionSchema = z.enum(['projects', 'save_projects', 'sync']);
+const saveProjectsSchema = z.object({
+    projectIds: z.array(z.string().min(1).max(200)).max(500),
+});
 
 // ── GET — Connection status ─────────────────────────────────────────────────
 
@@ -71,7 +77,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const action = searchParams.get('action') ?? 'sync';
+    const actionParsed = todoistActionSchema.safeParse(searchParams.get('action') ?? 'sync');
+    if (!actionParsed.success) {
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+    const action = actionParsed.data;
 
     const account = await prisma.integrationAccount.findUnique({
         where: {
@@ -90,16 +100,20 @@ export async function POST(req: NextRequest) {
         try {
             const projects = await todoistService.listProjects(account.accessToken);
             return NextResponse.json({ projects });
-        } catch (err: any) {
-            console.error('[Todoist] Failed to list projects:', err);
-            return NextResponse.json({ error: 'Failed to fetch projects', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Todoist] Failed to list projects:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 502 });
         }
     }
 
     // ── action=save_projects — persist chosen project IDs ─────────────────────
     if (action === 'save_projects') {
         const body = await req.json().catch(() => ({}));
-        const projectIds: string[] = body.projectIds ?? [];
+        const parsed = saveProjectsSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'projectIds inválido' }, { status: 400 });
+        }
+        const projectIds = parsed.data.projectIds;
         await prisma.integrationAccount.update({
             where: { userId_provider: { userId: session.user.id, provider: 'todoist' } },
             data: {
@@ -163,11 +177,11 @@ export async function POST(req: NextRequest) {
                 created,
                 updated,
             });
-        } catch (err: any) {
-            console.error('[Todoist] Sync error:', err);
-            return NextResponse.json({ error: 'Sync failed', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Todoist] Sync error:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Sync failed' }, { status: 502 });
         }
     }
 
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }

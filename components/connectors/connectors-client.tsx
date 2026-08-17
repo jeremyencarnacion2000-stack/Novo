@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
+import { useTranslation } from '@/lib/i18n'
 import { useModalFlip } from '@/hooks/use-modal-flip'
 import { cn } from '@/lib/utils'
 import {
@@ -12,14 +13,16 @@ import {
 import { Input } from '@/components/ui/input'
 import {
   Link2, RefreshCw, Upload, Database, Search, ChevronLeft, ChevronRight,
-  Plus, Trash2, Sparkles, BookOpen,
+  Plus, Trash2, Sparkles, BookOpen, BrainCircuit, Eye, MessageCircle, ShieldCheck,
 } from 'lucide-react'
 import type { IconType } from 'react-icons'
 import {
-  SiNotion, SiGoogledrive, SiGmail, SiGoogle, SiSlack, SiGithub, SiWhatsapp,
-  SiGooglecalendar, SiGooglefit, SiSpotify, SiYoutube, SiTodoist, SiTrello,
+  SiNotion, SiGoogledrive, SiGmail, SiGoogle, SiGithub, SiWhatsapp,
+  SiGooglecalendar, SiSpotify, SiYoutube, SiTodoist, SiTrello,
   SiLinear, SiObsidian, SiDiscord, SiStrava, SiFitbit, SiApplemusic, SiApple,
 } from 'react-icons/si'
+import { FaSlack } from 'react-icons/fa6'
+import { MdFitnessCenter } from 'react-icons/md'
 
 // ── Real brand logos via Simple Icons (react-icons/si). Each renders the
 //    platform's actual mark in its official brand color, so the marketplace
@@ -56,6 +59,35 @@ const CATEGORIES: { id: Connector['category']; label: string; description: strin
 ]
 
 const PAGE_SIZE = 4
+
+function getTwinIntegrationDetail(id: string, language: string) {
+  const es = {
+    notion: { observes: 'Bases seleccionadas y tareas pendientes sincronizadas.', learns: 'Detecta acumulación de tareas y horas de edición cuando hay suficiente actividad.', uses: 'Las tareas importadas entran al contexto de planificación del Twin.', citation: 'El chat muestra Notion cuando esos registros se consultaron.' },
+    todoist: { observes: 'Tareas vencidas y actividad de completado reciente.', learns: 'Puede detectar aplazamientos y una franja de completado frecuente.', uses: 'Las tareas sincronizadas ayudan a priorizar y se mantienen trazables en Novo.', citation: 'El chat muestra Todoist cuando esos registros se consultaron.' },
+    slack: { observes: 'Actividad propia en los canales autorizados durante la sincronización.', learns: 'Puede señalar actividad fuera de horario o una carga elevada.', uses: 'Envía alertas cognitivas al canal elegido; no envía mensajes sin una acción explícita.', citation: 'El chat muestra Slack cuando una señal de esta fuente fue incluida.' },
+    calendar: { observes: 'Eventos de tu agenda y bloques disponibles del día.', learns: 'Estima carga de reuniones y ventanas útiles para foco.', uses: 'El Twin puede proponer eventos; los cambios requieren la aprobación del usuario.', citation: 'El chat muestra Google Calendar cuando la agenda aportó contexto.' },
+  }
+  const en = {
+    notion: { observes: 'Selected databases and synced open tasks.', learns: 'Detects task buildup and editing hours when there is enough activity.', uses: 'Imported tasks enter the Twin planning context.', citation: 'Chat shows Notion when those records were consulted.' },
+    todoist: { observes: 'Overdue tasks and recent completion activity.', learns: 'Can detect deferrals and a recurring completion window.', uses: 'Synced tasks help prioritization and remain traceable in Novo.', citation: 'Chat shows Todoist when those records were consulted.' },
+    slack: { observes: 'Your own activity in authorised channels during a sync.', learns: 'Can flag after-hours activity or elevated load.', uses: 'Sends cognitive alerts to the selected channel; it does not send messages without an explicit action.', citation: 'Chat shows Slack when a signal from this source was included.' },
+    calendar: { observes: 'Calendar events and your available blocks today.', learns: 'Estimates meeting load and useful focus windows.', uses: 'The Twin can propose events; changes require user approval.', citation: 'Chat shows Google Calendar when the schedule provided context.' },
+  }
+  const fr = {
+    notion: { observes: 'Bases sélectionnées et tâches ouvertes synchronisées.', learns: 'Détecte l’accumulation de tâches et les heures d’édition avec suffisamment d’activité.', uses: 'Les tâches importées alimentent le contexte de planification du Jumeau.', citation: 'Le chat affiche Notion lorsque ces données ont été consultées.' },
+    todoist: { observes: 'Tâches en retard et activité de finalisation récente.', learns: 'Peut détecter les reports et une plage de finalisation récurrente.', uses: 'Les tâches synchronisées aident à prioriser et restent traçables dans Novo.', citation: 'Le chat affiche Todoist lorsque ces données ont été consultées.' },
+    slack: { observes: 'Votre activité dans les canaux autorisés pendant une synchronisation.', learns: 'Peut signaler une activité hors horaires ou une charge élevée.', uses: 'Envoie les alertes cognitives au canal choisi ; aucun message sans action explicite.', citation: 'Le chat affiche Slack lorsqu’un signal de cette source est inclus.' },
+    calendar: { observes: 'Événements de calendrier et créneaux disponibles du jour.', learns: 'Estime la charge de réunions et les créneaux utiles de concentration.', uses: 'Le Jumeau peut proposer des événements ; les changements demandent votre accord.', citation: 'Le chat affiche Google Calendar lorsque l’agenda apporte du contexte.' },
+  }
+  const de = {
+    notion: { observes: 'Ausgewählte Datenbanken und synchronisierte offene Aufgaben.', learns: 'Erkennt Aufgabenstau und Bearbeitungszeiten bei genügend Aktivität.', uses: 'Importierte Aufgaben fließen in den Planungs-Kontext des Zwillings ein.', citation: 'Der Chat zeigt Notion, wenn diese Daten verwendet wurden.' },
+    todoist: { observes: 'Überfällige Aufgaben und jüngste Abschlussaktivität.', learns: 'Kann Aufschübe und wiederkehrende Abschlusszeiten erkennen.', uses: 'Synchronisierte Aufgaben helfen bei der Priorisierung und bleiben in Novo nachvollziehbar.', citation: 'Der Chat zeigt Todoist, wenn diese Daten verwendet wurden.' },
+    slack: { observes: 'Deine Aktivität in autorisierten Kanälen während einer Synchronisierung.', learns: 'Kann Aktivität außerhalb der Arbeitszeit oder hohe Last markieren.', uses: 'Sendet kognitive Hinweise an den gewählten Kanal; keine Nachricht ohne explizite Aktion.', citation: 'Der Chat zeigt Slack, wenn ein Signal dieser Quelle enthalten war.' },
+    calendar: { observes: 'Kalendertermine und verfügbare Zeitblöcke des Tages.', learns: 'Schätzt Meetinglast und sinnvolle Fokusfenster.', uses: 'Der Zwilling kann Termine vorschlagen; Änderungen brauchen deine Zustimmung.', citation: 'Der Chat zeigt Google Calendar, wenn der Kalender Kontext lieferte.' },
+  }
+  const dictionary = language === 'es' ? es : language === 'fr' ? fr : language === 'de' ? de : en
+  return dictionary[id as keyof typeof dictionary] ?? null
+}
 
 function StatusPill({ status }: { status: ConnectorStatus }) {
   if (status === 'connected') {
@@ -177,6 +209,7 @@ function CategorySection({
 export function ConnectorsClient() {
   const { toast } = useToast()
   const { settings } = useSettings()
+  const { language } = useTranslation()
   const { data: session } = useSession()
 
   // ── Notion state (moved verbatim from settings-integrations.tsx) ───────────
@@ -239,6 +272,7 @@ export function ConnectorsClient() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [twinSyncing, setTwinSyncing] = useState(false)
 
   const refreshCustomConnectors = () => {
     fetch('/api/integration/custom').then(r => r.json()).then(d => setCustomConnectors(d.connectors ?? [])).catch(() => {})
@@ -270,6 +304,28 @@ export function ConnectorsClient() {
       window.history.replaceState({}, '', url.toString())
     }
   }, [])
+
+  // OAuth setup is an environment concern, not a user error. The connect
+  // routes return here instead of exposing a raw JSON 503, so the next action
+  // stays inside Novo and tells the user what is actually missing.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('integrationStatus') !== 'unconfigured') return
+    const provider = params.get('provider')
+    const labels: Record<string, string> = { todoist: 'Todoist', slack: 'Slack', notion: 'Notion' }
+    const label = provider ? labels[provider] : undefined
+    toast({
+      title: label ? `${label} todavía no está configurado` : 'Integración todavía no configurada',
+      description: 'Falta la configuración OAuth del entorno. Novo no guarda ni muestra secretos aquí; vuelve a intentarlo cuando el conector esté habilitado.',
+      variant: 'destructive',
+    })
+    params.delete('integrationStatus')
+    params.delete('provider')
+    const url = new URL(window.location.href)
+    url.search = params.toString()
+    window.history.replaceState({}, '', url.toString())
+  }, [toast])
 
   // Handle ?todoistStatus= query param from OAuth callback redirect (mirrors Notion)
   useEffect(() => {
@@ -600,6 +656,65 @@ export function ConnectorsClient() {
     toast({ title: 'Conector personalizado eliminado' })
   }
 
+  const twinCopy = language === 'es'
+    ? {
+        title: 'Cómo aprende tu Gemelo', subtitle: 'Solo convierte señales de las fuentes que conectaste en contexto útil. Nunca actúa fuera de Novo sin una propuesta y tu aprobación.',
+        observe: 'Observa señales', learn: 'Actualiza el mapa', cite: 'Cita el origen',
+        observeDetail: 'Agenda, tareas y actividad que habilitaste.', learnDetail: 'Patrones medibles como carga, foco y fricción.', citeDetail: 'El chat enseña qué contexto recibió en cada respuesta.',
+        connected: 'fuentes activas', sync: 'Actualizar señales', syncing: 'Actualizando…', synced: 'Señales actualizadas', noSignals: 'No hubo señales nuevas; tu configuración se mantiene intacta.',
+        privacy: 'Una conexión no da permisos ilimitados: las acciones sensibles siempre se revisan antes de ejecutarse.',
+      }
+    : language === 'fr'
+      ? {
+          title: 'Comment votre Jumeau apprend', subtitle: 'Il transforme uniquement les signaux des sources que vous avez connectées en contexte utile. Il ne réalise aucune action hors de Novo sans proposition et accord.',
+          observe: 'Observe les signaux', learn: 'Met à jour la carte', cite: 'Cite la source',
+          observeDetail: 'Agenda, tâches et activité que vous avez autorisés.', learnDetail: 'Des tendances mesurables comme la charge, la concentration et la friction.', citeDetail: 'Le chat montre le contexte reçu dans chaque réponse.',
+          connected: 'sources actives', sync: 'Actualiser les signaux', syncing: 'Actualisation…', synced: 'Signaux actualisés', noSignals: 'Aucun nouveau signal ; votre configuration reste intacte.',
+          privacy: 'Une connexion ne donne pas des droits illimités : les actions sensibles sont toujours vérifiées avant exécution.',
+        }
+      : language === 'de'
+        ? {
+            title: 'Wie dein Zwilling lernt', subtitle: 'Er wandelt nur Signale aus von dir verbundenen Quellen in nützlichen Kontext um. Außerhalb von Novo handelt er nie ohne Vorschlag und Zustimmung.',
+            observe: 'Beobachtet Signale', learn: 'Aktualisiert die Karte', cite: 'Nennt die Quelle',
+            observeDetail: 'Kalender, Aufgaben und Aktivitäten, die du freigegeben hast.', learnDetail: 'Messbare Muster wie Auslastung, Fokus und Reibung.', citeDetail: 'Der Chat zeigt den verwendeten Kontext pro Antwort.',
+            connected: 'aktive Quellen', sync: 'Signale aktualisieren', syncing: 'Aktualisierung…', synced: 'Signale aktualisiert', noSignals: 'Keine neuen Signale; deine Einrichtung bleibt unverändert.',
+            privacy: 'Eine Verbindung gibt keine unbegrenzten Rechte: sensible Aktionen werden immer vor der Ausführung geprüft.',
+          }
+        : {
+            title: 'How your Twin learns', subtitle: 'It only turns signals from the sources you connected into useful context. It never acts outside Novo without a proposal and your approval.',
+            observe: 'Observes signals', learn: 'Updates the map', cite: 'Cites the source',
+            observeDetail: 'Calendar, tasks, and activity you enabled.', learnDetail: 'Measurable patterns such as load, focus, and friction.', citeDetail: 'Chat shows the context it received with every response.',
+            connected: 'active sources', sync: 'Refresh signals', syncing: 'Refreshing…', synced: 'Signals refreshed', noSignals: 'No new signals; your setup remains unchanged.',
+            privacy: 'A connection does not grant unlimited permission: sensitive actions are always reviewed before execution.',
+          }
+
+  const learningSources = [
+    { name: 'Notion', connected: !!notionStatus?.connected },
+    { name: 'Todoist', connected: !!todoistStatus?.connected },
+    { name: 'Slack', connected: !!slackStatus?.connected },
+    { name: 'Google Calendar', connected: !!calendarStatus?.connected && !!calendarStatus?.hasScope },
+  ]
+  const activeLearningSources = learningSources.filter(source => source.connected)
+
+  const handleTwinSync = async () => {
+    setTwinSyncing(true)
+    try {
+      const response = await fetch('/api/plugins/sync-all', { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'sync_failed')
+      toast({
+        title: twinCopy.synced,
+        description: result.totalSignals > 0
+          ? `${result.totalSignals} ${language === 'es' ? 'señal(es) nueva(s) para el Twin.' : language === 'fr' ? 'nouveau(x) signal(aux) pour le Jumeau.' : language === 'de' ? 'neue(s) Signal(e) für den Zwilling.' : 'new signal(s) for the Twin.'}`
+          : twinCopy.noSignals,
+      })
+    } catch {
+      toast({ title: language === 'es' ? 'No se pudieron actualizar las señales' : language === 'fr' ? 'Impossible d’actualiser les signaux' : language === 'de' ? 'Signale konnten nicht aktualisiert werden' : 'Could not refresh signals', variant: 'destructive' })
+    } finally {
+      setTwinSyncing(false)
+    }
+  }
+
   // ── Catalog — built from live status so a card never claims a state that
   //    isn't real ────────────────────────────────────────────────────────────
   const connectors = useMemo<Connector[]>(() => {
@@ -682,7 +797,7 @@ export function ConnectorsClient() {
           'Recibe alertas del motor cognitivo el mismo día que se detectan',
           'Envía un mensaje de prueba para confirmar que quedó bien configurado',
         ],
-        icon: <BrandIcon icon={SiSlack} color="#4A154B" />,
+        icon: <BrandIcon icon={FaSlack} color="#4A154B" />,
         status: slackStatus?.connected ? 'connected' : 'available',
       },
       {
@@ -773,7 +888,7 @@ export function ConnectorsClient() {
         name: 'Google Fit',
         description: 'Importa pasos, sueño y frecuencia cardíaca automáticamente.',
         detail: 'Trae datos de actividad, sueño y frecuencia cardíaca de Google Fit a tus trackers de salud.',
-        icon: <BrandIcon icon={SiGooglefit} color="#4285F4" />,
+        icon: <BrandIcon icon={MdFitnessCenter} color="#4285F4" />,
         status: 'soon',
       },
       {
@@ -883,9 +998,9 @@ export function ConnectorsClient() {
     <div className="flex flex-col gap-6 md:gap-8">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter">Conectores</h1>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter">{language === 'es' ? 'Conectores del Twin' : language === 'fr' ? 'Connecteurs du Jumeau' : language === 'de' ? 'Zwilling-Konnektoren' : 'Twin connectors'}</h1>
           <p className="text-muted-foreground mt-2 text-base md:text-lg font-medium">
-            Conecta Novo con las herramientas que ya usas.
+            {language === 'es' ? 'Conecta Novo con las herramientas que ya usas.' : language === 'fr' ? 'Connectez Novo aux outils que vous utilisez déjà.' : language === 'de' ? 'Verbinde Novo mit den Tools, die du bereits nutzt.' : 'Connect Novo with the tools you already use.'}
           </p>
         </div>
         <button
@@ -896,7 +1011,71 @@ export function ConnectorsClient() {
           <Plus className="w-4 h-4" />
           Conectar API personalizada
         </button>
+        <a
+          href="/settings/mcp"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-all text-primary flex-shrink-0 self-start md:self-auto active:scale-95"
+        >
+          <BrainCircuit className="w-4 h-4" />
+          Conectar un dispositivo
+        </a>
       </div>
+
+      <section className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/[0.10] via-background to-background p-5 md:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-primary/15 blur-3xl" />
+        <div className="relative flex flex-col gap-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 text-primary">
+                <BrainCircuit className="h-4 w-4" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Twin learning</span>
+              </div>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">{twinCopy.title}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/55">{twinCopy.subtitle}</p>
+            </div>
+            <button
+              onClick={handleTwinSync}
+              disabled={twinSyncing || activeLearningSources.length === 0}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3.5 py-2.5 text-xs font-semibold text-primary transition-all hover:bg-primary/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', twinSyncing && 'animate-spin')} />
+              {twinSyncing ? twinCopy.syncing : twinCopy.sync}
+            </button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              { icon: Eye, title: twinCopy.observe, detail: twinCopy.observeDetail },
+              { icon: BrainCircuit, title: twinCopy.learn, detail: twinCopy.learnDetail },
+              { icon: MessageCircle, title: twinCopy.cite, detail: twinCopy.citeDetail },
+            ].map((step) => {
+              const Icon = step.icon
+              return (
+                <div key={step.title} className="rounded-2xl border border-foreground/[0.07] bg-background/50 p-4 backdrop-blur-sm">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <p className="mt-3 text-sm font-semibold text-foreground/85">{step.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground/45">{step.detail}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-foreground/[0.07] pt-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {activeLearningSources.length > 0 ? activeLearningSources.map((source) => (
+                <span key={source.name} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{source.name}
+                </span>
+              )) : (
+                <span className="text-xs text-foreground/40">0 {twinCopy.connected}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-foreground/45">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span>{twinCopy.privacy}</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="relative">
         <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-foreground/30" />
@@ -1057,6 +1236,8 @@ function ConnectorDetail({
   onGmailListUnread: () => void
   onDeleteCustom: (provider: string) => void
 }) {
+  const { language } = useTranslation()
+  const twinDetail = getTwinIntegrationDetail(connector.id, language)
   return (
     <div className="flex flex-col gap-5">
       <DialogHeader>
@@ -1071,6 +1252,30 @@ function ConnectorDetail({
         </div>
         <DialogDescription className="pt-2 text-foreground/50">{connector.detail}</DialogDescription>
       </DialogHeader>
+
+      {twinDetail && (
+        <section className="rounded-2xl border border-primary/15 bg-primary/[0.045] p-3.5">
+          <div className="flex items-center gap-2 text-primary">
+            <BrainCircuit className="h-3.5 w-3.5" />
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]">
+              {language === 'es' ? 'Impacto en el Gemelo' : language === 'fr' ? 'Impact sur le Jumeau' : language === 'de' ? 'Einfluss auf den Zwilling' : 'Twin impact'}
+            </p>
+          </div>
+          <dl className="mt-3 grid gap-2.5 text-xs leading-relaxed">
+            {[
+              [language === 'es' ? 'Observa' : language === 'fr' ? 'Observe' : language === 'de' ? 'Beobachtet' : 'Observes', twinDetail.observes],
+              [language === 'es' ? 'Aprende' : language === 'fr' ? 'Apprend' : language === 'de' ? 'Lernt' : 'Learns', twinDetail.learns],
+              [language === 'es' ? 'Usa' : language === 'fr' ? 'Utilise' : language === 'de' ? 'Verwendet' : 'Uses', twinDetail.uses],
+              [language === 'es' ? 'Procedencia en chat' : language === 'fr' ? 'Source dans le chat' : language === 'de' ? 'Quelle im Chat' : 'Chat provenance', twinDetail.citation],
+            ].map(([label, detail]) => (
+              <div key={label as string} className="grid grid-cols-[82px_1fr] gap-2">
+                <dt className="font-semibold text-foreground/65">{label}</dt>
+                <dd className="text-foreground/50">{detail}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
 
       {connector.capabilities && connector.capabilities.length > 0 && (
         <div className="space-y-2">

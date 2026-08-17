@@ -24,7 +24,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing type or content' }, { status: 400 })
     }
 
-    const validTypes = ['fatigue', 'productivity', 'habit', 'burnout', 'peak_focus', 'general']
+    // Fatigue/burnout claims must originate in an explicitly sourced,
+    // user-visible check-in flow. This legacy endpoint is not such a source.
+    const validTypes = ['productivity', 'habit', 'peak_focus', 'general']
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: 'Invalid insight type' }, { status: 400 })
     }
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
       create: {
         userId,
         lastInsightGeneratedAt: new Date(),
-        fatigueEstimate: 'low',
+        fatigueEstimate: 'unavailable',
         focusTimeToday: 0,
         productivityScore: 0,
         overdueTasks: 0,
@@ -55,8 +57,8 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(insight, { status: 201 })
-  } catch (error) {
-    console.error('[cognitive/insight] POST error:', error)
+  } catch {
+    console.error('[cognitive/insight] POST failed.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

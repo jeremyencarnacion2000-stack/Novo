@@ -13,8 +13,10 @@ import { calculateCurrentStreak } from '@/lib/streaks'
 // actions) - clamped here rather than trusted, since a Free user could
 // otherwise just ask for 365 directly.
 async function clampDaysForPlan(userId: string, requestedDays: number): Promise<number> {
-  const { plan } = (await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })) ?? {}
-  return plan === 'pro' ? requestedDays : Math.min(requestedDays, 30)
+  // Free plan: 30 days of history, Pro: whatever was requested.
+  // We perform a light select of only the plan column.
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })
+  return user?.plan === 'pro' ? requestedDays : Math.min(requestedDays, 30)
 }
 
 export async function GET(request: NextRequest) {
@@ -155,41 +157,32 @@ export async function GET(request: NextRequest) {
     const minutes = Math.floor((totalFocusTime % 3600) / 60)
     const focusTimeString = `${hours}h ${minutes}m`
 
-    // Get real goal data
-    const goals = await prisma.goal.findMany({
-      where: { userId: userId }
-    })
+    const [goals, insights, streak] = await Promise.all([
+      prisma.goal.findMany({ where: { userId } }),
+      getAdvancedInsights(userId).catch((insightError) => {
+        console.error('Failed to get advanced insights:', insightError)
+        return {
+          bestDay: 'N/A',
+          habitInsights: { top: [], bottom: [] },
+          routineConsistency: [],
+          goals: []
+        }
+      }),
+      calculateCurrentStreak(userId).catch((streakError) => {
+        console.error('Failed to calculate streak:', streakError)
+        return 0
+      }),
+    ])
     const goalsAchieved = goals.filter(g => g.status === 'completed').length
     const goalCompletionRate = goals.length > 0 ? Math.round((goalsAchieved / goals.length) * 100) : 0
 
     const goalTrend = 0 // Need historical goal data for trend
-
-    // Get advanced insights with error handling
-    let insights = null
-    try {
-      insights = await getAdvancedInsights(userId)
-    } catch (insightError) {
-      console.error('Failed to get advanced insights:', insightError)
-      // Fallback to empty insights instead of failing the whole request
-      insights = {
-        bestDay: 'N/A',
-        habitInsights: { top: [], bottom: [] },
-        routineConsistency: [],
-        goals: []
-      }
-    }
 
     // The Focus page's "Active streak" stat reads this field — it was never
     // included here, so the card was permanently stuck at "0d" regardless of
     // actual activity. /api/stats/productivity already computes a real
     // current-streak from completed checklist items; reuse it instead of a
     // second implementation.
-    let streak = 0
-    try {
-      streak = await calculateCurrentStreak(userId)
-    } catch (streakError) {
-      console.error('Failed to calculate streak:', streakError)
-    }
 
     return NextResponse.json({
       dailyData: enrichedDailyData,
@@ -230,15 +223,14 @@ async function updateDailyAnalytics(userId: string, module: string, duration: nu
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const body = await request.json()
-    const { action, ...data } = body
-
-    // Use session userId if not provided in body
-    const userId = data.userId || session?.user?.id
-
-    if (!userId && action !== 'endSession') {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const body = await request.json()
+    const { action, ...data } = body
+    // Analytics is account-owned input to the Twin. Never accept an owner id
+    // from the browser, otherwise one account can contaminate another Twin.
+    const userId = session.user.id
 
     switch (action) {
       case 'startSession': {
@@ -253,8 +245,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'endSession': {
-        const session = await prisma.userSession.findUnique({
-          where: { id: data.sessionId },
+        const session = await prisma.userSession.findFirst({
+          where: { id: data.sessionId, userId },
         })
 
         if (session && !session.endTime) {

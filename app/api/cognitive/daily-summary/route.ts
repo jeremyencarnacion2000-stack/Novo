@@ -71,12 +71,12 @@ export async function GET() {
       focusMinutes: Math.round(focusMinutes),
       focusSessionsCompleted: completedSessions,
       avgFocusQuality: Math.round(avgQuality * 10) / 10,
-      fatigueEstimate: snapshot?.fatigueEstimate ?? 'low',
+      fatigueEstimate: snapshot?.fatigueEstimate ?? 'unavailable',
       productivityScore: snapshot?.productivityScore ?? 0,
       insights: insights.map(i => ({ message: i.content, type: i.type })),
     })
-  } catch (error) {
-    console.error('[cognitive/daily-summary] GET error:', error)
+  } catch {
+    console.error('[cognitive/daily-summary] GET failed.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

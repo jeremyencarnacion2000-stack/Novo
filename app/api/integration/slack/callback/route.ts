@@ -12,6 +12,8 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { hashOAuthNonce, parseIntegrationOAuthState } from '@/lib/todoist-oauth-state';
 
 export async function GET(req: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -23,13 +25,35 @@ export async function GET(req: NextRequest) {
         return NextResponse.redirect(`${settingsUrl}error&reason=unauthenticated`);
     }
 
-    // ── 2. Validate OAuth code ─────────────────────────────────────────────────
+    // ── 2. Validate OAuth code and state ───────────────────────────────────────
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    const cookieStore = await cookies();
+    const storedState = cookieStore.get('novo_slack_oauth_state')?.value;
+    cookieStore.delete('novo_slack_oauth_state');
+    const payload = parseIntegrationOAuthState(state, 'slack');
+    if (!storedState || state !== storedState || !payload || payload.userId !== session.user.id) {
+        return NextResponse.redirect(`${settingsUrl}error&reason=invalid_state`);
+    }
+
+    const claimed = await prisma.todoistOAuthState.updateMany({
+        where: {
+            provider: 'slack',
+            userId: session.user.id,
+            nonceHash: hashOAuthNonce(payload.nonce),
+            status: 'issued',
+            consumedAt: null,
+            expiresAt: { gt: new Date() },
+        },
+        data: { status: 'consumed', consumedAt: new Date() },
+    });
+    if (claimed.count !== 1) return NextResponse.redirect(`${settingsUrl}error&reason=invalid_state`);
+
     if (error || !code) {
-        console.error('[Slack Callback] OAuth error or missing code:', error);
+        console.error('[Slack Callback] OAuth denied or missing code:', { reason: error ? error.slice(0, 80) : 'missing_code' });
         return NextResponse.redirect(`${settingsUrl}error&reason=denied`);
     }
 
@@ -53,11 +77,15 @@ export async function GET(req: NextRequest) {
 
         tokenData = await tokenRes.json();
         if (!tokenRes.ok || !tokenData.ok || !tokenData.access_token) {
-            console.error('[Slack Callback] Token exchange failed:', tokenData);
+            console.error('[Slack Callback] Token exchange failed:', {
+                status: tokenRes.status,
+                ok: Boolean(tokenData?.ok),
+                error: typeof tokenData?.error === 'string' ? tokenData.error.slice(0, 80) : undefined,
+            });
             return NextResponse.redirect(`${settingsUrl}error&reason=token_exchange`);
         }
     } catch (err) {
-        console.error('[Slack Callback] Network error during token exchange:', err);
+        console.error('[Slack Callback] Network error during token exchange:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=network`);
     }
 
@@ -106,7 +134,7 @@ export async function GET(req: NextRequest) {
 
         console.log(`✅ [Slack] Connected for user ${session.user.id}, team: ${tokenData.team?.name}`);
     } catch (err) {
-        console.error('[Slack Callback] Failed to upsert IntegrationAccount:', err);
+        console.error('[Slack Callback] Failed to upsert IntegrationAccount:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);
     }
 

@@ -35,9 +35,11 @@ export default async function AnalyticsPage() {
   const userId = session.user.id
 
   // Use server-side functions with direct Prisma queries
-  const { dailyData } = await getAnalyticsData(userId, 90)
-  const metrics = await calculateProductivityMetrics(userId, 90)
-  const insights = await getAdvancedInsights(userId)
+  const [{ dailyData }, metrics, insights] = await Promise.all([
+    getAnalyticsData(userId, 90),
+    calculateProductivityMetrics(userId, 90),
+    getAdvancedInsights(userId),
+  ])
 
   // Format data for charts
   const formattedData: DailyData[] = dailyData.map((d: any) => ({

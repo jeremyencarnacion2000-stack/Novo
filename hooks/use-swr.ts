@@ -111,3 +111,8 @@ export const COGNITIVE_ENGINE_KEY = '/api/ai/cognitive-engine'
 export const useCognitiveEngine = () => {
   return useSWRWithConfig<any>(COGNITIVE_ENGINE_KEY)
 }
+
+export const useCognitiveEngineData = (chronotype?: string | null) => {
+  const url = chronotype ? `${COGNITIVE_ENGINE_KEY}?chronotype=${chronotype}` : COGNITIVE_ENGINE_KEY
+  return useSWRWithConfig<any>(url)
+}

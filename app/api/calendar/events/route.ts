@@ -1,25 +1,20 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CalendarAggregator } from '@/lib/calendar-aggregator';
+import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime';
 
 // GET /api/calendar/events - Get calendar events for date range
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
+        const userId = session.user.id;
 
         const { searchParams } = new URL(request.url);
         const startParam = searchParams.get('start');
@@ -40,7 +35,7 @@ export async function GET(request: NextRequest) {
         const sources = sourcesParam ? sourcesParam.split(',') : undefined;
 
         const events = await CalendarAggregator.getEventsForRange(
-            user.id,
+            userId,
             start,
             end,
             sources
@@ -61,17 +56,11 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
+        const userId = session.user.id;
 
         const body = await request.json();
         const { title, description, start, end, allDay } = body;
@@ -85,7 +74,7 @@ export async function POST(request: NextRequest) {
 
         const event = await prisma.calendarEvent.create({
             data: {
-                userId: user.id,
+                userId,
                 title,
                 description: description || null,
                 start: new Date(start),
@@ -93,6 +82,8 @@ export async function POST(request: NextRequest) {
                 allDay: !!allDay,
             },
         });
+
+        void runAmbientTwinForUser(userId, { trigger: 'calendar_changed' }).catch(() => undefined)
 
         return NextResponse.json({ event }, { status: 201 });
     } catch (error) {

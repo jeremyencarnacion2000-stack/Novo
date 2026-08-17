@@ -27,6 +27,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
   const isFullScreenPage =
     pathname?.startsWith('/music') ||
     pathname?.startsWith('/ai') ||
+    pathname?.startsWith('/chat') ||
     pathname?.startsWith('/calendar') ||
     pathname?.startsWith('/cognitive') ||
     pathname?.startsWith('/social')
@@ -92,13 +93,15 @@ function DashboardShellInner({ children }: DashboardShellProps) {
         )}
         style={{ transformOrigin: 'top center', willChange: 'transform, border-radius' }}
       >
+        <div data-app-wallpaper aria-hidden />
+
         {/* Persistent sidebar */}
         <div className="hidden md:flex h-full">
           <AppSidebar />
         </div>
 
         <main
-          className="flex-1 relative flex flex-col min-h-0 overflow-hidden transition-all duration-1000"
+          className="flex-1 relative flex flex-col min-h-0 overflow-hidden transition-[background-color,opacity] duration-300 ease-out"
         >
           <div className="w-full flex-1 flex flex-col min-h-0 relative overflow-hidden">
             <PageWrapper isFullScreen={isFullScreenPage}>

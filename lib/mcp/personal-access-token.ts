@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma'
 
 export const MCP_DEVICE_SCOPES = [
   'tasks:read', 'tasks:write', 'goals:read', 'recommendations:read',
-  'recommendations:update', 'activity:write',
+  'recommendations:update', 'activity:write', 'twin:read',
+  'integrations:read', 'integrations:write',
 ] as const
 export type McpDeviceScope = (typeof MCP_DEVICE_SCOPES)[number]
 
@@ -28,6 +29,9 @@ export function normalizeMcpDeviceScopes(scopes: readonly string[]): McpDeviceSc
   if (requested.has('tasks:write')) {
     normalized.push('tasks:write', 'recommendations:update', 'activity:write')
   }
+  if (requested.has('twin:read')) normalized.push('twin:read')
+  if (requested.has('integrations:read')) normalized.push('integrations:read')
+  if (requested.has('integrations:write')) normalized.push('integrations:write')
   return normalized
 }
 

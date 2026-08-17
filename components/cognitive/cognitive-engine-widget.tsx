@@ -1,13 +1,11 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Brain, ArrowRight, AlertTriangle, Zap, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { springConfig } from '@/lib/design-tokens';
-import { GlassSurface } from '@/components/ui/GlassSurface';
 import { useCognitiveEngine } from '@/hooks/use-swr';
+import { useTranslation } from '@/lib/i18n';
 
 interface WidgetData {
   focusScore: number;
@@ -17,6 +15,49 @@ interface WidgetData {
   recommendation: string;
 }
 
+const WIDGET_COPY = {
+  en: {
+    engine: 'Cognitive engine',
+    report: 'Performance report',
+    focus: 'Focus score',
+    operationalLoad: 'Estimated operational load',
+    now: 'Now',
+    offline: 'Engine offline · Check connection',
+    open: 'Open full report',
+    risk: { critical: 'high', warning: 'elevated', safe: 'low' },
+  },
+  es: {
+    engine: 'Motor cognitivo',
+    report: 'Informe de rendimiento',
+    focus: 'Puntuación de foco',
+    operationalLoad: 'Carga operativa estimada',
+    now: 'Ahora',
+    offline: 'Motor sin conexión · Revisa tu conexión',
+    open: 'Abrir informe completo',
+    risk: { critical: 'alta', warning: 'elevada', safe: 'baja' },
+  },
+  fr: {
+    engine: 'Moteur cognitif',
+    report: 'Rapport de performance',
+    focus: 'Score de concentration',
+    operationalLoad: 'Charge opérationnelle estimée',
+    now: 'Maintenant',
+    offline: 'Moteur hors ligne · Vérifiez la connexion',
+    open: 'Ouvrir le rapport complet',
+    risk: { critical: 'élevée', warning: 'modérée', safe: 'faible' },
+  },
+  de: {
+    engine: 'Kognitive Engine',
+    report: 'Leistungsbericht',
+    focus: 'Fokuswert',
+    operationalLoad: 'Geschätzte operative Last',
+    now: 'Jetzt',
+    offline: 'Engine offline · Verbindung prüfen',
+    open: 'Vollständigen Bericht öffnen',
+    risk: { critical: 'hoch', warning: 'erhöht', safe: 'niedrig' },
+  },
+} as const;
+
 function ScoreMini({ score, color }: { score: number; color: string }) {
   const radius = 21;
   const circ = 2 * Math.PI * radius;
@@ -24,17 +65,14 @@ function ScoreMini({ score, color }: { score: number; color: string }) {
   return (
     <svg width="58" height="58" viewBox="0 0 58 58" className="-rotate-90 flex-shrink-0">
       <circle cx="29" cy="29" r={radius} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="5" />
-      <motion.circle
+      <circle
         cx="29" cy="29" r={radius}
         fill="none"
         stroke={color}
         strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={circ}
-        initial={{ strokeDashoffset: circ }}
-        animate={{ strokeDashoffset: offset }}
-        transition={{ duration: 1.6, ease: [0.25, 0.1, 0.25, 1], delay: 0.2 }}
-        style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+        strokeDashoffset={offset}
       />
     </svg>
   );
@@ -45,6 +83,8 @@ export function CognitiveEngineWidget() {
   // same dashboard render; SWR's dedupingInterval collapses both into one
   // request instead of two independent calls to an LLM-backed route.
   const { data: json, isLoading: loading } = useCognitiveEngine();
+  const { language } = useTranslation();
+  const copy = WIDGET_COPY[language as keyof typeof WIDGET_COPY] ?? WIDGET_COPY.en;
   const data: WidgetData | null = json?.success
     ? {
         focusScore: json.report.focusScore,
@@ -65,58 +105,35 @@ export function CognitiveEngineWidget() {
 
   return (
     <Link href="/cognitive" className="block group">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...springConfig.smooth, delay: 0.05 }}
-        whileHover={{ scale: 1.015, y: -2, transition: { ...springConfig.snappy } }}
+      <div
         className={cn(
-          'relative rounded-3xl p-5 border transition-all duration-500 cursor-pointer',
-          'border-foreground/[0.08] bg-foreground/[0.01]',
-          'hover:border-primary/30 hover:bg-primary/[0.02]',
-          'shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_50px_rgba(0,0,0,0.3)]',
-          'hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(99,102,241,0.2)]',
+          'cognitive-engine-summary glass-surface relative isolate overflow-hidden rounded-3xl border p-5 cursor-pointer',
+          'border-foreground/[0.09]',
+          'shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_18px_46px_-34px_rgba(0,0,0,0.72)]',
         )}
       >
-        <GlassSurface
-          radius={24}
-          depth={10}
-          blur={1}
-          strength={40}
-          chromaticAberration={6}
-          backgroundColor="transparent"
-          elevation="low"
+        <div
           aria-hidden
-          className="pointer-events-none"
-          style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
-        />
-        {/* Ambient gradient orb — shifts on hover via CSS */}
-        <div
-          className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10 blur-3xl transition-all duration-700 group-hover:opacity-25 group-hover:scale-125 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
-        />
-
-        {/* Secondary warm orb */}
-        <div
-          className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-5 blur-2xl transition-all duration-700 group-hover:opacity-15 pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${scoreColor} 0%, transparent 70%)` }}
+          className="pointer-events-none absolute inset-0 -z-10 opacity-70"
+          style={{
+            background: `radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--primary) 11%, transparent), transparent 42%), radial-gradient(circle at 0% 100%, ${scoreColor}0f, transparent 32%)`,
+          }}
         />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4 relative z-10">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-8 h-8 rounded-xl border border-primary/25 flex items-center justify-center transition-all duration-300 group-hover:border-primary/50 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.2)]"
-              style={{ background: 'rgba(99,102,241,0.1)' }}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 transition-[border-color,background-color] duration-200 group-hover:border-primary/45 group-hover:bg-primary/15"
             >
-              <Brain className="w-4 h-4 text-primary transition-transform duration-300 group-hover:scale-110" />
+              <Brain className="w-4 h-4 text-primary" strokeWidth={1.7} />
             </div>
             <div>
-              <p className="text-[9px] font-black tracking-[0.25em] uppercase text-foreground/35">Cognitive Engine</p>
-              <p className="text-xs font-bold text-foreground/70">Performance Report</p>
+              <p className="text-[9px] font-black tracking-[0.25em] uppercase text-foreground/45">{copy.engine}</p>
+              <p className="text-xs font-bold text-foreground/75">{copy.report}</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-foreground/20 group-hover:text-primary group-hover:translate-x-1 transition-all duration-300" />
+          <ArrowRight className="w-4 h-4 text-foreground/30 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-primary" strokeWidth={1.8} />
         </div>
 
         {/* Body */}
@@ -140,7 +157,7 @@ export function CognitiveEngineWidget() {
                   <div className="absolute inset-0 flex flex-col items-center justify-center rotate-90">
                     <span
                       className="text-[13px] font-black tabular-nums leading-none"
-                      style={{ color: scoreColor, textShadow: `0 0 12px ${scoreColor}80` }}
+                      style={{ color: scoreColor }}
                     >
                       {data.focusScore}
                     </span>
@@ -148,7 +165,7 @@ export function CognitiveEngineWidget() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-foreground/25 uppercase tracking-widest mb-1">Focus Score</p>
+                  <p className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest mb-1">{copy.focus}</p>
                   <p className="text-sm font-bold text-foreground/75 leading-snug truncate">{data.topInsight}</p>
 
                   <div className="flex items-center gap-1.5 mt-1.5">
@@ -160,7 +177,7 @@ export function CognitiveEngineWidget() {
                       'text-[9px] font-black uppercase tracking-widest',
                       riskLevel === 'critical' ? 'text-red-400' : riskLevel === 'warning' ? 'text-amber-400' : 'text-green-400'
                     )}>
-                      Burnout {riskLevel} · {data.burnoutRisk}%
+                      {copy.operationalLoad} {copy.risk[riskLevel]} · {data.burnoutRisk}%
                     </span>
                   </div>
                 </div>
@@ -168,20 +185,19 @@ export function CognitiveEngineWidget() {
 
               {/* Recommendation glass pill */}
               <div
-                className="px-3.5 py-2.5 rounded-xl border border-foreground/[0.06] transition-all duration-300 group-hover:border-foreground/[0.10]"
+                className="rounded-xl border border-foreground/[0.07] bg-foreground/[0.018] px-3.5 py-2.5 transition-colors duration-200 group-hover:border-foreground/[0.12]"
                 style={{
-                  background: 'rgba(255,255,255,0.015)',
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
                 }}
               >
-                <p className="text-[9px] font-black tracking-widest uppercase text-primary/45 mb-0.5 group-hover:text-primary/70 transition-colors">Now →</p>
-                <p className="text-[11px] text-foreground/40 leading-relaxed line-clamp-2">{data.recommendation}</p>
+                <p className="text-[9px] font-black tracking-widest uppercase text-primary/55 mb-0.5 group-hover:text-primary/75 transition-colors">{copy.now} →</p>
+                <p className="text-[11px] text-foreground/55 leading-relaxed line-clamp-2">{data.recommendation}</p>
               </div>
             </>
           ) : (
             <div className="flex items-center gap-2 py-2 text-foreground/20">
               <TrendingDown className="w-4 h-4" />
-              <span className="text-xs">Engine offline · Check connection</span>
+              <span className="text-xs">{copy.offline}</span>
             </div>
           )}
         </div>
@@ -189,10 +205,10 @@ export function CognitiveEngineWidget() {
         {/* CTA footer */}
         <div className="flex items-center justify-end mt-3 relative z-10">
           <span className="text-[9px] font-black tracking-[0.2em] uppercase text-primary/30 group-hover:text-primary/60 transition-colors duration-300">
-            Open Full Report →
+            {copy.open} →
           </span>
         </div>
-      </motion.div>
+      </div>
     </Link>
   );
 }

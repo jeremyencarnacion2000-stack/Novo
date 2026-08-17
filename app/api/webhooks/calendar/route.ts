@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime';
 
 // Disable Static Optimization for Webhook listener
 export const dynamic = 'force-dynamic';
@@ -151,6 +152,8 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    await runAmbientTwinForUser(userId, { trigger: 'calendar_changed' }).catch(() => undefined);
 
     return NextResponse.json({ success: true, synced: googleEvents.length });
   } catch (error: any) {

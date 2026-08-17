@@ -28,9 +28,9 @@ export async function linkTodoistTask(input: { userId: string; connectionId: str
   await ports.saveMapping({ ...input, integrationAccountId: c.id, provider: 'todoist', providerAccountId: c.providerAccountId, entityType: 'task', sourceEntityId: task.id, status: 'active', canonicalBaseline: baseline, sourceRevision: baseline.providerUpdatedAt, lastObservedAt: new Date() })
   return { idempotent: false, baseline }
 }
-export async function unlinkTodoistTask(input: { mappingId: string; reason: string }, ports: Pick<LinkPorts, 'updateMapping'>) {
-  return ports.updateMapping({ id: input.mappingId, status: 'unlinked', unlinkReason: input.reason, unlinkedAt: new Date() })
+export async function unlinkTodoistTask(input: { mappingId: string; reason: string; userId?: string }, ports: Pick<LinkPorts, 'updateMapping'>) {
+  return ports.updateMapping({ id: input.mappingId, userId: input.userId, status: 'unlinked', unlinkReason: input.reason, unlinkedAt: new Date() })
 }
-export async function rejectTodoistTask(input: { mappingId: string; reason: string }, ports: Pick<LinkPorts, 'updateMapping'>) {
-  return ports.updateMapping({ id: input.mappingId, status: 'quarantined', correctionReason: input.reason, correctedAt: new Date() })
+export async function rejectTodoistTask(input: { mappingId: string; reason: string; userId?: string }, ports: Pick<LinkPorts, 'updateMapping'>) {
+  return ports.updateMapping({ id: input.mappingId, userId: input.userId, status: 'quarantined', correctionReason: input.reason, correctedAt: new Date() })
 }

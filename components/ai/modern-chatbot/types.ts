@@ -1,4 +1,6 @@
 // Types for Modern Chatbot
+import type { ContextSource } from '@/lib/ai/source-attribution';
+
 export interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -16,6 +18,9 @@ export interface Message {
     blocks?: MessageBlock[];
     attachments?: Attachment[];
     suggestedFollowups?: string[];
+    /** Context actually supplied to the model for this response. */
+    sources?: ContextSource[];
+    activityRunId?: string;
 }
 
 export interface Attachment {
@@ -50,7 +55,7 @@ export interface MessageBlock {
     type: BlockType;
     title?: string;
     content: any;
-    status?: 'pending' | 'success' | 'failed' | 'waiting' | 'waiting_confirmation' | 'confirmed' | 'cancelled';
+    status?: 'pending' | 'executing' | 'success' | 'failed' | 'waiting' | 'waiting_confirmation' | 'confirmed' | 'cancelled';
     isVisible?: boolean;
     actionId?: string;
     metadata?: any;

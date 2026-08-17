@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react'
@@ -18,6 +18,21 @@ export default function SignUpPage() {
     const [loading, setLoading] = useState(false)
     const [googleLoading, setGoogleLoading] = useState(false)
     const [success, setSuccess] = useState(false)
+
+    const getCallbackUrl = () => {
+        if (typeof window === 'undefined') return '/onboarding'
+        const raw = new URLSearchParams(window.location.search).get('callbackUrl')
+        return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/onboarding'
+    }
+
+    const getIntent = () => typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('intent')
+
+    useEffect(() => {
+        const intent = new URLSearchParams(window.location.search).get('intent')
+        if (intent === 'pro') localStorage.setItem('novo:purchase-intent', 'pro')
+    }, [])
 
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -49,7 +64,11 @@ export default function SignUpPage() {
 
             setSuccess(true)
             setTimeout(() => {
-                router.push('/auth/signin')
+                const callbackUrl = getCallbackUrl()
+                const intent = getIntent()
+                const params = new URLSearchParams({ callbackUrl })
+                if (intent === 'pro') params.set('intent', 'pro')
+                router.push(`/auth/signin?${params.toString()}`)
             }, 2000)
 
         } catch (error) {
@@ -62,7 +81,12 @@ export default function SignUpPage() {
         setError('')
         setGoogleLoading(true)
         try {
-            await signIn('google', { callbackUrl: '/onboarding', redirect: true })
+            const callbackUrl = getCallbackUrl()
+            const intent = getIntent()
+            const target = intent === 'pro' && callbackUrl === '/onboarding'
+                ? '/onboarding?intent=pro'
+                : callbackUrl
+            await signIn('google', { callbackUrl: target, redirect: true })
         } catch (error) {
             setError('Error al registrarte con Google')
             setGoogleLoading(false)
@@ -91,9 +115,9 @@ export default function SignUpPage() {
         <div className="min-h-dvh w-full flex bg-background text-foreground overflow-hidden">
             {/* Left — decorative panel, own fixed-dark surface (Kreative-style, matches /auth/signin) */}
             <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-10 overflow-hidden bg-[#0a0a0d]">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/40 via-purple-700/20 to-black" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(129,140,248,0.35),_transparent_55%)]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(168,85,247,0.25),_transparent_50%)]" />
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/30 via-teal-400/10 to-black" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(74,222,128,0.30),_transparent_55%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(45,212,191,0.22),_transparent_50%)]" />
 
                 <div className="relative z-10 flex justify-center">
                     <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-xl px-4 py-2 shadow-lg">
@@ -123,7 +147,7 @@ export default function SignUpPage() {
 
             {/* Right — form panel, theme-adaptive */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative overflow-y-auto">
-                <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 to-transparent pointer-events-none" />
                 <div className="w-full max-w-sm space-y-7 relative z-10 py-8">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2.5 mb-6 lg:hidden">
@@ -169,7 +193,7 @@ export default function SignUpPage() {
                                     placeholder="Juan"
                                     value={firstName}
                                     onChange={(e) => setFirstName(e.target.value)}
-                                    className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                                    className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                                     required
                                     disabled={loading || googleLoading}
                                 />
@@ -181,7 +205,7 @@ export default function SignUpPage() {
                                     placeholder="Pérez"
                                     value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
-                                    className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                                    className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                                     required
                                     disabled={loading || googleLoading}
                                 />
@@ -196,7 +220,7 @@ export default function SignUpPage() {
                                 placeholder="tu@ejemplo.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                                className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                                 required
                                 disabled={loading || googleLoading}
                             />
@@ -211,7 +235,7 @@ export default function SignUpPage() {
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full h-13 px-4 py-3.5 pr-12 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                                    className="w-full h-13 px-4 py-3.5 pr-12 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                                     required
                                     disabled={loading || googleLoading}
                                 />

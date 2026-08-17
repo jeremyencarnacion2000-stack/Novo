@@ -2,7 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { Bot, User, Copy, Check, Download, Eye, EyeOff } from 'lucide-react';
+import { Bot, Copy, Check, Download, Eye, EyeOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -19,7 +19,6 @@ const SyntaxHighlighter = dynamic(
 );
 import type { Message as MessageType } from './types';
 import { MessageActions } from './message-actions';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
 
 import { AnalysisBlock } from './blocks/analysis-block';
@@ -33,6 +32,7 @@ import { MusicRecommendationCard } from './blocks/music-recommendation-card';
 import { OutfitRecommendationCard } from './blocks/outfit-recommendation-card';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
+import { SourceCitations } from './source-citations';
 
 interface MessageProps {
     message: MessageType;
@@ -310,29 +310,15 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
 
     return (
         <div
-            className="group flex gap-3 sm:gap-4 px-4 sm:px-6 py-5 transition-all duration-300 w-full max-w-full overflow-hidden bg-transparent"
+            data-message-role={message.role}
+            className={`group flex w-full max-w-full overflow-hidden px-4 py-4 sm:px-6 transition-all duration-300 ${isUser ? 'justify-end' : 'justify-start'}`}
         >
-            {/* Avatar */}
-            <div className="flex-shrink-0 pt-0.5">
-                {isUser ? (
-                    <Avatar className="h-8 w-8 rounded-xl ring-1 ring-white/10">
-                        <AvatarImage src={session?.user?.image || ''} alt={session?.user?.name || 'User'} />
-                        <AvatarFallback className="bg-white/[0.06] text-white/70 rounded-xl text-xs font-medium">
-                            <User className="w-4 h-4" />
-                        </AvatarFallback>
-                    </Avatar>
-                ) : (
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br from-primary to-primary/70 shadow-[0_0_12px_var(--primary-glow,rgba(99,102,241,0.25))] ring-1 ring-primary/30">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
-                    </div>
-                )}
-            </div>
 
             {/* Content — critical: min-w-0 + overflow-hidden prevents child overflow */}
-            <div className="flex-1 min-w-0 overflow-hidden">
-                <div className="flex items-center gap-2 mb-1.5">
+            <div className={`min-w-0 overflow-hidden ${isUser ? 'w-fit max-w-[min(90%,42rem)] rounded-[22px] border border-primary/20 bg-primary/[0.08] px-4 py-3 shadow-[0_8px_30px_rgba(var(--primary-rgb),0.08)]' : 'w-full'}`}>
+                <div className={`flex items-center gap-2 mb-1.5 ${!isUser ? 'hidden' : ''}`}>
                     <span className="text-[13px] font-semibold text-white/90">
-                        {isUser ? (session?.user?.name || 'User') : 'Novo AI'}
+                        {session?.user?.name || 'Tú'}
                     </span>
                     <span className="text-[11px] text-white/30 tabular-nums">
                         {new Date(message.timestamp).toLocaleTimeString('es-ES', {
@@ -510,6 +496,8 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                         ))}
                     </div>
                 )}
+
+                {!isUser && <SourceCitations sources={message.sources} />}
 
                 {/* Actions */}
                 <div className="mt-2">

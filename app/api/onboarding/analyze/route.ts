@@ -6,13 +6,13 @@ const SYSTEM_PROMPT = `You are Novo's onboarding analyst. Read the user's onboar
 
 Return ONLY valid JSON (no markdown) with exactly this shape:
 {
-  "longTermGoal": "clean, concise restatement (1 sentence, in Spanish) of the user's stated 12-month goal",
+  "longTermGoal": "clean, concise restatement (1 sentence, in the requested interface language) of the user's stated 12-month goal",
   "identity": { "role": "student|founder|developer|creator|professional", "industry": string, "focusStyle": string, "deepWorkCapacity": number },
   "energyCurve": { "chronotype": "morning_lark|night_owl|intermediate", "peakFocusStart": "HH:MM", "peakFocusEnd": "HH:MM", "typicalSlumpHour": number },
-  "metrics": { "currentCognitiveLoad": number 0-100, "decisionFatigueRisk": "low|moderate|high", "burnoutIndex": number 0-100 },
+  "metrics": { "currentCognitiveLoad": 0, "decisionFatigueRisk": "unknown", "burnoutIndex": 0 },
   "bottlenecks": { "mainFrictionPoint": "context_switching|procrastination|overcommitment|lack_of_structure", "motivationDrivers": string[], "planningPreference": "adaptive|rigid" },
   "workspaceLayout": { "enabledModules": string[] (from: today, ai, cognitive, focus, school, library, business, projects, music, trackers), "collapsedSidebar": false, "heroWidget": "cognitive_twin_orb" },
-  "selfDiscoveryText": "2-3 sentence personalized diagnosis, in Spanish, referencing what they specifically said"
+  "selfDiscoveryText": "2-3 sentence personalized diagnosis in the requested interface language, referencing what they specifically said"
 }
 
 Rules:
@@ -20,14 +20,22 @@ Rules:
 - "today", "ai", "cognitive", "focus" are always in enabledModules; add role-relevant ones on top (school/library for students, business/projects for founders, projects for developers, music/projects for creators, trackers otherwise).
 - selfDiscoveryText must feel specific to this person, not generic.`
 
-async function analyzeWithLLM(textLog: string) {
+const OUTPUT_LANGUAGE: Record<string, string> = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+}
+
+async function analyzeWithLLM(textLog: string, language: string) {
   const userMessage = `Onboarding transcript:\n\n${textLog}`
+  const prompt = `${SYSTEM_PROMPT}\n\nWrite longTermGoal and selfDiscoveryText in ${OUTPUT_LANGUAGE[language] || 'English'}.`
   let raw: string
   try {
-    raw = (await groqAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'qwen/qwen3-32b')).content
+    raw = (await groqAPI.generateResponse(userMessage, '', [], prompt, 'qwen/qwen3-32b')).content
   } catch (groqError) {
     console.error('[Onboarding Analyze] Groq failed, trying OpenRouter:', groqError)
-    raw = (await openRouterAPI.generateResponse(userMessage, '', [], SYSTEM_PROMPT, 'openai/gpt-oss-20b:free')).content
+    raw = (await openRouterAPI.generateResponse(userMessage, '', [], prompt, 'openai/gpt-oss-20b:free')).content
   }
   const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim()
   return JSON.parse(cleaned)
@@ -38,20 +46,20 @@ async function analyzeWithLLM(textLog: string) {
 // Grabbing the user reply that immediately follows it gives the raw goal
 // answer without the two files needing to share a schema.
 function extractGoalAnswer(messages: any[]): string {
-  const idx = messages.findIndex((m: any) => m.role === 'assistant' && /12 meses/i.test(m.content))
+  const idx = messages.findIndex((m: any) => m.role === 'assistant' && /12 (meses|months|mois|monate)/i.test(m.content))
   return idx >= 0 && messages[idx + 1]?.role === 'user' ? messages[idx + 1].content.trim() : ''
 }
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json()
+    const { messages, language = 'en' } = await req.json()
     const textLog = messages
       .map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`)
       .join('\n')
     const rawGoalAnswer = extractGoalAnswer(messages)
 
     try {
-      const profile = await analyzeWithLLM(textLog)
+      const profile = await analyzeWithLLM(textLog, language)
       // Belt-and-suspenders: if the LLM ever drops the field, fall back to
       // the raw text the user typed rather than losing the goal entirely.
       profile.longTermGoal = profile.longTermGoal || rawGoalAnswer
@@ -65,13 +73,13 @@ export async function POST(req: Request) {
     // OpenRouter are both down, at the cost of the generic profile below.
     // 1. Identity
     let role: 'student' | 'founder' | 'developer' | 'creator' | 'professional' = 'professional'
-    if (/estudiante|estudio|uni|universidad|clase|colegio|escuela/i.test(textLog)) {
+    if (/\[selection:student\]|estudiante|student|étudiant|studentin|studium|uni|universidad|classe?|colegio|escuela/i.test(textLog)) {
       role = 'student'
-    } else if (/founder|fundador|startup|ceo|empresa|emprendedor/i.test(textLog)) {
+    } else if (/\[selection:founder\]|founder|fundador|fondateur|gründer|startup|ceo|empresa|emprendedor/i.test(textLog)) {
       role = 'founder'
-    } else if (/dev|developer|desarrollador|programador|codigo|code/i.test(textLog)) {
+    } else if (/\[selection:developer\]|dev|developer|développeur|entwickler|desarrollador|programador|código|codigo|code/i.test(textLog)) {
       role = 'developer'
-    } else if (/creador|creator|diseñador|writer|video|musica/i.test(textLog)) {
+    } else if (/\[selection:creator\]|creador|creator|créateur|kreativ|diseñador|designer|writer|video|música|musica/i.test(textLog)) {
       role = 'creator'
     }
 
@@ -81,12 +89,12 @@ export async function POST(req: Request) {
     let peakFocusEnd = '18:00'
     let typicalSlumpHour = 13
 
-    if (/noche|tarde|madrugada|nocturno/i.test(textLog)) {
+    if (/\[selection:night\]|noche|madrugada|nocturno|evening|late night|soir|nacht/i.test(textLog)) {
       chronotype = 'night_owl'
       peakFocusStart = '20:00'
       peakFocusEnd = '01:00'
       typicalSlumpHour = 15
-    } else if (/mañana|madrugar|temprano/i.test(textLog)) {
+    } else if (/\[selection:morning\]|mañana|madrugar|temprano|morning|matin|morgen|früh/i.test(textLog)) {
       chronotype = 'morning_lark'
       peakFocusStart = '08:00'
       peakFocusEnd = '12:00'
@@ -95,24 +103,29 @@ export async function POST(req: Request) {
 
     // 3. Friction Points
     let mainFrictionPoint: 'context_switching' | 'procrastination' | 'overcommitment' | 'lack_of_structure' = 'lack_of_structure'
-    if (/procrastinar|aplaz|postergar/i.test(textLog)) {
+    if (/\[selection:procrastination\]|procrastin|aplaz|postergar|aufschieben/i.test(textLog)) {
       mainFrictionPoint = 'procrastination'
-    } else if (/multitasking|alternar|distra|notificaciones/i.test(textLog)) {
+    } else if (/\[selection:context_switching\]|multitasking|alternar|switching|distra|notificaciones|wechsel/i.test(textLog)) {
       mainFrictionPoint = 'context_switching'
-    } else if (/muchas cosas|sobrecarga|tiempo|no llego/i.test(textLog)) {
+    } else if (/\[selection:overcommitment\]|muchas cosas|sobrecarga|too much|trop|zu viel|no llego/i.test(textLog)) {
       mainFrictionPoint = 'overcommitment'
+    } else if (/\[selection:lack_of_structure\]/i.test(textLog)) {
+      mainFrictionPoint = 'lack_of_structure'
     }
 
     // 4. Motivation Drivers
     const motivationDrivers: Array<'achievement' | 'urgency' | 'gamification' | 'minimalist_calm'> = []
-    if (/gamif|juego|puntos|recompensa/i.test(textLog)) {
+    if (/\[selection:gamification\]|gamif|juego|puntos|recompensa|reward/i.test(textLog)) {
       motivationDrivers.push('gamification')
     }
-    if (/plazo|fecha|urgente|limite/i.test(textLog)) {
+    if (/\[selection:urgency\]|plazo|fecha|urgente|límite|limite|deadline|échéance|frist/i.test(textLog)) {
       motivationDrivers.push('urgency')
     }
-    if (/calma|paz|orden|minimal/i.test(textLog)) {
+    if (/\[selection:minimalist_calm\]|calma|calm|paz|orden|minimal|ruhig/i.test(textLog)) {
       motivationDrivers.push('minimalist_calm')
+    }
+    if (/\[selection:achievement\]/i.test(textLog)) {
+      motivationDrivers.push('achievement')
     }
     if (motivationDrivers.length === 0) {
       motivationDrivers.push('achievement') // default
@@ -154,7 +167,13 @@ export async function POST(req: Request) {
       ? 'Rindes mejor de noche, pero la sociedad te fuerza a mañanas tempranas, consumiendo tus reservas antes del mediodía.'
       : 'Tu ventana óptima es matutina, lo que significa que el trabajo pesado debe resolverse antes de que comience el ruido de reuniones.'
 
-    const fullNarrative = `Basándome en nuestra conversación, identifico tu perfil como un ${focusStyleName}. ${diagnosis} ${energyText} Hemos optimizado Novo para estructurar tu espacio alrededor de esta realidad.`
+    const fallbackNarratives: Record<string, string> = {
+      es: `Basándome en nuestra conversación, identifico tu perfil como un ${focusStyleName}. ${diagnosis} ${energyText} Hemos optimizado Novo para estructurar tu espacio alrededor de esta realidad.`,
+      en: `Based on our conversation, your starting profile is ${focusStyleName}. Your workspace is ready to learn from your real habits and help you take a clearer next step.`,
+      fr: `D’après notre échange, votre profil de départ est ${focusStyleName}. Votre espace est prêt à apprendre de vos habitudes réelles et à vous aider à choisir une prochaine étape plus claire.`,
+      de: `Aus unserem Gespräch ergibt sich als Ausgangspunkt das Profil ${focusStyleName}. Dein Bereich ist bereit, aus deinen echten Gewohnheiten zu lernen und dir den nächsten Schritt klarer zu machen.`,
+    }
+    const fullNarrative = fallbackNarratives[language] || fallbackNarratives.en
 
     return NextResponse.json({
       // Simplest correct thing: pass through the raw text they typed, we
@@ -172,11 +191,9 @@ export async function POST(req: Request) {
         peakFocusEnd,
         typicalSlumpHour,
       },
-      metrics: {
-        currentCognitiveLoad: role === 'student' || role === 'founder' ? 65 : 45,
-        decisionFatigueRisk: role === 'founder' ? 'high' : 'moderate',
-        burnoutIndex: role === 'founder' ? 55 : 35,
-      },
+      // Onboarding answers can establish preferences, never biometrics or a
+      // measured workload. Operational metrics begin uncalibrated.
+      metrics: { currentCognitiveLoad: 0, decisionFatigueRisk: 'unknown', burnoutIndex: 0 },
       bottlenecks: {
         mainFrictionPoint,
         motivationDrivers,

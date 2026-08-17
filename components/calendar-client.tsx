@@ -88,7 +88,7 @@ export default function CalendarClient() {
 
   // Custom DayButton component with cognitive load tokens
   const CustomDayButton = React.useMemo(() => {
-    return (props: any) => {
+    const CognitiveDayButton = (props: any) => {
       const { day, modifiers, ...buttonProps } = props
       const dateObj = day.date
       const dateStr = format(dateObj, 'yyyy-MM-dd')
@@ -161,6 +161,8 @@ export default function CalendarClient() {
         </button>
       )
     }
+    CognitiveDayButton.displayName = 'CognitiveDayButton'
+    return CognitiveDayButton
   }, [eventsByDate])
 
   return (

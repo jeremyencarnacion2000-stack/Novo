@@ -21,10 +21,11 @@ export function SettingsModal() {
         >
             <DialogContent
                 style={{ viewTransitionName: 'settings-window' } as React.CSSProperties}
+                data-overlay-material
                 className={cn(
                 "max-w-4xl md:max-w-5xl w-full md:w-[94vw] h-[100dvh] md:h-[85vh] p-0 shadow-2xl outline-none",
                 "!flex flex-col overflow-hidden rounded-none md:rounded-[34px]",
-                "bg-background/95 md:bg-background/90 dark:bg-black/95 md:dark:bg-black/85 backdrop-blur-2xl border-0 md:border md:border-border/20 dark:md:border-white/10 liquid-glass-premium text-foreground"
+                "novo-settings-modal liquid-glass-premium text-foreground"
             )}>
                 {/* Content Layer (Sharp) */}
                 <div className="flex-1 w-full flex flex-col p-0 overflow-hidden relative bg-transparent h-full">

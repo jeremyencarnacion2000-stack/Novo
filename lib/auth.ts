@@ -212,6 +212,33 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
+  // OAuth is also launched from Novo's embedded browser surfaces.  Those
+  // surfaces can treat the provider hop as a cross-site navigation and drop
+  // the default Lax state/PKCE cookies on the way back.  Keep the state check
+  // enabled, but explicitly allow these short-lived handshake cookies to make
+  // the round trip; the session and CSRF cookies remain host-only and Lax.
+  cookies: {
+    state: {
+      name: '__Secure-next-auth.state',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+        maxAge: 15 * 60,
+      },
+    },
+    pkceCodeVerifier: {
+      name: '__Secure-next-auth.pkce.code_verifier',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+        maxAge: 15 * 60,
+      },
+    },
+  },
   // NextAuth's default adapter only writes the Account row's OAuth fields
   // (access_token/refresh_token/scope/...) the FIRST time a given
   // provider+providerAccountId signs in - node_modules/next-auth/core/lib/

@@ -26,11 +26,11 @@ export function ErrorToast({ error, onDismiss, onRetry, autoDismiss = true }: Er
 
   const getErrorColor = (type: string) => {
     switch (type) {
-      case 'network': return 'border-red-200 bg-red-50 text-red-800';
-      case 'api': return 'border-orange-200 bg-orange-50 text-orange-800';
-      case 'validation': return 'border-yellow-200 bg-yellow-50 text-yellow-800';
-      case 'timeout': return 'border-blue-200 bg-blue-50 text-blue-800';
-      default: return 'border-gray-200 bg-gray-50 text-gray-800';
+      case 'network': return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300';
+      case 'api': return 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300';
+      case 'validation': return 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200';
+      case 'timeout': return 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300';
+      default: return 'border-border bg-card text-foreground';
     }
   };
 

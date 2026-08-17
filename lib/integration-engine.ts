@@ -53,7 +53,7 @@ export class IntegrationEngine {
 
         // All 5 sources are independent reads — fetch them in parallel
         // instead of one round trip after another.
-        const [routines, projects, checklistItems, aiTasks, courses] = await Promise.all([
+        const [routines, projects, checklistItems, aiTasks, courses, currentPlan] = await Promise.all([
             // 1. Routine tasks for current time of day
             prisma.routine.findMany({
                 where: {
@@ -105,7 +105,16 @@ export class IntegrationEngine {
                     }
                 }
             }),
+            prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: true } }),
         ]);
+
+        // A canonical recommendation may be undated and therefore absent
+        // from the normal Today task query. Resolve that durable task once so
+        // Today still reflects the active plan after a replan.
+        const canonicalTaskId = currentPlan?.actions?.find((action) => ['proposed', 'accepted', 'modified', 'started'].includes(action.status))?.taskId;
+        const canonicalTask = canonicalTaskId && !aiTasks.some((task) => task.id === canonicalTaskId)
+            ? await prisma.task.findFirst({ where: { id: canonicalTaskId, userId, status: { not: 'done' } } })
+            : null;
 
         for (const routine of routines) {
             for (const task of routine.tasks) {
@@ -171,6 +180,17 @@ export class IntegrationEngine {
                 scheduledHour: task.scheduledHour,
                 scheduledReason: task.scheduledReason,
             });
+        }
+
+        // The canonical active plan is authoritative for the current action.
+        // Surface it through the same Today collection so replans are visible
+        // without provider-specific branches or client-side injection.
+        const canonical = currentPlan?.actions?.find((action) => ['proposed', 'accepted', 'modified', 'started'].includes(action.status) && action.taskId);
+        if (canonical?.taskId && !tasks.some((task) => task.source === 'ai-task' && task.sourceId === canonical.taskId)) {
+            const task = aiTasks.find((item) => item.id === canonical.taskId) || canonicalTask;
+            if (task && task.status !== 'done') {
+                tasks.unshift({ id: `task:${task.id}`, text: task.title, completed: false, priority: task.priority as 'low' | 'medium' | 'high', source: 'ai-task', sourceId: task.id, scheduledHour: task.scheduledHour, scheduledReason: task.scheduledReason });
+            }
         }
 
         // 4. School assignments due today (if any)

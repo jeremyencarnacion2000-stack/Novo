@@ -124,7 +124,8 @@ export interface HeartRateSummary {
 
 /**
  * The fully normalized biometric payload returned by the ingestion endpoint.
- * All fields are guaranteed non-null — missing data uses safe defaults.
+ * Biometric measurements are nullable when the provider did not supply them.
+ * A missing measurement is deliberately not represented as a neutral score.
  */
 export interface BiometricPayload {
   /** ISO timestamp of when this payload was computed */
@@ -138,21 +139,21 @@ export interface BiometricPayload {
   heartRate: HeartRateSummary
 
   /**
-   * Composite User Stress Score (1–100).
+   * Composite User Stress Score (1–100) when sufficient physiological data exists.
    *
    * Derived from:
    *   • Sleep quality deficit (low deep sleep / low total sleep = higher stress)
    *   • Resting heart rate elevation (above personal baseline = higher stress)
-   *   • Data availability penalty (no data = neutral 50)
+   *   • It is absent when no verified biometric source is connected
    *
    * 1  = Fully recovered, zero stress indicators
    * 50 = Baseline / insufficient data
    * 100 = Extreme physiological stress signals
    */
-  userStressScore: number
+  userStressScore: number | null
 
   /** Human-readable stress level label */
-  stressLevel: 'minimal' | 'low' | 'moderate' | 'elevated' | 'high' | 'critical'
+  stressLevel: 'minimal' | 'low' | 'moderate' | 'elevated' | 'high' | 'critical' | 'unavailable'
 
   /** Diagnostic metadata for debugging */
   meta: {

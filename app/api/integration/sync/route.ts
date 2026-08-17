@@ -1,34 +1,34 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { IntegrationEngine } from '@/lib/integration-engine';
+import { z } from 'zod';
+
+const syncCompletionSchema = z.object({
+    taskId: z.string().min(1).max(200),
+    completed: z.boolean(),
+});
 
 // POST /api/integration/sync - Sync task completion across sources
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
+        const body = await request.json().catch(() => ({}));
+        const parsed = syncCompletionSchema.safeParse(body);
 
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        const { taskId, completed } = await request.json();
-
-        if (!taskId || completed === undefined) {
+        if (!parsed.success) {
             return NextResponse.json(
                 { error: 'Missing taskId or completed status' },
                 { status: 400 }
             );
         }
+
+        const { taskId, completed } = parsed.data;
 
         const persisted = await IntegrationEngine.syncCompletion(taskId, completed);
         if (!persisted) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error syncing completion:', error);
+        console.error('Error syncing completion:', { name: error instanceof Error ? error.name : 'UnknownError' });
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

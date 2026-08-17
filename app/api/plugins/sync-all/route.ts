@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { syncAllPlugins } from '@/lib/plugins/plugin-orchestrator';
+import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { results, totalSignals, twinUpdated } = await syncAllPlugins(session.user.id);
+    await runAmbientTwinForUser(session.user.id, { trigger: 'sync' });
     return NextResponse.json({
       success: true,
       totalSignals,

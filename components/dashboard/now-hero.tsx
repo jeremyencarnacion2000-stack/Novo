@@ -9,6 +9,7 @@ import { useCognitivePhase } from '@/lib/cognitive-context'
 import { springConfig } from '@/lib/design-tokens'
 import { useCognitiveEngine } from '@/hooks/use-swr'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 
 // Calendar-signal changeTypes that mean "your schedule is the problem" (as
 // opposed to e.g. a Notion signal) — the only cases where offering to
@@ -21,6 +22,14 @@ interface TaskLite {
   title: string
   priority: string
   dueDate: string | null
+}
+
+interface ChecklistLite {
+  id: string
+  text: string
+  priority: string
+  dueDate: string | null
+  completed: boolean
 }
 
 interface PlatformSignalEntry {
@@ -47,6 +56,46 @@ const PLATFORM_ACTION_LABEL: Record<PlatformSignalEntry['platform'], string> = {
   calendar: 'Ver calendario',
   gmail: 'Ver conectores',
   books: 'Ver biblioteca',
+}
+
+interface AmbientStateEntry {
+  status: 'active' | 'paused' | 'insufficient_context'
+  summary: string
+  initiative: string
+  recommendation: { title: string; nextStep: string } | null
+  question?: string
+}
+
+// Signal descriptions are stored as operational logs and may have been
+// produced by older integrations. Never render them verbatim in "Ahora": a
+// raw enum, JSON fragment, or emoji is useful to developers but not to the
+// person deciding what to do next.
+const SIGNAL_HEADLINE: Record<string, string> = {
+  calendar_meeting_overload: 'Tienes reuniones muy seguidas. Reserva un margen antes de tu siguiente bloque.',
+  calendar_no_focus_window: 'Tu calendario no deja espacio para concentrarte. Protege un bloque corto hoy.',
+  calendar_peak_conflict: 'Una reunión cae dentro de tu ventana de mayor enfoque. Considera mover el trabajo profundo.',
+  notion_overdue_accumulation: 'Hay tareas vencidas que necesitan una decisión. Empieza por la más importante.',
+  todoist_overdue_accumulation: 'Hay tareas vencidas que necesitan una decisión. Empieza por la más importante.',
+  context_switching: 'Has cambiado de contexto varias veces. Elige una sola tarea para los próximos minutos.',
+  switch_context: 'Has cambiado de contexto varias veces. Elige una sola tarea para los próximos minutos.',
+}
+
+const PLATFORM_FALLBACK_HEADLINE: Record<PlatformSignalEntry['platform'], string> = {
+  notion: 'El Gemelo detectó tareas que conviene revisar ahora.',
+  todoist: 'El Gemelo detectó tareas que conviene revisar ahora.',
+  calendar: 'El Gemelo detectó un cambio relevante en tu calendario.',
+  gmail: 'El Gemelo detectó información pendiente en tus conexiones.',
+  books: 'El Gemelo detectó una recomendación relevante para ti.',
+}
+
+function getSignalHeadline(signal: PlatformSignalEntry): string {
+  return SIGNAL_HEADLINE[signal.changeType] ?? PLATFORM_FALLBACK_HEADLINE[signal.platform]
+}
+
+function cleanTaskTitle(title: string, resumeCopy: string) {
+  if (/twin\s*agent/i.test(title) && /retomar|resume/i.test(title)) return resumeCopy
+  if (/context[_ -]?switching|switch[_ -]?context/i.test(title)) return resumeCopy
+  return title.replace(/^\p{Extended_Pictographic}\s*/u, '').trim()
 }
 
 const PHASE_COPY: Record<string, string> = {
@@ -108,9 +157,12 @@ function buildEngineHeadline(report: any): string | null {
 // as "según nos dijiste" — never a "detected" pattern.
 export function NowHero() {
   const { twin } = useCognitiveTwin()
+  const { t } = useTranslation()
   const phase = useCognitivePhase()
   const [task, setTask] = useState<TaskLite | null>(null)
+  const [hasAnyTask, setHasAnyTask] = useState(false)
   const [platformSignal, setPlatformSignal] = useState<PlatformSignalEntry | null>(null)
+  const [ambientState, setAmbientState] = useState<AmbientStateEntry | null>(null)
   const [loading, setLoading] = useState(true)
   // Progressive enhancement, not a load-blocking dependency: NowHero renders
   // immediately from local signals, then re-renders with the real read once
@@ -142,12 +194,23 @@ export function NowHero() {
   useEffect(() => {
     Promise.all([
       fetch('/api/tasks?status=todo').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/checklist').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/cognitive/active-signal').then((r) => (r.ok ? r.json() : { signal: null })),
+      fetch('/api/cognitive/ambient').then((r) => (r.ok ? r.json() : { state: null })),
     ])
-      .then(([tasks, activeSignalResponse]: [TaskLite[], { signal: PlatformSignalEntry | null }]) => {
+      .then(([tasks, checklist, activeSignalResponse, ambientResponse]: [TaskLite[], ChecklistLite[], { signal: PlatformSignalEntry | null }, { state: AmbientStateEntry | null }]) => {
         const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
         const now = Date.now()
-        const sorted = [...tasks].sort((a, b) => {
+        const checklistTasks: TaskLite[] = (Array.isArray(checklist) ? checklist : [])
+          .filter((item) => !item.completed)
+          .map((item) => ({
+            id: `checklist:${item.id}`,
+            title: item.text,
+            priority: item.priority,
+            dueDate: item.dueDate,
+          }))
+        setHasAnyTask((Array.isArray(tasks) && tasks.length > 0) || (Array.isArray(checklist) && checklist.length > 0))
+        const sorted = [...(Array.isArray(tasks) ? tasks : []), ...checklistTasks].sort((a, b) => {
           const overdueA = a.dueDate && new Date(a.dueDate).getTime() < now ? 0 : 1
           const overdueB = b.dueDate && new Date(b.dueDate).getTime() < now ? 0 : 1
           if (overdueA !== overdueB) return overdueA - overdueB
@@ -155,6 +218,7 @@ export function NowHero() {
         })
         const topTask = sorted[0] ?? null
         setTask(topTask)
+        setAmbientState(ambientResponse.state)
 
         const isUrgentTask = !!topTask && (
           (!!topTask.dueDate && new Date(topTask.dueDate).getTime() < now) || topTask.priority === 'high'
@@ -182,12 +246,18 @@ export function NowHero() {
   // A platform signal only preempts a task when that task isn't urgent — a non-urgent
   // task with no competing signal still beats onboarding/generic fallback copy.
   const showPlatformSignal = !isUrgentTask && !!platformSignal
-  const showTask = !!task && !showPlatformSignal
+  const showAmbient = !isUrgentTask && !showPlatformSignal && !!ambientState && (!!ambientState.recommendation || !!ambientState.question) && ['PROACTIVE_SUGGESTION', 'UPDATE_RECOMMENDATION', 'ASK_USER'].includes(ambientState.initiative)
+  const contextInsufficient = ambientState?.status === 'insufficient_context'
+  const showTask = !!task && !showPlatformSignal && !showAmbient
+  const taskTitle = task ? cleanTaskTitle(task.title, t('dashboard.twinResume')) : ''
+  const signalHeadline = showPlatformSignal ? getSignalHeadline(platformSignal!) : null
   const linkHref = showTask
     ? '/checklist'
+    : showAmbient
+      ? '/cognitive'
     : showPlatformSignal
       ? PLATFORM_LINK[platformSignal!.platform]
-      : twin.energyCurve.chronotype ? '/checklist' : '/onboarding'
+      : '/checklist'
 
   // The engine already computed how to fix this in the same response that
   // produced the signal's headline — offer it right here instead of only
@@ -208,29 +278,36 @@ export function NowHero() {
           Ahora →
         </p>
         <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary">
-          Twin Activo · {twin?.confidenceScore ?? 42}% precisión
+          {typeof twin?.confidenceScore === 'number' && twin.confidenceScore > 0
+            ? `Twin activo · ${Math.round(twin.confidenceScore)}% de confianza`
+            : 'Twin sin calibrar'}
         </span>
       </div>
 
       {showTask ? (
             <>
-              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{task!.title}</h2>
+              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{taskTitle}</h2>
               <p className="relative text-sm md:text-base text-foreground/60">
                 {phaseCopy}
                 {isOverdue && <span className="text-red-400 font-medium"> · vencida</span>}
               </p>
             </>
+          ) : showAmbient ? (
+            <>
+              <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{ambientState?.initiative === 'ASK_USER' ? ambientState.question : ambientState?.recommendation?.title ?? ambientState?.question}</h2>
+              <p className="relative text-sm md:text-base text-foreground/60">{ambientState?.recommendation?.nextStep ?? ambientState?.summary}</p>
+            </>
           ) : showPlatformSignal ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
-                {platformSignal!.description}
+                {signalHeadline}
               </h2>
               <p className="relative text-sm md:text-base text-foreground/60">{phaseCopy}</p>
             </>
           ) : twin.energyCurve.chronotype ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
-                {buildEngineHeadline(engineReport) ?? frictionTip ?? 'Agrega tu primera tarea para que el Twin empiece a aprender.'}
+                {contextInsufficient ? 'Novo todavía está reuniendo contexto suficiente para priorizar con confianza.' : buildEngineHeadline(engineReport) ?? frictionTip ?? (hasAnyTask ? 'No hay tareas pendientes visibles. Revisa el contexto del Twin.' : 'Agrega tu primera tarea para que el Twin empiece a aprender.')}
               </h2>
               <p className="relative text-sm md:text-base text-foreground/60">
                 {phaseCopy}
@@ -242,7 +319,7 @@ export function NowHero() {
           ) : (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">
-                Agrega tu primera tarea para que el Twin empiece a aprender.
+                {contextInsufficient ? 'Novo todavía está reuniendo contexto suficiente para priorizar con confianza.' : hasAnyTask ? 'No hay tareas pendientes visibles. Revisa el contexto del Twin.' : 'Agrega tu primera tarea para que el Twin empiece a aprender.'}
               </h2>
               <p className="relative text-sm md:text-base text-foreground/60">{phaseCopy}</p>
             </>
@@ -274,7 +351,7 @@ export function NowHero() {
         </div>
       ) : (
         <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
-          {showTask ? 'Ir a la tarea' : showPlatformSignal ? PLATFORM_ACTION_LABEL[platformSignal!.platform] : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
+          {showTask ? 'Ir a la tarea' : showAmbient ? 'Ver por qué' : showPlatformSignal ? PLATFORM_ACTION_LABEL[platformSignal!.platform] : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
         </div>
       )}
     </div>

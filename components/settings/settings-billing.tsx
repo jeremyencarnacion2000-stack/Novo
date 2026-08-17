@@ -2,9 +2,86 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Crown, Zap, CreditCard, Loader2, History, Share2, Sparkles } from 'lucide-react'
+import { Crown, CreditCard, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Section, SafeAction } from './settings-shared'
+import { InlineNovoPaywall } from '@/components/billing/novo-paywall'
+import { useTranslation } from '@/lib/i18n'
+
+const BILLING_COPY = {
+  es: {
+    loadError: 'No se pudo cargar tu plan',
+    confirming: 'Confirmando tu pago… esto puede tardar unos segundos.',
+    welcome: '¡Bienvenido a Novo Pro!',
+    active: 'Tu suscripción está activa.',
+    plan: 'Tu plan',
+    annual: 'anual',
+    monthly: 'mensual',
+    cancels: 'Se cancela el',
+    freeHint: 'Acciones de IA ilimitadas con Pro',
+    usage: 'Acciones de IA este mes',
+    billing: 'Facturación',
+    opening: 'Abriendo portal…',
+    manage: 'Administrar facturación',
+    manageDescription: 'Cambia tu método de pago, ve facturas o cancela tu suscripción.',
+    portalError: 'No se pudo abrir el portal de facturación',
+    upgrade: 'Actualizar a Pro',
+  },
+  en: {
+    loadError: 'Your plan could not be loaded',
+    confirming: 'Confirming your payment… this may take a few seconds.',
+    welcome: 'Welcome to Novo Pro!',
+    active: 'Your subscription is active.',
+    plan: 'Your plan',
+    annual: 'yearly',
+    monthly: 'monthly',
+    cancels: 'Cancels on',
+    freeHint: 'Unlimited AI actions with Pro',
+    usage: 'AI actions this month',
+    billing: 'Billing',
+    opening: 'Opening portal…',
+    manage: 'Manage billing',
+    manageDescription: 'Change your payment method, view invoices, or cancel your subscription.',
+    portalError: 'The billing portal could not be opened',
+    upgrade: 'Upgrade to Pro',
+  },
+  fr: {
+    loadError: 'Impossible de charger votre forfait',
+    confirming: 'Confirmation de votre paiement… cela peut prendre quelques secondes.',
+    welcome: 'Bienvenue dans Novo Pro !',
+    active: 'Votre abonnement est actif.',
+    plan: 'Votre forfait',
+    annual: 'annuel',
+    monthly: 'mensuel',
+    cancels: 'Annulation le',
+    freeHint: 'Actions IA illimitées avec Pro',
+    usage: 'Actions IA ce mois-ci',
+    billing: 'Facturation',
+    opening: 'Ouverture du portail…',
+    manage: 'Gérer la facturation',
+    manageDescription: 'Modifiez votre moyen de paiement, consultez vos factures ou annulez votre abonnement.',
+    portalError: 'Impossible d’ouvrir le portail de facturation',
+    upgrade: 'Passer à Pro',
+  },
+  de: {
+    loadError: 'Dein Tarif konnte nicht geladen werden',
+    confirming: 'Zahlung wird bestätigt… das kann einige Sekunden dauern.',
+    welcome: 'Willkommen bei Novo Pro!',
+    active: 'Dein Abonnement ist aktiv.',
+    plan: 'Dein Tarif',
+    annual: 'jährlich',
+    monthly: 'monatlich',
+    cancels: 'Endet am',
+    freeHint: 'Unbegrenzte KI-Aktionen mit Pro',
+    usage: 'KI-Aktionen in diesem Monat',
+    billing: 'Abrechnung',
+    opening: 'Portal wird geöffnet…',
+    manage: 'Abrechnung verwalten',
+    manageDescription: 'Zahlungsmethode ändern, Rechnungen ansehen oder das Abonnement kündigen.',
+    portalError: 'Das Abrechnungsportal konnte nicht geöffnet werden',
+    upgrade: 'Auf Pro upgraden',
+  },
+} as const
 
 interface BillingStatus {
   plan: 'free' | 'pro'
@@ -17,11 +94,15 @@ interface BillingStatus {
 
 export function SettingsBilling() {
   const { toast } = useToast()
+  const { language } = useTranslation()
+  const locale = language === 'es' || language === 'fr' || language === 'de' ? language : 'en'
+  const copy = BILLING_COPY[locale]
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<BillingStatus | null>(null)
-  const [redirecting, setRedirecting] = useState<'checkout' | 'portal' | null>(null)
+  const [redirecting, setRedirecting] = useState<'portal' | null>(null)
   const confirmingUpgrade = searchParams?.get('upgraded') === '1'
+  const paywallSource = searchParams?.get('source') === 'landing-intent' ? 'landing-intent' : 'settings'
   const toldRef = useRef(false)
 
   const loadStatus = () => fetch('/api/billing/status').then(res => res.json())
@@ -29,10 +110,10 @@ export function SettingsBilling() {
   useEffect(() => {
     loadStatus()
       .then(setStatus)
-      .catch(() => toast({ title: 'No se pudo cargar tu plan', variant: 'destructive' }))
+      .catch(() => toast({ title: copy.loadError, variant: 'destructive' }))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stripe's webhook can take a few seconds to land after the checkout
+  // The billing webhook can take a few seconds to land after checkout
   // redirect — poll briefly instead of trusting the first read, since the
   // plan flip happens server-side and isn't guaranteed to have landed yet.
   useEffect(() => {
@@ -46,30 +127,13 @@ export function SettingsBilling() {
         clearInterval(interval)
         if (next?.plan === 'pro' && !toldRef.current) {
           toldRef.current = true
-          toast({ title: '¡Bienvenido a Novo Pro!', description: 'Tu suscripción está activa.' })
+          toast({ title: copy.welcome, description: copy.active })
         }
         router.replace('/settings')
       }
     }, 1500)
     return () => clearInterval(interval)
   }, [confirmingUpgrade]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const goToCheckout = async (interval: 'month' | 'year') => {
-    setRedirecting('checkout')
-    try {
-      const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interval }),
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else throw new Error(data.error)
-    } catch {
-      toast({ title: 'No se pudo iniciar el pago', variant: 'destructive' })
-      setRedirecting(null)
-    }
-  }
 
   const goToPortal = async () => {
     setRedirecting('portal')
@@ -79,7 +143,7 @@ export function SettingsBilling() {
       if (data.url) window.location.href = data.url
       else throw new Error(data.error)
     } catch {
-      toast({ title: 'No se pudo abrir el portal de facturación', variant: 'destructive' })
+      toast({ title: copy.portalError, variant: 'destructive' })
       setRedirecting(null)
     }
   }
@@ -100,12 +164,12 @@ export function SettingsBilling() {
       {confirmingUpgrade && !isPro && (
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/[0.05]">
           <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-          <p className="text-xs text-foreground/60">Confirmando tu pago con Stripe... esto puede tardar unos segundos.</p>
+          <p className="text-xs text-foreground/60">{copy.confirming}</p>
         </div>
       )}
 
-      <Section title="Tu plan">
-        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-4">
+      <Section title={copy.plan}>
+        <div className="novo-premium-field rounded-2xl border border-primary/15 p-5 space-y-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isPro ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-foreground/[0.04] border border-foreground/[0.06]'}`}>
               <Crown className={`w-4 h-4 ${isPro ? 'text-amber-400' : 'text-foreground/40'}`} />
@@ -113,15 +177,15 @@ export function SettingsBilling() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground/85">
                 {isPro ? 'Novo Pro' : 'Novo Free'}
-                {isPro && status.interval && <span className="text-foreground/35 font-normal"> · {status.interval === 'year' ? 'anual' : 'mensual'}</span>}
+                {isPro && status.interval && <span className="text-foreground/35 font-normal"> · {status.interval === 'year' ? copy.annual : copy.monthly}</span>}
               </p>
               {isPro && status.cancelAtPeriodEnd && status.currentPeriodEnd && (
                 <p className="text-xs text-amber-400/70 mt-0.5">
-                  Se cancela el {new Date(status.currentPeriodEnd).toLocaleDateString()}
+                  {copy.cancels} {new Date(status.currentPeriodEnd).toLocaleDateString(locale)}
                 </p>
               )}
               {!isPro && (
-                <p className="text-xs text-foreground/35 mt-0.5">Acciones de IA ilimitadas con Pro</p>
+                <p className="text-xs text-foreground/35 mt-0.5">{copy.freeHint}</p>
               )}
             </div>
           </div>
@@ -129,7 +193,7 @@ export function SettingsBilling() {
           {!isPro && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground/40">Acciones de IA este mes</span>
+                <span className="text-foreground/40">{copy.usage}</span>
                 <span className="text-foreground/60 font-medium">{status.actionsUsed} / {status.actionsLimit}</span>
               </div>
               <div className="h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
@@ -144,50 +208,18 @@ export function SettingsBilling() {
       </Section>
 
       {isPro ? (
-        <Section title="Facturación">
+        <Section title={copy.billing}>
           <SafeAction
             icon={CreditCard}
-            label={redirecting === 'portal' ? 'Abriendo portal...' : 'Administrar facturación'}
-            description="Cambia tu método de pago, ve facturas o cancela tu suscripción."
+            label={redirecting === 'portal' ? copy.opening : copy.manage}
+            description={copy.manageDescription}
             onClick={goToPortal}
             loading={redirecting === 'portal'}
           />
         </Section>
       ) : (
-        <Section title="Actualizar a Pro">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              onClick={() => goToCheckout('month')}
-              disabled={!!redirecting}
-              className="flex flex-col items-start gap-1 p-4 rounded-2xl border border-foreground/[0.06] bg-foreground/[0.02] hover:bg-foreground/[0.05] hover:border-primary/20 transition-all duration-300 text-left disabled:opacity-50"
-            >
-              <span className="text-sm font-semibold text-foreground/85">Mensual</span>
-              <span className="text-lg font-bold text-primary">$9.99<span className="text-xs font-normal text-foreground/35">/mes</span></span>
-            </button>
-            <button
-              onClick={() => goToCheckout('year')}
-              disabled={!!redirecting}
-              className="flex flex-col items-start gap-1 p-4 rounded-2xl border border-primary/20 bg-primary/[0.05] hover:bg-primary/[0.08] transition-all duration-300 text-left disabled:opacity-50 relative"
-            >
-              <span className="absolute top-3 right-3 text-[9px] font-black uppercase tracking-wide text-primary/70">Ahorra 20%</span>
-              <span className="text-sm font-semibold text-foreground/85">Anual</span>
-              <span className="text-lg font-bold text-primary">$95.99<span className="text-xs font-normal text-foreground/35">/año</span></span>
-              <span className="text-[11px] text-foreground/40">$8.00/mes · 2 meses gratis</span>
-            </button>
-          </div>
-          <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-4 space-y-3">
-            {[
-              { icon: Zap, text: 'Acciones de IA ilimitadas, sin esperar al reinicio mensual.' },
-              { icon: Sparkles, text: 'Twin Mode: el chat responde usando todo tu perfil cognitivo.' },
-              { icon: History, text: 'Historial de analytics ilimitado (Free ve los últimos 30 días).' },
-              { icon: Share2, text: 'Cognitive Graph avanzado: el mapa visual de tu Twin.' },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-start gap-3">
-                <Icon className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-foreground/45">{text}</p>
-              </div>
-            ))}
-          </div>
+        <Section title={copy.upgrade}>
+          <InlineNovoPaywall source={paywallSource} />
         </Section>
       )}
     </div>

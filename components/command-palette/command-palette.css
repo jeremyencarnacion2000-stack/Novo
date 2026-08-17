@@ -25,7 +25,7 @@
     z-index: 49;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
-    animation: novo-fade-in var(--novo-duration-fast) var(--novo-spring) both;
+    animation: novo-fade-in var(--novo-duration-fast) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Header */
@@ -141,7 +141,7 @@
 
 /* Animations — Sileo spring physics */
 [cmdk-dialog] {
-    animation: novo-cmd-in var(--novo-duration) var(--novo-spring) both;
+    animation: novo-cmd-in var(--novo-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes novo-cmd-in {

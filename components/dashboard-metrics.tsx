@@ -10,6 +10,7 @@ import { TrendingUp } from 'lucide-react'
 import { HiOutlineClipboardDocumentCheck, HiOutlineClock, HiOutlineFire, HiOutlineTrophy } from 'react-icons/hi2'
 import { motion } from 'framer-motion'
 import { springConfig } from '@/lib/design-tokens'
+import { useTranslation } from '@/lib/i18n'
 
 interface DashboardMetricsProps {
   refreshKey: number
@@ -21,30 +22,31 @@ interface DashboardMetricsProps {
 export const DashboardMetrics = React.memo(
   function DashboardMetrics({ refreshKey, compact }: DashboardMetricsProps) {
   const { data, error, isLoading } = useAnalytics()
+  const { t } = useTranslation()
 
   const metrics = [
     {
-      title: 'Tasks Completed',
+      title: t('dashboard.tasksCompleted'),
       value: data?.tasksCompleted,
       progress: data?.taskCompletionRate,
       icon: <HiOutlineClipboardDocumentCheck className="h-6 w-6 text-emerald-400 group-hover:scale-110 transition-transform duration-500" />,
       change: data?.taskTrend,
     },
     {
-      title: 'Focus Time',
+      title: t('dashboard.focusTime'),
       value: data?.focusTime,
       icon: <HiOutlineClock className="h-6 w-6 text-blue-400 group-hover:rotate-12 group-hover:scale-110 transition-all duration-500" />,
       change: data?.focusTrend,
     },
     {
-      title: 'Habits Mastered',
+      title: t('dashboard.habitsMastered'),
       value: data?.habitsMastered,
       progress: data?.habitCompletionRate,
       icon: <HiOutlineFire className="h-6 w-6 text-orange-400 group-hover:scale-125 transition-transform duration-700 ease-out" />,
       change: data?.habitTrend,
     },
     {
-      title: 'Goals Achieved',
+      title: t('dashboard.goalsAchieved'),
       value: data?.goalsAchieved,
       progress: data?.goalCompletionRate,
       icon: <HiOutlineTrophy className="h-6 w-6 text-amber-400 group-hover:scale-110 group-hover:brightness-110 transition-all duration-500" />,

@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
+import { useSWRWithConfig } from '@/hooks/use-swr'
 
 // Real connection status only — reuses the same endpoints Settings >
 // Integrations already calls, plus the session (Google) and billing status
@@ -17,22 +17,20 @@ interface SystemStatus {
 
 export function IntegratedSystemsStrip() {
   const { data: session } = useSession()
-  const [notionConnected, setNotionConnected] = useState(false)
-  const [driveConnected, setDriveConnected] = useState(false)
-  const [isPro, setIsPro] = useState(false)
-
-  useEffect(() => {
-    if (!session?.user?.id) return
-    fetch('/api/integration/notion').then((r) => r.json()).then((d) => setNotionConnected(!!d.connected)).catch(() => {})
-    fetch('/api/integration/drive').then((r) => r.json()).then((d) => setDriveConnected(!!d.connected && !!d.hasScope)).catch(() => {})
-    fetch('/api/billing/status').then((r) => r.json()).then((d) => setIsPro(d.plan === 'pro')).catch(() => {})
-  }, [session?.user?.id])
+  const key = session?.user?.id ? '/api/integration/notion' : null
+  const { data: notionStatus } = useSWRWithConfig<{ connected?: boolean }>(key)
+  const { data: driveStatus } = useSWRWithConfig<{ connected?: boolean; hasScope?: boolean }>(
+    session?.user?.id ? '/api/integration/drive' : null
+  )
+  const { data: billingStatus } = useSWRWithConfig<{ plan?: string }>(
+    session?.user?.id ? '/api/billing/status' : null
+  )
 
   const systems: SystemStatus[] = [
     { label: 'Google', connected: !!session?.user },
-    { label: 'Notion', connected: notionConnected },
-    { label: 'Drive', connected: driveConnected },
-    { label: 'Stripe', connected: isPro },
+    { label: 'Notion', connected: !!notionStatus?.connected },
+    { label: 'Drive', connected: !!driveStatus?.connected && !!driveStatus?.hasScope },
+    { label: 'Lemon Squeezy', connected: billingStatus?.plan === 'pro' },
   ]
   const connectedCount = systems.filter((s) => s.connected).length
 

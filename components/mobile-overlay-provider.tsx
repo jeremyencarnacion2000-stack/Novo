@@ -17,7 +17,11 @@ interface MobileOverlayContextValue {
   activeOverlay: MobileOverlayKind
   keyboardOpen: boolean
   openOverlay: (kind: OpenMobileOverlayKind) => void
-  closeOverlay: () => void
+  /**
+   * `historyAction` is accepted for call-site compatibility but ignored:
+   * overlays no longer own synthetic history entries (see popstate handler).
+   */
+  closeOverlay: (options?: { historyAction?: 'back' | 'replace' | 'none' }) => void
   setKeyboardOpen: (open: boolean) => void
   setModalOpen: (open: boolean) => void
   suppressSecondary: boolean
@@ -34,7 +38,6 @@ const defaultValue: MobileOverlayContextValue = {
 }
 
 const MobileOverlayContext = createContext<MobileOverlayContextValue>(defaultValue)
-const OVERLAY_HISTORY_KEY = '__novoMobileOverlay'
 
 function isEditableControl(element: Element | null) {
   return element instanceof HTMLInputElement
@@ -51,58 +54,47 @@ export function MobileOverlayProvider({ children }: { children: React.ReactNode 
     () => typeof window !== 'undefined' && window.innerWidth <= 767,
   )
   const activeOverlayRef = useRef(activeOverlay)
-  const ownsHistoryEntryRef = useRef(false)
-  const closingHistoryEntryRef = useRef(false)
+  const consumingForwardRef = useRef(false)
 
   useEffect(() => {
     activeOverlayRef.current = activeOverlay
   }, [activeOverlay])
 
+  // Overlays are pure state. They used to push a synthetic history entry so
+  // the system Back gesture would close them, but that entry kept racing
+  // with Next.js' own pushState during in-drawer navigation and bounced
+  // users to the previous route. Back is now consumed in the popstate
+  // handler below without ever mutating history from this provider.
   const openOverlay = useCallback((kind: OpenMobileOverlayKind) => {
-    if (activeOverlayRef.current === 'none' && !ownsHistoryEntryRef.current) {
-      window.history.pushState(
-        { ...window.history.state, [OVERLAY_HISTORY_KEY]: kind },
-        '',
-        window.location.href,
-      )
-      ownsHistoryEntryRef.current = true
-    } else if (ownsHistoryEntryRef.current) {
-      window.history.replaceState(
-        { ...window.history.state, [OVERLAY_HISTORY_KEY]: kind },
-        '',
-        window.location.href,
-      )
-    }
-
     activeOverlayRef.current = kind
     setActiveOverlay(kind)
   }, [])
 
-  const closeOverlay = useCallback(() => {
+  const closeOverlay = useCallback((_options?: { historyAction?: 'back' | 'replace' | 'none' }) => {
     if (activeOverlayRef.current === 'none') return
 
     activeOverlayRef.current = 'none'
     setActiveOverlay('none')
-
-    if (ownsHistoryEntryRef.current) {
-      ownsHistoryEntryRef.current = false
-      closingHistoryEntryRef.current = true
-      window.history.back()
-    }
   }, [])
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      if (closingHistoryEntryRef.current) {
-        closingHistoryEntryRef.current = false
+      // The follow-up popstate fired by our own history.forward() below.
+      if (consumingForwardRef.current) {
+        consumingForwardRef.current = false
+        event.stopImmediatePropagation()
         return
       }
       if (activeOverlayRef.current === 'none') return
 
+      // The browser already stepped back. Close the sheet, then step forward
+      // again to reclaim that same entry — the Back gesture closes the
+      // overlay while the page stays put, with zero synthetic entries.
       event.stopImmediatePropagation()
-      ownsHistoryEntryRef.current = false
       activeOverlayRef.current = 'none'
       setActiveOverlay('none')
+      consumingForwardRef.current = true
+      window.history.forward()
     }
 
     window.addEventListener('popstate', handlePopState)

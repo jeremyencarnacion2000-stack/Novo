@@ -20,17 +20,19 @@ import { useScrollContainer } from '@/lib/scroll-container-context';
 import { useCognitiveState, useCognitiveDispatch } from '@/lib/cognitive-context';
 import type { CognitivePhase } from '@/lib/cognitive-engine';
 import {
-  Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
+  Play, Pause, SkipForward, SkipBack, Plus, Timer, Waves,
   Sun, Moon, Music, CloudSun, Cloud, CloudRain, Zap,
-  Brain, X, GripVertical, ArrowRight, Target, Coffee
+  Brain, X, GripVertical, ArrowRight, Target, Coffee, FileText, Mic
 } from 'lucide-react';
 import {
-  SiNotion, SiTodoist, SiSlack, SiGmail, SiGooglecalendar
+  SiNotion, SiTodoist, SiGmail, SiGooglecalendar
 } from 'react-icons/si';
+import { FaSlack } from 'react-icons/fa6';
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
-import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useQuickCapture } from '@/lib/quick-capture-context';
 
 // ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
 const PHASE_COLOR: Record<CognitivePhase, string> = {
@@ -40,10 +42,10 @@ const PHASE_COLOR: Record<CognitivePhase, string> = {
   REDUCED_CAPACITY_MODE: '#f59e0b', // warm amber
 };
 const PHASE_LABEL: Record<CognitivePhase, string> = {
-  PEAK_FOCUS:       'FOCUS',
-  LINEAR_EXECUTION: 'LINEAR',
-  SYNAPTIC_FATIGUE: 'REST',
-  REDUCED_CAPACITY_MODE: 'STRESS',
+  PEAK_FOCUS:       'FOCO',
+  LINEAR_EXECUTION: 'RITMO',
+  SYNAPTIC_FATIGUE: 'DESCANSO',
+  REDUCED_CAPACITY_MODE: 'RECUPERACIÓN',
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -54,7 +56,7 @@ const HUB_SHAPE: Record<HubState, { width: number; height: number; radius: numbe
   idle: { width: 8, height: 80, radius: 20 },
   capsule: { width: 46, height: 190, radius: 9999 },
   notification: { width: 352, height: 118, radius: 30 },
-  expanded: { width: 360, height: 310, radius: 26 },
+  expanded: { width: 360, height: 420, radius: 28 },
 };
 
 const HUB_SPRING = {
@@ -110,7 +112,7 @@ function NotificationContent({
   const renderIcon = () => {
     if (notification.platform === 'notion') return <SiNotion className="w-3.5 h-3.5 text-white" />;
     if (notification.platform === 'todoist') return <SiTodoist className="w-3.5 h-3.5 text-red-400" />;
-    if (notification.platform === 'slack') return <SiSlack className="w-3.5 h-3.5 text-emerald-400" />;
+    if (notification.platform === 'slack') return <FaSlack className="w-3.5 h-3.5 text-emerald-400" />;
     if (notification.platform === 'gmail') return <SiGmail className="w-3.5 h-3.5 text-red-400" />;
     if (notification.platform === 'calendar') return <SiGooglecalendar className="w-3.5 h-3.5 text-blue-400" />;
 
@@ -122,7 +124,8 @@ function NotificationContent({
   };
 
   return (
-    <div className="w-full h-full p-3.5 flex flex-col justify-between overflow-hidden relative bg-black/95 border border-white/10 backdrop-blur-3xl rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)]">
+    <div className="w-full h-full p-3.5 flex flex-col justify-between overflow-visible relative bg-black/95 border border-white/10 backdrop-blur-3xl rounded-l-[30px] rounded-r-none shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)]">
+      <div aria-hidden="true" className="absolute -right-3 top-1/2 h-12 w-4 -translate-y-1/2 rounded-l-[18px] border-y border-l border-white/10 bg-black/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
       {/* Top Header Row — iOS Dynamic Island style dot indicator + category tag */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
@@ -301,6 +304,7 @@ function PlaylistPanel() {
 
   return (
     <div className="flex flex-col h-full gap-3">
+      <AmbientControls />
       {/* Now Playing Bar — triggers lazy YouTube API load on first interaction */}
       {currentTrack && (
         <div
@@ -312,18 +316,18 @@ function PlaylistPanel() {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-white/90 truncate">{currentTrack.name}</p>
-            <p className="text-[10px] text-zinc-500 font-mono tracking-tighter truncate mt-0.5">{currentTrack.artist}</p>
+            <p className="text-[10px] text-white/70 font-mono tracking-tighter truncate mt-0.5">{currentTrack.artist || 'Artista desconocido'}</p>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={previousTrack}
-              aria-label="Previous track"
+              aria-label="Pista anterior"
               className="p-1 rounded-lg hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/80"
             >
               <SkipBack aria-hidden="true" className="w-3.5 h-3.5 text-zinc-500 hover:text-white" strokeWidth={1.2} />
             </button>
             <button
-              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
               onClick={() => {
                 window.dispatchEvent(new Event('youtube:load-api'))
                 togglePlayPause()
@@ -338,7 +342,7 @@ function PlaylistPanel() {
             </button>
             <button
               onClick={nextTrack}
-              aria-label="Next track"
+              aria-label="Pista siguiente"
               className="p-1 rounded-lg hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/80"
             >
               <SkipForward aria-hidden="true" className="w-3.5 h-3.5 text-zinc-500 hover:text-white" strokeWidth={1.2} />
@@ -353,7 +357,7 @@ function PlaylistPanel() {
           <button
             key={tab}
             aria-pressed={activeList === tab}
-            aria-label={tab === 'playlists' ? 'Show playlists' : 'Show liked tracks'}
+            aria-label={tab === 'playlists' ? 'Ver listas' : 'Ver canciones guardadas'}
             onClick={() => startTransition(() => setActiveList(tab))}
             className={cn(
               'flex-1 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all',
@@ -363,7 +367,7 @@ function PlaylistPanel() {
                 : 'text-zinc-500 hover:text-zinc-300'
             )}
           >
-            {tab === 'playlists' ? 'Playlists' : 'Liked'}
+            {tab === 'playlists' ? 'Listas' : 'Guardadas'}
           </button>
         ))}
       </div>
@@ -414,7 +418,7 @@ function PlaylistPanel() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-semibold text-zinc-300 truncate group-hover:text-white transition-colors">{pl.title}</p>
-                      <p className="text-[9px] text-zinc-500 font-mono tracking-tighter mt-0.5">{pl.itemCount} TRACKS</p>
+                      <p className="text-[9px] text-white/60 font-mono tracking-tighter mt-0.5">{pl.itemCount} pistas</p>
                     </div>
                   </div>
                 ))
@@ -430,7 +434,7 @@ function PlaylistPanel() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-semibold text-zinc-300 truncate group-hover:text-white transition-colors">{t.title}</p>
-                      <p className="text-[9px] text-zinc-500 font-mono tracking-tighter mt-0.5 truncate">{t.channelTitle}</p>
+                      <p className="text-[9px] text-white/60 font-mono tracking-tighter mt-0.5 truncate">{t.channelTitle || 'Artista desconocido'}</p>
                     </div>
                   </div>
                 ))
@@ -439,8 +443,8 @@ function PlaylistPanel() {
           ) : (
             <NovoEmptyState
               key="playlist-empty"
-              message="Silence is preparation. Speak or tap to initialize focus frequencies."
-              actionLabel="Quick Focus"
+              message="El silencio también prepara el foco. Inicia una sesión cuando estés listo."
+              actionLabel="Iniciar foco"
               onAction={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
               className="py-6 min-h-[140px] w-full"
             />
@@ -452,6 +456,86 @@ function PlaylistPanel() {
 }
 
 // ─── Clock and Weather Section Sub-component (Self-updating for render isolation) ───
+type AmbientPreset = 'lluvia' | 'blanco' | 'cafetería';
+
+let ambientAudio: { context: AudioContext; source: AudioBufferSourceNode; preset: AmbientPreset } | null = null;
+
+function setAmbientIndicator(active: boolean) {
+  window.dispatchEvent(new CustomEvent('cognitive:ambient-audio', { detail: { active } }));
+}
+
+function AmbientControls() {
+  const [activePreset, setActivePreset] = useState<AmbientPreset | null>(() => ambientAudio?.preset ?? null);
+
+  const stopAmbient = () => {
+    ambientAudio?.source.stop();
+    ambientAudio = null;
+    setAmbientIndicator(false);
+  };
+
+  const toggleAmbient = (preset: AmbientPreset) => {
+    if (activePreset === preset) {
+      stopAmbient();
+      setActivePreset(null);
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = ambientAudio?.context ?? new AudioContextClass();
+    void context.resume();
+    stopAmbient();
+
+    const buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
+    const samples = buffer.getChannelData(0);
+    let previous = 0;
+    for (let index = 0; index < samples.length; index += 1) {
+      const white = Math.random() * 2 - 1;
+      previous = preset === 'blanco' ? white : previous * 0.96 + white * 0.04;
+      samples[index] = previous;
+    }
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    filter.type = preset === 'cafetería' ? 'bandpass' : 'lowpass';
+    filter.frequency.value = preset === 'lluvia' ? 1300 : preset === 'cafetería' ? 900 : 7000;
+    gain.gain.value = preset === 'blanco' ? 0.025 : 0.045;
+    source.connect(filter).connect(gain).connect(context.destination);
+    source.start();
+    ambientAudio = { context, source, preset };
+    setActivePreset(preset);
+    setAmbientIndicator(true);
+  };
+
+  return (
+    <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-2.5 shadow-inner">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[9px] font-black tracking-[0.16em] uppercase text-white/80 flex items-center gap-1.5">
+          <Waves className="w-3.5 h-3.5 text-indigo-300" strokeWidth={1.4} /> Ambiente
+        </p>
+        <div className="flex h-4 items-end gap-[2px]" aria-hidden="true">
+          {[0, 1, 2, 3].map((bar) => <span key={bar} className={cn('w-px rounded-full bg-indigo-300/80', activePreset ? 'animate-pulse' : 'opacity-30')} style={{ height: `${5 + (bar % 3) * 3}px`, animationDelay: `${bar * 90}ms` }} />)}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        {(['lluvia', 'blanco', 'cafetería'] as AmbientPreset[]).map((preset) => (
+          <button
+            key={preset}
+            onClick={() => toggleAmbient(preset)}
+            aria-pressed={activePreset === preset}
+            aria-label={`Activar sonido de ${preset}`}
+            className={cn('rounded-xl px-1.5 py-1.5 text-[9px] font-semibold capitalize transition-[background,color,transform] duration-150 active:scale-[0.97]', activePreset === preset ? 'bg-indigo-400/20 text-indigo-100 border border-indigo-300/25' : 'bg-black/20 text-white/65 hover:bg-white/[0.07] hover:text-white border border-transparent')}
+          >
+            {preset}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ClockSection({
   attentionScore,
   showDetails = false,
@@ -488,7 +572,7 @@ function ClockSection({
     );
   }
 
-  const formattedTime = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const formattedTime = time.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hour12: false });
   const weatherIcon = getContextualWeather(time.getHours());
 
   if (showDetails) {
@@ -499,9 +583,9 @@ function ClockSection({
         </div>
         <div>
           <p className="text-[11px] font-bold text-white/95 leading-none">{formattedTime}</p>
-          <p className="text-[9px] text-zinc-500 font-mono tracking-tighter mt-1 flex items-center gap-1.5">
+          <p className="text-[9px] text-zinc-300/75 font-mono tracking-tight mt-1 flex items-center gap-1.5">
             {getWeatherIcon(weatherIcon)}
-            <span>{time.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <span>{time.toLocaleDateString('es-BO', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
           </p>
           {children}
         </div>
@@ -515,9 +599,7 @@ function ClockSection({
         <AnalogClock time={time} attentionScore={attentionScore} />
       </div>
 
-      <p className="text-[10px] font-mono font-medium text-zinc-500 tracking-tighter leading-none">{formattedTime}</p>
-
-      <div className="w-6 h-px bg-white/10 my-0.5" />
+      <p className="text-[10px] font-mono font-semibold text-white/80 tracking-tight leading-none">{formattedTime}</p>
 
       {getWeatherIcon(weatherIcon)}
     </>
@@ -525,22 +607,52 @@ function ClockSection({
 }
 
 // ─── Capsule Content Sub-component ──────────────────────────────────────────
-function CapsuleContent({ cognitiveAlert }: { cognitiveAlert: boolean }) {
+function CapsuleContent({ cognitiveAlert, ambientAudioActive }: { cognitiveAlert: boolean; ambientAudioActive: boolean }) {
   const { bioState } = useCognitiveState();
+  const { isActive: focusTimerActive, time, formatTime } = useFocus();
+  const { isPlaying } = usePlayerStore();
+  const reduceMotion = useReducedMotion();
   return (
     <div className="flex flex-col items-center justify-between py-4 px-2 w-full h-full">
       <ClockSection attentionScore={bioState.attentionScore} showDetails={false} />
 
-      <div className="px-2 py-1 rounded-full text-[8px] font-bold tracking-widest uppercase bg-white/5 backdrop-blur-md text-white/60 border border-white/5 flex-shrink-0 text-center leading-none">
-        {PHASE_LABEL[bioState.phase]}
-      </div>
+      {cognitiveAlert ? (
+        <motion.div
+          className="w-7 h-7 rounded-full border border-indigo-400/35 bg-indigo-400/10 flex items-center justify-center shadow-[0_0_14px_rgba(129,140,248,0.28)]"
+          animate={reduceMotion ? { scale: 1, opacity: 1 } : { scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          aria-label="Alerta del Gemelo Cognitivo"
+        >
+          <Brain className="w-3.5 h-3.5 text-indigo-200" strokeWidth={1.5} />
+        </motion.div>
+      ) : focusTimerActive ? (
+        <div className="flex flex-col items-center gap-1 text-emerald-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.9)]" />
+          <span className="text-[8px] font-mono font-bold tabular-nums tracking-tight">{formatTime(time)}</span>
+        </div>
+      ) : isPlaying || ambientAudioActive ? (
+        <div className="h-6 flex items-center gap-[2px]" aria-label="Audio activo">
+          {[0, 1, 2].map((bar) => (
+            <motion.span
+              key={bar}
+              className="w-[2px] rounded-full bg-indigo-300"
+              animate={reduceMotion ? { height: `${5 + bar * 1.5}px` } : { height: ['5px', `${10 + bar * 3}px`, '5px'] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.55 + bar * 0.12, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="px-2 py-1 rounded-full text-[7px] font-bold tracking-[0.13em] uppercase bg-white/[0.06] text-white/75 border border-white/[0.08] flex-shrink-0 text-center leading-none">
+          En reposo
+        </div>
+      )}
 
       {cognitiveAlert && (
         <motion.div
           className="absolute inset-0 pointer-events-none"
           style={{ border: `1.5px solid ${PHASE_COLOR[bioState.phase]}50` }}
-          animate={{ opacity: [1, 0, 1, 0] }}
-          transition={{ duration: 1.2, repeat: 2 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: [1, 0, 1, 0] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 1.2, repeat: 2 }}
         />
       )}
     </div>
@@ -554,13 +666,22 @@ function ExpandedContent({
   setActiveTab,
 }: {
   setHubState: React.Dispatch<React.SetStateAction<HubState>>;
-  activeTab: 'music' | 'controls';
-  setActiveTab: React.Dispatch<React.SetStateAction<'music' | 'controls'>>;
+  activeTab: 'focus' | 'audio' | 'settings';
+  setActiveTab: React.Dispatch<React.SetStateAction<'focus' | 'audio' | 'settings'>>;
 }) {
   // ── Real settings connections ──────────────────────────────────────────────
   const { settings, updateSettings } = useSettings();
-  const { isActive: focusTimerActive, toggleTimer } = useFocus();
+  const { isActive: focusTimerActive, toggleTimer, time, formatTime, tasks, selectedTaskId, addTask } = useFocus();
   const { bioState } = useCognitiveState();
+  const { onOpen: openQuickNote } = useQuickCapture();
+  const [quickCapture, setQuickCapture] = useState('');
+  const activeTask = tasks.find((task) => task.id === selectedTaskId);
+  const submitQuickCapture = () => {
+    const text = quickCapture.trim();
+    if (!text) return;
+    addTask(text);
+    setQuickCapture('');
+  };
   return (
     <div className="w-full h-full p-4 flex flex-col overflow-hidden">
       {/* Header */}
@@ -584,7 +705,7 @@ function ExpandedContent({
           </div>
         </ClockSection>
         <button
-          aria-label="Collapse hub"
+          aria-label="Contraer Hub"
           onClick={() => startTransition(() => setHubState('capsule'))}
           className="p-1.5 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
         >
@@ -597,36 +718,36 @@ function ExpandedContent({
           <div className="flex items-center gap-2">
             <Zap className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.2} />
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-amber-200">Guided Breathing Recommended</p>
-              <p className="text-[8px] text-amber-400/80 leading-normal">Stress score high. Tap to initiate 2-min recovery.</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-amber-200">Respiración guiada recomendada</p>
+              <p className="text-[8px] text-amber-300/85 leading-normal">Reserva baja. Inicia una recuperación de 2 minutos.</p>
             </div>
           </div>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('cognitive:start-breathing'))}
             className="px-2 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/40 text-[8px] font-bold uppercase tracking-widest text-white border border-amber-500/30 transition-all flex-shrink-0"
           >
-            Start
+            Iniciar
           </button>
         </div>
       )}
 
       {/* Tab bar — startTransition keeps INP < 50ms during panel switch */}
-      <div className="flex gap-1 mx-2 mb-2 bg-black/35 rounded-xl p-1 border border-white/5 shadow-inner">
-        {(['music', 'controls'] as const).map(tab => (
+      <div className="grid grid-cols-3 mx-2 mb-3 rounded-[14px] bg-black/45 p-1 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(0,0,0,0.55)]">
+        {(['focus', 'audio', 'settings'] as const).map(tab => (
           <button
             key={tab}
             aria-pressed={activeTab === tab}
-            aria-label={tab === 'music' ? 'Music tab' : 'Controls tab'}
+            aria-label={`Pestaña ${tab === 'focus' ? 'Foco' : tab === 'audio' ? 'Audio' : 'Ajustes'}`}
             onClick={() => startTransition(() => setActiveTab(tab))}
             className={cn(
-              'flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all',
+              'py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-[10px] transition-[background,color,box-shadow,transform] duration-150 active:scale-[0.97]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
               activeTab === tab
-                ? 'bg-white/5 backdrop-blur-md text-white border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'bg-white/[0.12] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_1px_2px_rgba(0,0,0,0.2)]'
+                : 'text-white/65 hover:text-white/90'
             )}
           >
-            {tab === 'music' ? 'Music' : 'Controls'}
+            {tab === 'focus' ? 'Foco' : tab === 'audio' ? 'Audio' : 'Ajustes'}
           </button>
         ))}
       </div>
@@ -634,9 +755,60 @@ function ExpandedContent({
       {/* Tab contents */}
       <div className="flex-1 min-h-0 px-2 pb-2 overflow-hidden">
         <AnimatePresence mode="wait">
-          {activeTab === 'music' ? (
+          {activeTab === 'focus' ? (
             <motion.div
-              key="music"
+              key="focus"
+              className="h-full flex flex-col gap-3"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.16 }}
+            >
+              <div className="rounded-[20px] border border-emerald-400/15 bg-emerald-400/[0.055] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200/85 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> Temporizador de foco</p>
+                    <p className="mt-1 text-sm font-semibold text-white truncate">{activeTask?.text ?? 'Sin tarea seleccionada'}</p>
+                    <p className="mt-0.5 text-[10px] text-white/70">{focusTimerActive ? `${formatTime(time)} restantes` : 'Elige una tarea y comienza cuando estés listo'}</p>
+                  </div>
+                  <button onClick={toggleTimer} className={cn('shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold transition-[background,transform] duration-150 active:scale-[0.97]', focusTimerActive ? 'bg-emerald-400/20 text-emerald-100 border border-emerald-300/25' : 'bg-white/10 text-white border border-white/10')}>
+                    {focusTimerActive ? 'Pausar' : 'Iniciar'}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-2.5">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/75">Captura rápida</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={openQuickNote}
+                      aria-label="Nueva nota"
+                      className="inline-flex min-h-7 items-center gap-1 rounded-lg bg-white/10 px-2 text-[9px] font-semibold text-white/75 transition-colors hover:bg-white/15 hover:text-white active:scale-[0.97]"
+                    >
+                      <FileText aria-hidden="true" className="h-3 w-3" />
+                      Nota
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('toggle-voice-command-hub'))}
+                      aria-label="Abrir comandos de voz"
+                      className="inline-flex min-h-7 items-center gap-1 rounded-lg bg-white/10 px-2 text-[9px] font-semibold text-white/75 transition-colors hover:bg-white/15 hover:text-white active:scale-[0.97]"
+                    >
+                      <Mic aria-hidden="true" className="h-3 w-3" />
+                      Voz
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <input value={quickCapture} onChange={(event) => setQuickCapture(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitQuickCapture(); }} placeholder="Añadir tarea…" className="min-w-0 flex-1 bg-transparent text-xs text-white placeholder:text-white/35 outline-none" />
+                  <button onClick={submitQuickCapture} aria-label="Guardar captura rápida" className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/18 text-white flex items-center justify-center transition-[background,transform] duration-150 active:scale-[0.97]"><Plus className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            </motion.div>
+          ) : activeTab === 'audio' ? (
+            <motion.div
+              key="audio"
               className="h-full"
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
@@ -654,32 +826,11 @@ function ExpandedContent({
               exit={{ opacity: 0, x: -8 }}
               transition={{ duration: 0.16 }}
             >
-              {/* Focus mode switch — starts/pauses the Pomodoro focus timer */}
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
-                <div>
-                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Focus Timer</p>
-                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">{focusTimerActive ? 'Sesión activa — toca para pausar' : 'Iniciar sesión Pomodoro'}</p>
-                </div>
-                <button
-                  onClick={toggleTimer}
-                  aria-label={focusTimerActive ? 'Pause focus timer' : 'Start focus timer'}
-                  className={cn(
-                    'relative w-9 h-5 rounded-full transition-all duration-300',
-                    focusTimerActive ? 'bg-indigo-500/80' : 'bg-white/10'
-                  )}
-                >
-                  <div className={cn(
-                    'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all shadow-md',
-                    focusTimerActive ? 'left-[18px]' : 'left-0.5'
-                  )} />
-                </button>
-              </div>
-
               {/* Dimness slider — controls backgroundDimness in settings */}
               <div className="p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-bold text-white/90 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Sun className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.2} /> Dimness
+                    <Sun className="w-3.5 h-3.5 text-zinc-300" strokeWidth={1.2} /> Atenuación
                   </p>
                   <span className="text-[9px] font-mono text-zinc-500">{settings.backgroundDimness}%</span>
                 </div>
@@ -691,8 +842,8 @@ function ExpandedContent({
                   <input
                     type="range" min={0} max={80} value={settings.backgroundDimness}
                     onChange={e => updateSettings({ backgroundDimness: Number(e.target.value) })}
-                    aria-label="Background dimness"
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                    aria-label="Atenuación global"
+                    className="absolute -inset-y-2 inset-x-0 h-5 w-full cursor-pointer appearance-none bg-transparent accent-indigo-300"
                   />
                 </div>
               </div>
@@ -700,12 +851,12 @@ function ExpandedContent({
               {/* Theme selector — toggles light/dark via settings context */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
                 <div>
-                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Appearance</p>
-                  <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">{settings.theme === 'dark' ? 'Dark mode' : 'Light mode'}</p>
+                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Apariencia</p>
+                  <p className="text-[9px] text-white/65 mt-0.5 font-medium">{settings.theme === 'dark' ? 'Modo oscuro' : 'Modo claro'}</p>
                 </div>
                 <div className="flex gap-1.5 bg-black/30 p-1 rounded-xl border border-white/5">
                   <button
-                    aria-label="Light mode"
+                    aria-label="Modo claro"
                     aria-pressed={settings.theme === 'light'}
                     onClick={() => updateSettings({ theme: 'light' })}
                     className={cn('p-1.5 rounded-lg transition-colors', settings.theme === 'light' ? 'bg-white/15 text-white' : 'hover:bg-white/5 text-zinc-400')}
@@ -713,7 +864,7 @@ function ExpandedContent({
                     <Sun className="w-3.5 h-3.5" strokeWidth={1.2} />
                   </button>
                   <button
-                    aria-label="Dark mode"
+                    aria-label="Modo oscuro"
                     aria-pressed={settings.theme === 'dark'}
                     onClick={() => updateSettings({ theme: 'dark' })}
                     className={cn('p-1.5 rounded-lg transition-colors', settings.theme === 'dark' ? 'bg-white/15 text-white' : 'hover:bg-white/5 text-zinc-400')}
@@ -734,15 +885,18 @@ function ExpandedContent({
 const ContextHubComponent = () => {
   const pathname = usePathname();
   const { scrollContainer } = useScrollContainer();
+  const { bioState } = useCognitiveState();
   const { logHabit } = useCognitiveDispatch();
 
   const [hubState, setHubState] = useState<HubState>('idle');
-  const [activeTab, setActiveTab] = useState<'music' | 'controls'>('music');
+  const [activeTab, setActiveTab] = useState<'focus' | 'audio' | 'settings'>('focus');
   const [isHovered, setIsHovered] = useState(false);
   const [cognitiveAlert, setCognitiveAlert] = useState(false);
+  const [ambientAudioActive, setAmbientAudioActive] = useState(false);
   const [dopaminePulse, setDopaminePulse] = useState(false);
   const [activeNotification, setActiveNotification] = useState<TwinNotificationPayload | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveryPhaseRef = useRef<CognitivePhase | null>(null);
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -758,6 +912,47 @@ const ContextHubComponent = () => {
     window.addEventListener('resize', handle);
     return () => window.removeEventListener('resize', handle);
   }, []);
+
+  // ContextHub is lazy-loaded. Reading the current Twin state here avoids
+  // missing a fatigue event emitted before the Hub mounted, while the phase
+  // ref ensures that changing metrics do not repeatedly interrupt the user.
+  useEffect(() => {
+    const phase = bioState.phase;
+    const previousPhase = recoveryPhaseRef.current;
+    recoveryPhaseRef.current = phase;
+
+    // Heuristic fatigue phases are not user-facing diagnoses. The normalized
+    // presentation keeps this branch disabled even during initial hydration.
+    const needsRecovery = false;
+
+    if (!needsRecovery) {
+      setCognitiveAlert(false);
+      return;
+    }
+
+    if (previousPhase === phase) return;
+
+    const reducedCapacity = phase === 'REDUCED_CAPACITY_MODE';
+    const notification: TwinNotificationPayload = {
+      title: reducedCapacity ? 'Capacidad reducida' : 'Fatiga cognitiva detectada',
+      description: reducedCapacity
+        ? `El Gemelo detectó capacidad limitada. Prioriza descanso o tareas ligeras durante los próximos ${bioState.minutesToNextPhase} min.`
+        : `El Gemelo recomienda una pausa de ${bioState.minutesToNextPhase} min. Carga cognitiva actual: ${bioState.fatigueScore}%.`,
+      platform: 'twin',
+      severity: reducedCapacity ? 'critical' : 'warning',
+      actionLabel: 'Iniciar descanso',
+      actionUrl: '/focus',
+    };
+
+    setCognitiveAlert(true);
+    setActiveNotification(notification);
+    setHubState('notification');
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = setTimeout(() => {
+      setCognitiveAlert(false);
+      setHubState('idle');
+    }, 6000);
+  }, [bioState.fatigueScore, bioState.minutesToNextPhase, bioState.phase]);
 
 
   // Refs to avoid scroll handler re-creation on state changes
@@ -879,19 +1074,6 @@ const ContextHubComponent = () => {
         }, 6000);
       }
     };
-    const onFatigue = () => {
-      setCognitiveAlert(true);
-      handleNotification(new CustomEvent('cognitive:notification', {
-        detail: {
-          title: 'Alerta de Fatiga Cognitiva',
-          description: 'Se ha detectado acumulación de fatiga. Te recomendamos hacer una pausa de 5 minutos o activar la música de foco.',
-          platform: 'twin',
-          severity: 'warning',
-          actionLabel: 'Escuchar Música',
-          actionUrl: '/music'
-        }
-      }));
-    };
     const onNavWarn = () => {
       setCognitiveAlert(true);
       handleNotification(new CustomEvent('cognitive:notification', {
@@ -905,45 +1087,34 @@ const ContextHubComponent = () => {
         }
       }));
     };
-    const onReduced = () => {
-      setCognitiveAlert(true);
-      handleNotification(new CustomEvent('cognitive:notification', {
-        detail: {
-          title: 'Capacidad Reducida',
-          description: 'Tu reserva energética está baja. Se recomienda respiración guiada o tareas de bajo impacto.',
-          platform: 'twin',
-          severity: 'critical',
-          actionLabel: 'Iniciar Respiración',
-          actionUrl: '/cognitive'
-        }
-      }));
-    };
 
     window.addEventListener('habit-completed', onHabit);
     window.addEventListener('cognitive:task-completed', onTask);
     window.addEventListener('routine-opened', onRoutine);
     window.addEventListener('cognitive:notification', handleNotification);
-    window.addEventListener('cognitive:fatigue-onset', onFatigue);
     window.addEventListener('cognitive:navigation-warning', onNavWarn);
-    window.addEventListener('cognitive:reduced-capacity-onset', onReduced);
     return () => {
       window.removeEventListener('habit-completed', onHabit);
       window.removeEventListener('cognitive:task-completed', onTask);
       window.removeEventListener('routine-opened', onRoutine);
       window.removeEventListener('cognitive:notification', handleNotification);
-      window.removeEventListener('cognitive:fatigue-onset', onFatigue);
       window.removeEventListener('cognitive:navigation-warning', onNavWarn);
-      window.removeEventListener('cognitive:reduced-capacity-onset', onReduced);
       if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     };
   }, [logHabit]);
+
+  useEffect(() => {
+    const handleAmbientAudio = (event: Event) => setAmbientAudioActive(Boolean((event as CustomEvent<{ active?: boolean }>).detail?.active));
+    window.addEventListener('cognitive:ambient-audio', handleAmbientAudio);
+    return () => window.removeEventListener('cognitive:ambient-audio', handleAmbientAudio);
+  }, []);
 
   // Agent Event Triggers
   useEffect(() => {
     const handlePlayMusic = () => {
       expandedViaHoverRef.current = false;
       setHubState('expanded');
-      setActiveTab('music');
+      setActiveTab('audio');
     };
     const handleExpandHub = () => {
       expandedViaHoverRef.current = false;
@@ -967,7 +1138,7 @@ const ContextHubComponent = () => {
       <motion.div
         ref={hubRef}
         className={cn(
-          "context-hub-layer pointer-events-auto select-none relative overflow-hidden border transition-colors duration-300",
+          "context-hub-layer pointer-events-auto select-none relative overflow-visible border transition-colors duration-300",
           hubState === 'idle'
             ? 'bg-white/20 border-white/5 cursor-pointer hover:bg-white/40'
             : hubState === 'capsule' && cognitiveAlert
@@ -1031,7 +1202,7 @@ const ContextHubComponent = () => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.12 }}
             >
-              <CapsuleContent cognitiveAlert={cognitiveAlert} />
+              <CapsuleContent cognitiveAlert={cognitiveAlert} ambientAudioActive={ambientAudioActive} />
             </motion.div>
           )}
           {hubState === 'notification' && activeNotification && (

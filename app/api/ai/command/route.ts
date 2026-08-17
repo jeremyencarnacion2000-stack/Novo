@@ -31,11 +31,11 @@ const generateAIResponse = async (
   history: ConversationMessage[],
   userId: string
 ) => {
-  console.log('DEBUG: generateAIResponse called with message:', message.substring(0, 100));
+  console.log('[AI command] Authenticated request received.');
 
   try {
     // First call to Gemini with tools
-    console.log('DEBUG: Calling geminiAPI with tools');
+    console.log('[AI command] Calling provider with declared tools.');
     let geminiResult = await geminiAPI.generateResponse(
       message,
       context,
@@ -44,15 +44,24 @@ const generateAIResponse = async (
       AI_FUNCTION_DECLARATIONS
     );
 
-    console.log('DEBUG: geminiAPI response:', geminiResult.content.substring(0, 200));
-    console.log('DEBUG: Function calls:', geminiResult.functionCalls);
+    console.log('[AI command] Provider response received.');
 
     // If there are function calls, execute them
     if (geminiResult.functionCalls && geminiResult.functionCalls.length > 0) {
+      // This legacy endpoint has no confirmation card or idempotency surface.
+      // A model-selected function therefore remains a proposal; it must not
+      // mutate tasks, Calendar or other user data merely because it appeared
+      // in a provider response.
+      return {
+        response: 'Preparé una acción para tu revisión. Confírmala desde la experiencia de Novo antes de aplicarla.',
+        functionResults: null,
+        requiresConfirmation: true,
+      };
+
       const functionResults = [];
 
       for (const functionCall of geminiResult.functionCalls) {
-        console.log(`DEBUG: Executing function ${functionCall.name}`, functionCall.args);
+        console.log('[AI command] Executing declared function.', { name: functionCall.name });
         const result = await executeFunctionCall(
           functionCall.name,
           functionCall.args,
@@ -77,7 +86,7 @@ const generateAIResponse = async (
       ];
 
       // Second call to Gemini to generate natural language response
-      console.log('DEBUG: Calling geminiAPI for natural response');
+      console.log('[AI command] Composing post-tool response.');
       geminiResult = await geminiAPI.generateResponse(
         'Based on the function execution results above, provide a clear and friendly response to the user explaining what was done.',
         context,
@@ -96,12 +105,10 @@ const generateAIResponse = async (
       response: geminiResult.content,
       functionResults: null
     };
-  } catch (error) {
-    console.error('DEBUG: AI inference failed:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('CRITICAL AI ERROR:', errorMessage);
+  } catch {
+    console.error('[AI command] Inference failed.');
     return {
-      response: `Lo siento, hubo un error al procesar tu mensaje. Detalles del error: ${errorMessage}`,
+      response: 'Lo siento, no pude procesar tu solicitud en este momento. Inténtalo de nuevo.',
       functionResults: null
     };
   }
@@ -109,7 +116,7 @@ const generateAIResponse = async (
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('DEBUG: POST request received at /api/ai/command');
+    console.log('[AI command] POST received.');
 
     // Get user session
     const session = await getServerSession(authOptions);
@@ -133,15 +140,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       response: result.response,
-      functionResults: result.functionResults
+      functionResults: result.functionResults,
+      requiresConfirmation: result.requiresConfirmation === true,
     });
-  } catch (error) {
-    console.error('Error in command API:', error);
+  } catch {
+    console.error('[AI command] Request failed.');
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : 'Internal server error',
-        details: error instanceof Error ? error.stack : undefined
-      },
+      { error: 'InternalError', message: 'No se pudo completar la solicitud de IA.' },
       { status: 500 }
     );
   }

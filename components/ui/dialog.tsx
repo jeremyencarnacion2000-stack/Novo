@@ -36,14 +36,19 @@ function DialogOverlay({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   const isFlipModal = Boolean((props as any)['data-flip-overlay'])
+  const isMaterialOverlay = Boolean((props as any)['data-overlay-material'])
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-[5000] bg-black/60',
+        'fixed inset-0 z-[5000]',
+        isMaterialOverlay ? 'novo-material-overlay' : 'bg-black/60',
         isFlipModal
           ? 'modal-flip-overlay'
-          : 'backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+          : cn(
+              !isMaterialOverlay && 'backdrop-blur-sm',
+              'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            ),
         className,
       )}
       {...props}
@@ -100,18 +105,13 @@ function FlipAnchoredPositioner({
 }
 
 function MobileDialogDragHandle() {
-  const ref = useDragToDismiss<HTMLDivElement>({
-    onDismiss: () => {
-      const closeBtn = document.querySelector<HTMLElement>('[data-slot="dialog-close"]')
-      closeBtn?.click()
-    },
-  })
   return (
     <div
-      ref={ref}
-      className="flex sm:hidden justify-center pt-3 pb-2 -mt-3 -mx-4 cursor-grab active:cursor-grabbing touch-none select-none"
+      aria-hidden="true"
+      data-modal-drag-handle
+      className="flex sm:hidden justify-center pt-3 pb-2 -mt-3 -mx-4 shrink-0 touch-none select-none"
     >
-      <div className="w-9 h-[4px] rounded-full bg-foreground/20 hover:bg-foreground/40 transition-colors" />
+      <div className="w-9 h-[4px] rounded-full bg-foreground/20" />
     </div>
   )
 }
@@ -121,17 +121,25 @@ function DialogContent({
   children,
   showCloseButton = true,
   flipAnchored = false,
+  contextualRect,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Anchor near the trigger instead of centering — for small, single-purpose dialogs. */
   flipAnchored?: boolean
+  contextualRect?: DOMRect | null
 }) {
   const flipId = (props as any)['data-flip-to'] as string | undefined
   const isFlipModal = Boolean(flipId)
+  const isContextualModal = Boolean(contextualRect)
+  const isMaterialOverlay = Boolean((props as any)['data-overlay-material'])
+  const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="dialog-close"]')?.click(),
+  })
 
   const content = (
     <DialogPrimitive.Content
+      ref={dragSurfaceRef}
       data-slot="dialog-content"
       aria-describedby={undefined}
       className={cn(
@@ -144,7 +152,9 @@ function DialogContent({
         'bg-background pointer-events-auto relative w-full max-w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
         isFlipModal
           ? 'modal-flip-target'
-          : 'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200',
+          : isContextualModal
+            ? 'contextual-modal-target'
+          : 'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:duration-[180ms] data-[state=open]:duration-[320ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
         className,
       )}
       {...props}
@@ -165,11 +175,23 @@ function DialogContent({
 
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay {...(isFlipModal ? { 'data-flip-overlay': flipId } as any : {})} />
+      <DialogOverlay
+        {...(isFlipModal ? { 'data-flip-overlay': flipId } as any : {})}
+        {...(isMaterialOverlay ? { 'data-overlay-material': true } as any : {})}
+      />
       {isFlipModal && flipAnchored ? (
         <FlipAnchoredPositioner flipId={flipId!}>{content}</FlipAnchoredPositioner>
       ) : (
-        <div className="fixed inset-0 z-[5001] flex items-center justify-center pointer-events-none">
+        <div
+          className={cn(
+            "fixed inset-0 z-[5001] pointer-events-none",
+            isContextualModal ? "flex items-start justify-start" : "flex items-center justify-center",
+          )}
+          style={isContextualModal && contextualRect ? {
+            paddingLeft: Math.max(12, Math.min(contextualRect.left, (typeof window !== 'undefined' ? window.innerWidth : 640) - 432)),
+            paddingTop: Math.max(12, Math.min(contextualRect.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 180)),
+          } : undefined}
+        >
           {content}
         </div>
       )}

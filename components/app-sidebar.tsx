@@ -132,28 +132,32 @@ export function AppSidebar() {
     {
       title: t('sidebar.overview'),
       items: [
-        { title: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard },
+        // The root route is the authenticated dashboard and must remain
+        // reachable from every desktop surface. The logo only controls the
+        // collapsed sidebar, so it cannot be the sole dashboard affordance.
+        { title: t('sidebar.dashboard') || 'Dashboard', href: '/', icon: LayoutDashboard },
         { title: t('sidebar.today'), href: '/today', icon: Sun },
-        { title: t('sidebar.analytics'), href: '/analytics', icon: BarChart3 },
-        { title: t('sidebar.calendar'), href: '/calendar', icon: CalendarRange },
-        { title: t('sidebar.ai'), href: '/ai', icon: Bot },
         { title: t('sidebar.cognitive_engine'), href: '/cognitive', icon: Brain },
-        { title: t('sidebar.focus'), href: '/focus', icon: Timer },
-      ],
+        { title: t('sidebar.chat'), href: '/chat', icon: Bot },
+        { title: t('sidebar.activity'), href: '/activity', icon: Timer },
+    ],
     },
     {
-      title: t('sidebar.productivity'),
+      title: t('sidebar.workspace'),
       items: [
-        { title: t('sidebar.routines'), href: '/routines', icon: ListChecks },
-        { title: t('sidebar.checklist'), href: '/checklist', icon: CheckSquare },
         { title: t('sidebar.projects'), href: '/projects', icon: KanbanSquare },
-        { title: t('sidebar.trackers'), href: '/trackers', icon: TrendingUp },
+        { title: t('sidebar.checklist'), href: '/checklist', icon: CheckSquare },
+        { title: t('sidebar.calendar'), href: '/calendar', icon: CalendarRange },
         { title: t('sidebar.connectors'), href: '/connectors', icon: Plug },
-      ],
+    ],
     },
     {
-      title: t('sidebar.life_context'),
+      title: t('sidebar.more'),
       items: [
+        { title: t('sidebar.analytics'), href: '/analytics', icon: BarChart3 },
+        { title: t('sidebar.focus'), href: '/focus', icon: Timer },
+        { title: t('sidebar.routines'), href: '/routines', icon: ListChecks },
+        { title: t('sidebar.trackers'), href: '/trackers', icon: TrendingUp },
         { title: t('sidebar.school'), href: '/school', icon: GraduationCap },
         { title: t('sidebar.business'), href: '/business', icon: Briefcase },
         { title: t('sidebar.library'), href: '/library', icon: BookOpen },
@@ -173,7 +177,7 @@ export function AppSidebar() {
     const filteredGroups = rawNavigation.map((group) => {
       const items = group.items.filter((item) => {
         // Core dashboard items always visible
-        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus', '/connectors']
+        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/calendar', '/projects', '/checklist', '/connectors']
         if (coreHrefs.includes(item.href)) return true
         
         const moduleKey = item.href.replace('/', '')
@@ -182,7 +186,7 @@ export function AppSidebar() {
 
       // Sort items based on their order in enabledModules
       const sortedItems = [...items].sort((a, b) => {
-        const coreHrefs = ['/', '/today', '/analytics', '/calendar', '/ai', '/cognitive', '/focus', '/connectors']
+        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/calendar', '/projects', '/checklist', '/connectors']
         const aIsCore = coreHrefs.includes(a.href)
         const bIsCore = coreHrefs.includes(b.href)
         
@@ -283,7 +287,9 @@ export function AppSidebar() {
                       <SidebarGroupContent>
                         <SidebarMenu className="gap-2">
                           {section.items.map((item) => {
-                            const isActive = pathname === item.href || pathname === item.href + '/'
+                            const isActive = item.href.includes('#')
+                              ? pathname === '/today' && typeof window !== 'undefined' && window.location.hash === '#actividad'
+                              : pathname === item.href || pathname === item.href + '/'
                             return (
                               <SidebarMenuItem key={item.title} className="relative">
                                 {isActive && (
@@ -292,7 +298,7 @@ export function AppSidebar() {
                                     depth={4}
                                     blur={1}
                                     strength={20}
-                                    chromaticAberration={3}
+                                    chromaticAberration={2.75}
                                     backgroundColor="transparent"
                                     elevation="low"
                                     aria-hidden
@@ -316,6 +322,7 @@ export function AppSidebar() {
                                   tooltip={item.title}
                                   className={cn(
                                     "rounded-full transition-[background-color,color,box-shadow,width,padding] duration-200 ease-out h-10",
+                                    "novo-sidebar-nav-button",
                                     state === 'collapsed' ? "!justify-center !px-0 !w-10 !mx-auto" : "px-4",
                                     isActive
                                       ? "!bg-transparent"
@@ -356,7 +363,7 @@ export function AppSidebar() {
                     whileTap={{ scale: 0.96 }}
                     transition={springConfig.snappy}
                   >
-                  <SidebarMenuButton asChild tooltip="Profile" className={cn("rounded-full h-10 transition-all duration-300 btn-press",
+                  <SidebarMenuButton asChild tooltip="Profile" className={cn("rounded-full h-10 transition-all duration-300 btn-press novo-sidebar-nav-button",
                     state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "p-0 overflow-hidden",
                     (pathname === '/profile' || pathname === '/profile/') ? "" : "hover:bg-foreground/10"
                   )}>
@@ -429,7 +436,7 @@ export function AppSidebar() {
                   style={!isSettingsOpen ? { viewTransitionName: 'settings-window' } as React.CSSProperties : undefined}
                   tooltip={t('sidebar.settings')}
                   aria-label="Settings"
-                  className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative",
+                  className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative novo-sidebar-nav-button",
                     state === 'collapsed' ? "!justify-center !w-10 !mx-auto !px-0" : "w-full",
                     isSettingsOpen ? "p-0 overflow-hidden opacity-0 pointer-events-none" : "px-3 hover:bg-foreground/10 opacity-100"
                   )}

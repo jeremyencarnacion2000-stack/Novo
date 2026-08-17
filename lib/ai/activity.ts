@@ -11,7 +11,7 @@ function safeToolName(value?: string) {
   return value && safeToolNames.has(value) ? value : undefined
 }
 
-export async function createActivityRun(userId: string, surface: NovoActivitySurface, id = randomUUID()) {
+export async function createActivityRun(userId: string, surface: NovoActivitySurface, id: string = randomUUID()) {
   const now = new Date()
   // Opportunistic compaction keeps the table bounded even when the scheduled
   // cleanup job is delayed. Only expired operational records are removed.

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { groqAPI } from "@/lib/groq";
 import { logAICall } from "@/lib/ai-call-log";
 import { syncAllPlugins } from "@/lib/plugins/plugin-orchestrator";
+import { runAmbientTwinForUser } from "@/lib/cognitive/ambient-twin-runtime";
 
 // llama3-8b-8192 was decommissioned by Groq (404 on every call) — this
 // autonomous daily-insight generation had been silently failing/falling back
@@ -25,7 +26,10 @@ Under 150 characters.
 export async function runDailyInsights() {
     // 0. Sync all connected plugins first so Twin data is fresh
     const allUsers = await prisma.user.findMany({ select: { id: true }, take: 100 });
-    await Promise.allSettled(allUsers.map((u) => syncAllPlugins(u.id)));
+    await Promise.allSettled(allUsers.map(async (u) => {
+        await syncAllPlugins(u.id);
+        await runAmbientTwinForUser(u.id, { trigger: 'sync' });
+    }));
 
     // 1. Get all users who had a cognitive snapshot updated in the last 24h
     const usersWithActivity = await prisma.userCognitiveSnapshot.findMany({

@@ -146,7 +146,9 @@ describe('WebSocket Memory Leak & Lifecycle Audit (V8 Engine)', () => {
       // ── 2. Start session ──────────────────────────────────────────────────
       // Wrap in act to capture getUserMedia resolution & state updates (setIsRecording)
       await act(async () => {
-        result.current.startSession()
+        // Use a synthetic key so the lifecycle test does not depend on a
+        // provider credential being present in the isolated test environment.
+        result.current.startSession('synthetic-test-key')
         await flushPromises()
       })
 

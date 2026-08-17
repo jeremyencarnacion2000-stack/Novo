@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Eye, EyeOff, ChevronsRight } from 'lucide-react'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
 import { InfinityOrbit } from '@/components/auth/infinity-orbit'
+import { reloadAuthenticatedApp } from '@/lib/auth-navigation'
 
 // Only follow a same-origin relative path (never a protocol-relative "//host"
 // or absolute URL) — this is read from a query param an attacker could craft,
@@ -26,6 +27,24 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
+  // NextAuth sends provider failures back to this screen as a query parameter.
+  // Surface a useful, non-sensitive explanation instead of silently looping.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const providerError = new URLSearchParams(window.location.search).get('error')
+    if (!providerError) return
+
+    const messages: Record<string, string> = {
+      OAuthCallback: 'The provider could not complete the sign-in callback. Check the connection settings and try again.',
+      OAuthSignin: 'The provider sign-in could not be started. Check the connection settings and try again.',
+      google: 'Google sign-in could not be completed. Check the Google callback URL and try again.',
+      spotify: 'Spotify sign-in could not be completed. Check the Spotify callback URL and try again.',
+      AccessDenied: 'Access was denied. You can try again or use your email and password.',
+    }
+
+    setError(messages[providerError] ?? 'Sign-in could not be completed. Please try again.')
+  }, [])
+
   const handleCredentialsLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     setError('')
@@ -41,8 +60,7 @@ export default function SignInPage() {
       if (result?.error) {
         setError('Invalid email or password')
       } else if (result?.ok) {
-        router.push(getSafeCallbackUrl())
-        router.refresh()
+        reloadAuthenticatedApp(getSafeCallbackUrl())
       } else {
         setError('Unexpected error occurred')
       }
@@ -71,9 +89,9 @@ export default function SignInPage() {
     <div className="min-h-dvh w-full flex bg-background text-foreground overflow-hidden">
       {/* Left — decorative panel, own fixed-dark surface (Kreative-style) */}
       <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-10 overflow-hidden bg-[#0a0a0d]">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/40 via-purple-700/20 to-black" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(129,140,248,0.35),_transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(168,85,247,0.25),_transparent_50%)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/30 via-teal-400/10 to-black" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(74,222,128,0.30),_transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(45,212,191,0.22),_transparent_50%)]" />
 
         {/* Floating browser-chrome pill */}
         <div className="relative z-10 flex justify-center">
@@ -105,7 +123,7 @@ export default function SignInPage() {
 
       {/* Right — form panel, theme-adaptive */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative">
-        <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 to-transparent pointer-events-none" />
         <div className="w-full max-w-sm space-y-8 relative z-10">
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 mb-6 lg:hidden">
@@ -151,7 +169,7 @@ export default function SignInPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                className="w-full h-13 px-4 py-3.5 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                 required
                 disabled={loading || googleLoading}
               />
@@ -171,7 +189,7 @@ export default function SignInPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-13 px-4 py-3.5 pr-12 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-indigo-500/50 focus:bg-foreground/[0.07] transition-all"
+                  className="w-full h-13 px-4 py-3.5 pr-12 bg-foreground/5 border border-foreground/10 backdrop-blur-md rounded-xl text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-emerald-500/50 focus:bg-foreground/[0.07] transition-all"
                   required
                   disabled={loading || googleLoading}
                 />
@@ -271,7 +289,7 @@ function SlideToSignIn({ isLoading, enabled, onSwipeComplete }: SlideToSignInPro
     >
       {/* Dynamic Background Pulse when enabled */}
       {enabled && !isLoading && (
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 pointer-events-none animate-pulse-slow" />
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 pointer-events-none animate-pulse-slow" />
       )}
 
       {/* Track Label Text */}
@@ -300,7 +318,7 @@ function SlideToSignIn({ isLoading, enabled, onSwipeComplete }: SlideToSignInPro
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        className={`h-10 w-10 rounded-lg bg-foreground text-background flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-colors select-none z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        className={`h-10 w-10 rounded-lg bg-foreground text-background flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-colors select-none z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           isLoading ? 'cursor-default' : ''
         }`}
       >

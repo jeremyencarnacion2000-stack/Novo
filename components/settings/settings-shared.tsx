@@ -14,7 +14,7 @@ export interface DisabledModule {
 }
 
 // ─── Tab type ────────────────────────────────────────────────────────────────
-export type Tab = 'twin' | 'personalization' | 'modules' | 'preferences' | 'ai_models' | 'advanced' | 'integrations' | 'billing'
+export type Tab = 'twin' | 'personalization' | 'modules' | 'preferences' | 'ai_models' | 'advanced' | 'integrations' | 'billing' | 'mcp'
 
 // ─── All available modules ───────────────────────────────────────────────────
 import {

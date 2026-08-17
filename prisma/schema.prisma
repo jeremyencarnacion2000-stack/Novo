@@ -103,6 +103,7 @@ model User {
   externalActionExecutions ExternalActionExecution[]
   mcpPersonalAccessTokens McpPersonalAccessToken[]
   mcpAuditLogs McpAuditLog[]
+  cognitiveReplanRequests CognitiveReplanRequest[]
 
   // Social
   // Social
@@ -125,6 +126,7 @@ model User {
   integrationAccounts IntegrationAccount[]
   todoistOAuthStates TodoistOAuthState[]
   externalEntityMappings ExternalEntityMapping[]
+  externalEntityBaselines ExternalEntityBaseline[]
   ambientReconciliationClaims AmbientReconciliationClaim[]
 
   // Behavioral Intelligence Pilot (interruption-frequency experiment)
@@ -817,10 +819,36 @@ model OutcomeEvent {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan                ActionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
   recommendedAction   RecommendedAction? @relation(fields: [recommendedActionId], references: [id], onDelete: SetNull)
+  replanRequest        CognitiveReplanRequest?
 
   @@index([userId, type, createdAt])
   @@index([recommendedActionId, createdAt])
   @@map("outcome_events")
+}
+
+model CognitiveReplanRequest {
+  id                  String   @id @default(cuid())
+  userId              String
+  outcomeEventId      String   @unique
+  completedTaskId     String
+  status              String   @default("pending") // pending|running|completed|failed
+  attempts            Int      @default(0)
+  nextAttemptAt       DateTime @default(now())
+  lastError           String?
+  resultingActionPlanId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  claimedAt           DateTime?
+  leaseExpiresAt      DateTime?
+  claimToken          String?
+  completedAt         DateTime?
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outcomeEvent        OutcomeEvent @relation(fields: [outcomeEventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, nextAttemptAt])
+  @@index([resultingActionPlanId])
+  @@index([status, leaseExpiresAt, nextAttemptAt])
+  @@map("cognitive_replan_requests")
 }
 
 // Auditable planning evidence. Values are deliberately a short safe summary,
@@ -1617,11 +1645,28 @@ model ExternalEntityMapping {
   updatedAt             DateTime @updatedAt
   user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
   integrationAccount    IntegrationAccount @relation(fields: [integrationAccountId], references: [id], onDelete: Cascade)
+  baseline              ExternalEntityBaseline?
 
   @@unique([userId, provider, providerAccountId, entityType, sourceEntityId])
   @@index([userId, internalType, internalId])
   @@index([integrationAccountId, entityType, status])
   @@map("external_entity_mappings")
+}
+
+model ExternalEntityBaseline {
+  id             String   @id @default(cuid())
+  mappingId      String   @unique
+  userId         String
+  provider       String
+  providerAccountId String
+  sourceEntityId String
+  normalizedState Json
+  stateHash      String
+  observedAt     DateTime @default(now())
+  mapping        ExternalEntityMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, provider, providerAccountId, sourceEntityId])
+  @@map("external_entity_baselines")
 }
 
 // Idempotent durable work claim for provider reconciliation deliveries.

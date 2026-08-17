@@ -45,12 +45,14 @@ const customJestConfig = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // Jest's empty export-condition set cannot resolve Prisma's package
+    // export map; point the isolated DB runner at its generated entrypoint.
+    '^@prisma/client$': '<rootDir>/node_modules/@prisma/client/default.js',
+    '^uuid$': '<rootDir>/tests/mocks/uuid.ts',
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(msw|@mswjs)/)',
-  ],
-  testPathIgnorePatterns: ['/node_modules/', nestedWorktreePattern],
-  modulePathIgnorePatterns: [nestedWorktreePattern],
+  transformIgnorePatterns: ['node_modules/(?!(msw|@mswjs|uuid)/)'],
+  testPathIgnorePatterns: ['/node_modules/', nestedWorktreePattern, '/\\.kilo\\/worktrees\\/'],
+  modulePathIgnorePatterns: [nestedWorktreePattern, '\\.kilo\\worktrees'],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

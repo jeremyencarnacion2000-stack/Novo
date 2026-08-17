@@ -21,7 +21,13 @@ describe('SettingsProvider material theme refresh', () => {
       const { updateSettings } = useSettings()
 
       return (
-        <button onClick={() => updateSettings({ theme: 'system', glassOpacity: 40, cardOpacity: 50 })}>
+        <button onClick={() => updateSettings({
+          theme: 'system',
+          glassOpacity: 40,
+          cardOpacity: 50,
+          glassBlur: 3,
+          cardLiquidIntensity: 6,
+        })}>
           Use system theme
         </button>
       )
@@ -39,16 +45,18 @@ describe('SettingsProvider material theme refresh', () => {
       expect(document.documentElement.style.getPropertyValue('--novo-context-background')).toBe(
         'rgba(255, 255, 255, 0.4)',
       )
+      expect(document.documentElement.style.getPropertyValue('--glass-blur-px')).toBe('3px')
+      expect(document.documentElement.style.getPropertyValue('--card-blur-px')).toBe('6px')
     })
 
     act(() => systemThemeListener?.({ matches: true } as MediaQueryListEvent))
 
     expect(document.documentElement.classList).toContain('dark')
     expect(document.documentElement.style.getPropertyValue('--novo-context-background')).toBe(
-      'rgba(10, 14, 20, 0.4)',
+      'rgba(255, 255, 255, 0.4)',
     )
     expect(document.documentElement.style.getPropertyValue('--novo-focus-background')).toBe(
-      'rgba(10, 14, 20, 0.5)',
+      'rgba(255, 255, 255, 0.5)',
     )
   })
 })

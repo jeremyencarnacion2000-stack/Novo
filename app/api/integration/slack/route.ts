@@ -12,6 +12,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { slackService } from '@/lib/slack';
+import { z } from 'zod';
+
+const slackActionSchema = z.enum(['channels', 'save_channel', 'test']);
+const saveChannelSchema = z.object({
+    channelId: z.string().min(1).max(200).nullable(),
+    channelName: z.string().max(200).nullable().optional(),
+});
 
 // ── GET — Connection status ─────────────────────────────────────────────────
 
@@ -72,7 +79,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const action = searchParams.get('action') ?? 'channels';
+    const actionParsed = slackActionSchema.safeParse(searchParams.get('action') ?? 'channels');
+    if (!actionParsed.success) {
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+    const action = actionParsed.data;
 
     const account = await prisma.integrationAccount.findUnique({
         where: {
@@ -91,17 +102,21 @@ export async function POST(req: NextRequest) {
         try {
             const channels = await slackService.listChannels(account.accessToken);
             return NextResponse.json({ channels });
-        } catch (err: any) {
-            console.error('[Slack] Failed to list channels:', err);
-            return NextResponse.json({ error: 'Failed to fetch channels', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Slack] Failed to list channels:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Failed to fetch channels' }, { status: 502 });
         }
     }
 
     // ── action=save_channel — persist the chosen destination channel ──────────
     if (action === 'save_channel') {
         const body = await req.json().catch(() => ({}));
-        const channelId: string | null = body.channelId ?? null;
-        const channelName: string | null = body.channelName ?? null;
+        const parsed = saveChannelSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'channelId/channelName inválido' }, { status: 400 });
+        }
+        const channelId = parsed.data.channelId;
+        const channelName = parsed.data.channelName ?? null;
         await prisma.integrationAccount.update({
             where: { userId_provider: { userId: session.user.id, provider: 'slack' } },
             data: {
@@ -127,11 +142,11 @@ export async function POST(req: NextRequest) {
                 '👋 Novo está conectado a este canal. Aquí llegarán tus alertas del motor cognitivo.',
             );
             return NextResponse.json({ sent: true });
-        } catch (err: any) {
-            console.error('[Slack] Test message failed:', err);
-            return NextResponse.json({ error: 'Failed to send test message', detail: err.message }, { status: 502 });
+        } catch (err) {
+            console.error('[Slack] Test message failed:', { name: err instanceof Error ? err.name : 'UnknownError' });
+            return NextResponse.json({ error: 'Failed to send test message' }, { status: 502 });
         }
     }
 
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }

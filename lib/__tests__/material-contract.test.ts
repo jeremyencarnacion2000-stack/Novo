@@ -31,7 +31,7 @@ describe('resolveMaterialContract', () => {
 
   it.each([
     ['light', 'rgba(255, 255, 255, 0.68)', 'rgba(255, 255, 255, 0.78)'],
-    ['dark', 'rgba(10, 14, 20, 0.56)', 'rgba(10, 14, 20, 0.68)'],
+    ['dark', 'rgba(255, 255, 255, 0.56)', 'rgba(255, 255, 255, 0.68)'],
   ] as const)(
     'prevents zero opacity and blur settings from making %s wallpaper materials transparent',
     (theme, expectedContextFill, expectedFocusFill) => {
@@ -39,6 +39,7 @@ describe('resolveMaterialContract', () => {
         ...baseInput,
         theme,
         backgroundImage: '/wallpapers/arbitrary.jpg',
+        autoContrast: true,
         glassOpacity: 0,
         glassBlur: 0,
         cardOpacity: 0,
@@ -69,5 +70,42 @@ describe('resolveMaterialContract', () => {
     expect(contract.canvas.backdropFilter).toBe('blur(10px)')
     expect(contract.contextGlass.backdropFilter).toContain('blur(12px)')
     expect(contract.focusSurface.backdropFilter).toContain('blur(18px)')
+  })
+
+  it('preserves the requested flat-canvas opacity and blur without adding visual floors', () => {
+    const contract = resolveMaterialContract(baseInput)
+
+    expect(contract.contextGlass.background).toBe('rgba(255, 255, 255, 0.12)')
+    expect(contract.contextGlass.backdropFilter).toContain('blur(8px)')
+    expect(contract.contextGlass.border).toBe('1px solid transparent')
+    expect(contract.focusSurface.background).toBe('rgba(255, 255, 255, 0.15)')
+    expect(contract.focusSurface.backdropFilter).toContain('blur(10px)')
+    expect(contract.focusSurface.border).toBe('1px solid transparent')
+  })
+
+  it('uses quiet optical edges instead of accessibility-token outlines in dark mode', () => {
+    const contract = resolveMaterialContract({ ...baseInput, theme: 'dark' })
+
+    expect(contract.contextGlass.border).toBe('1px solid transparent')
+    expect(contract.focusSurface.border).toBe('1px solid transparent')
+  })
+
+  it('keeps dark wallpaper cards neutral and honors the requested opacity and blur', () => {
+    const contract = resolveMaterialContract({
+      ...baseInput,
+      theme: 'dark',
+      backgroundImage: '/wallpapers/arbitrary.jpg',
+      autoContrast: false,
+      glassOpacity: 7,
+      glassBlur: 3,
+      cardOpacity: 11,
+      cardLiquidIntensity: 6,
+    })
+
+    expect(contract.contextGlass.background).toBe('rgba(255, 255, 255, 0.07)')
+    expect(contract.contextGlass.backdropFilter).toContain('blur(3px)')
+    expect(contract.focusSurface.background).toBe('rgba(255, 255, 255, 0.11)')
+    expect(contract.focusSurface.backdropFilter).toContain('blur(6px)')
+    expect(contract.focusSurface.background).not.toContain('10, 14, 20')
   })
 })

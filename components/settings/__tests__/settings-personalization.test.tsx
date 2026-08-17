@@ -53,7 +53,9 @@ describe('SettingsPersonalization material preview', () => {
     expect(preview.querySelector('canvas')).toBeNull()
     expect(preview.querySelector('img')).toBeNull()
     expect(within(preview).getByTestId('preview-context-glass')).toHaveClass('novo-context-glass')
-    expect(within(preview).getByTestId('preview-focus-card')).toHaveClass('novo-focus-surface')
+    // Focus preview uses the restored shared Card hierarchy; the deprecated
+    // global focus-surface class must not be required by this surface.
+    expect(within(preview).getByTestId('preview-focus-card')).toHaveClass('glass-surface')
 
     fireEvent.input(screen.getByLabelText('Dashboard Card Glass Opacity'), { target: { value: '90' } })
 

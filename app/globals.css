@@ -58,6 +58,35 @@
   pointer-events: none;
 }
 
+/* Settings is a first-class material surface. The generic Dialog primitive
+   still has a safe opaque fallback for other dialogs, but Settings opts into
+   the same focus role as dashboard cards so its opacity/blur sliders are the
+   actual source of truth rather than Tailwind's fixed bg/backdrop utilities. */
+[data-slot="dialog-content"].novo-settings-modal {
+  background: var(--novo-focus-background) !important;
+  backdrop-filter: var(--novo-focus-backdrop-filter) !important;
+  -webkit-backdrop-filter: var(--novo-focus-backdrop-filter) !important;
+  border: var(--novo-focus-border) !important;
+  box-shadow: var(--novo-focus-box-shadow) !important;
+}
+
+/* Dashboard/card material is opt-in per surface so feature-specific cards can
+   still retain their own semantic fills. The tracker grid uses this marker;
+   its blur and alpha now resolve from Settings' Dashboard Card controls. */
+[data-slot="card"][data-card-material="focus"] {
+  background: var(--novo-focus-background) !important;
+  backdrop-filter: var(--novo-focus-backdrop-filter) !important;
+  -webkit-backdrop-filter: var(--novo-focus-backdrop-filter) !important;
+  border: var(--novo-focus-border) !important;
+  box-shadow: var(--novo-focus-box-shadow) !important;
+}
+
+.novo-material-overlay {
+  background: rgba(0, 0, 0, var(--novo-dialog-overlay-opacity, 0.6));
+  backdrop-filter: blur(var(--novo-dialog-overlay-blur, 4px));
+  -webkit-backdrop-filter: blur(var(--novo-dialog-overlay-blur, 4px));
+}
+
 body.has-bg-image [data-app-wallpaper] {
   display: block;
   background: var(--novo-canvas-background);
@@ -75,52 +104,11 @@ body.has-bg-image [data-app-wallpaper] {
   backdrop-filter: var(--novo-glass-backdrop-filter, none);
 }
 
-[data-app-viewport]::before,
-[data-app-viewport]::after {
-  content: '';
-  position: absolute;
-  inset: -8%;
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-[data-app-viewport]::before {
-  z-index: 0;
-  opacity: .34;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='novoNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23novoNoise)' opacity='.22'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-}
-
-[data-app-viewport]::after {
-  z-index: 0;
-  opacity: .28;
-  filter: blur(44px) saturate(115%);
-  background:
-    radial-gradient(ellipse 54% 46% at 18% 18%, rgba(35, 197, 126, .24), transparent 72%),
-    radial-gradient(ellipse 48% 52% at 82% 20%, rgba(20, 184, 166, .17), transparent 72%),
-    radial-gradient(ellipse 48% 54% at 56% 92%, rgba(183, 243, 208, .12), transparent 76%);
-  animation: novo-ambient-drift 22s ease-in-out infinite alternate;
-}
-
-html:not(.dark) [data-app-viewport]::after {
-  opacity: .18;
-  background:
-    radial-gradient(ellipse 54% 46% at 18% 18%, rgba(34, 160, 106, .18), transparent 72%),
-    radial-gradient(ellipse 48% 52% at 82% 20%, rgba(20, 160, 150, .12), transparent 72%),
-    radial-gradient(ellipse 48% 54% at 56% 92%, rgba(216, 198, 160, .14), transparent 76%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-app-viewport]::after { animation: none; }
-}
-
 /* Appearance changes are a single handoff rather than a flash of individual
    variables. Native View Transitions crossfade the complete rendered frame,
    including a custom wallpaper; this CSS block is the consistent fallback. */
 html[data-appearance-transition] body,
-html[data-appearance-transition] [data-app-viewport],
-html[data-appearance-transition] [data-app-viewport]::after {
+html[data-appearance-transition] [data-app-viewport] {
   transition: background-color 520ms cubic-bezier(0.16, 1, 0.3, 1), color 360ms ease, opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), filter 520ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -218,41 +206,6 @@ html[data-appearance-transition] body.has-bg-image::before {
   .novo-premium-field:hover::after { transform: none; transition: none; animation: none; }
 }
 
-/* Shared dialog depth: the panel gets the same quiet texture as the app
-   surface, while all interactive/content children remain above the layers. */
-[data-slot='dialog-content'] {
-  overflow: hidden;
-  isolation: isolate;
-  background: var(--novo-focus-background);
-  backdrop-filter: var(--novo-focus-backdrop-filter);
-  border: var(--novo-focus-border);
-  box-shadow: var(--novo-focus-box-shadow);
-}
-
-[data-slot='dialog-content']::before,
-[data-slot='dialog-content']::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-[data-slot='dialog-content']::before {
-  z-index: 0;
-  opacity: .24;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='dialogNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23dialogNoise)' opacity='.2'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-}
-
-[data-slot='dialog-content']::after {
-  z-index: 0;
-  opacity: .2;
-  background: radial-gradient(ellipse at 16% 0%, rgba(35, 197, 126, .16), transparent 58%), radial-gradient(ellipse at 90% 100%, rgba(20, 184, 166, .11), transparent 62%);
-}
-
-[data-slot='dialog-content'] > * { position: relative; z-index: 1; }
-
 /* ── Novo Panel Animation System (Sileo-derived spring physics) ────────── */
 :root {
   /* The three material roles have safe startup values. SettingsContext
@@ -263,11 +216,11 @@ html[data-appearance-transition] body.has-bg-image::before {
   --novo-canvas-box-shadow: none;
   --novo-context-background: rgba(255, 255, 255, 0.68);
   --novo-context-backdrop-filter: blur(12px) saturate(160%) brightness(1.04);
-  --novo-context-border: 1px solid #767676;
+  --novo-context-border: 1px solid transparent;
   --novo-context-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 8px 28px rgba(15, 23, 42, 0.14);
   --novo-focus-background: rgba(255, 255, 255, 0.78);
   --novo-focus-backdrop-filter: blur(18px) saturate(160%) brightness(1.04);
-  --novo-focus-border: 1px solid #767676;
+  --novo-focus-border: 1px solid transparent;
   --novo-focus-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 12px 36px rgba(15, 23, 42, 0.18);
 
   --novo-spring: linear(
@@ -550,11 +503,13 @@ html[data-appearance-transition] body.has-bg-image::before {
 
 .dark {
   --novo-canvas-background: var(--background);
-  --novo-context-background: rgba(10, 14, 20, 0.56);
-  --novo-context-border: 1px solid #737a84;
+  --novo-context-background: rgba(255, 255, 255, 0.12);
+  --novo-context-backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
+  --novo-context-border: 1px solid transparent;
   --novo-context-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 12px 34px rgba(0, 0, 0, 0.34);
-  --novo-focus-background: rgba(10, 14, 20, 0.68);
-  --novo-focus-border: 1px solid #737a84;
+  --novo-focus-background: rgba(255, 255, 255, 0.15);
+  --novo-focus-backdrop-filter: blur(16px) saturate(160%) brightness(1.04);
+  --novo-focus-border: 1px solid transparent;
   --novo-focus-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 16px 48px rgba(0, 0, 0, 0.42);
 
   /* Material design systems background variable mapping */
@@ -802,17 +757,17 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 @utility card--secondary {
-  background: var(--novo-focus-background);
-  border: var(--novo-focus-border);
-  backdrop-filter: var(--novo-focus-backdrop-filter);
-  box-shadow: var(--novo-focus-box-shadow);
+  background: var(--novo-context-background);
+  border: var(--novo-context-border);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 @utility card--tertiary {
-  background: var(--novo-focus-background);
-  border: var(--novo-focus-border);
-  backdrop-filter: var(--novo-focus-backdrop-filter);
-  box-shadow: var(--novo-focus-box-shadow);
+  background: var(--novo-context-background);
+  border: var(--novo-context-border);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 /* Glass Blur Utility — heavier for 'milky' look */
@@ -933,18 +888,18 @@ html[data-appearance-transition] body.has-bg-image::before {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: var(--novo-focus-background);
-  border: var(--novo-focus-border);
+  background: var(--novo-context-background);
+  border: var(--novo-context-border);
   border-radius: var(--glass-radius);
-  backdrop-filter: var(--novo-focus-backdrop-filter);
-  -webkit-backdrop-filter: var(--novo-focus-backdrop-filter);
-  box-shadow: var(--novo-focus-box-shadow);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
+  box-shadow: var(--novo-context-box-shadow);
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
-    background: var(--novo-focus-background);
-    border-color: var(--novo-focus-border);
-    box-shadow: var(--novo-focus-box-shadow);
+    background: var(--novo-context-background);
+    border-color: var(--novo-context-border);
+    box-shadow: var(--novo-context-box-shadow);
     transform: translateY(-2px);
   }
 }
@@ -956,18 +911,18 @@ html[data-appearance-transition] body.has-bg-image::before {
 .glass-card-list {
   position: relative;
   overflow: hidden;
-  background: var(--novo-focus-background);
-  border: var(--novo-focus-border);
+  background: var(--novo-context-background);
+  border: var(--novo-context-border);
   border-radius: var(--glass-radius);
-  box-shadow: var(--novo-focus-box-shadow);
-  backdrop-filter: var(--novo-focus-backdrop-filter);
+  box-shadow: var(--novo-context-box-shadow);
+  backdrop-filter: var(--novo-context-backdrop-filter);
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 
   &:hover {
-    background: var(--novo-focus-background);
-    border-color: var(--novo-focus-border);
-    box-shadow: var(--novo-focus-box-shadow);
-    backdrop-filter: var(--novo-focus-backdrop-filter);
+    background: var(--novo-context-background);
+    border-color: var(--novo-context-border);
+    box-shadow: var(--novo-context-box-shadow);
+    backdrop-filter: var(--novo-context-backdrop-filter);
   }
 }
 
@@ -1194,6 +1149,10 @@ html[data-appearance-transition] body.has-bg-image::before {
     position: relative;
     isolation: isolate;
     overflow: hidden;
+    /* Fed by the card Settings controls (cardOpacity/cardLiquidIntensity →
+       --novo-focus-*). This used to read --novo-context-*, which the sidebar
+       glass sliders own — so the card opacity/intensity sliders changed
+       nothing on dashboard cards, reported as "antes estaba pero se dañó". */
     background: var(--novo-focus-background);
     backdrop-filter: var(--novo-focus-backdrop-filter);
     border: var(--novo-focus-border);
@@ -1298,6 +1257,8 @@ html[data-appearance-transition] body.has-bg-image::before {
      always-on blur per card compounds into real jank that a single card
      never shows. */
   .liquid-glass-hover {
+    /* Same card-controls wiring as .liquid-glass above — list-item cards
+       must track the same Settings sliders as full cards. */
     background: var(--novo-focus-background);
     border: var(--novo-focus-border);
     box-shadow: var(--novo-focus-box-shadow);
@@ -1335,6 +1296,122 @@ html[data-appearance-transition] body.has-bg-image::before {
   backdrop-filter: var(--novo-focus-backdrop-filter);
   border: var(--novo-focus-border);
   box-shadow: var(--novo-focus-box-shadow);
+}
+
+/* Navigation controls use the same material language as the Pomodoro lens,
+   but with a deliberately lighter treatment. The rail itself and the active
+   route carry the real displacement surface; inactive controls only reveal a
+   small refractive edge on hover/focus so the shell remains calm and fast. */
+@layer components {
+  .novo-nav-glass-control,
+  .novo-sidebar-nav-button {
+    --novo-nav-aberration: 0.2;
+    isolation: isolate;
+    overflow: hidden;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
+    transition:
+      background-color 180ms ease,
+      box-shadow 220ms ease,
+      color 180ms ease,
+      transform 220ms var(--novo-spring);
+  }
+
+  .novo-nav-glass-control::before,
+  .novo-sidebar-nav-button::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0;
+    background:
+      linear-gradient(110deg,
+        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
+        transparent 23%,
+        transparent 76%,
+        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
+    filter: blur(0.6px);
+    mix-blend-mode: screen;
+    transition: opacity 180ms ease;
+  }
+
+  .novo-nav-glass-control:hover,
+  .novo-nav-glass-control:focus-visible,
+  .novo-sidebar-nav-button:hover,
+  .novo-sidebar-nav-button:focus-visible {
+    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
+    backdrop-filter: blur(9px) saturate(145%);
+    -webkit-backdrop-filter: blur(9px) saturate(145%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 3px 14px rgba(0, 0, 0, 0.08);
+  }
+
+  .novo-nav-glass-control:hover::before,
+  .novo-nav-glass-control:focus-visible::before,
+  .novo-sidebar-nav-button:hover::before,
+  .novo-sidebar-nav-button:focus-visible::before {
+    opacity: 0.55;
+  }
+
+  /* The active route is already backed by GlassSurface. Keep its button
+     transparent so two full-strength lenses never fight each other. */
+  .novo-nav-glass-control[data-active='true'],
+  .novo-sidebar-nav-button[data-active='true'] {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .novo-nav-glass-control[data-active='true']::before,
+  .novo-sidebar-nav-button[data-active='true']::before {
+    opacity: 0;
+  }
+
+  .novo-mobile-nav-shell {
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  }
+
+  .novo-mobile-nav-fab {
+    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .novo-nav-glass-control,
+    .novo-sidebar-nav-button {
+      transition: none;
+    }
+  }
+}
+
+/* The Context Hub uses a morphing outer shell. Its elevation and inner
+   highlight already define the edge, so a utility `border` must not reappear
+   as a dark hairline when the shell changes state or receives hover. */
+.context-hub-layer,
+.context-hub-layer:hover {
+  border-color: transparent !important;
+}
+
+/* Respect the platform's reduced-transparency preference without changing
+   Novo's spacing, color language or hierarchy. Opaque materials keep text
+   readable over user wallpapers while preserving the same elevation cues. */
+@media (prefers-reduced-transparency: reduce) {
+  .novo-context-glass,
+  .novo-focus-surface,
+  .novo-premium-field,
+  .novo-settings-nav,
+  .glass-surface,
+  .glass-floating,
+  .glass-active,
+  .glass-card,
+  .glass-panel {
+    background: var(--background) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }
 
 /* Cognitive Engine surfaces use a few legacy white-on-glass utilities. Keep

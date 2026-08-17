@@ -15,7 +15,7 @@ import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
 interface MobileSectionDrawerProps {
-    onClose: () => void
+    onClose: (options?: { historyAction?: 'back' | 'replace' | 'none' }) => void
     onOpenVoice?: () => void
 }
 
@@ -29,7 +29,8 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
         setModalOpen(true)
         return () => setModalOpen(false)
     }, [setModalOpen])
-    const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({ onDismiss: onClose })
+    const handleDismiss = () => onClose()
+    const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({ onDismiss: handleDismiss })
 
     // Primary navigation lives in MobileNav. This drawer is deliberately
     // secondary: workspace context first, then legacy/labs modules.
@@ -57,8 +58,11 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
     ]
 
     const handleNavigate = (href: string) => {
+        // Overlays own no history entries anymore, so navigating is just a
+        // route push plus the visual close flight — nothing can race with
+        // Next.js' own history management.
         router.push(href)
-        onClose()
+        onClose({ historyAction: 'none' })
     }
 
     return (
@@ -69,7 +73,7 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                 data-testid="workspace-backdrop"
                 aria-hidden="true"
                 className="modal-flip-overlay fixed inset-0 z-[5000] bg-black/60 md:hidden"
-                onClick={onClose}
+                onClick={handleDismiss}
             />
 
             {/* Same left-4/right-4/bottom-4 bounds as the nav bar's own
@@ -154,7 +158,7 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                             <button
                                 onClick={() => {
                                     window.dispatchEvent(new CustomEvent('open-command-palette'))
-                                    onClose()
+                                    onClose({ historyAction: 'none' })
                                 }}
                                 className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >

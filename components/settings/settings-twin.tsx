@@ -1,14 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, Zap, Clock, AlertTriangle, Brain } from 'lucide-react'
+import { Activity, Zap, Clock, AlertTriangle } from 'lucide-react'
 import { LiquidSwitch } from '@/components/ui/liquid-switch'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
+import { useTranslation } from '@/lib/i18n'
 import { ConfidenceGauge, TrustBadge, OrbPrimitive, TelemetryPill } from '@/components/cognitive/primitives'
+import { TrustCenter } from '@/components/cognitive/trust-center'
 import { Section, Row, OptionButton } from './settings-shared'
 
 export function SettingsTwin() {
   const { twin } = useCognitiveTwin()
+  const { language } = useTranslation()
 
   // Twin behavior state overrides
   const [adaptationMode, setAdaptationMode] = useState<'aggressive' | 'balanced' | 'minimal'>('balanced')
@@ -19,70 +22,66 @@ export function SettingsTwin() {
 
   const role = twin.identity?.role || ''
 
-  // Chronotype / focus labels
-  const chronoLabel: Record<string, string> = { morning_lark: 'Morning Lark', night_owl: 'Night Owl', intermediate: 'Intermediate Peak', '': 'Not detected' }
-  const focusLabel: Record<string, string> = { deep_builder: 'Deep Builder', reactive_communicator: 'Reactive Communicator', frantic_juggler: 'Frantic Juggler', consistent_planner: 'Consistent Planner', '': 'Not detected' }
-  const frictionLabel: Record<string, string> = { context_switching: 'Context Switching', procrastination: 'Procrastination', overcommitment: 'Overcommitment', lack_of_structure: 'Lack of Structure', '': 'Not detected' }
+  const copy = {
+    en: { title: 'Cognitive Twin', profile: 'Profile', notInitialized: 'Not initialized', updated: 'Updated', telemetry: 'Operational indicators', note: 'These are operational estimates, not medical or biometric measurements.', load: 'Estimated workload', overload: 'Estimated overload', decision: 'Estimated decision friction', uncalibrated: 'Not calibrated', noData: 'No data', chrono: 'Chronotype', focus: 'Focus style', friction: 'Main friction', notDetected: 'Not detected' },
+    es: { title: 'Gemelo cognitivo', profile: 'Perfil', notInitialized: 'Sin inicializar', updated: 'Actualizado', telemetry: 'Indicadores operativos', note: 'Son estimaciones operativas; no son mediciones médicas ni biométricas.', load: 'Carga operativa estimada', overload: 'Sobrecarga estimada', decision: 'Fricción de decisiones estimada', uncalibrated: 'Sin calibrar', noData: 'Sin datos', chrono: 'Cronotipo', focus: 'Estilo de enfoque', friction: 'Fricción principal', notDetected: 'No detectado' },
+    fr: { title: 'Jumeau cognitif', profile: 'Profil', notInitialized: 'Non initialisé', updated: 'Mis à jour', telemetry: 'Indicateurs opérationnels', note: 'Ce sont des estimations opérationnelles, pas des mesures médicales ou biométriques.', load: 'Charge opérationnelle estimée', overload: 'Surcharge estimée', decision: 'Friction décisionnelle estimée', uncalibrated: 'Non calibré', noData: 'Aucune donnée', chrono: 'Chronotype', focus: 'Style de concentration', friction: 'Friction principale', notDetected: 'Non détecté' },
+    de: { title: 'Kognitiver Zwilling', profile: 'Profil', notInitialized: 'Nicht initialisiert', updated: 'Aktualisiert', telemetry: 'Operative Indikatoren', note: 'Dies sind operative Schätzungen, keine medizinischen oder biometrischen Messwerte.', load: 'Geschätzte Arbeitslast', overload: 'Geschätzte Überlastung', decision: 'Geschätzte Entscheidungsreibung', uncalibrated: 'Nicht kalibriert', noData: 'Keine Daten', chrono: 'Chronotyp', focus: 'Fokusstil', friction: 'Hauptreibung', notDetected: 'Nicht erkannt' },
+  }[language]
+
+  const chronoLabel: Record<string, string> = { morning_lark: language === 'es' ? 'Madrugador' : 'Morning lark', night_owl: language === 'es' ? 'Nocturno' : 'Night owl', intermediate: language === 'es' ? 'Pico intermedio' : 'Intermediate peak', '': copy.notDetected }
+  const focusLabel: Record<string, string> = { deep_builder: language === 'es' ? 'Trabajo profundo' : 'Deep builder', reactive_communicator: language === 'es' ? 'Comunicación reactiva' : 'Reactive communicator', frantic_juggler: language === 'es' ? 'Multitarea intensa' : 'Frantic juggler', consistent_planner: language === 'es' ? 'Planificación constante' : 'Consistent planner', '': copy.notDetected }
+  const frictionLabel: Record<string, string> = { context_switching: language === 'es' ? 'Cambio de contexto' : 'Context switching', procrastination: language === 'es' ? 'Postergación' : 'Procrastination', overcommitment: language === 'es' ? 'Sobrecompromiso' : 'Overcommitment', lack_of_structure: language === 'es' ? 'Falta de estructura' : 'Lack of structure', '': copy.notDetected }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="rounded-3xl border border-foreground/[0.06] bg-foreground/[0.015] p-6 flex flex-col sm:flex-row items-center gap-6">
         <OrbPrimitive size="lg" variant={twin.isInitialized ? 'active' : 'dormant'} />
         <div className="flex-1 text-center sm:text-left">
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground/30 mb-1">Cognitive Twin</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground/30 mb-1">{copy.title}</p>
           <h2 className="text-xl font-bold text-foreground/90 mb-2">
-            {twin.isInitialized ? `${role.charAt(0).toUpperCase() + role.slice(1)} Profile` : 'Not Initialized'}
+            {twin.isInitialized ? `${role.charAt(0).toUpperCase() + role.slice(1)} ${copy.profile}` : copy.notInitialized}
           </h2>
           <div className="flex items-center gap-3 justify-center sm:justify-start">
             <TrustBadge level={twin.trustLevel} />
-            <span className="text-xs text-foreground/30">Updated {new Date(twin.updatedAt).toLocaleDateString()}</span>
+            <span className="text-xs text-foreground/50">{copy.updated} {new Date(twin.updatedAt).toLocaleDateString(language)}</span>
           </div>
         </div>
         <ConfidenceGauge score={twin.confidenceScore} size="md" />
       </div>
 
-      <Section title="System Telemetry">
+      <Section title={copy.telemetry}>
+        <p className="-mt-1 text-xs leading-relaxed text-foreground/65">{copy.note}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TelemetryPill
-            label="Cognitive Load"
-            value={twin.metrics.currentCognitiveLoad}
-            unit="%"
-            status={twin.metrics.currentCognitiveLoad > 75 ? 'warning' : twin.metrics.currentCognitiveLoad > 90 ? 'critical' : 'normal'}
+            label={copy.load}
+            value={twin.confidenceScore > 0 ? twin.metrics.currentCognitiveLoad : copy.uncalibrated}
+            unit={twin.confidenceScore > 0 ? '%' : undefined}
+            status={twin.confidenceScore > 0 && twin.metrics.currentCognitiveLoad > 90 ? 'critical' : twin.confidenceScore > 0 && twin.metrics.currentCognitiveLoad > 75 ? 'warning' : 'normal'}
             icon={Activity}
           />
           <TelemetryPill
-            label="Burnout Risk"
-            value={twin.metrics.burnoutIndex}
-            unit="%"
-            status={twin.metrics.burnoutIndex > 70 ? 'critical' : twin.metrics.burnoutIndex > 50 ? 'warning' : 'good'}
-            icon={AlertTriangle}
-          />
-          <TelemetryPill
-            label="Chronotype"
-            value={chronoLabel[twin.energyCurve.chronotype] || 'Not detected'}
+            label={copy.chrono}
+            value={chronoLabel[twin.energyCurve.chronotype] || copy.notDetected}
             icon={Clock}
             status="normal"
           />
           <TelemetryPill
-            label="Focus Style"
-            value={focusLabel[twin.identity.focusStyle] || 'Not detected'}
+            label={copy.focus}
+            value={focusLabel[twin.identity.focusStyle] || copy.notDetected}
             icon={Zap}
             status="normal"
           />
           <TelemetryPill
-            label="Main Friction"
-            value={frictionLabel[twin.bottlenecks.mainFrictionPoint] || 'Not detected'}
+            label={copy.friction}
+            value={frictionLabel[twin.bottlenecks.mainFrictionPoint] || copy.notDetected}
             icon={AlertTriangle}
             status={twin.bottlenecks.mainFrictionPoint ? 'warning' : 'normal'}
           />
-          <TelemetryPill
-            label="Decision Fatigue"
-            value={twin.metrics.decisionFatigueRisk}
-            icon={Brain}
-            status={twin.metrics.decisionFatigueRisk === 'critical' ? 'critical' : twin.metrics.decisionFatigueRisk === 'high' ? 'warning' : 'normal'}
-          />
         </div>
       </Section>
+
+      <TrustCenter language={language === 'es' ? 'es' : 'en'} />
 
       <Section title="Adaptation Level">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

@@ -30,6 +30,27 @@ export const OAUTH_ROUTES = {
 
 let provider: Provider | undefined
 
+/**
+ * Vercel runs the authorization request and the consent page in separate
+ * serverless invocations. oidc-provider signs persisted interactions with its
+ * keystore, so an in-memory keystore makes the next invocation unable to
+ * verify the interaction and silently fall back to the dashboard. Keep the
+ * production JWKS in an environment variable; local development may continue
+ * using oidc-provider's generated keys.
+ */
+function getPersistentJwks(): { keys: Record<string, unknown>[] } | undefined {
+  const raw = process.env.OIDC_JWKS_JSON
+  if (!raw) return undefined
+
+  try {
+    const parsed = JSON.parse(raw) as { keys?: unknown }
+    if (!Array.isArray(parsed.keys) || parsed.keys.length === 0) return undefined
+    return { keys: parsed.keys.filter((key): key is Record<string, unknown> => Boolean(key && typeof key === 'object')) }
+  } catch {
+    return undefined
+  }
+}
+
 // Singleton — module-level cache. On Vercel each serverless function gets
 // its own module instance anyway, so this only saves repeated construction
 // within one warm invocation; all real state lives in Postgres via the
@@ -42,6 +63,7 @@ export function getOidcProvider(): Provider {
 
   provider = new Provider(issuer, {
     adapter: oidcAdapterFactory,
+    jwks: getPersistentJwks(),
     // Dynamic Client Registration only — no pre-registered clients. DCR is
     // what real MCP clients (Claude Desktop/Code) support today; the newer
     // Client ID Metadata Documents mechanism the spec now prefers isn't yet
@@ -111,6 +133,20 @@ export function getOidcProvider(): Provider {
     }),
     cookies: {
       keys: [process.env.NEXTAUTH_SECRET || 'novo-oidc-dev-secret-change-me'],
+      // The consent UI and its server-side login/confirm endpoints live on
+      // different paths.  Keep the short interaction cookie available to
+      // both routes; the default host-only path would otherwise scope it to
+      // `/oauth/consent/<uid>` and the API bridge would see no interaction.
+      short: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+      },
+      long: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+      },
     },
   })
 

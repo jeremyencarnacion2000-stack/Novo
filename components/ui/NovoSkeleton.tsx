@@ -25,8 +25,7 @@ export function NovoSkeleton({
     return (
       <motion.div
         className={cn(
-          "rounded-2xl border border-white/[0.04] p-5 space-y-4 overflow-hidden relative",
-          "bg-gradient-to-r from-zinc-950/80 via-zinc-900/60 to-zinc-950/80",
+          "rounded-2xl border border-border/70 bg-card/70 p-5 space-y-4 overflow-hidden relative",
           className
         )}
         animate={{ opacity: [0.45, 0.75, 0.45] }}
@@ -38,17 +37,17 @@ export function NovoSkeleton({
         style={{ width, height, willChange: 'opacity' }}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="h-4 bg-zinc-800/80 rounded w-2/3" />
-          <div className="h-4 bg-zinc-800/40 rounded w-1/4" />
+          <div className="h-4 bg-muted/90 rounded w-2/3" />
+          <div className="h-4 bg-muted/65 rounded w-1/4" />
         </div>
         <div className="space-y-2">
-          <div className="h-3 bg-zinc-800/60 rounded w-5/6" />
-          <div className="h-3 bg-zinc-800/40 rounded w-1/2" />
+          <div className="h-3 bg-muted/75 rounded w-5/6" />
+          <div className="h-3 bg-muted/55 rounded w-1/2" />
         </div>
         <div className="flex gap-2 pt-1">
-          <div className="h-7 bg-zinc-800/40 rounded flex-1" />
-          <div className="h-7 bg-zinc-800/40 rounded w-7" />
-          <div className="h-7 bg-zinc-800/40 rounded w-7" />
+          <div className="h-7 bg-muted/55 rounded flex-1" />
+          <div className="h-7 bg-muted/55 rounded w-7" />
+          <div className="h-7 bg-muted/55 rounded w-7" />
         </div>
       </motion.div>
     )
@@ -57,7 +56,7 @@ export function NovoSkeleton({
   return (
     <motion.div
       className={cn(
-        "relative overflow-hidden bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-white/[0.03]",
+        "relative overflow-hidden bg-muted/65 border border-border/60",
         isCircle ? "rounded-full" : isText ? "rounded h-3 w-full" : "rounded-xl",
         className
       )}
