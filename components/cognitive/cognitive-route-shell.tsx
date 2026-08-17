@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { useDevicePresence } from '@/hooks/use-device-presence'
 
 const AppSidebar = dynamic(() => import('@/components/app-sidebar').then((module) => ({ default: module.AppSidebar })), { ssr: false })
 const MobileNav = dynamic(() => import('@/components/mobile-nav').then((module) => ({ default: module.MobileNav })), { ssr: false })
@@ -15,6 +16,8 @@ const MobileNav = dynamic(() => import('@/components/mobile-nav').then((module) 
  * while those secondary modules remain progressively loaded on other pages.
  */
 export function CognitiveRouteShell({ children }: { children: ReactNode }) {
+  useDevicePresence()
+
   return (
     <SidebarProvider defaultOpen={false}>
       <div data-app-viewport className="flex h-dvh w-full overflow-hidden">
