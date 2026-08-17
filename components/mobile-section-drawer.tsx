@@ -88,7 +88,16 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                 aria-modal="true"
                 aria-label="Workspace menu"
                 className="modal-flip-target novo-focus-surface fixed left-4 right-4 z-[5001] pointer-events-auto rounded-[32px] overflow-hidden md:hidden"
-                style={{ bottom: 'var(--mobile-navigation-bottom)' }}
+                style={{
+                    bottom: 'var(--mobile-navigation-bottom)',
+                    // Primary navigation must stay legible over arbitrary dashboard
+                    // content, not just a custom wallpaper. novo-focus-surface's
+                    // opacity is Settings-driven (cardOpacity, default 15%) and only
+                    // gets an auto-contrast floor when a wallpaper is set, so this
+                    // sheet forces the real solid background instead of inheriting
+                    // that decorative-card opacity.
+                    backgroundColor: 'var(--background)',
+                }}
             >
                     {/* Handle — drag down from here to dismiss with native physics */}
                     <div

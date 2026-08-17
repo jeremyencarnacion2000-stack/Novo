@@ -1,0 +1,5 @@
+.codex-remote-attachments/
+.codex-dev-stdout.log
+.codex-dev-stderr.log
+vercel_deploy.log
+public/art/novo-companion-sprite-source.png
