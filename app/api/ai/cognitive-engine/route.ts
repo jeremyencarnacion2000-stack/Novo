@@ -14,6 +14,7 @@ import { evaluateNotionThresholds } from '@/lib/cognitive/notion-signal';
 import { evaluateTodoistThresholds } from '@/lib/cognitive/todoist-signal';
 import { evaluateGmailThresholds } from '@/lib/cognitive/gmail-signal';
 import { evaluateReadingSignal } from '@/lib/cognitive/books-signal';
+import { evaluateDevicePresence } from '@/lib/cognitive/device-signal';
 import { persistNewPlatformSignals } from '@/lib/cognitive/platform-signals';
 import { detectAbandonmentPattern } from '@/lib/cognitive/focus-abandonment';
 import type { BiometricPayload } from '@/types/biometrics';
@@ -260,6 +261,24 @@ export async function GET(req: NextRequest) {
         });
         const readingThresholdSignals = evaluateReadingSignal(readingBooks, now);
         await persistNewPlatformSignals(twinRecord.id, userId, readingThresholdSignals);
+      } catch {
+        // Non-critical — the report itself doesn't depend on this succeeding.
+      }
+    }
+
+    // Device: presence sessions Novo's own hooks/use-device-presence.ts
+    // reports via sendBeacon — no API call needed, just a query against data
+    // Novo already owns, same as Reading (Books) above.
+    if (twinRecord) {
+      try {
+        const recentSessions = await prisma.deviceActivityEvent.findMany({
+          where: { userId },
+          orderBy: { endedAt: 'desc' },
+          take: 5,
+          select: { startedAt: true, endedAt: true },
+        });
+        const deviceThresholdSignals = evaluateDevicePresence(recentSessions, now);
+        await persistNewPlatformSignals(twinRecord.id, userId, deviceThresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
       }

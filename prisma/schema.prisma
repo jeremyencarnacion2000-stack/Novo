@@ -58,6 +58,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   checklistItems ChecklistItem[]
+  deviceActivityEvents DeviceActivityEvent[]
   routines      Routine[]
   projects      Project[]
   tasks         Task[]
@@ -1514,6 +1515,18 @@ model TwinEvolutionLog {
   @@index([twinId, createdAt])
   @@index([twinId, changeType, createdAt])
   @@map("twin_evolution_logs")
+}
+
+model DeviceActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  startedAt DateTime
+  endedAt   DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
 }
 
 model TwinSnapshot {

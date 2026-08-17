@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { PageWrapper } from '@/components/PageWrapper'
 import { VoiceCommandHub } from '@/components/ai/VoiceCommandHub'
 import { usePeakTaskOrchestrator } from '@/hooks/use-peak-task-orchestrator'
+import { useDevicePresence } from '@/hooks/use-device-presence'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
@@ -40,6 +41,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
   // hooks/use-peak-task-orchestrator.ts for why the old separate DB-polled
   // toast was folded into this same `insight` slot).
   const { insight, dismissInsight } = usePeakTaskOrchestrator()
+  useDevicePresence()
 
   useEffect(() => {
     DataIntegrator.initialize()
