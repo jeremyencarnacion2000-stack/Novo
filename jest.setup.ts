@@ -43,7 +43,7 @@ const originalFetch = globalThis.fetch;
 
     let content = 'This is a mocked response from Groq.';
 
-    if (model === 'llama-3.1-8b-instant') {
+    if (model === 'openai/gpt-oss-20b') {
       const isCritical = body.messages[1].content.toLowerCase().includes('borra');
       content = JSON.stringify({
         analysis: "Mocked analysis",

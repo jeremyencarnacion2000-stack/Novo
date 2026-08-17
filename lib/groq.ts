@@ -33,7 +33,11 @@ export class GroqAPIClient {
         context: string,
         history: ConversationMessage[] = [],
         systemPrompt?: string,
-        model: string = 'qwen/qwen3-32b',
+        // qwen/qwen3-32b, llama-3.3-70b-versatile and llama-3.1-8b-instant were
+        // all decommissioned on this Groq account (verified 2026-08-17 via
+        // GET /v1/models: catalog is now the gpt-oss family + qwen3.6).
+        // openai/gpt-oss-120b answered live probes on the production key.
+        model: string = 'openai/gpt-oss-120b',
         temperature: number = 0.7
     ): Promise<{ content: string; tokensIn?: number; tokensOut?: number }> {
         const apiKey = process.env.GROQ_API_KEY;
@@ -134,12 +138,12 @@ export class GroqAPIClient {
     }
 
     async getModels(): Promise<string[]> {
+        // Mirrors the live catalog of this Groq account (GET /v1/models,
+        // verified 2026-08-17) — the llama/mixtral/gemma ids were retired.
         return [
-            'qwen-2.5-coder-32b',
-            'llama-3.3-70b-versatile',
-            'llama-3.1-8b-instant',
-            'mixtral-8x7b-32768',
-            'gemma2-9b-it'
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.6-27b'
         ];
     }
 }

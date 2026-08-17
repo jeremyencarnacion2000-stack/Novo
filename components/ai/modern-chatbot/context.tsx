@@ -64,30 +64,23 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     const availableModels: AIModel[] = [
         {
-            id: 'qwen/qwen3-32b',
-            name: 'Qwen 3 Coder',
-            provider: 'Qwen',
-            description: 'Altamente estable, de alta velocidad y especialista en código. Recomendado.',
-            enabled: true
-        },
-        {
-            id: 'llama-3.3-70b-versatile',
+            id: 'openai/gpt-oss-120b',
             name: 'Cognitive Core',
-            provider: 'Llama 3.3 70B',
-            description: 'Razonamiento lógico avanzado y conversación general.',
+            provider: 'GPT-OSS 120B',
+            description: 'Razonamiento avanzado, código y conversación general. Recomendado.',
             enabled: true
         },
         {
-            id: 'llama-3.1-8b-instant',
+            id: 'openai/gpt-oss-20b',
             name: 'Fast Engine',
-            provider: 'Llama 3.1 8B',
+            provider: 'GPT-OSS 20B',
             description: 'Velocidad ultra rápida e ideal para tareas cotidianas.',
             enabled: true
         },
         {
-            id: 'llama-3.2-11b-vision-preview',
+            id: 'gemini-flash-latest',
             name: 'Vision Scout',
-            provider: 'Llama 3.2 Vision',
+            provider: 'Gemini Flash',
             description: 'Análisis visual y procesamiento de imágenes de forma precisa.',
             enabled: true
         }
@@ -154,15 +147,17 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const storedModel = localStorage.getItem(MODEL_KEY);
         if (storedModel) {
             let mappedModel = storedModel;
-            if (mappedModel === 'qwen-2.5-coder-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'openai/gpt-oss-120b') {
-                mappedModel = 'qwen/qwen3-32b';
-            } else if (mappedModel === 'meta-llama/llama-4-scout-17b-16e-instruct') {
-                mappedModel = 'llama-3.2-11b-vision-preview';
+            if (mappedModel === 'qwen-2.5-coder-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'qwen/qwen3-32b' || mappedModel === 'llama-3.3-70b-versatile') {
+                mappedModel = 'openai/gpt-oss-120b';
+            } else if (mappedModel === 'meta-llama/llama-4-scout-17b-16e-instruct' || mappedModel === 'llama-3.2-11b-vision-preview') {
+                mappedModel = 'gemini-flash-latest';
+            } else if (mappedModel === 'llama-3.1-8b-instant') {
+                mappedModel = 'openai/gpt-oss-20b';
             }
 
             // Ensure it is one of the available models
-            const isValid = ['qwen/qwen3-32b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.2-11b-vision-preview'].includes(mappedModel);
-            const finalModel = isValid ? mappedModel : 'qwen/qwen3-32b';
+            const isValid = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gemini-flash-latest'].includes(mappedModel);
+            const finalModel = isValid ? mappedModel : 'openai/gpt-oss-120b';
             
             setSelectedModel(finalModel);
             localStorage.setItem(MODEL_KEY, finalModel);
@@ -1136,7 +1131,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     role: 'assistant',
                                     content: followUpContent,
                                     timestamp: new Date().toISOString(),
-                                    model: 'qwen/qwen3-32b'
+                                    model: 'openai/gpt-oss-120b'
                                 };
 
                                 setConversations(prev => prev.map(c =>

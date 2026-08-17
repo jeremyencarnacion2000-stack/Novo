@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         '',
         [],
         systemPrompt,
-        'qwen/qwen3-32b'
+        'openai/gpt-oss-120b'
       );
     } catch (groqError) {
       console.error('Groq API failed, trying OpenRouter:', groqError);

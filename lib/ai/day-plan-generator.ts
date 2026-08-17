@@ -160,7 +160,7 @@ ${projectLine}`
   const systemPrompt = SYSTEM_PROMPTS[lang]
   let raw: string
   try {
-    raw = (await groqAPI.generateResponse(userMessage, '', [], systemPrompt, 'qwen/qwen3-32b')).content
+    raw = (await groqAPI.generateResponse(userMessage, '', [], systemPrompt, 'openai/gpt-oss-120b')).content
   } catch (groqError) {
     console.error('[DayPlanGenerator] Groq failed, trying OpenRouter:', groqError)
     raw = (await openRouterAPI.generateResponse(userMessage, '', [], systemPrompt, 'openai/gpt-oss-20b:free')).content

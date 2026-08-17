@@ -29,15 +29,12 @@ function getAvailableModels(): ModelConfig[] {
     CHUTES: !!process.env.CHUTES_API_TOKEN,
   });
 
-  // Groq - PRIMARY MODEL. Was qwen/qwen3-32b, but that model's Groq free-tier
-  // TPM limit is only 6000 — the ACTION_PROMPT (tools + skills + cognitive
-  // context) alone tokenizes to ~7700 tokens under Qwen's tokenizer, so every
-  // action-classified message (create task, plan, schedule, etc.) failed with
-  // a 413 rate_limit_exceeded. llama-3.3-70b-versatile has a 12000 TPM limit
-  // (verified live via the x-ratelimit-limit-tokens response header) and
-  // comfortably covers the same prompt. Confirmed 2026-07-16.
+  // Groq - PRIMARY MODEL. Was qwen/qwen3-32b, then llama-3.3-70b-versatile
+  // (both decommissioned from this Groq account as of 2026-08-17 — GET
+  // /v1/models now only lists the gpt-oss family + qwen3.6). openai/gpt-oss-120b
+  // is the strongest surviving model on this account and was verified live.
   if (process.env.GROQ_API_KEY) {
-    models.push({ name: 'llama-3.3-70b', provider: 'groq', modelId: 'llama-3.3-70b-versatile', priority: 1 });
+    models.push({ name: 'gpt-oss-120b', provider: 'groq', modelId: 'openai/gpt-oss-120b', priority: 1 });
   }
 
   // Grok (xAI) — disabled 2026-07-16: xAI team account is out of credits

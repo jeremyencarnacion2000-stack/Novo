@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { groqAPI } from "@/lib/groq";
 import { logAICall } from "@/lib/ai-call-log";
 
-// Using Llama3 for insights generation as per requirements for low cost & speed
-// llama3-8b-8192 was decommissioned by Groq (404 on every call) — this
-// autonomous insight generation had been silently failing/falling back ever
-// since. llama-3.1-8b-instant is the current equivalent.
-const INSIGHT_MODEL = "llama-3.1-8b-instant";
+// Using a small, fast model for insights generation as per requirements for
+// low cost & speed. llama3-8b-8192 and llama-3.1-8b-instant were both
+// decommissioned from this Groq account (verified 2026-08-17 via GET
+// /v1/models — only the gpt-oss family + qwen3.6 remain); GPT-OSS 20B is
+// the surviving small/high-rate-limit model.
+const INSIGHT_MODEL = "openai/gpt-oss-20b";
 
 const INSIGHTS_SYSTEM_PROMPT = `
 You are Novo's Cognitive Insight Engine.

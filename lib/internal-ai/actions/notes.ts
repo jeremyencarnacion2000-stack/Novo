@@ -63,7 +63,7 @@ export const registerNoteActions = (service: IInternalAIService) => {
             }
 
             try {
-                const raw = (await groqAPI.generateResponse(content, '', [], CATEGORIZE_SYSTEM_PROMPT, 'qwen/qwen3-32b')).content;
+                const raw = (await groqAPI.generateResponse(content, '', [], CATEGORIZE_SYSTEM_PROMPT, 'openai/gpt-oss-20b')).content;
                 const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim();
                 const data = JSON.parse(cleaned);
                 if (Array.isArray(data.tags) && typeof data.color === 'string') {

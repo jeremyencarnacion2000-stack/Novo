@@ -130,7 +130,9 @@ export async function routeIntent(message: string): Promise<IntentClassification
 
     // STEP 2: Fall back to LLM classification
     try {
-        const modelId = 'llama-3.1-8b-instant';
+        // llama-3.1-8b-instant was decommissioned from this Groq account
+        // (2026-08-17); GPT-OSS 20B is the surviving small/fast model.
+        const modelId = 'openai/gpt-oss-20b';
         const response = await groqAPI.generateResponse(
             message, '', [], ROUTER_SYSTEM_PROMPT, modelId, 0.0
         );

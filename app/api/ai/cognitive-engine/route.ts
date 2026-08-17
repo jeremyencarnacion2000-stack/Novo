@@ -606,20 +606,17 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       try {
         console.log('[Cognitive API] Falling back to Groq...');
         const result = await logAICall(
-          // Was qwen/qwen3-32b, whose Groq free-tier limit is 6000 TPM — this
-          // engine's prompt (energy + tasks + calendar + biometrics + Notion)
-          // tokenizes well past that, so it 413'd on every real call and the
-          // "AI" report was always the deterministic local synthesis below,
-          // never actually AI. llama-3.3-70b-versatile has a 12000 TPM limit
-          // (verified via the x-ratelimit-limit-tokens header) and comfortably
-          // fits this prompt. Same root cause as the /api/ai/generate fix.
-          { userId: session.user.id, provider: 'groq', model: 'llama-3.3-70b-versatile', purpose: 'cognitive_reorg' },
+          // Was qwen/qwen3-32b (413 TPM issue), then llama-3.3-70b-versatile.
+          // llama-3.3-70b-versatile was decommissioned from this Groq account
+          // on 2026-08-17 (GET /v1/models only lists gpt-oss + qwen3.6), so
+          // this Groq fallback now uses openai/gpt-oss-120b, verified live.
+          { userId: session.user.id, provider: 'groq', model: 'openai/gpt-oss-120b', purpose: 'cognitive_reorg' },
           () => groqAPI.generateResponse(
             prompt,
             '',
             [],
             'You are NOVO\'s Adaptive Cognitive Engine — an elite performance intelligence system.',
-            'llama-3.3-70b-versatile'
+            'openai/gpt-oss-120b'
           )
         );
         text = result.content.trim();

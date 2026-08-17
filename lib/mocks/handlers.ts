@@ -34,7 +34,7 @@ export const handlers = [
 
     let content = 'This is a mocked response from Groq.';
 
-    if (model === 'llama-3.1-8b-instant') {
+    if (model === 'openai/gpt-oss-20b') {
       // System Agent mock
       content = JSON.stringify({
         analysis: "Mocked analysis",

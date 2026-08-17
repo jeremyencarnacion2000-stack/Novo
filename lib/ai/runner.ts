@@ -28,7 +28,7 @@ export async function runAI(message: string, history: any[] = [], userId: string
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'openai/gpt-oss-120b',
             messages: [
                 { role: 'system', content: finalPrompt },
                 ...history,
@@ -61,7 +61,7 @@ export async function runAI(message: string, history: any[] = [], userId: string
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
+                model: 'openai/gpt-oss-20b',
                 messages: [
                     { role: 'system', content: SYSTEM_AGENT_PROMPT },
                     { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}` }

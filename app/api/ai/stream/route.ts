@@ -61,17 +61,19 @@ function selectModelForIntent(
     // TWO-MODEL REPLICATION PIPELINE (flagged for special handling)
     if (hasImages && (wantsReplication || ['CODE', 'DESIGN'].includes(intentType))) {
         return {
-            model: 'qwen/qwen3-32b',              // Code gen model (Step 2)
+            model: 'openai/gpt-oss-120b',         // Code gen model (Step 2)
             prompt: REPLICATION_CODE_PROMPT,
             label: 'Design Replicator',
             isReplication: true                         // Flag for two-model pipeline
         };
     }
 
-    // Vision without code intent — general image analysis
+    // Vision without code intent — general image analysis. Groq's llama
+    // vision model was decommissioned; Gemini flash handles image_url
+    // content through its OpenAI-compatible endpoint (routed below).
     if (hasImages) {
         return {
-            model: 'llama-3.2-11b-vision-preview',
+            model: 'gemini-flash-latest',
             prompt: COGNITIVE_CORE_PROMPT,
             label: 'Vision'
         };
@@ -80,25 +82,25 @@ function selectModelForIntent(
     switch (intentType) {
         case 'CODE':
             return {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 prompt: CODE_SPECIALIST_PROMPT,
                 label: 'Code Engine'
             };
         case 'QUIZ':
             return {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 prompt: QUIZ_SPECIALIST_PROMPT,
                 label: 'Quiz Engine'
             };
         case 'DESIGN':
             return {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 prompt: DESIGN_SPECIALIST_PROMPT,
                 label: 'Design Engine'
             };
         default:
             return {
-                model: 'llama-3.3-70b-versatile',
+                model: 'openai/gpt-oss-120b',
                 prompt: COGNITIVE_CORE_PROMPT,
                 label: 'Cognitive Core'
             };
@@ -130,13 +132,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Sanitize requestedModel to prevent obsolete model names causing Groq errors.
-        // qwen-2.5-coder-32b was decommissioned by Groq; qwen/qwen3-32b is the current
-        // replacement (already used successfully elsewhere in this codebase).
+        // 2026-08-17: this Groq account's catalog shrank to the gpt-oss family +
+        // qwen3.6 (verified via GET /v1/models) — every legacy id below now 404s.
         if (requestedModel) {
-            if (requestedModel === 'qwen-2.5-coder-32b' || requestedModel === 'qwen3-32b' || requestedModel === 'openai/gpt-oss-120b') {
-                requestedModel = 'qwen/qwen3-32b';
-            } else if (requestedModel === 'meta-llama/llama-4-scout-17b-16e-instruct') {
-                requestedModel = 'llama-3.2-11b-vision-preview';
+            if (
+                requestedModel === 'qwen-2.5-coder-32b'
+                || requestedModel === 'qwen3-32b'
+                || requestedModel === 'qwen/qwen3-32b'
+                || requestedModel === 'openai/gpt-oss-120b'
+                || requestedModel === 'llama-3.3-70b-versatile'
+            ) {
+                requestedModel = 'openai/gpt-oss-120b';
+            } else if (requestedModel === 'meta-llama/llama-4-scout-17b-16e-instruct' || requestedModel === 'llama-3.2-11b-vision-preview') {
+                requestedModel = 'gemini-flash-latest';
             }
         }
 
@@ -203,17 +211,14 @@ export async function POST(request: NextRequest) {
             model = requestedModel;
 
             // Update prompt to match the explicitly chosen model
-            if (model.includes('qwen') || model.includes('coder-32b')) {
-                modelLabel = 'Qwen 2.5 Coder';
-                selectedPrompt = SYSTEM_PROMPT; // General-purpose prompt for Qwen
-            } else if (model.includes('gpt-oss')) {
-                modelLabel = 'Code Engine (Qwen 32B)';
-                selectedPrompt = CODE_SPECIALIST_PROMPT;
-            } else if (model.includes('llama-3.3')) {
-                modelLabel = 'Cognitive Core (Llama 3.3)';
+            if (model === 'gemini-flash-latest') {
+                modelLabel = 'Vision Scout (Gemini Flash)';
                 selectedPrompt = COGNITIVE_CORE_PROMPT;
-            } else if (model.includes('llama-4-scout') || model.includes('llama-3.2') || model.includes('vision')) {
-                modelLabel = 'Vision Scout (Llama 3.2)';
+            } else if (model === 'openai/gpt-oss-20b') {
+                modelLabel = 'Fast Engine (GPT-OSS 20B)';
+                selectedPrompt = SYSTEM_PROMPT;
+            } else if (model.includes('gpt-oss')) {
+                modelLabel = 'Cognitive Core (GPT-OSS 120B)';
                 selectedPrompt = COGNITIVE_CORE_PROMPT;
             } else {
                 modelLabel = model.split('/').pop() || model;
@@ -221,7 +226,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Only allow replication pipeline if user explicitly picks a code/vision model
-            if (isReplication && !model.includes('gpt-oss') && !model.includes('coder-32b') && !model.includes('llama-4-scout') && !model.includes('llama-3.2')) {
+            if (isReplication && !model.includes('gpt-oss') && model !== 'gemini-flash-latest') {
                 isReplication = false;
             }
         }
@@ -229,8 +234,8 @@ export async function POST(request: NextRequest) {
 
         // =====================================================================
         // TWO-MODEL REPLICATION PIPELINE
-        // Step 1: Llama 3.2 Vision analyzes the image visually (non-streaming)
-        // Step 2: Qwen 2.5 Coder generates code from the analysis (streaming)
+        // Step 1: Gemini Flash analyzes the image visually (non-streaming)
+        // Step 2: GPT-OSS 120B generates code from the analysis (streaming)
         // =====================================================================
         const groqKey = process.env.GROQ_API_KEY;
         const cerebrasKey = process.env.CEREBRAS_API_KEY;
@@ -251,11 +256,10 @@ export async function POST(request: NextRequest) {
                 headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' }
             });
         }
-        const apiKey = groqKey;
 
         let visualAnalysis = '';
         if (isReplication && hasImages) {
-            console.log('[Novo Brain] Step 1: Visual analysis with Llama 3.2 Vision...');
+            console.log('[Novo Brain] Step 1: Visual analysis with Gemini Flash...');
 
             // Build the vision request with image attachments
             const visionContent: any[] = [
@@ -270,34 +274,42 @@ export async function POST(request: NextRequest) {
                 }
             });
 
-            try {
-                const visionResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'llama-3.2-11b-vision-preview',
-                        messages: [
-                            { role: 'system', content: VISION_ANALYSIS_PROMPT },
-                            { role: 'user', content: visionContent }
-                        ],
-                        temperature: 0.3,
-                        max_tokens: 4096,
-                        stream: false
-                    })
-                });
+            // Groq's llama-3.2-11b-vision-preview was decommissioned (404),
+            // so vision analysis now goes through Gemini's OpenAI-compatible
+            // endpoint. If no Gemini key is configured we skip analysis and
+            // let step 2 work from the user's text alone.
+            if (geminiKey) {
+                try {
+                    const visionResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${geminiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'gemini-flash-latest',
+                            messages: [
+                                { role: 'system', content: VISION_ANALYSIS_PROMPT },
+                                { role: 'user', content: visionContent }
+                            ],
+                            temperature: 0.3,
+                            max_tokens: 4096,
+                            stream: false
+                        })
+                    });
 
-                if (visionResponse.ok) {
-                    const visionData = await visionResponse.json();
-                    visualAnalysis = visionData.choices?.[0]?.message?.content || '';
-                    console.log(`[Novo Brain] Visual analysis complete (${visualAnalysis.length} chars)`);
-                } else {
-                    console.error('[Novo Brain] Vision analysis failed');
+                    if (visionResponse.ok) {
+                        const visionData = await visionResponse.json();
+                        visualAnalysis = visionData.choices?.[0]?.message?.content || '';
+                        console.log(`[Novo Brain] Visual analysis complete (${visualAnalysis.length} chars)`);
+                    } else {
+                        console.error('[Novo Brain] Vision analysis failed');
+                    }
+                } catch {
+                    console.error('[Novo Brain] Vision analysis request failed');
                 }
-            } catch {
-                console.error('[Novo Brain] Vision analysis request failed');
+            } else {
+                console.warn('[Novo Brain] No GEMINI_API_KEY — skipping visual analysis step');
             }
         }
 
@@ -358,7 +370,23 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             return new Response(JSON.stringify({ error: 'Run cancelled' }), { status: 409 });
         }
         let groqResponse: Response;
-        if (groqKey) {
+        if (finalModel === 'gemini-flash-latest' && geminiKey) {
+            // Vision/general intent routed to Gemini directly via its
+            // OpenAI-compatible endpoint (same SSE shape as Groq).
+            groqResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${geminiKey}`
+                },
+                body: JSON.stringify({
+                    model: finalModel,
+                    messages,
+                    temperature: ['CODE', 'QUIZ', 'DESIGN'].includes(classification.type) ? 0.2 : 0.6,
+                    stream: true
+                })
+            });
+        } else if (groqKey) {
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -377,11 +405,11 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             groqResponse = new Response('GROQ_API_KEY omitted', { status: 503 });
         }
 
-        if (!groqResponse.ok && groqKey && finalModel !== 'llama-3.3-70b-versatile') {
+        if (!groqResponse.ok && groqKey && finalModel !== 'openai/gpt-oss-120b') {
             await groqResponse.text();
             console.warn('[Novo Brain] Primary model failed; retrying fallback');
 
-            finalModel = 'llama-3.3-70b-versatile';
+            finalModel = 'openai/gpt-oss-120b';
             isFallbackUsed = true;
             
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -400,10 +428,12 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             });
         }
 
-        // Final Ultimate Fallback to Llama 3.1 8B (highly stable, very high rate limit) if Qwen Coder also fails
-        if (!groqResponse.ok && groqKey && finalModel !== 'llama-3.1-8b-instant') {
-            console.warn(`[Novo Brain] Fallback model ${finalModel} also failed. Triggering Ultimate stable fallback Llama 3.1 8B...`);
-            finalModel = 'llama-3.1-8b-instant';
+        // Final ultimate fallback to GPT-OSS 20B (small, high rate limit) if
+        // the 120B tier also fails. llama-3.1-8b-instant was decommissioned
+        // from this Groq account on 2026-08-17.
+        if (!groqResponse.ok && groqKey && finalModel !== 'openai/gpt-oss-20b') {
+            console.warn(`[Novo Brain] Fallback model ${finalModel} also failed. Triggering ultimate stable fallback GPT-OSS 20B...`);
+            finalModel = 'openai/gpt-oss-20b';
             isFallbackUsed = true;
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
@@ -572,8 +602,8 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 // Gemini currently rate-limited, is effectively every response) opened
                 // with a permanent, alarming, technical note baked into the chat
                 // transcript itself, as if the assistant were apologizing.
-                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'llama-3.1-8b-instant' ? '⚡ Llama 3.1 8B (Respaldo Estable)' : '⚡ Llama 3.3 70B (Respaldo)') : modelLabel);
-                await appendActivityEvent(userId, { runId: activityRunId, phase: 'composing_response', label: 'Preparando la respuesta', toolName: finalModel.includes('llama') || finalModel.includes('qwen') ? 'groq' : undefined });
+                const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'openai/gpt-oss-20b' ? '⚡ GPT-OSS 20B (Respaldo Estable)' : '⚡ GPT-OSS 120B (Respaldo)') : modelLabel);
+                await appendActivityEvent(userId, { runId: activityRunId, phase: 'composing_response', label: 'Preparando la respuesta', toolName: finalModel.includes('gpt-oss') || finalModel.includes('llama') || finalModel.includes('qwen') ? 'groq' : undefined });
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { runId: activityRunId, model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed, sources: context.structured.sources } })}\n\n`));
 
                 try {
@@ -648,7 +678,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                                     'Authorization': `Bearer ${groqKey}`
                                 },
                                 body: JSON.stringify({
-                                    model: 'llama-3.3-70b-versatile',
+                                    model: 'openai/gpt-oss-120b',
                                     messages: [
                                         { role: 'system', content: `${SYSTEM_AGENT_PROMPT}\n\nAGENCY SAFETY: Return a proposal, never claim an action has already happened. The client will show a clear review before sensitive or multi-step changes are executed. For any mutation, describe the intended outcome in the message and return exactly one valid action object.` },
                                         { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}${twinMode ? `\n\nApproved Twin Context: ${JSON.stringify(context.structured.twinContext)}` : ''}` }

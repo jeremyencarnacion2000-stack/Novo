@@ -32,7 +32,7 @@ async function analyzeWithLLM(textLog: string, language: string) {
   const prompt = `${SYSTEM_PROMPT}\n\nWrite longTermGoal and selfDiscoveryText in ${OUTPUT_LANGUAGE[language] || 'English'}.`
   let raw: string
   try {
-    raw = (await groqAPI.generateResponse(userMessage, '', [], prompt, 'qwen/qwen3-32b')).content
+    raw = (await groqAPI.generateResponse(userMessage, '', [], prompt, 'openai/gpt-oss-120b')).content
   } catch (groqError) {
     console.error('[Onboarding Analyze] Groq failed, trying OpenRouter:', groqError)
     raw = (await openRouterAPI.generateResponse(userMessage, '', [], prompt, 'openai/gpt-oss-20b:free')).content

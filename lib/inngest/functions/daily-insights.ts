@@ -5,10 +5,12 @@ import { logAICall } from "@/lib/ai-call-log";
 import { syncAllPlugins } from "@/lib/plugins/plugin-orchestrator";
 import { runAmbientTwinForUser } from "@/lib/cognitive/ambient-twin-runtime";
 
-// llama3-8b-8192 was decommissioned by Groq (404 on every call) — this
-// autonomous daily-insight generation had been silently failing/falling back
-// ever since. llama-3.1-8b-instant is the current equivalent.
-const DAILY_INSIGHT_MODEL = "llama-3.1-8b-instant";
+// llama3-8b-8192 and its successor llama-3.1-8b-instant were both
+// decommissioned from this Groq account (verified 2026-08-17 via GET
+// /v1/models — only the gpt-oss family + qwen3.6 remain), so this
+// autonomous daily-insight generation was silently failing. GPT-OSS 20B
+// is the small, high-rate-limit survivor that fits this one-sentence job.
+const DAILY_INSIGHT_MODEL = "openai/gpt-oss-20b";
 
 const DAILY_PROMPT = `
 You are the Novo Day Wrap-up Engine.
