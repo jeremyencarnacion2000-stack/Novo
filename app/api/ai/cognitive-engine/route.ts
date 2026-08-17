@@ -582,8 +582,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
             try {
               geminiResult = await model.generateContent(prompt);
             } catch (e) {
-              console.warn('[Cognitive API] gemini-flash-latest failed, trying gemini-2.0-flash:', e);
-              modelName = 'gemini-2.0-flash';
+              console.warn('[Cognitive API] gemini-flash-latest failed, trying gemini-3.5-flash:', e);
+              modelName = 'gemini-3.5-flash';
               model = genAI.getGenerativeModel({ model: modelName });
               geminiResult = await model.generateContent(prompt);
             }
