@@ -14,7 +14,7 @@ export interface ActiveSignal {
   changeType: string;
   description: string;
   createdAt: Date;
-  platform: 'notion' | 'todoist' | 'calendar' | 'gmail' | 'books';
+  platform: 'notion' | 'todoist' | 'calendar' | 'gmail' | 'books' | 'device';
 }
 
 const PLATFORM_PREFIX_PRIORITY: { prefix: string; platform: ActiveSignal['platform'] }[] = [
@@ -23,6 +23,7 @@ const PLATFORM_PREFIX_PRIORITY: { prefix: string; platform: ActiveSignal['platfo
   { prefix: 'calendar_', platform: 'calendar' },
   { prefix: 'gmail_', platform: 'gmail' },
   { prefix: 'books_', platform: 'books' },
+  { prefix: 'device_', platform: 'device' },
 ];
 
 export async function getActiveSignal(userId: string): Promise<ActiveSignal | null> {

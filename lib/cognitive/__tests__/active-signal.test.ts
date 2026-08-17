@@ -82,4 +82,20 @@ describe('getActiveSignal', () => {
     const result = await getActiveSignal('user-1');
     expect(result).toBeNull();
   });
+
+  it('ranks a device signal below every other platform when they coexist today', async () => {
+    (prisma.twinEvolutionLog.findFirst as jest.Mock).mockImplementation(({ where }: any) => {
+      if (where.changeType.startsWith === 'device_') {
+        return Promise.resolve({
+          id: 'd1', changeType: 'device_long_session',
+          description: 'Tuviste una sesión de más de 2 horas seguidas en Novo', createdAt: new Date(),
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const result = await getActiveSignal('user-1');
+    expect(result?.platform).toBe('device');
+    expect(result?.id).toBe('d1');
+  });
 });
