@@ -17,3 +17,10 @@ node_modules
 .gstack/
 *.tsbuildinfo
 .env*
+
+# Never commit logs, probes or pulled env snapshots
+*.log
+.codex-*
+cap_sync_log.txt
+tmp/
+.vercel-tmp/
