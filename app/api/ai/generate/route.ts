@@ -13,7 +13,7 @@ import { pickResultMessage } from '@/lib/ai/executor';
 
 interface ModelConfig {
   name: string;
-  provider: 'groq' | 'grok' | 'chutes' | 'dashscope' | 'openrouter' | 'cerebras';
+  provider: 'groq' | 'grok' | 'chutes' | 'dashscope' | 'openrouter';
   modelId: string;
   priority: number;
 }
@@ -47,13 +47,9 @@ function getAvailableModels(): ModelConfig[] {
     models.push({ name: 'grok-2', provider: 'grok', modelId: 'grok-2-1212', priority: 2 });
   }
 
-  // Cerebras — added 2026-07-17 to take over Grok's old priority-2 slot.
-  // Independent quota pool from Groq, OpenAI-compatible, fast inference.
-  // Verified live against GET /v1/models 2026-07-17 — this account's
-  // available models are gemma-4-31b, zai-glm-4.7, gpt-oss-120b only.
-  if (process.env.CEREBRAS_API_KEY) {
-    models.push({ name: 'cerebras-gpt-oss-120b', provider: 'cerebras', modelId: 'gpt-oss-120b', priority: 2 });
-  }
+  // Cerebras — removed 2026-08-17: it was only a trial account and its
+  // production key is now invalid (401). Rescue chain is Groq → Gemini →
+  // OpenRouter.
 
   // DashScope — disabled 2026-07-16: DASHSCOPE_API_KEY returns 401 "Invalid
   // API-key provided". Needs a fresh key from the Alibaba Cloud console
@@ -171,11 +167,6 @@ async function callModel(
     case 'chutes': {
       const { chutesAPI } = await import('@/lib/chutes');
       return await chutesAPI.generateResponse(message, '', history, systemPrompt, config.modelId);
-    }
-
-    case 'cerebras': {
-      const { cerebrasAPI } = await import('@/lib/cerebras');
-      return await cerebrasAPI.generateResponse(message, '', history, systemPrompt, config.modelId);
     }
 
     default:

@@ -238,10 +238,9 @@ export async function POST(request: NextRequest) {
         // Step 2: GPT-OSS 120B generates code from the analysis (streaming)
         // =====================================================================
         const groqKey = process.env.GROQ_API_KEY;
-        const cerebrasKey = process.env.CEREBRAS_API_KEY;
         const geminiKey = process.env.GEMINI_API_KEY;
         const openRouterKey = process.env.OPENROUTER_API_KEY;
-        const hasAnyKey = Boolean(groqKey || cerebrasKey || geminiKey || openRouterKey);
+        const hasAnyKey = Boolean(groqKey || geminiKey || openRouterKey);
 
         if (!hasAnyKey) {
             await finishActivityRun(userId, activityRunId, 'failed', { errorCode: 'provider_not_configured', errorMessage: 'No hay un proveedor AI configurado.' });
@@ -451,51 +450,17 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             });
         }
 
-        // Cerebras Rescue: independent quota pool from Groq, and Cerebras's
-        // OpenAI-compatible endpoint means the same SSE streaming path below
-        // works unchanged. Placed before the Gemini rescue below because the
-        // Gemini rescue is currently dead in this project (free-tier quota
-        // structurally capped at 0 — needs Google Cloud billing enabled to
-        // ever succeed; see [[project-visual-audit-round2]] /
-        // [[project-landing-redesign-references]] context), so Cerebras is
-        // the tier that actually has a chance of rescuing the request before
-        // falling through to the paid OpenRouter tier.
-        if (!groqResponse.ok) {
-            const cerebrasKey = process.env.CEREBRAS_API_KEY;
-            if (cerebrasKey) {
-                console.warn('[Novo Brain] Groq exhausted. Activating Cerebras rescue...');
-                // Verified live against GET /v1/models 2026-07-17 — this
-                // account only has gemma-4-31b / zai-glm-4.7 / gpt-oss-120b.
-                finalModel = 'gpt-oss-120b';
-                isFallbackUsed = true;
-                modelLabel = 'Cerebras (Rescate)';
-
-                groqResponse = await fetch('https://api.cerebras.ai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${cerebrasKey}`
-                    },
-                    body: JSON.stringify({
-                        model: finalModel,
-                        messages,
-                        temperature: 0.6,
-                        stream: true
-                    })
-                });
-            }
-        }
-
         // Gemini Direct Rescue: Groq's free tier shares one account-level daily
         // quota across ALL its models, so once it's exhausted every Groq fallback
         // above fails together. Gemini (Google AI) is a fully independent quota
         // pool with a far more generous free tier (15 RPM / 1500 RPD), reached
         // here via Google's OpenAI-compatible endpoint so the exact same SSE
-        // streaming path below works unchanged.
+        // streaming path below works unchanged. (Cerebras was a middle rescue
+        // tier until 2026-08-17 — removed because it was only a trial account.)
         if (!groqResponse.ok) {
             const geminiKey = process.env.GEMINI_API_KEY;
             if (geminiKey) {
-                console.warn('[Novo Brain] Groq and Cerebras exhausted. Activating Gemini direct rescue...');
+                console.warn('[Novo Brain] Groq exhausted. Activating Gemini direct rescue...');
                 finalModel = 'gemini-flash-latest';
                 isFallbackUsed = true;
                 modelLabel = 'Gemini (Rescate)';
