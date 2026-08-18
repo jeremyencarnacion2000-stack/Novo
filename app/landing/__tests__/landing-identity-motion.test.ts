@@ -91,4 +91,12 @@ describe('landing identity and motion', () => {
     expect(source).toContain('richOpacity')
     expect(source).toContain('progress: MotionValue<number>')
   })
+
+  it('pins the hero and reveals the headline word-by-word as the user scrolls', () => {
+    const source = landingSource()
+
+    expect(source).toContain('function HeroSection')
+    expect(source).toContain('const HERO_HEADLINE')
+    expect(source).toContain('function HeroWord')
+  })
 })

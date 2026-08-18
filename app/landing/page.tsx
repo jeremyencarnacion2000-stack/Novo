@@ -336,14 +336,64 @@ function ProductWindow({ progress }: { progress: MotionValue<number> }) {
   )
 }
 
+const HERO_HEADLINE = 'Es contexto compartido.'
+
+function HeroWord({ word, index, count, progress }: { word: string; index: number; count: number; progress: MotionValue<number> }) {
+  const start = index / count
+  const end = start + 1 / count
+  const opacity = useTransform(progress, [start, end], [0.12, 1])
+  const blur = useTransform(progress, [start, end], [6, 0])
+  const filter = useMotionTemplate`blur(${blur}px)`
+
+  return (
+    <motion.span style={{ opacity, filter }} className="inline-block">
+      {word}{' '}
+    </motion.span>
+  )
+}
+
+function HeroSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDivElement | null> }) {
+  const pinRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
+  const { scrollYProgress } = useScroll({ target: pinRef, container: scrollContainer, offset: ['start start', 'end end'] })
+  const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 28, mass: 0.5 })
+  const words = HERO_HEADLINE.split(' ')
+
+  return (
+    <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
+      <section
+        className={`relative isolate overflow-hidden px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'min-h-[calc(100dvh-68px)] pb-16 pt-12 lg:flex lg:items-center lg:py-16' : 'sticky top-0 flex min-h-dvh items-center py-16'}`}
+      >
+        <div className="pointer-events-none absolute -left-24 top-[8%] -z-10 size-[34rem] rounded-full bg-[#225D3A]/18 blur-[150px]" />
+        <div className="pointer-events-none absolute right-[5%] top-[20%] -z-10 size-[28rem] rounded-full bg-[#ADEBC1]/[0.045] blur-[130px]" />
+        <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[.88fr_1.12fr] lg:gap-14 xl:gap-20">
+          <motion.div className="relative z-10 max-w-2xl">
+            <motion.p initial={false} className="landing-enter landing-enter-lead max-w-xl text-base leading-relaxed text-[#ADEBC1] sm:text-lg">La próxima interfaz para la IA no es otro chat.</motion.p>
+            <motion.h1 initial={false} className="landing-enter landing-enter-title mt-5 max-w-2xl text-[clamp(3.5rem,5.7vw,6.25rem)] font-medium leading-[0.9] tracking-[-0.075em]" style={DARK_HEADING_STYLE}>
+              {reduceMotion
+                ? HERO_HEADLINE
+                : words.map((word, index) => (
+                    <HeroWord key={`${word}-${index}`} word={word} index={index} count={words.length} progress={progress} />
+                  ))}
+            </motion.h1>
+            <motion.p initial={false} className="landing-enter landing-enter-body mt-7 max-w-lg text-lg leading-relaxed text-white/60">Novo construye un Twin que aprende de lo que haces y adapta cada siguiente decisión.</motion.p>
+            <motion.div initial={false} className="landing-enter landing-enter-actions mt-9 flex flex-wrap items-center gap-4">
+              <LandingTransitionLink href="/auth/signup?callbackUrl=%2Fonboarding" className="group inline-flex h-12 items-center rounded-full bg-[#ADEBC1] px-6 text-sm font-semibold text-[#06100B] shadow-[0_16px_50px_rgba(173,235,193,0.14)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#CBF5D8] active:scale-[0.98]">
+                Crear mi Twin <ArrowRight className="ml-2 size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+              </LandingTransitionLink>
+              <a href="#sistema" className="group inline-flex h-12 items-center gap-2 px-2 text-sm font-medium text-white/70 transition-colors hover:text-white">Ver cómo aprende <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" /></a>
+            </motion.div>
+          </motion.div>
+          <div><LandingTwinField /></div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function LandingPageContent() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const reduceMotion = useReducedMotion()
-  const { scrollYProgress } = useScroll({ container: scrollRef })
-  const heroProgress = useTransform(scrollYProgress, [0, 0.16], [0, 1])
-  const heroCopyY = useTransform(heroProgress, [0, 1], [0, -34])
-  const heroGraphY = useTransform(heroProgress, [0, 1], [0, 28])
-  const heroGraphScale = useTransform(heroProgress, [0, 1], [1, 0.975])
 
   return (
     <div ref={scrollRef} className="landing-ambient h-dvh overflow-x-hidden overflow-y-auto bg-[#06100B] text-[#F4F0E8] [scrollbar-width:none]" style={{ '--primary': '#ADEBC1', '--background': '#06100B', '--foreground': '#F4F0E8' } as CSSProperties}>
@@ -364,24 +414,7 @@ function LandingPageContent() {
           <LandingNav />
 
           <main id="contenido">
-            <section className="relative isolate min-h-[calc(100dvh-68px)] overflow-hidden px-6 pb-16 pt-12 sm:px-10 lg:flex lg:items-center lg:px-16 lg:py-16">
-              <div className="pointer-events-none absolute -left-24 top-[8%] -z-10 size-[34rem] rounded-full bg-[#225D3A]/18 blur-[150px]" />
-              <div className="pointer-events-none absolute right-[5%] top-[20%] -z-10 size-[28rem] rounded-full bg-[#ADEBC1]/[0.045] blur-[130px]" />
-              <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[.88fr_1.12fr] lg:gap-14 xl:gap-20">
-                <motion.div className="relative z-10 max-w-2xl" style={reduceMotion ? undefined : { y: heroCopyY }}>
-                  <motion.p initial={false} className="landing-enter landing-enter-lead max-w-xl text-base leading-relaxed text-[#ADEBC1] sm:text-lg">La próxima interfaz para la IA no es otro chat.</motion.p>
-                  <motion.h1 initial={false} className="landing-enter landing-enter-title mt-5 max-w-2xl text-[clamp(3.5rem,5.7vw,6.25rem)] font-medium leading-[0.9] tracking-[-0.075em]" style={DARK_HEADING_STYLE}>Es contexto compartido.</motion.h1>
-                  <motion.p initial={false} className="landing-enter landing-enter-body mt-7 max-w-lg text-lg leading-relaxed text-white/60">Novo construye un Twin que aprende de lo que haces y adapta cada siguiente decisión.</motion.p>
-                  <motion.div initial={false} className="landing-enter landing-enter-actions mt-9 flex flex-wrap items-center gap-4">
-                    <LandingTransitionLink href="/auth/signup?callbackUrl=%2Fonboarding" className="group inline-flex h-12 items-center rounded-full bg-[#ADEBC1] px-6 text-sm font-semibold text-[#06100B] shadow-[0_16px_50px_rgba(173,235,193,0.14)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#CBF5D8] active:scale-[0.98]">
-                      Crear mi Twin <ArrowRight className="ml-2 size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                    </LandingTransitionLink>
-                    <a href="#sistema" className="group inline-flex h-12 items-center gap-2 px-2 text-sm font-medium text-white/70 transition-colors hover:text-white">Ver cómo aprende <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" /></a>
-                  </motion.div>
-                </motion.div>
-                <motion.div style={reduceMotion ? undefined : { y: heroGraphY, scale: heroGraphScale }}><LandingTwinField /></motion.div>
-              </div>
-            </section>
+            <HeroSection scrollContainer={scrollRef} />
 
             <section className="border-y border-white/[0.07] bg-[#08120D] px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
               <motion.div initial={reduceMotion ? false : { opacity: 0.7, x: 24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.35 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.72, ease: PREMIUM_EASE }} className="mx-auto max-w-7xl lg:pl-[28%]">
