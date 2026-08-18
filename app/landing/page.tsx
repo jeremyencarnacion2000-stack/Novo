@@ -17,11 +17,13 @@ import {
   useScroll,
   useSpring,
   useTransform,
+  type MotionValue,
 } from 'framer-motion'
 import { ArrowRight, Check, Compass, Eye, Radar } from 'lucide-react'
 import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 import { PageTransitionProvider, usePageTransition } from '@/components/landing/page-transition-overlay'
 import currentProductCapture from '../../docs/release/evidence/current-cognitive-product-desktop.png'
+import previewProductCapture from '../../docs/release/evidence/final-cognitive-preview-desktop.png'
 
 const PREMIUM_EASE = [0.4, 0, 0.2, 1] as const
 const DARK_HEADING_STYLE = { color: '#F4F0E8' } as const
@@ -255,6 +257,34 @@ function CognitiveSequence({ scrollContainer }: { scrollContainer: RefObject<HTM
   )
 }
 
+function ProductSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDivElement | null> }) {
+  const pinRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
+  const { scrollYProgress } = useScroll({ target: pinRef, container: scrollContainer, offset: ['start start', 'end end'] })
+  const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 28, mass: 0.5 })
+
+  return (
+    <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
+      <section
+        id="producto"
+        className={`relative overflow-hidden border-y border-white/[0.07] bg-[#08120D] px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'py-24 lg:py-32' : 'sticky top-0 flex min-h-dvh items-center py-16'}`}
+      >
+        <div className="pointer-events-none absolute -right-40 top-1/4 size-[36rem] rounded-full bg-[#ADEBC1]/[0.055] blur-[160px]" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[.78fr_1.22fr] lg:gap-20">
+          <motion.div initial={reduceMotion ? false : { opacity: 0.65, x: -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.35 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.72, ease: PREMIUM_EASE }}>
+            <h2 className="max-w-lg text-[clamp(2.7rem,4.8vw,5rem)] font-medium leading-[0.94] tracking-[-0.065em]" style={DARK_HEADING_STYLE}>Puedes ver qué sabe. Y por qué lo sabe.</h2>
+            <p className="mt-7 max-w-md text-lg leading-relaxed text-white/56">El Centro Cognitivo convierte memoria, patrones y evidencia en un mapa que puedes explorar, corregir y hacer crecer.</p>
+            <div className="mt-8 grid gap-3 text-sm text-white/68">
+              {['Nodos con procedencia visible', 'Relaciones que explican cada recomendación', 'Aprendizajes que cambian con resultados reales'].map((item) => <div key={item} className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full border border-[#ADEBC1]/18 text-[#ADEBC1]"><Check className="size-3.5" /></span>{item}</div>)}
+            </div>
+          </motion.div>
+          <ProductWindow progress={progress} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function ContextMask({ scrollContainer }: { scrollContainer: RefObject<HTMLDivElement | null> }) {
   const maskRef = useRef<HTMLDivElement>(null)
   const reduceMotion = useReducedMotion()
@@ -280,8 +310,10 @@ function ContextMask({ scrollContainer }: { scrollContainer: RefObject<HTMLDivEl
   )
 }
 
-function ProductWindow() {
+function ProductWindow({ progress }: { progress: MotionValue<number> }) {
   const reduceMotion = useReducedMotion()
+  const richOpacity = useTransform(progress, [0.2, 0.7], [0, 1])
+
   return (
     <motion.figure
       initial={false}
@@ -293,7 +325,12 @@ function ProductWindow() {
       <div className="flex h-10 items-center gap-1.5 border-b border-white/[0.07] px-4" aria-hidden="true">
         <span className="size-1.5 rounded-full bg-white/22" /><span className="size-1.5 rounded-full bg-white/22" /><span className="size-1.5 rounded-full bg-white/22" />
       </div>
-      <Image src={currentProductCapture} alt="Centro Cognitivo real de Novo con el cerebro navegable del Twin" className="h-auto w-full" sizes="(max-width: 1024px) 92vw, 58vw" />
+      <div className="relative">
+        <Image src={previewProductCapture} alt="" aria-hidden="true" className="h-auto w-full" sizes="(max-width: 1024px) 92vw, 58vw" />
+        <motion.div className="absolute inset-0" style={{ opacity: reduceMotion ? 1 : richOpacity }}>
+          <Image src={currentProductCapture} alt="Centro Cognitivo real de Novo con el cerebro navegable del Twin" className="h-auto w-full" sizes="(max-width: 1024px) 92vw, 58vw" />
+        </motion.div>
+      </div>
       <figcaption className="flex flex-col gap-1 border-t border-white/[0.07] px-5 py-4 text-xs text-white/48 sm:flex-row sm:items-center sm:justify-between"><span>Centro Cognitivo</span><span>Contexto, evidencia y siguiente acción</span></figcaption>
     </motion.figure>
   )
@@ -357,19 +394,7 @@ function LandingPageContent() {
 
             <CognitiveSequence scrollContainer={scrollRef} />
 
-            <section id="producto" className="relative overflow-hidden border-y border-white/[0.07] bg-[#08120D] px-6 py-24 sm:px-10 lg:px-16 lg:py-32">
-              <div className="pointer-events-none absolute -right-40 top-1/4 size-[36rem] rounded-full bg-[#ADEBC1]/[0.055] blur-[160px]" />
-              <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[.78fr_1.22fr] lg:gap-20">
-                <motion.div initial={reduceMotion ? false : { opacity: 0.65, x: -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.35 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.72, ease: PREMIUM_EASE }}>
-                  <h2 className="max-w-lg text-[clamp(2.7rem,4.8vw,5rem)] font-medium leading-[0.94] tracking-[-0.065em]" style={DARK_HEADING_STYLE}>Puedes ver qué sabe. Y por qué lo sabe.</h2>
-                  <p className="mt-7 max-w-md text-lg leading-relaxed text-white/56">El Centro Cognitivo convierte memoria, patrones y evidencia en un mapa que puedes explorar, corregir y hacer crecer.</p>
-                  <div className="mt-8 grid gap-3 text-sm text-white/68">
-                    {['Nodos con procedencia visible', 'Relaciones que explican cada recomendación', 'Aprendizajes que cambian con resultados reales'].map((item) => <div key={item} className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full border border-[#ADEBC1]/18 text-[#ADEBC1]"><Check className="size-3.5" /></span>{item}</div>)}
-                  </div>
-                </motion.div>
-                <ProductWindow />
-              </div>
-            </section>
+            <ProductSection scrollContainer={scrollRef} />
 
             <section className="px-6 py-24 sm:px-10 lg:px-16 lg:py-32">
               <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-24">

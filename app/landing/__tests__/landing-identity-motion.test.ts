@@ -82,4 +82,13 @@ describe('landing identity and motion', () => {
     expect(source).toContain('landing-enter landing-enter-title')
     expect(source).toContain('landing-enter landing-enter-actions')
   })
+
+  it('crossfades between the sparse and rich product states as the section pins on scroll', () => {
+    const source = landingSource()
+
+    expect(source).toContain('final-cognitive-preview-desktop.png')
+    expect(source).toContain('function ProductSection')
+    expect(source).toContain('richOpacity')
+    expect(source).toContain('progress: MotionValue<number>')
+  })
 })
