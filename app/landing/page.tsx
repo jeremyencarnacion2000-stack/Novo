@@ -267,7 +267,7 @@ function ProductSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDi
     <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
       <section
         id="producto"
-        className={`relative overflow-hidden border-y border-white/[0.07] bg-[#08120D] px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'py-24 lg:py-32' : 'sticky top-0 flex min-h-dvh items-center py-16'}`}
+        className={`relative overflow-hidden border-y border-white/[0.07] bg-[#08120D] px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'py-24 lg:py-32' : 'sticky top-0 flex min-h-dvh items-start pt-20 pb-6 lg:items-center lg:py-16'}`}
       >
         <div className="pointer-events-none absolute -right-40 top-1/4 size-[36rem] rounded-full bg-[#ADEBC1]/[0.055] blur-[160px]" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[.78fr_1.22fr] lg:gap-20">
@@ -346,7 +346,7 @@ function HeroWord({ word, index, count, progress }: { word: string; index: numbe
   const filter = useMotionTemplate`blur(${blur}px)`
 
   return (
-    <motion.span style={{ opacity, filter }} className="inline-block">
+    <motion.span style={{ opacity, filter }}>
       {word}{' '}
     </motion.span>
   )
@@ -398,7 +398,7 @@ function LandingPageContent() {
   return (
     <div ref={scrollRef} className="landing-ambient h-dvh overflow-x-hidden overflow-y-auto bg-[#06100B] text-[#F4F0E8] [scrollbar-width:none]" style={{ '--primary': '#ADEBC1', '--background': '#06100B', '--foreground': '#F4F0E8' } as CSSProperties}>
       <SmoothScrollProvider scrollRef={scrollRef}>
-        <div className="min-h-full overflow-x-hidden">
+        <div className="min-h-full">
           <style jsx global>{`
             @keyframes novo-breathe { 0%, 100% { opacity: .54; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.08); } }
             @keyframes novo-enter { from { opacity: .62; transform: translate3d(0, 16px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
