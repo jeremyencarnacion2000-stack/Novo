@@ -26,6 +26,7 @@ import currentProductCapture from '../../docs/release/evidence/current-cognitive
 import previewProductCapture from '../../docs/release/evidence/final-cognitive-preview-desktop.png'
 
 const PREMIUM_EASE = [0.4, 0, 0.2, 1] as const
+const PIN_SPRING = { stiffness: 100, damping: 28, mass: 0.5 } as const
 const DARK_HEADING_STYLE = { color: '#F4F0E8' } as const
 
 const TWIN_NODES = [
@@ -214,7 +215,7 @@ function CognitiveSequence({ scrollContainer }: { scrollContainer: RefObject<HTM
   const sectionRef = useRef<HTMLElement>(null)
   const reduceMotion = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: sectionRef, container: scrollContainer, offset: ['start 78%', 'end 35%'] })
-  const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 28, mass: 0.5 })
+  const progress = useSpring(scrollYProgress, PIN_SPRING)
   const lineScale = useTransform(progress, [0, 1], [0.08, 1])
   const orbit = useTransform(progress, [0, 1], [-10, 18])
   const variants = {
@@ -261,7 +262,7 @@ function ProductSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDi
   const pinRef = useRef<HTMLDivElement>(null)
   const reduceMotion = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: pinRef, container: scrollContainer, offset: ['start start', 'end end'] })
-  const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 28, mass: 0.5 })
+  const progress = useSpring(scrollYProgress, PIN_SPRING)
 
   return (
     <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
@@ -339,14 +340,15 @@ function ProductWindow({ progress }: { progress: MotionValue<number> }) {
 const HERO_HEADLINE = 'Es contexto compartido.'
 
 function HeroWord({ word, index, count, progress }: { word: string; index: number; count: number; progress: MotionValue<number> }) {
-  const start = index / count
-  const end = start + 1 / count
-  const opacity = useTransform(progress, [start, end], [0.12, 1])
-  const blur = useTransform(progress, [start, end], [6, 0])
+  const reduceMotion = useReducedMotion()
+  const start = 0.1 + (index / count) * 0.55
+  const end = start + 0.55 / count
+  const opacity = useTransform(progress, [start, end], [0.4, 1])
+  const blur = useTransform(progress, [start, end], [3, 0])
   const filter = useMotionTemplate`blur(${blur}px)`
 
   return (
-    <motion.span style={{ opacity, filter }}>
+    <motion.span style={reduceMotion ? undefined : { opacity, filter }}>
       {word}{' '}
     </motion.span>
   )
@@ -356,13 +358,13 @@ function HeroSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDivEl
   const pinRef = useRef<HTMLDivElement>(null)
   const reduceMotion = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: pinRef, container: scrollContainer, offset: ['start start', 'end end'] })
-  const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 28, mass: 0.5 })
+  const progress = useSpring(scrollYProgress, PIN_SPRING)
   const words = HERO_HEADLINE.split(' ')
 
   return (
     <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
       <section
-        className={`relative isolate overflow-hidden px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'min-h-[calc(100dvh-68px)] pb-16 pt-12 lg:flex lg:items-center lg:py-16' : 'sticky top-0 flex min-h-dvh items-center py-16'}`}
+        className={`relative isolate overflow-hidden px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'min-h-[calc(100dvh-68px)] pb-16 pt-12 lg:flex lg:items-center lg:py-16' : 'sticky top-0 flex min-h-dvh items-start pt-20 pb-6 lg:items-center lg:py-16'}`}
       >
         <div className="pointer-events-none absolute -left-24 top-[8%] -z-10 size-[34rem] rounded-full bg-[#225D3A]/18 blur-[150px]" />
         <div className="pointer-events-none absolute right-[5%] top-[20%] -z-10 size-[28rem] rounded-full bg-[#ADEBC1]/[0.045] blur-[130px]" />
@@ -370,11 +372,9 @@ function HeroSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDivEl
           <motion.div className="relative z-10 max-w-2xl">
             <motion.p initial={false} className="landing-enter landing-enter-lead max-w-xl text-base leading-relaxed text-[#ADEBC1] sm:text-lg">La próxima interfaz para la IA no es otro chat.</motion.p>
             <motion.h1 initial={false} className="landing-enter landing-enter-title mt-5 max-w-2xl text-[clamp(3.5rem,5.7vw,6.25rem)] font-medium leading-[0.9] tracking-[-0.075em]" style={DARK_HEADING_STYLE}>
-              {reduceMotion
-                ? HERO_HEADLINE
-                : words.map((word, index) => (
-                    <HeroWord key={`${word}-${index}`} word={word} index={index} count={words.length} progress={progress} />
-                  ))}
+              {words.map((word, index) => (
+                <HeroWord key={`${word}-${index}`} word={word} index={index} count={words.length} progress={progress} />
+              ))}
             </motion.h1>
             <motion.p initial={false} className="landing-enter landing-enter-body mt-7 max-w-lg text-lg leading-relaxed text-white/60">Novo construye un Twin que aprende de lo que haces y adapta cada siguiente decisión.</motion.p>
             <motion.div initial={false} className="landing-enter landing-enter-actions mt-9 flex flex-wrap items-center gap-4">
