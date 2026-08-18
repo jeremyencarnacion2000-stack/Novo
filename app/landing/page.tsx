@@ -362,7 +362,7 @@ function HeroSection({ scrollContainer }: { scrollContainer: RefObject<HTMLDivEl
   const words = HERO_HEADLINE.split(' ')
 
   return (
-    <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[200dvh]'}>
+    <div ref={pinRef} className={reduceMotion ? '' : 'relative h-[150dvh]'}>
       <section
         className={`relative isolate overflow-hidden px-6 sm:px-10 lg:px-16 ${reduceMotion ? 'min-h-[calc(100dvh-68px)] pb-16 pt-12 lg:flex lg:items-center lg:py-16' : 'sticky top-0 flex min-h-dvh items-start pt-20 pb-6 lg:items-center lg:py-16'}`}
       >
