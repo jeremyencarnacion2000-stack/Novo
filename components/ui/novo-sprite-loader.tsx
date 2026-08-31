@@ -4,11 +4,13 @@ import { cn } from '@/lib/utils'
 
 interface NovoSpriteLoaderProps {
   className?: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   label?: string
+  variant?: 'build' | 'thinking' | 'listening' | 'resolved'
 }
 
 const sizeClasses = {
+  xs: 'size-12',
   sm: 'size-16',
   md: 'size-24',
   lg: 'size-32 sm:size-36',
@@ -18,6 +20,7 @@ export function NovoSpriteLoader({
   className,
   size = 'md',
   label,
+  variant = 'build',
 }: NovoSpriteLoaderProps) {
   return (
     <div
@@ -27,6 +30,7 @@ export function NovoSpriteLoader({
     >
       <span
         aria-hidden
+        data-variant={variant}
         className={cn('novo-sprite-loader shrink-0', sizeClasses[size])}
       >
         <span className="novo-sprite-sheet" />

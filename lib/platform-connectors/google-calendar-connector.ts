@@ -25,7 +25,7 @@ export const googleCalendarConnector: PlatformConnector = {
       const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-      const events = await calendarService.listEvents(dayStart.toISOString(), 50, dayEnd.toISOString());
+      const events = await calendarService.listEventsForUser(userId, dayStart.toISOString(), 50, dayEnd.toISOString());
       const signal = computeCalendarSignal(events as any, now);
 
       const twinRecord = await prisma.cognitiveTwinRecord.findUnique({ where: { userId } });

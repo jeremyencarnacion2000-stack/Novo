@@ -4,6 +4,8 @@ import { ArrowRight, BookOpen, Check, ChevronRight, ExternalLink, LockKeyhole, S
 const sections = [
   { id: 'overview', label: 'Visión general' },
   { id: 'connect', label: 'Conectar un cliente' },
+  { id: 'sources', label: 'Fuentes del Twin' },
+  { id: 'devices', label: 'Computadora y dispositivos' },
   { id: 'permissions', label: 'Permisos y alcance' },
   { id: 'mcp', label: 'Usar MCP' },
   { id: 'security', label: 'Seguridad y revocación' },
@@ -60,6 +62,21 @@ export default function DocsPage() {
             <h2 className="text-2xl font-bold tracking-tight">Conectar un cliente</h2>
             <p className="mt-4 leading-7 text-[#68736b]">Las plataformas compatibles usan OAuth 2.1 con PKCE. El flujo siempre ocurre en una página independiente de Novo para que puedas revisar la cuenta, el destino y los permisos antes de aceptar.</p>
             <ol className="mt-6 space-y-3">{['El cliente inicia la conexión y abre la página de autorización de Novo.', 'Si no tienes sesión, Novo te lleva al login y vuelve a la solicitud original.', 'Revisa los permisos y pulsa Autorizar conexión.', 'Novo confirma el acceso y devuelve el navegador al callback del cliente.'].map((step, index) => <li key={step} className="flex gap-3 text-sm leading-6 text-[#68736b]"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#dff8e8] text-xs font-bold text-[#208f54]">{index + 1}</span>{step}</li>)}</ol>
+          </section>
+
+          <section id="sources" className="scroll-mt-28 border-t border-[#d9e1d9] py-14">
+            <h2 className="text-2xl font-bold tracking-tight">Fuentes del Twin</h2>
+            <p className="mt-4 leading-7 text-[#68736b]">Cada conexión aporta una señal concreta, no una copia de tu vida digital. Gmail aporta presión de bandeja y solo consulta encabezados cuando preguntas por correo; Calendar, Todoist y Notion aportan compromisos; Slack y GitHub aportan actividad agregada y ventanas de trabajo.</p>
+            <p className="mt-4 leading-7 text-[#68736b]">El ciclo es activo: una sincronización acotada actualiza el ledger, las señales de menos de 24 horas se consideran frescas y el planificador las usa junto con tus objetivos, tareas, estado y correcciones anteriores. Cuando una fuente está obsoleta, revocada o requiere autorización, Novo la excluye y continúa con el contexto que sí puede verificar.</p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">{['Hechos agregados', 'Evidencia fresca', 'Recomendación adaptable'].map((item) => <div key={item} className="rounded-2xl border border-[#d9e1d9] bg-white/75 p-4 text-sm font-semibold text-[#24342a]">{item}</div>)}</div>
+            <Link href="/docs/integrations" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#208f54] hover:underline">Ver guía completa de integraciones <ArrowRight className="size-3.5" /></Link>
+          </section>
+
+          <section id="devices" className="scroll-mt-28 border-t border-[#d9e1d9] py-14">
+            <h2 className="text-2xl font-bold tracking-tight">Computadora y dispositivos</h2>
+            <p className="mt-4 leading-7 text-[#68736b]">Hoy Novo aprende de tu presencia dentro de la app sin instalar nada: solo registra sesiones en las que la pestaña está visible y la ventana enfocada. Guarda inicio y fin, descarta sesiones breves y nunca captura pantalla, teclas, micrófono, archivos ni otras pestañas.</p>
+            <ol className="mt-6 space-y-3">{['Inicia sesión en Novo y mantén abierta la app mientras trabajas.', 'Al cambiar de pestaña, Novo espera dos minutos antes de cerrar la sesión para evitar cortes accidentales.', 'Al terminar, el evento se envía de forma autenticada y el Twin puede detectar sesiones largas y ajustar su contexto.', 'Para contexto del sistema operativo, usa el futuro companion de escritorio: se emparejará con un código de un solo uso y permisos por capacidad, nunca por acceso total.'].map((step, index) => <li key={step} className="flex gap-3 text-sm leading-6 text-[#68736b]"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#dff8e8] text-xs font-bold text-[#208f54]">{index + 1}</span>{step}</li>)}</ol>
+            <div className="mt-6 rounded-2xl border border-[#bfe8cd] bg-[#effbf3] p-4 text-sm leading-6 text-[#365a43]">Puedes pausar el aprendizaje ambiental desde Ajustes. La futura conexión nativa seguirá el mismo control: elegir capacidades, revisar retención y revocar el dispositivo cuando quieras.</div>
           </section>
 
           <section id="permissions" className="scroll-mt-28 border-t border-[#d9e1d9] py-14">

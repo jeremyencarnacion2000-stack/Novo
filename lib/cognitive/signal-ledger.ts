@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export type NovoSignalInput = {
   source: 'checkin' | 'goal' | 'task' | 'calendar' | 'outcome'
+    | 'gmail' | 'notion' | 'todoist' | 'slack' | 'github'
   sourceRef?: string | null
   signalType: string
   label: string

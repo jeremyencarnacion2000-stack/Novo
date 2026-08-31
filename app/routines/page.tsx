@@ -14,17 +14,25 @@ import { useToast } from '@/hooks/use-toast'
 import { RoutineStatsCard } from '@/components/routines/routine-stats'
 import { safeViewTransition } from '@/hooks/use-view-transition'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
+import { useCognitiveEngine } from '@/lib/cognitive-context'
+import { useTranslation } from '@/lib/i18n'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
   const { mutate: globalMutate } = useSWRConfig()
   const { toast } = useToast()
+  const { bioState } = useCognitiveEngine()
+  const { language } = useTranslation()
+  const isReducedCapacity = bioState.phase === 'SYNAPTIC_FATIGUE' || bioState.phase === 'REDUCED_CAPACITY_MODE'
+  const copy = language === 'es'
+    ? { title: 'Tus rutinas', description: 'Pequeños hábitos que ayudan a Novo a cuidar tu día.', import: 'Importar rutina', add: 'Añadir rutina', simplify: 'Mostrando solo lo esencial mientras recuperas energía.' }
+    : { title: 'Your routines', description: 'Small habits that help Novo take care of your day.', import: 'Import routine', add: 'Add routine', simplify: 'Showing only the essentials while you recover your energy.' }
 
   useEffect(() => {
     if (error) {
       toast({
-        title: 'Error fetching routines',
-        description: 'Could not fetch routines. Please try again later.',
+            title: language === 'es' ? 'No pudimos cargar tus rutinas' : 'We could not load your routines',
+            description: language === 'es' ? 'Inténtalo de nuevo en unos instantes.' : 'Please try again in a moment.',
         variant: 'destructive',
       })
     }
@@ -276,33 +284,32 @@ export default function RoutinesPage() {
       <ScrollReveal>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
-            Routines
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">{copy.title}</h1>
           <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            Manage your daily routines and habits
+            {copy.description}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button
+          {!isReducedCapacity && <Button
             onClick={() => setImportDialogOpen(true)}
             data-flip-from="btn-import-routine"
             variant="outline"
             className="w-full sm:w-auto"
           >
             <Upload data-shared-item="icon" className="h-4 w-4 mr-2" />
-            <span data-shared-item="text">Import</span>
-          </Button>
+            <span data-shared-item="text">{copy.import}</span>
+          </Button>}
           <Button
             onClick={() => setDialogOpen(true)}
             data-flip-from="btn-new-routine"
             className="w-full sm:w-auto"
           >
             <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
-            <span data-shared-item="text">New Routine</span>
+            <span data-shared-item="text">{copy.add}</span>
           </Button>
         </div>
       </div>
+      {isReducedCapacity && <p className="text-xs text-muted-foreground" role="status">{copy.simplify}</p>}
       </ScrollReveal>
 
       {/* Stats Section */}

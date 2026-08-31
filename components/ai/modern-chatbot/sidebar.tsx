@@ -74,7 +74,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
 
     return (
         <div
-            className={`relative h-full bg-background border-border transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : 'w-full md:w-72 lg:w-80'
+            className={`relative h-full bg-background border-border transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : embedded ? 'w-full' : 'w-full md:w-72 lg:w-80'
                 }`}
         >
             {/* Header — the embedded drawer supplies its own title/close button */}

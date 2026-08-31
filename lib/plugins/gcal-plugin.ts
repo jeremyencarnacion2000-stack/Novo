@@ -8,6 +8,8 @@
 import { prisma } from '@/lib/prisma';
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin';
 import { google } from 'googleapis';
+import { getGoogleAuthClientForUser } from '@/lib/google';
+import { upsertNovoSignals } from '@/lib/cognitive/signal-ledger';
 
 interface CalEvent {
   id: string;
@@ -33,25 +35,9 @@ function toMinutes(dateStr: string): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-export async function syncGCalPlugin(userId: string): Promise<GCalSyncResult> {
+export async function syncGCalPlugin(userId: string, options: { signal?: AbortSignal } = {}): Promise<GCalSyncResult> {
   try {
-    const account = await prisma.account.findFirst({
-      where: { userId, provider: 'google' },
-      select: { access_token: true, refresh_token: true },
-    });
-
-    if (!account?.access_token) {
-      return { eventsRead: 0, meetingsToday: 0, freeBlocksFound: 0, cognitiveLoadEstimate: 0, signalsEmitted: 0, error: 'not_connected' };
-    }
-
-    const oauth2 = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-    );
-    oauth2.setCredentials({
-      access_token: account.access_token,
-      refresh_token: account.refresh_token ?? undefined,
-    });
+    const oauth2 = await getGoogleAuthClientForUser(userId, ['calendar']);
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
@@ -66,7 +52,7 @@ export async function syncGCalPlugin(userId: string): Promise<GCalSyncResult> {
       singleEvents: true,
       orderBy: 'startTime',
       maxResults: 50,
-    });
+    }, { signal: options.signal });
 
     const events: CalEvent[] = (data.items ?? []).filter(
       (e: any) => e.status !== 'cancelled' && (e.start?.dateTime || e.start?.date),
@@ -133,53 +119,40 @@ export async function syncGCalPlugin(userId: string): Promise<GCalSyncResult> {
       ? `${String(Math.floor((peakBlockStart + maxBlockMinutes) / 60)).padStart(2, '0')}:${String((peakBlockStart + maxBlockMinutes) % 60).padStart(2, '0')}`
       : undefined;
 
-    let signalsEmitted = 0;
-
     // Update Twin with calendar-derived metrics
-    const twin = await prisma.cognitiveTwinRecord.findUnique({ where: { userId } });
-    if (twin) {
-      const metrics = (twin.metrics as any) ?? {};
-      const energyCurve = (twin.energyCurve as any) ?? {};
+    const twin = await getOrCreateTwin(userId);
+    const metrics = (twin.metrics as Record<string, unknown> | null) ?? {};
+    const energyCurve = (twin.energyCurve as any) ?? {};
 
-      await prisma.cognitiveTwinRecord.update({
-        where: { userId },
-        data: {
-          metrics: {
-            ...metrics,
-            currentCognitiveLoad: Math.max(metrics.currentCognitiveLoad ?? 0, cognitiveLoadEstimate),
-            meetingsToday: meetings.length,
-            totalMeetingMinutesToday: totalMeetingMinutes,
-          },
-          energyCurve: peakFocusStart ? {
+    await prisma.cognitiveTwinRecord.update({
+      where: { userId },
+      data: {
+        metrics: {
+          ...metrics,
+          currentCognitiveLoad: Math.max(Number(metrics.currentCognitiveLoad ?? 0), cognitiveLoadEstimate),
+          gcalCognitiveLoadEstimate: cognitiveLoadEstimate,
+          meetingsToday: meetings.length,
+          totalMeetingMinutesToday: totalMeetingMinutes,
+        },
+        ...(peakFocusStart ? {
+          energyCurve: {
             ...energyCurve,
             peakFocusStart,
             peakFocusEnd: peakFocusEnd ?? energyCurve.peakFocusEnd,
-            gcalDerivedAt: new Date().toISOString(),
-          } : energyCurve,
-        },
-      });
-    }
-
-    // Emit overload signal if meetings > 4 or load > 75%
-    if (meetings.length > 4 || cognitiveLoadEstimate > 75) {
-      const twinRecord = twin ?? await getOrCreateTwin(userId);
-      await prisma.behavioralSignal.create({
-        data: {
-          userId,
-          twinId: twinRecord.id,
-          signal: 'task_deferred',
-          occurredAt: new Date(),
-          metadata: {
-            source: 'google_calendar',
-            type: 'meeting_overload',
-            meetingsToday: meetings.length,
-            totalMeetingMinutes,
-            cognitiveLoadEstimate,
+            gcalDerivedAt: now.toISOString(),
           },
-        },
-      });
-      signalsEmitted++;
-    }
+        } : {}),
+      },
+    });
+
+    await upsertNovoSignals(userId, [{
+      source: 'calendar',
+      sourceRef: 'primary:today',
+      signalType: 'calendar_load_observed',
+      label: `Calendar observed: ${meetings.length} meetings, ${totalMeetingMinutes} minutes, ${cognitiveLoadEstimate}% estimated load`,
+      observedAt: now,
+      reliability: 'direct',
+    }]);
 
     return {
       eventsRead: events.length,
@@ -188,10 +161,10 @@ export async function syncGCalPlugin(userId: string): Promise<GCalSyncResult> {
       peakFocusStart,
       peakFocusEnd,
       cognitiveLoadEstimate,
-      signalsEmitted,
+      signalsEmitted: 1,
     };
-  } catch (err) {
-    console.error('[GCalPlugin] Error:', err);
-    return { eventsRead: 0, meetingsToday: 0, freeBlocksFound: 0, cognitiveLoadEstimate: 0, signalsEmitted: 0, error: String(err) };
+  } catch {
+    console.error('[GCalPlugin] Provider read failed');
+    return { eventsRead: 0, meetingsToday: 0, freeBlocksFound: 0, cognitiveLoadEstimate: 0, signalsEmitted: 0, error: 'unavailable' };
   }
 }

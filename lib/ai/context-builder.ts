@@ -7,6 +7,10 @@ import { startOfDay, endOfDay } from 'date-fns';
 import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
 import { buildTwinContextSummary, type TwinContextSummary } from '@/lib/cognitive/twin-context';
 import { getContextSource, NOVO_CONTEXT_SOURCE, type ContextSource } from '@/lib/ai/source-attribution';
+import { getGmailContextForUser, type GmailContext } from '@/lib/ai/gmail-context';
+import { providerSignalFreshness, type ProviderSignalFreshness } from '@/lib/cognitive/provider-signal-freshness';
+
+const BLOCKED_PROVIDER_STATES = new Set(['disconnected', 'revoked', 'reauth_required', 'error']);
 
 export interface CognitiveContext {
     system: {
@@ -44,6 +48,22 @@ export interface CognitiveContext {
     currentPlan?: { id: string; recommendation?: { id: string; taskId: string | null; title: string; status: string } } | null;
     recentOutcomes?: { id: string; type: string; taskId: string | null; createdAt: string }[];
     activePlugins?: string[];
+    /** Connection health is metadata only; it never includes tokens. */
+    providerHealth?: {
+        provider: string;
+        status: string;
+        lastSuccessfulSyncAt: string | null;
+    }[];
+    mailbox?: GmailContext | null;
+    /** Recent, privacy-safe provider summaries from the durable signal ledger. */
+    externalSignals?: {
+        source: string;
+        signalType: string;
+        label: string;
+        observedAt: string;
+        reliability: string;
+        freshness: ProviderSignalFreshness;
+    }[];
     sources: ContextSource[];
 }
 
@@ -52,11 +72,12 @@ export interface UserContext {
     structured: CognitiveContext;
 }
 
-export async function buildUserContext(userId: string, options?: { twinMode?: boolean }): Promise<UserContext> {
+export async function buildUserContext(userId: string, options?: { twinMode?: boolean; includeGmail?: boolean }): Promise<UserContext> {
     try {
         const now = new Date();
         const start = startOfDay(now);
         const end = endOfDay(now);
+        const signalHorizon = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
         const [
             settings,
@@ -73,7 +94,10 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             checklistItems,
             integrationAccounts,
             currentPlan,
-            recentOutcomes
+            recentOutcomes,
+            mailbox,
+            externalSignalRows,
+            signalSourcePreferences,
         ] = await Promise.all([
             prisma.userSettings.findUnique({ where: { userId } }),
             prisma.userCognitiveSnapshot.findUnique({ where: { userId } }),
@@ -118,13 +142,40 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             }),
             prisma.integrationAccount.findMany({
                 where: { userId },
-                select: { provider: true, createdAt: true }
+                select: { provider: true, createdAt: true, syncStatus: true, lastSuccessfulSyncAt: true }
             }),
             prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: { where: { status: { in: ['proposed', 'accepted', 'modified', 'started'] } }, orderBy: { priority: 'desc' }, take: 1 } } }),
-            prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } })
+            prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } }),
+            options?.includeGmail ? getGmailContextForUser(userId) : Promise.resolve(null),
+            prisma.novoSignalLedger.findMany({
+                where: {
+                    userId,
+                    excludedAt: null,
+                    observedAt: { gte: signalHorizon },
+                    source: { in: ['gmail', 'notion', 'todoist', 'slack', 'github', 'calendar'] },
+                },
+                orderBy: { observedAt: 'desc' },
+                take: 20,
+                select: { source: true, signalType: true, label: true, observedAt: true, reliability: true },
+            }),
+            prisma.novoSignalSourcePreference.findMany({
+                where: { userId, excludedAt: { not: null } },
+                select: { source: true },
+            }),
         ]);
 
         const twinContext = options?.twinMode ? await buildTwinContextSummary(userId) : null;
+        const excludedSignalSources = new Set(signalSourcePreferences.map((item) => item.source));
+        const externalSignals = externalSignalRows
+            .filter((item) => !excludedSignalSources.has(item.source))
+            .map((item) => ({
+                source: item.source,
+                signalType: item.signalType,
+                label: item.label,
+                observedAt: item.observedAt.toISOString(),
+                reliability: item.reliability,
+                freshness: providerSignalFreshness(item.observedAt, now),
+            }));
 
         const combinedTasks = [
             ...tasksList,
@@ -150,6 +201,8 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
         checklistItems.forEach((item) => addSource(item.source));
         todayEvents.forEach((event: any) => addSource(event.source));
         addSource((activeSignal as any)?.metadata?.source);
+        if (mailbox?.status === 'available') addSource('gmail');
+        externalSignals.forEach((signal) => addSource(signal.source));
 
         const structuredContext: CognitiveContext = {
             system: {
@@ -187,7 +240,26 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             twinContext,
             currentPlan: currentPlan ? { id: currentPlan.id, recommendation: currentPlan.actions[0] ? { id: currentPlan.actions[0].id, taskId: currentPlan.actions[0].taskId, title: currentPlan.actions[0].title, status: currentPlan.actions[0].status } : undefined } : null,
             recentOutcomes: recentOutcomes.map((outcome) => ({ id: outcome.id, type: outcome.type, taskId: outcome.recommendedAction?.taskId ?? null, createdAt: outcome.createdAt.toISOString() })),
-            activePlugins: (integrationAccounts || []).map(a => a.provider),
+            activePlugins: [...new Set([
+                ...(integrationAccounts || [])
+                    .filter((account) => !BLOCKED_PROVIDER_STATES.has(String(account.syncStatus ?? '').toLowerCase()))
+                    .map((account) => account.provider),
+                ...(mailbox?.status === 'available' ? ['gmail'] : []),
+            ])],
+            providerHealth: [
+                ...(integrationAccounts || []).map((account) => ({
+                    provider: account.provider,
+                    status: String(account.syncStatus ?? 'connected'),
+                    lastSuccessfulSyncAt: account.lastSuccessfulSyncAt?.toISOString() ?? null,
+                })),
+                ...(mailbox ? [{
+                    provider: 'gmail',
+                    status: mailbox.status,
+                    lastSuccessfulSyncAt: mailbox.status === 'available' ? now.toISOString() : null,
+                }] : []),
+            ],
+            mailbox,
+            externalSignals,
             sources: Array.from(sourceById.values()),
         };
 
@@ -213,6 +285,9 @@ export async function buildUserContext(userId: string, options?: { twinMode?: bo
             twinContext: null,
             currentPlan: null,
             recentOutcomes: [],
+            providerHealth: [],
+            mailbox: null,
+            externalSignals: [],
             sources: [NOVO_CONTEXT_SOURCE],
         };
 

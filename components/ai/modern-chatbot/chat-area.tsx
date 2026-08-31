@@ -106,6 +106,7 @@ export function ChatArea() {
                             intent={streamingMessage?.intent ?? null}
                             fallback={!!streamingMessage?.fallback}
                             agentMode={twinMode}
+                            showCompanion={!streamingMessage?.activityRunId}
                         /></div>
                     )}
                     <div ref={messagesEndRef} />

@@ -10,8 +10,9 @@
 import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { gmailService } from '@/lib/google';
+import { findGoogleAccountForScopes } from '@/lib/google-account';
+import { isGmailReauthorizationError } from '@/lib/ai/gmail-context';
 
 // ── GET — Check Connection / Scope Status ────────────────────────────────────
 
@@ -21,12 +22,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['gmail.readonly']);
 
     if (!googleAccount) {
         return NextResponse.json({
@@ -36,13 +32,7 @@ export async function GET() {
         });
     }
 
-    const scopes = googleAccount.scope || '';
-    const hasGmailScope = scopes.includes('gmail');
-
-    return NextResponse.json({
-        connected: true,
-        hasScope: hasGmailScope,
-    });
+    return NextResponse.json({ connected: true, hasScope: true });
 }
 
 // ── POST — List Unread ───────────────────────────────────────────────────────
@@ -53,25 +43,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['gmail.readonly']);
 
     if (!googleAccount) {
         return NextResponse.json({ error: 'Google account not connected' }, { status: 400 });
-    }
-
-    const scopes = googleAccount.scope || '';
-    const hasGmailScope = scopes.includes('gmail');
-
-    if (!hasGmailScope) {
-        return NextResponse.json({
-            error: 'Insufficient permission. Gmail access not granted.',
-            code: 'MISSING_GMAIL_SCOPE',
-        }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -80,13 +55,20 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const emails = await gmailService.listUnread(10);
+        const emails = await gmailService.listUnreadForUser(session.user.id, 10);
         return NextResponse.json({ success: true, emails });
-    } catch (err: any) {
-        console.error('[Gmail] List unread failed:', err);
+    } catch (error) {
+        console.error('[Gmail] List unread failed.');
+        if (isGmailReauthorizationError(error)) {
+            return NextResponse.json({
+                error: 'Gmail authorization needs renewal',
+                code: 'GMAIL_REAUTH_REQUIRED',
+                reconnectPath: '/connectors?reconnect=gmail',
+            }, { status: 409 });
+        }
         return NextResponse.json({
             error: 'Failed to fetch unread emails',
-            detail: err.message || err,
+            code: 'GMAIL_UNAVAILABLE',
         }, { status: 502 });
     }
 }

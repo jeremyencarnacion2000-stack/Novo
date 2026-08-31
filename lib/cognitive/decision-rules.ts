@@ -26,6 +26,7 @@ export type OperationalContext = {
   adaptationPolicy?: {
     proposals: Array<{ id: string; behavior?: string; reason?: string }>
   }
+  providerSignals?: Array<{ source: string; label: string }>
 }
 
 export type DeterministicRecommendation = {
@@ -117,11 +118,13 @@ export function choosePrimaryRecommendation(context: OperationalContext): Determ
   }
 
   const dueInDays = daysUntil(selected.task.dueDate, context.now)
+  const providerFacts = (context.providerSignals ?? []).slice(0, 3).map((signal) => signal.label)
   const facts = [
     `This task is marked ${selected.task.priority} priority.`,
     ...(dueInDays === null ? [] : [dueInDays < 0 ? 'Its deadline has passed.' : dueInDays === 0 ? 'It is due today.' : `It is due in ${dueInDays} day${dueInDays === 1 ? '' : 's'}.`]),
     `You reported ${context.availableMinutes} minutes available and focus ${context.focus}/5.`,
     ...(inactivityPriority(selected.task.updatedAt, context.now) > 0 ? [`This task has had no recorded update for ${Math.floor((context.now.getTime() - selected.task.updatedAt.getTime()) / 86_400_000)} days.`] : []),
+    ...providerFacts,
   ]
   const feedbackSuggestsSmallStep = context.recentlyTooLargeTitles?.includes(selected.task.title) || context.recentlyTimeLimitedTitles?.includes(selected.task.title)
   const defaultEstimate = context.energy <= 2 || context.focus <= 2 || feedbackSuggestsSmallStep || reduceContextSwitching ? 15 : 45
@@ -139,6 +142,7 @@ export function choosePrimaryRecommendation(context: OperationalContext): Determ
       ...(respectPeakWindow ? ['Adaptation applied: prefer the Twin\'s observed peak window when scheduling the next block.'] : []),
       ...(useValidatedPattern ? ['A previously validated Twin pattern was used as context, not as a fact.'] : []),
       ...(keepConfirmationBoundary ? ['The recommendation remains subject to user confirmation before action.'] : []),
+      ...(providerFacts.length ? ['Fresh authorized integration context was included as evidence for this recommendation.'] : []),
   ]
 
   return {

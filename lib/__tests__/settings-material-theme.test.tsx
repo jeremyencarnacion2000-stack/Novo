@@ -47,6 +47,7 @@ describe('SettingsProvider material theme refresh', () => {
       )
       expect(document.documentElement.style.getPropertyValue('--glass-blur-px')).toBe('3px')
       expect(document.documentElement.style.getPropertyValue('--card-blur-px')).toBe('6px')
+      expect(document.documentElement.style.getPropertyValue('--novo-focus-refractive-opacity')).toBe('0.27')
     })
 
     act(() => systemThemeListener?.({ matches: true } as MediaQueryListEvent))
@@ -58,5 +59,6 @@ describe('SettingsProvider material theme refresh', () => {
     expect(document.documentElement.style.getPropertyValue('--novo-focus-background')).toBe(
       'rgba(255, 255, 255, 0.5)',
     )
+    expect(document.documentElement.style.getPropertyValue('--novo-focus-refractive-opacity')).toBe('0.27')
   })
 })

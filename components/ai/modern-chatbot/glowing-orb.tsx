@@ -33,8 +33,8 @@ const STATE_CONFIG: Record<OrbState, OrbConfig> = {
     dotSize: 1.8,
     speed: 1.1,
     pulseScale: 1.15,
-    color: 'rgba(99,179,237,0.9)',
-    glowColor: 'rgba(99,179,237,0.18)',
+    color: 'rgba(173,235,193,0.92)',
+    glowColor: 'rgba(113,216,143,0.18)',
     scatterRadius: 2.5,
   },
   thinking: {
@@ -43,8 +43,8 @@ const STATE_CONFIG: Record<OrbState, OrbConfig> = {
     dotSize: 1.6,
     speed: 2.2,
     pulseScale: 1.25,
-    color: 'rgba(167,139,250,0.9)',
-    glowColor: 'rgba(139,92,246,0.22)',
+    color: 'rgba(113,216,143,0.92)',
+    glowColor: 'rgba(173,235,193,0.2)',
     scatterRadius: 4,
   },
   speaking: {
@@ -63,8 +63,8 @@ const STATE_CONFIG: Record<OrbState, OrbConfig> = {
     dotSize: 1.5,
     speed: 3.5,
     pulseScale: 1.1,
-    color: 'rgba(251,191,36,0.85)',
-    glowColor: 'rgba(245,158,11,0.15)',
+    color: 'rgba(220,207,159,0.88)',
+    glowColor: 'rgba(220,207,159,0.15)',
     scatterRadius: 1.5,
   },
   error: {

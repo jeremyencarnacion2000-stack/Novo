@@ -46,7 +46,7 @@ describe('Twin Mode server-side gating', () => {
     });
     await POST(request as any);
 
-    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: false });
+    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: false, includeGmail: false });
   });
 
   it('passes twinMode: true through to buildUserContext for a Pro-plan user who asked for it', async () => {
@@ -59,7 +59,7 @@ describe('Twin Mode server-side gating', () => {
     });
     await POST(request as any);
 
-    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: true });
+    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: true, includeGmail: false });
   });
 
   it('includes the persisted run identifier in the no-provider fallback stream', async () => {

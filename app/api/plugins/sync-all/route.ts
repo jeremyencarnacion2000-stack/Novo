@@ -18,11 +18,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const { results, totalSignals, twinUpdated } = await syncAllPlugins(session.user.id);
-    await runAmbientTwinForUser(session.user.id, { trigger: 'sync' });
+    const ambient = await runAmbientTwinForUser(session.user.id, { trigger: 'sync' });
     return NextResponse.json({
       success: true,
       totalSignals,
       twinUpdated,
+      planning: ambient.planning,
+      recommendation: ambient.recommendation ? {
+        id: ambient.recommendation.id,
+        title: ambient.recommendation.title,
+        nextStep: ambient.recommendation.nextStep,
+        confidence: ambient.recommendation.confidence,
+      } : null,
       results: results.map((r) => ({
         provider: r.provider,
         status: r.status,
@@ -30,7 +37,7 @@ export async function POST(req: NextRequest) {
         error: r.error,
       })),
     });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'plugin_sync_failed' }, { status: 500 });
   }
 }

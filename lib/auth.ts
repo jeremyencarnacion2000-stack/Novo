@@ -7,6 +7,7 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import { rateLimit } from '@/lib/rate-limit'
+import { shouldPersistGoogleGrant } from '@/lib/google-account'
 
 /**
  * Type-Safe function with Exponential Backoff retry to refresh Google OAuth Access Token.
@@ -262,6 +263,14 @@ export const authOptions: NextAuthOptions = {
           where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
           select: { scope: true },
         })
+        // A normal Google login requests identity scopes only. Do not let that
+        // callback overwrite a connector token that was granted broader access
+        // (for example Gmail) while keeping the old broad scope in the row.
+        // Connector-specific callbacks include a non-identity scope and are
+        // still persisted below.
+        if (account.provider === 'google' && !shouldPersistGoogleGrant(existing?.scope, account.scope)) {
+          return
+        }
         // Each connector button below requests only the specific scope it
         // needs (incremental authorization - see GoogleProvider's comment),
         // so a single grant's account.scope only reflects THAT request, not

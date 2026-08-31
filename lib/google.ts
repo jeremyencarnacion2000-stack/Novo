@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { findGoogleAccountForScopes, toGoogleOAuthCredentials } from '@/lib/google-account';
 
 /**
  * Resolve a usable Google OAuth access token for a user — the session's
@@ -10,14 +11,11 @@ import { prisma } from '@/lib/prisma';
  * back to non-Google data when the user hasn't connected (or their token
  * has expired) — most users sign in with credentials, not Google.
  */
-export async function getGoogleAccessToken(userId: string, sessionToken?: string): Promise<string | null> {
+export async function getGoogleAccessToken(userId: string, sessionToken?: string, requiredScopes: string[] = []): Promise<string | null> {
     if (sessionToken) return sessionToken;
 
     try {
-        const account = await prisma.account.findFirst({
-            where: { userId, provider: 'google' },
-            select: { access_token: true, expires_at: true },
-        });
+        const account = await findGoogleAccountForScopes(userId, requiredScopes);
 
         if (!account?.access_token) return null;
         if (account.expires_at && account.expires_at < Math.floor(Date.now() / 1000) + 60) return null;
@@ -46,6 +44,38 @@ export async function getGoogleAuthClient() {
     oauth2Client.setCredentials({
         access_token: session.accessToken,
         refresh_token: session.refreshToken, // Optional, if we have it
+    });
+
+    return oauth2Client;
+}
+
+/**
+ * Server/background OAuth client. Unlike getGoogleAuthClient(), this resolves
+ * a durable Google grant owned by a Novo user and rotates refreshed tokens
+ * back into that same account record. It is safe for credentials-based users,
+ * Vercel Cron and no-browser reconciliation jobs.
+ */
+export async function getGoogleAuthClientForUser(userId: string, requiredScopes: string[] = []) {
+    const account = await findGoogleAccountForScopes(userId, requiredScopes);
+    if (!account) {
+        throw new Error('Google connection with the required permission was not found.');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+    );
+    oauth2Client.setCredentials(toGoogleOAuthCredentials(account));
+    oauth2Client.on('tokens', (tokens) => {
+        if (!tokens.access_token) return;
+        void prisma.account.update({
+            where: { id: account.id },
+            data: {
+                access_token: tokens.access_token,
+                expires_at: tokens.expiry_date ? Math.floor(tokens.expiry_date / 1000) : undefined,
+                refresh_token: tokens.refresh_token ?? account.refresh_token ?? undefined,
+            },
+        }).catch(() => undefined);
     });
 
     return oauth2Client;
@@ -89,13 +119,24 @@ export const gmailService = {
 
     listUnread: async (maxResults = 5) => {
         const auth = await getGoogleAuthClient();
+        return listUnreadWithAuth(auth, maxResults);
+    },
+
+    /** Read a user's mailbox from their persisted OAuth grant, never a browser session. */
+    listUnreadForUser: async (userId: string, maxResults = 5, signal?: AbortSignal) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        return listUnreadWithAuth(auth, maxResults, signal);
+    },
+};
+
+async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, maxResults: number, signal?: AbortSignal) {
         const gmail = google.gmail({ version: 'v1', auth });
 
         const res = await gmail.users.messages.list({
             userId: 'me',
             q: 'is:unread',
             maxResults,
-        });
+        }, { signal });
 
         if (!res.data.messages) return [];
 
@@ -103,7 +144,7 @@ export const gmailService = {
             const details = await gmail.users.messages.get({
                 userId: 'me',
                 id: msg.id!,
-            });
+            }, { signal });
 
             const headers = details.data.payload?.headers;
             const subject = headers?.find(h => h.name === 'Subject')?.value || '(No Subject)';
@@ -114,8 +155,7 @@ export const gmailService = {
         }));
 
         return emails;
-    }
-};
+}
 
 /**
  * Calendar Service
@@ -123,6 +163,26 @@ export const gmailService = {
 export const calendarService = {
     listEvents: async (timeMin = new Date().toISOString(), maxResults = 10, timeMax?: string) => {
         const auth = await getGoogleAuthClient();
+        return listCalendarEventsWithAuth(auth, timeMin, maxResults, timeMax);
+    },
+
+    listEventsForUser: async (userId: string, timeMin = new Date().toISOString(), maxResults = 10, timeMax?: string) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['calendar']);
+        return listCalendarEventsWithAuth(auth, timeMin, maxResults, timeMax);
+    },
+
+    createEvent: async (summary: string, description: string, startTime: string, endTime: string) => {
+        const auth = await getGoogleAuthClient();
+        return createCalendarEventWithAuth(auth, summary, description, startTime, endTime);
+    },
+
+    createEventForUser: async (userId: string, summary: string, description: string, startTime: string, endTime: string) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['calendar']);
+        return createCalendarEventWithAuth(auth, summary, description, startTime, endTime);
+    },
+};
+
+async function listCalendarEventsWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, timeMin: string, maxResults: number, timeMax?: string) {
         const calendar = google.calendar({ version: 'v3', auth });
 
         const res = await calendar.events.list({
@@ -135,10 +195,9 @@ export const calendarService = {
         });
 
         return res.data.items || [];
-    },
+}
 
-    createEvent: async (summary: string, description: string, startTime: string, endTime: string) => {
-        const auth = await getGoogleAuthClient();
+async function createCalendarEventWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, summary: string, description: string, startTime: string, endTime: string) {
         const calendar = google.calendar({ version: 'v3', auth });
 
         const event = {
@@ -160,8 +219,7 @@ export const calendarService = {
         });
 
         return res.data;
-    }
-};
+}
 
 /**
  * Fitness Service - DISABLED (Scope removed to reduce verification requirements)

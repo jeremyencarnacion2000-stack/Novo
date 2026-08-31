@@ -162,7 +162,7 @@ export class CalendarAggregator {
         end: Date
     ): Promise<CalendarEvent[]> {
         try {
-            const events = await calendarService.listEvents(start.toISOString(), 50, end.toISOString());
+            const events = await calendarService.listEventsForUser(userId, start.toISOString(), 50, end.toISOString());
             return events
                 .filter((e: any) => e.start?.dateTime || e.start?.date)
                 .map((e: any) => {

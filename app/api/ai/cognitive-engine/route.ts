@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { groqAPI } from '@/lib/groq';
 import { logAICall } from '@/lib/ai-call-log';
 import { calendarService, gmailService, getGoogleAccessToken } from '@/lib/google';
+import { findGoogleAccountForScopes } from '@/lib/google-account';
 import { fetchBiometricPayload } from '@/lib/google-fit';
 import { fetchDbBiometricPayload } from '@/lib/db-biometrics';
 import { computeCalendarSignal, evaluateCalendarThresholds, WAKING_HOURS_START, WAKING_HOURS_END, type CalendarSignal } from '@/lib/cognitive/calendar-signal';
@@ -172,7 +173,7 @@ export async function GET(req: NextRequest) {
     };
     try {
       const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
-      const events = await calendarService.listEvents(todayStart.toISOString(), 50, dayEndIso);
+      const events = await calendarService.listEventsForUser(userId, todayStart.toISOString(), 50, dayEndIso);
       calendarSignal = computeCalendarSignal(events as any, now);
     } catch {
       // Not connected, or the Google API call failed — no calendar signal this run.
@@ -194,7 +195,7 @@ export async function GET(req: NextRequest) {
     if (twinRecord && calendarSignal.connected) {
       try {
         const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
-        const events = await calendarService.listEvents(todayStart.toISOString(), 50, dayEndIso);
+        const events = await calendarService.listEventsForUser(userId, todayStart.toISOString(), 50, dayEndIso);
         const energyCurve = (twinRecord.energyCurve as any) || {};
         const peakStart = energyCurve.peakFocusStart || '09:00';
         const peakEnd = energyCurve.peakFocusEnd || '11:00';
@@ -238,10 +239,9 @@ export async function GET(req: NextRequest) {
     // ever granted (see lib/auth.ts's incremental-authorization comment).
     if (twinRecord) {
       try {
-        const googleAccount = await prisma.account.findFirst({ where: { userId, provider: 'google' } });
-        const hasGmailScope = !!googleAccount?.scope?.includes('gmail.readonly');
-        if (hasGmailScope) {
-          const unread = await gmailService.listUnread(50);
+        const googleAccount = await findGoogleAccountForScopes(userId, ['gmail.readonly']);
+        if (googleAccount) {
+          const unread = await gmailService.listUnreadForUser(userId, 50);
           const gmailThresholdSignals = evaluateGmailThresholds(unread.length);
           await persistNewPlatformSignals(twinRecord.id, userId, gmailThresholdSignals);
         }

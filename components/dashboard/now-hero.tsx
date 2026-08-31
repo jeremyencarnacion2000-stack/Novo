@@ -192,13 +192,15 @@ export function NowHero() {
   }
 
   useEffect(() => {
-    Promise.all([
+    let disposed = false
+    const loadWorkspaceContext = () => Promise.all([
       fetch('/api/tasks?status=todo').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/checklist').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/cognitive/active-signal').then((r) => (r.ok ? r.json() : { signal: null })),
       fetch('/api/cognitive/ambient').then((r) => (r.ok ? r.json() : { state: null })),
     ])
       .then(([tasks, checklist, activeSignalResponse, ambientResponse]: [TaskLite[], ChecklistLite[], { signal: PlatformSignalEntry | null }, { state: AmbientStateEntry | null }]) => {
+        if (disposed) return
         const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
         const now = Date.now()
         const checklistTasks: TaskLite[] = (Array.isArray(checklist) ? checklist : [])
@@ -228,7 +230,13 @@ export function NowHero() {
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false))
+      .finally(() => { if (!disposed) setLoading(false) })
+    void loadWorkspaceContext()
+    const interval = window.setInterval(() => void loadWorkspaceContext(), 15 * 60 * 1000)
+    return () => {
+      disposed = true
+      window.clearInterval(interval)
+    }
   }, [])
 
   const phaseCopy = PHASE_COPY[phase] ?? PHASE_COPY.LINEAR_EXECUTION

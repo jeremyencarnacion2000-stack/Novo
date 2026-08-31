@@ -183,6 +183,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         cardLiquidIntensity: settings.cardLiquidIntensity,
       })
 
+      // The SVG lens is a second visual layer on Liquid Cards. Keep it tied
+      // to the same card controls as the CSS backdrop so a 0 blur/opacity
+      // choice cannot leave a fixed refractive effect behind. The defaults
+      // preserve the established look (0.72 at 15% / 16px).
+      const focusRefractiveOpacity = settings.cardOpacity <= 0 || settings.cardLiquidIntensity <= 0
+        ? 0
+        : Math.min(
+          0.72,
+          0.72
+            * Math.min(1, settings.cardOpacity / defaultSettings.cardOpacity)
+            * Math.min(1, settings.cardLiquidIntensity / defaultSettings.cardLiquidIntensity),
+        )
+      const contextRefractiveOpacity = settings.glassOpacity <= 0 || settings.glassBlur <= 0
+        ? 0
+        : Math.min(
+          0.72,
+          0.72
+            * Math.min(1, settings.glassOpacity / defaultSettings.glassOpacity)
+            * Math.min(1, settings.glassBlur / defaultSettings.glassBlur),
+        )
+
       const materialVariables = {
         '--novo-canvas-background': material.canvas.background,
         '--novo-canvas-backdrop-filter': material.canvas.backdropFilter,
@@ -196,6 +217,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         '--novo-focus-backdrop-filter': material.focusSurface.backdropFilter,
         '--novo-focus-border': material.focusSurface.border,
         '--novo-focus-box-shadow': material.focusSurface.boxShadow,
+        '--novo-focus-refractive-opacity': `${focusRefractiveOpacity}`,
+        '--novo-context-refractive-opacity': `${contextRefractiveOpacity}`,
         // Settings owns the appearance of its own backdrop too. Keeping the
         // overlay values on the same root contract prevents DialogOverlay's
         // default black/blur treatment from masking Background Dimness/Blur.

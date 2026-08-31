@@ -45,6 +45,14 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: `frame-ancestors 'self' https://open.spotify.com/ https://adgen-dev.spotify.com/account/*/ad/*/details https://adgen-dev.spotify.com/preview/* https://local.spotify.net/account/*/ad/*/details https://local.spotify.net/preview/* https://app.smartly.io/*;`
           },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
         ],
       },
     ];

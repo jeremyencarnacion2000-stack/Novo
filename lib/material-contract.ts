@@ -129,28 +129,19 @@ export function resolveMaterialContract(input: MaterialContractInput): MaterialC
   const wallpaper = input.backgroundImage?.trim() ?? ''
   const hasWallpaper = wallpaper.length > 0
   const requestedDimness = alphaFromPercentage(input.backgroundDimness)
-  const canvasDimness = hasWallpaper && input.autoContrast
-    ? Math.max(requestedDimness, tokens.autoContrastDimness)
-    : requestedDimness
+  // Settings sliders are the source of truth. Auto Contrast can change the
+  // optical treatment of a surface, but must never make a 0px/0% user choice
+  // silently render as a hidden blur or dimming floor.
+  const canvasDimness = requestedDimness
   const requestedCanvasBlur = clamp(input.backgroundBlur, 0, 100)
-  const canvasBlur = hasWallpaper && input.autoContrast
-    ? Math.max(requestedCanvasBlur, 10)
-    : requestedCanvasBlur
+  const canvasBlur = requestedCanvasBlur
 
   const requestedContextAlpha = alphaFromPercentage(input.glassOpacity)
   const requestedFocusAlpha = alphaFromPercentage(input.cardOpacity)
-  const contextAlpha = hasWallpaper && input.autoContrast
-    ? Math.max(requestedContextAlpha, tokens.contextWallpaperAlpha)
-    : requestedContextAlpha
-  const focusAlpha = hasWallpaper && input.autoContrast
-    ? Math.max(requestedFocusAlpha, tokens.focusWallpaperAlpha)
-    : requestedFocusAlpha
-  const contextBlur = hasWallpaper && input.autoContrast
-    ? Math.max(clamp(input.glassBlur, 0, 100), 12)
-    : clamp(input.glassBlur, 0, 100)
-  const focusBlur = hasWallpaper && input.autoContrast
-    ? Math.max(clamp(input.cardLiquidIntensity, 0, 100), 18)
-    : clamp(input.cardLiquidIntensity, 0, 100)
+  const contextAlpha = requestedContextAlpha
+  const focusAlpha = requestedFocusAlpha
+  const contextBlur = clamp(input.glassBlur, 0, 100)
+  const focusBlur = clamp(input.cardLiquidIntensity, 0, 100)
 
   const canvasBackground = hasWallpaper
     ? `linear-gradient(${rgba([0, 0, 0], canvasDimness)}, ${rgba([0, 0, 0], canvasDimness)}), url("${escapeCssUrl(wallpaper)}")`

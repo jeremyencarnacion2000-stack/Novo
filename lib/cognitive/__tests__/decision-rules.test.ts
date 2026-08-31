@@ -100,4 +100,15 @@ describe('Novo Loop deterministic decision rules', () => {
     expect(recommendation?.inferences.join(' ')).toContain('reduce context switching')
     expect(recommendation?.inferences.join(' ')).toContain('confirmation')
   })
+
+  it('uses fresh integration context as explainable recommendation evidence', () => {
+    const recommendation = choosePrimaryRecommendation({
+      now, energy: 4, focus: 4, workload: 3, availableMinutes: 45, goal: null,
+      recentlyDismissedTitles: [], recentlyPostponedTaskIds: [],
+      providerSignals: [{ source: 'gmail', label: 'Gmail inbox observed: 24 unread messages' }],
+      tasks: [{ id: 'task', title: 'Reply to the important thread', priority: 'high', dueDate: null, updatedAt: now, status: 'todo' }],
+    })
+    expect(recommendation?.facts.join(' ')).toContain('Gmail inbox observed: 24 unread messages')
+    expect(recommendation?.inferences.join(' ')).toContain('authorized integration context')
+  })
 })

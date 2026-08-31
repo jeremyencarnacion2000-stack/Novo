@@ -50,7 +50,10 @@ const PHASE_LABEL: Record<CognitivePhase, string> = {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type HubState = 'idle' | 'capsule' | 'expanded' | 'notification';
+type HubTab = 'focus' | 'audio' | 'settings';
 type WeatherIcon = 'sun' | 'cloud-sun' | 'cloud' | 'cloud-rain' | 'zap';
+
+const HUB_TABS: readonly HubTab[] = ['focus', 'audio', 'settings'];
 
 const HUB_SHAPE: Record<HubState, { width: number; height: number; radius: number }> = {
   idle: { width: 8, height: 80, radius: 20 },
@@ -61,11 +64,31 @@ const HUB_SHAPE: Record<HubState, { width: number; height: number; radius: numbe
 
 const HUB_SPRING = {
   type: 'spring' as const,
+  // Near-critical damping gives the shell its soft, liquid morph without a
+  // visible bounce or a long microscopic tail at the end of a transition.
+  stiffness: 430,
+  damping: 40,
+  mass: 0.92,
+  restDelta: 0.25,
+  restSpeed: 0.25,
+};
+
+const HUB_CONTENT_SPRING = {
+  type: 'spring' as const,
   stiffness: 520,
-  damping: 34,
-  mass: 0.86,
-  restDelta: 0.01,
-  restSpeed: 0.01,
+  damping: 42,
+  mass: 0.7,
+  restDelta: 0.02,
+  restSpeed: 0.02,
+};
+
+const HUB_TAB_SPRING = {
+  type: 'spring' as const,
+  stiffness: 560,
+  damping: 44,
+  mass: 0.64,
+  restDelta: 0.02,
+  restSpeed: 0.02,
 };
 
 export interface TwinNotificationPayload {
@@ -663,11 +686,13 @@ function CapsuleContent({ cognitiveAlert, ambientAudioActive }: { cognitiveAlert
 function ExpandedContent({
   setHubState,
   activeTab,
-  setActiveTab,
+  onTabChange,
+  tabDirection,
 }: {
   setHubState: React.Dispatch<React.SetStateAction<HubState>>;
-  activeTab: 'focus' | 'audio' | 'settings';
-  setActiveTab: React.Dispatch<React.SetStateAction<'focus' | 'audio' | 'settings'>>;
+  activeTab: HubTab;
+  onTabChange: (tab: HubTab) => void;
+  tabDirection: 1 | -1;
 }) {
   // ── Real settings connections ──────────────────────────────────────────────
   const { settings, updateSettings } = useSettings();
@@ -731,14 +756,15 @@ function ExpandedContent({
         </div>
       )}
 
-      {/* Tab bar — startTransition keeps INP < 50ms during panel switch */}
+      {/* Tab bar — panels overlap briefly instead of waiting for an empty
+          exit frame, so tab changes read as one continuous fluid surface. */}
       <div className="grid grid-cols-3 mx-2 mb-3 rounded-[14px] bg-black/45 p-1 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(0,0,0,0.55)]">
-        {(['focus', 'audio', 'settings'] as const).map(tab => (
+        {HUB_TABS.map(tab => (
           <button
             key={tab}
             aria-pressed={activeTab === tab}
             aria-label={`Pestaña ${tab === 'focus' ? 'Foco' : tab === 'audio' ? 'Audio' : 'Ajustes'}`}
-            onClick={() => startTransition(() => setActiveTab(tab))}
+            onClick={() => onTabChange(tab)}
             className={cn(
               'py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-[10px] transition-[background,color,box-shadow,transform] duration-150 active:scale-[0.97]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
@@ -753,16 +779,17 @@ function ExpandedContent({
       </div>
 
       {/* Tab contents */}
-      <div className="flex-1 min-h-0 px-2 pb-2 overflow-hidden">
-        <AnimatePresence mode="wait">
+      <div className="relative flex-1 min-h-0 px-2 pb-2 overflow-hidden">
+        <AnimatePresence initial={false} mode="sync">
           {activeTab === 'focus' ? (
             <motion.div
               key="focus"
-              className="h-full flex flex-col gap-3"
-              initial={{ opacity: 0, x: 8 }}
+              data-hub-motion-panel
+              className="absolute inset-x-2 top-0 bottom-2 flex flex-col gap-3"
+              initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.16 }}
+              exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
+              transition={HUB_TAB_SPRING}
             >
               <div className="rounded-[20px] border border-emerald-400/15 bg-emerald-400/[0.055] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
                 <div className="flex items-center justify-between gap-3">
@@ -809,22 +836,24 @@ function ExpandedContent({
           ) : activeTab === 'audio' ? (
             <motion.div
               key="audio"
-              className="h-full"
-              initial={{ opacity: 0, x: 8 }}
+              data-hub-motion-panel
+              className="absolute inset-x-2 top-0 bottom-2"
+              initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.16 }}
+              exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
+              transition={HUB_TAB_SPRING}
             >
               <PlaylistPanel />
             </motion.div>
           ) : (
             <motion.div
               key="controls"
-              className="h-full flex flex-col gap-3"
-              initial={{ opacity: 0, x: 8 }}
+              data-hub-motion-panel
+              className="absolute inset-x-2 top-0 bottom-2 flex flex-col gap-3"
+              initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.16 }}
+              exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
+              transition={HUB_TAB_SPRING}
             >
               {/* Dimness slider — controls backgroundDimness in settings */}
               <div className="p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
@@ -889,7 +918,8 @@ const ContextHubComponent = () => {
   const { logHabit } = useCognitiveDispatch();
 
   const [hubState, setHubState] = useState<HubState>('idle');
-  const [activeTab, setActiveTab] = useState<'focus' | 'audio' | 'settings'>('focus');
+  const [activeTab, setActiveTab] = useState<HubTab>('focus');
+  const [tabDirection, setTabDirection] = useState<1 | -1>(1);
   const [isHovered, setIsHovered] = useState(false);
   const [cognitiveAlert, setCognitiveAlert] = useState(false);
   const [ambientAudioActive, setAmbientAudioActive] = useState(false);
@@ -1043,6 +1073,14 @@ const ContextHubComponent = () => {
     setHubState('expanded');
   };
 
+  const handleTabChange = (nextTab: HubTab) => {
+    if (nextTab === activeTab) return;
+    const currentIndex = HUB_TABS.indexOf(activeTab);
+    const nextIndex = HUB_TABS.indexOf(nextTab);
+    setTabDirection(nextIndex > currentIndex ? 1 : -1);
+    startTransition(() => setActiveTab(nextTab));
+  };
+
   // Event handlers
   // Event handlers — pulse hub on actions, let sileo handle the notification toast
   useEffect(() => {
@@ -1114,6 +1152,7 @@ const ContextHubComponent = () => {
     const handlePlayMusic = () => {
       expandedViaHoverRef.current = false;
       setHubState('expanded');
+      setTabDirection(1);
       setActiveTab('audio');
     };
     const handleExpandHub = () => {
@@ -1180,15 +1219,16 @@ const ContextHubComponent = () => {
         }
         title={hubState === 'idle' ? 'Novo Context Hub' : undefined}
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence initial={false} mode="sync">
           {hubState === 'idle' && (
             <motion.div
               key="idle"
+              data-hub-motion-panel
               className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={HUB_CONTENT_SPRING}
             >
               <GripVertical className="w-3 h-3 text-white/50" strokeWidth={1.5} />
             </motion.div>
@@ -1196,11 +1236,12 @@ const ContextHubComponent = () => {
           {hubState === 'capsule' && (
             <motion.div
               key="capsule"
+              data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              initial={{ opacity: 0, y: 7, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -5, scale: 0.97 }}
+              transition={HUB_CONTENT_SPRING}
             >
               <CapsuleContent cognitiveAlert={cognitiveAlert} ambientAudioActive={ambientAudioActive} />
             </motion.div>
@@ -1208,11 +1249,12 @@ const ContextHubComponent = () => {
           {hubState === 'notification' && activeNotification && (
             <motion.div
               key="notification"
+              data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0, x: 16, scale: 0.985, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: 10, scale: 0.985, filter: 'blur(5px)' }}
-              transition={{ type: 'spring', stiffness: 560, damping: 38, mass: 0.78 }}
+              initial={{ opacity: 0, x: 18, scale: 0.976 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 10, scale: 0.988 }}
+              transition={HUB_CONTENT_SPRING}
             >
               <NotificationContent
                 notification={activeNotification}
@@ -1226,16 +1268,18 @@ const ContextHubComponent = () => {
           {hubState === 'expanded' && (
             <motion.div
               key="expanded"
+              data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0, x: 18, scale: 0.992, filter: 'blur(5px)' }}
-              animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: 12, scale: 0.992, filter: 'blur(5px)' }}
-              transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.76 }}
+              initial={{ opacity: 0, x: 18, scale: 0.976 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 12, scale: 0.988 }}
+              transition={HUB_CONTENT_SPRING}
             >
               <ExpandedContent
                 setHubState={setHubState}
                 activeTab={activeTab}
-                setActiveTab={setActiveTab}
+                onTabChange={handleTabChange}
+                tabDirection={tabDirection}
               />
             </motion.div>
           )}

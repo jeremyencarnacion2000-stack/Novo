@@ -4,7 +4,7 @@ import { calendarService } from '@/lib/google';
 import { prisma } from '@/lib/prisma';
 
 jest.mock('@/lib/google', () => ({
-  calendarService: { listEvents: jest.fn() },
+  calendarService: { listEventsForUser: jest.fn() },
 }));
 
 jest.mock('@/lib/prisma', () => ({
@@ -25,7 +25,7 @@ describe('CalendarAggregator google events', () => {
   });
 
   it('maps real Google Calendar API events into CalendarEvent shape', async () => {
-    (calendarService.listEvents as jest.Mock).mockResolvedValue([
+    (calendarService.listEventsForUser as jest.Mock).mockResolvedValue([
       {
         id: 'abc123',
         summary: 'Team sync',
@@ -48,7 +48,7 @@ describe('CalendarAggregator google events', () => {
   });
 
   it('returns an empty array when Google is not connected (API call fails)', async () => {
-    (calendarService.listEvents as jest.Mock).mockRejectedValue(new Error('no token'));
+    (calendarService.listEventsForUser as jest.Mock).mockRejectedValue(new Error('no token'));
 
     const start = new Date('2026-07-13T00:00:00');
     const end = new Date('2026-07-13T23:59:59');

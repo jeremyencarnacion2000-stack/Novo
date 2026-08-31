@@ -11,6 +11,7 @@ jest.mock('@/lib/prisma', () => ({ prisma: {
   routine: { findMany: jest.fn().mockResolvedValue([]) },
   outcomeEvent: { findMany: jest.fn().mockResolvedValue([]) },
   behavioralSignal: { findMany: jest.fn().mockResolvedValue([]) },
+  novoSignalLedger: { findMany: jest.fn().mockResolvedValue([]) },
   novoSignalSourcePreference: { findMany: jest.fn().mockResolvedValue([]) },
   integrationPermission: { findMany: jest.fn().mockResolvedValue([]) },
 } }))
@@ -44,4 +45,32 @@ it('asks a targeted question when context matters but confidence is low', async 
     initiative: 'ASK_USER',
     question: expect.stringContaining('Preparar la propuesta'),
   })
+})
+
+it('includes a durable Gmail aggregate as ambient context without storing mailbox content', async () => {
+  const { prisma } = jest.requireMock('@/lib/prisma') as { prisma: Record<string, Record<string, jest.Mock>> }
+  prisma.novoSignalLedger.findMany.mockResolvedValue([{ id: 'ledger-1', source: 'gmail', signalType: 'unread_observed', label: 'Gmail inbox observed: 2 unread messages', observedAt: new Date() }])
+
+  await expect(readAmbientTwinState('user-1')).resolves.toMatchObject({
+    status: 'active',
+    sources: expect.arrayContaining(['gmail']),
+  })
+})
+
+it('does not let derived ambient bookkeeping change its own context fingerprint', async () => {
+  const { prisma } = jest.requireMock('@/lib/prisma') as { prisma: Record<string, Record<string, jest.Mock>> }
+  const gmailSignal = { id: 'gmail-1', source: 'gmail', signalType: 'unread_observed', label: '2 unread', observedAt: new Date() }
+  prisma.novoSignalLedger.findMany
+    .mockResolvedValueOnce([
+      gmailSignal,
+      { id: 'ambient-1', source: 'ambient', signalType: 'current_context_reconciled', label: 'derived', observedAt: new Date() },
+      { id: 'refresh-1', source: 'ambient_refresh', signalType: 'authorized_sources_polled', label: 'derived', observedAt: new Date() },
+    ])
+    .mockResolvedValueOnce([gmailSignal])
+
+  const first = await readAmbientTwinState('user-1')
+  const second = await readAmbientTwinState('user-1')
+
+  expect(first.contextFingerprint).toBe(second.contextFingerprint)
+  expect(first.sources).toContain('gmail')
 })

@@ -105,6 +105,9 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
    */
   autoSize?: boolean
 
+  /** Enable the heavier SVG displacement/refraction layer for focal surfaces. */
+  refractive?: boolean
+
   /** Static/fixed width overrides */
   width?: number
   /** Static/fixed height overrides */
@@ -138,6 +141,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       as,
       contrastObserver = false,
       autoSize = true,
+      refractive = false,
       width: staticWidth,
       height: staticHeight,
       className,
@@ -150,6 +154,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     const {
       ref: internalRef,
       mapUrl,
+      filterUrl,
+      useSVGFilter,
     } = useLiquidGlass({
       radius,
       depth,
@@ -160,6 +166,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       width: staticWidth,
       height: staticHeight,
       autoSize,
+      enabled: refractive,
     })
 
     const [resolvedContrast, setResolvedContrast] = React.useState<'light' | 'dark' | null>(null)
@@ -306,6 +313,9 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
 
       return {
         ...baseBg,
+        // Keep the Settings material as a standalone declaration. The SVG
+        // lens is rendered in a separate overlay below so an unsupported or
+        // temporarily invalid SVG URL can never disable the configured blur.
         '--novo-glass-backdrop-filter': `var(${materialVariable}-backdrop-filter)`,
       }
     }, [
@@ -316,6 +326,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       debug,
       mapUrl,
       material,
+      filterUrl,
+      refractive,
     ])
 
     const Component = as || 'div'
@@ -324,6 +336,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       <Component
         ref={ref}
         data-novo-glass
+        data-liquid-refractive={refractive ? (useSVGFilter ? 'svg' : 'fallback') : 'off'}
         data-elevation={elevation}
         data-contrast={resolvedContrast}
         className={cn(
@@ -337,18 +350,58 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         {/* Liquid Glass Background Layer */}
         <div aria-hidden data-glass-backdrop className="novo-glass-backdrop" style={bgStyles} />
 
-        {/* Inner edge highlight */}
+        {/* Optional refractive lens. It is deliberately separate from the
+            Settings-controlled backdrop layer: Chromium can reject a mixed
+            `url(#filter) blur(...)` declaration as a whole, which would make
+            a transparent card lose its blur. */}
+        {refractive && (
+          <div
+            aria-hidden
+            data-glass-refractive
+            data-glass-refractive-mode={useSVGFilter && filterUrl ? 'svg' : 'css'}
+            className="novo-glass-refractive"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: 'inherit',
+              pointerEvents: 'none',
+              zIndex: 0,
+              // Keep the lens subordinate to the Settings material contract.
+              // A fixed opacity made the refractive layer visually overpower
+              // the user-controlled card blur, especially on large dashboard
+              // cards where the backdrop itself is subtle.
+              '--novo-glass-refractive-opacity': `var(--novo-${material}-refractive-opacity, 0.72)`,
+              // Keep a restrained CSS optical fallback mounted when the
+              // browser cannot use an SVG filter or its finite lens budget is
+              // occupied. The configured backdrop blur remains underneath;
+              // this layer contributes only depth, an inner highlight and a
+              // gentle spectral edge instead of pretending that no material
+              // exists at all.
+              '--novo-glass-refractive-filter': filterUrl || 'none',
+            } as React.CSSProperties & {
+              '--novo-glass-refractive-opacity': string
+              '--novo-glass-refractive-filter': string
+            }}
+          />
+        )}
+
+        {/* The specular edge belongs to the same material contract as the
+            lens. This prevents a fixed white rim from surviving after the
+            user turns the card's opacity or liquid intensity down to zero. */}
         <div
           aria-hidden
+          data-glass-sheen
+          className="novo-glass-sheen"
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: 'inherit',
             pointerEvents: 'none',
-            background:
-              'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)',
             zIndex: 1,
-          }}
+            '--novo-glass-sheen-opacity': refractive
+              ? `calc(var(--novo-${material}-refractive-opacity, 0.72) * 0.46)`
+              : '0',
+          } as React.CSSProperties & { '--novo-glass-sheen-opacity': string }}
         />
 
         {/* Content — z-2 lifts above bg (z-0) and highlight (z-1) layers */}

@@ -660,20 +660,18 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
     // failure (no Google connection, expired token, API error) break event
     // creation — most users don't have Google connected at all.
     try {
-        const token = await getGoogleAccessToken(ctx.userId);
-        if (token) {
-            const googleEvent = await calendarService.createEvent(
-                title,
-                description || '',
-                event.start.toISOString(),
-                event.end.toISOString()
-            );
-            if (googleEvent?.id) {
-                await ctx.prisma.calendarEvent.update({
-                    where: { id: event.id },
-                    data: { googleEventId: googleEvent.id },
-                });
-            }
+        const googleEvent = await calendarService.createEventForUser(
+            ctx.userId,
+            title,
+            description || '',
+            event.start.toISOString(),
+            event.end.toISOString()
+        );
+        if (googleEvent?.id) {
+            await ctx.prisma.calendarEvent.update({
+                where: { id: event.id },
+                data: { googleEventId: googleEvent.id },
+            });
         }
     } catch (err) {
         console.warn('[AI Executor] Google Calendar push sync failed (non-blocking):', err);
@@ -1185,4 +1183,3 @@ registerActionHandler('COGNITIVE_PIPELINE', async (action: any, ctx) => {
         }
     };
 });
-

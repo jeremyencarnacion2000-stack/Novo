@@ -14,7 +14,16 @@ export function createTodoistAmbientPrismaPorts(provider: Pick<TodoistAmbientPor
   return {
     loadConnection: async (connectionId) => {
       const row = await prisma.integrationAccount.findFirst({
-        where: { id: connectionId, provider: 'todoist', providerAccountId: { not: null }, accessToken: { not: '' }, syncStatus: { notIn: blocked } },
+        where: {
+          id: connectionId,
+          provider: 'todoist',
+          providerAccountId: { not: null },
+          accessToken: { not: '' },
+          // OAuth rows created before durable sync status existed have NULL
+          // here. SQL `NOT IN (...)` excludes NULL, so the old query made a
+          // valid identified connection invisible to the ambient runner.
+          OR: [{ syncStatus: null }, { syncStatus: { notIn: blocked } }],
+        },
       })
       if (!row || !row.providerAccountId || blocked.includes(String(row.syncStatus ?? '').toLowerCase())) return null
       return { id: row.id, userId: row.userId, provider: row.provider, providerAccountId: row.providerAccountId, accessToken: row.accessToken, status: row.syncStatus }

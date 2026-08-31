@@ -10,6 +10,7 @@ import { CognitiveTwinProvider, useCognitiveTwin } from '@/lib/cognitive-twin-co
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 import { CognitiveRouteShell } from '@/components/cognitive/cognitive-route-shell'
 import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader'
+import { AmbientContextHeartbeat } from '@/components/ambient-context-heartbeat'
 
 function CognitiveThemeSyncer() {
   useCognitiveTheme()
@@ -45,6 +46,7 @@ function CognitiveAuthGate({ children }: { children: ReactNode }) {
 export default function CognitiveClientLayout({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
+      <AmbientContextHeartbeat />
       <SettingsProvider>
         <CognitiveProvider>
           <CognitiveTwinProvider>

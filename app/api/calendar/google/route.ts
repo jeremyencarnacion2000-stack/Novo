@@ -15,7 +15,7 @@ export async function GET(request: Request) {
         const maxResults = parseInt(searchParams.get('maxResults') || '50');
 
         try {
-            const events = await calendarService.listEvents(timeMin, maxResults);
+            const events = await calendarService.listEventsForUser(session.user.id, timeMin, maxResults);
             return NextResponse.json(events);
         } catch (calendarError: any) {
             console.error('Calendar service error:', calendarError);
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const event = await calendarService.createEvent(summary, description || '', startTime, endTime);
+        const event = await calendarService.createEventForUser(session.user.id, summary, description || '', startTime, endTime);
 
         return NextResponse.json(event);
     } catch (error) {

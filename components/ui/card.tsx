@@ -23,6 +23,7 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
       <GlassSurface
         data-slot="card"
         data-variant="liquid"
+        material="focus"
         radius={20}
         depth={8}
         blur={1}
@@ -33,6 +34,7 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
         // glass effect reads as almost invisible (see liquid-glass-aberration
         // memory: undersized aberration on large panels looks invisible).
         chromaticAberration={12}
+        refractive
         elevation="medium"
         contrastObserver
         className={cn(

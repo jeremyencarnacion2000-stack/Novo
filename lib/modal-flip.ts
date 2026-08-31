@@ -30,7 +30,12 @@ const EASE_EXIT     = 'contentExit'
 
 // Open timing — matches reference exactly
 const OPEN_DURATION          = 0.52
-const OPEN_CONTENT_AT        = 0.12   // content starts revealing at 120 ms
+// Fraction of OPEN_DURATION spent on the box's scaleX/scaleY geometry morph.
+// Content reveal (OPEN_CONTENT_AT) is timed to start right as this finishes,
+// so text is never visible while the container's non-uniform scale is still
+// changing — see the tl.to(target, ...) comment below for why that matters.
+const BOX_MORPH_FRACTION     = 0.6
+const OPEN_CONTENT_AT        = BOX_MORPH_FRACTION   // starts once the box has settled
 const OPEN_CONTENT_DURATION  = 0.44
 const OPEN_CONTENT_STAGGER   = 0.05
 const OPEN_BACKDROP_DURATION = 0.38
@@ -51,7 +56,13 @@ function isMobile() {
 }
 
 function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (typeof window === 'undefined') return false
+  const prefers = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Keep the authored container-transform visible on desktop. Desktop Novo
+  // uses the animation as spatial feedback; honour the OS preference on
+  // touch/mobile where motion sensitivity is more likely to be intentional.
+  const desktopPointer = window.innerWidth >= 1024 && window.matchMedia('(pointer: fine)').matches
+  return prefers && !desktopPointer
 }
 
 /** The single page-root element that shrinks to create depth on modal open. */
@@ -223,8 +234,14 @@ export const modalFlip = {
     const tl = gsap.timeline({
       defaults: { ease: EASE_FLUID, duration: openDuration },
       onComplete: () => {
+        // Keep the settled viewport geometry in place for the remainder of
+        // the dialog's lifetime. Clearing position/left/top/width/height
+        // here sends the panel back into its portal wrapper's normal flow
+        // after the flight has finished, which creates a second visible
+        // reposition/resize (especially for anchored dialogs). The close
+        // timeline owns cleanup once the panel is no longer visible.
         gsap.set(target, {
-          clearProps: 'position,left,top,width,height,borderRadius,overflow,zIndex,transition,transform,transformOrigin,opacity',
+          clearProps: 'borderRadius,overflow,zIndex,transition,transform,transformOrigin,opacity',
         })
         gsap.set(innerChildren, { clearProps: 'opacity,transform,filter,willChange' })
         if (overlay) gsap.set(overlay, { opacity: 1 })
@@ -267,12 +284,24 @@ export const modalFlip = {
     // resting rect. This is the web equivalent of a native container
     // transform: the user can see where the modal came from and where it will
     // return, without a layout-property jump.
+    //
+    // Duration is intentionally shorter than the full open timeline (and ends
+    // before OPEN_CONTENT_AT below) rather than inheriting `openDuration`.
+    // scaleX/scaleY here are independent (origin and target rarely share an
+    // aspect ratio), and innerChildren are DOM descendants of `target` — they
+    // inherit whatever non-uniform stretch the container is mid-animating.
+    // With the old shared full-duration tween, content became visible at 12%
+    // while the box was still actively distorting for another ~88% of the
+    // timeline, so every word visibly stretched/skewed as it faded in. Boxing
+    // the geometry morph into its own shorter window lets it settle before
+    // any content is visible enough to show the distortion.
     tl.to(target, {
       x: 0,
       y: 0,
       scaleX: 1,
       scaleY: 1,
       borderRadius: naturalRadius,
+      duration: openDuration * BOX_MORPH_FRACTION,
     }, 0)
 
     // Viewport depth effect — matches reference's appViewport scale

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { calendarService } from '@/lib/google';
+import { findGoogleAccountForScopes } from '@/lib/google-account';
 
 // ── GET — Check Connection / Scope Status ────────────────────────────────────
 
@@ -21,12 +22,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['calendar']);
 
     if (!googleAccount) {
         return NextResponse.json({
@@ -36,13 +32,7 @@ export async function GET() {
         });
     }
 
-    const scopes = googleAccount.scope || '';
-    const hasCalendarScope = scopes.includes('https://www.googleapis.com/auth/calendar') || scopes.includes('calendar');
-
-    return NextResponse.json({
-        connected: true,
-        hasScope: hasCalendarScope,
-    });
+    return NextResponse.json({ connected: true, hasScope: true });
 }
 
 // ── POST — Sync From Google ──────────────────────────────────────────────────
@@ -53,25 +43,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['calendar']);
 
     if (!googleAccount) {
         return NextResponse.json({ error: 'Google account not connected' }, { status: 400 });
-    }
-
-    const scopes = googleAccount.scope || '';
-    const hasCalendarScope = scopes.includes('https://www.googleapis.com/auth/calendar') || scopes.includes('calendar');
-
-    if (!hasCalendarScope) {
-        return NextResponse.json({
-            error: 'Insufficient permission. Google Calendar access not granted.',
-            code: 'MISSING_CALENDAR_SCOPE',
-        }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -82,7 +57,7 @@ export async function POST(req: NextRequest) {
     try {
         const timeMin = new Date();
         const timeMax = new Date(timeMin.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const googleEvents = await calendarService.listEvents(timeMin.toISOString(), 250, timeMax.toISOString());
+        const googleEvents = await calendarService.listEventsForUser(session.user.id, timeMin.toISOString(), 250, timeMax.toISOString());
 
         let created = 0;
         let updated = 0;
@@ -129,11 +104,11 @@ export async function POST(req: NextRequest) {
             created,
             updated,
         });
-    } catch (err: any) {
-        console.error('[Google Calendar Sync] Failed:', err);
+    } catch {
+        console.error('[Google Calendar Sync] Failed.');
         return NextResponse.json({
             error: 'Google Calendar sync failed',
-            detail: err.message || err,
+            code: 'GOOGLE_CALENDAR_UNAVAILABLE',
         }, { status: 502 });
     }
 }

@@ -12,7 +12,7 @@ import { authOptions } from '@/lib/auth';
 import { syncPlugin, type PluginProvider } from '@/lib/plugins/plugin-orchestrator';
 import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime';
 
-const VALID_PROVIDERS: PluginProvider[] = ['notion', 'todoist', 'slack', 'gcal', 'github'];
+const VALID_PROVIDERS: PluginProvider[] = ['notion', 'todoist', 'slack', 'gcal', 'github', 'gmail'];
 
 export async function POST(
   req: NextRequest,
@@ -33,8 +33,8 @@ export async function POST(
     const result = await syncPlugin(session.user.id, provider);
     await runAmbientTwinForUser(session.user.id, { trigger: 'sync' });
     return NextResponse.json({ success: true, result });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'plugin_sync_failed' }, { status: 500 });
   }
 }
 

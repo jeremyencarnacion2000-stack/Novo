@@ -70,6 +70,7 @@ export function PomodoroWidget() {
                     blur={1}
                     strength={35}
                     chromaticAberration={5}
+                    refractive
                     backgroundColor="transparent"
                     elevation="low"
                     aria-hidden

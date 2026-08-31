@@ -44,7 +44,12 @@ function cacheKey(p: Required<DisplacementFilterParams>): string {
 function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): string {
   if (typeof document === 'undefined') return ''
   const k = cacheKey(params)
-  if (domFilterIds.has(k)) return `url(#${domFilterIds.get(k)})`
+  const cachedId = domFilterIds.get(k)
+  // A route transition or development refresh can remove the hidden SVG host
+  // while this module cache remains alive. Never return a dead fragment URL:
+  // it silently drops the refraction layer until another resize happens.
+  if (cachedId && document.getElementById(cachedId)) return `url(#${cachedId})`
+  if (cachedId) domFilterIds.delete(k)
 
   let svgContainer = document.getElementById('_ng_svg') as SVGSVGElement | null
   if (!svgContainer) {
@@ -68,6 +73,12 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
   const half = Math.floor(Math.min(width, height) / 2)
   const safeRadius = Math.min(radius, half)
   const safeDepth = Math.max(1, Math.min(depth, half - 1))
+  // The RGB displacement shifts pixels beyond the source rectangle. Leaving
+  // the SVG filter region flush with the card edge clips that shift into a
+  // hard dark contour, especially over wallpapers. A small capped overscan
+  // keeps the lens continuous without turning each surface into a large
+  // compositor allocation.
+  const filterBleed = Math.min(48, Math.max(8, Math.ceil(Math.max(scR / 2, safeDepth * 2))))
 
   // Displacement texture as a data-URI image — the only feImage source Chromium
   // honours inside a backdrop-filter pipeline.
@@ -76,11 +87,12 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
   const filterEl = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
   filterEl.id = id
   filterEl.setAttribute('color-interpolation-filters', 'sRGB')
-  filterEl.setAttribute('x', '0')
-  filterEl.setAttribute('y', '0')
-  filterEl.setAttribute('width', String(width))
-  filterEl.setAttribute('height', String(height))
+  filterEl.setAttribute('x', String(-filterBleed))
+  filterEl.setAttribute('y', String(-filterBleed))
+  filterEl.setAttribute('width', String(width + filterBleed * 2))
+  filterEl.setAttribute('height', String(height + filterBleed * 2))
   filterEl.setAttribute('filterUnits', 'userSpaceOnUse')
+  filterEl.setAttribute('primitiveUnits', 'userSpaceOnUse')
 
   // feImage loads the displacement map; three feDisplacementMap passes (one per
   // RGB channel at slightly different scales) recombine via screen blend to
@@ -93,8 +105,8 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
     `<feColorMatrix type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="dG"/>`,
     `<feDisplacementMap in="SourceGraphic" in2="dm" scale="${scB}" xChannelSelector="R" yChannelSelector="G"/>`,
     `<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="dB"/>`,
-    `<feBlend in="dR" in2="dG" mode="screen"/>`,
-    `<feBlend in2="dB" mode="screen"/>`,
+    `<feBlend in="dR" in2="dG" mode="screen" result="rg"/>`,
+    `<feBlend in="rg" in2="dB" mode="screen"/>`,
   ].join('')
   svgContainer.appendChild(filterEl)
 
@@ -178,6 +190,8 @@ export interface UseLiquidGlassOptions {
   width?: number
   height?: number
   autoSize?: boolean
+  /** Enable the SVG displacement pipeline for this surface. */
+  enabled?: boolean
 }
 
 export interface UseLiquidGlassResult {
@@ -211,6 +225,7 @@ export function useLiquidGlass({
   width: staticWidth,
   height: staticHeight,
   autoSize = true,
+  enabled = true,
 }: UseLiquidGlassOptions): UseLiquidGlassResult {
   const ref = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({
@@ -253,9 +268,17 @@ export function useLiquidGlass({
 
   // Evaluate eligibility based on browser support, element dimensions, and performance settings
   const isEligible = useMemo(() => {
+    if (!enabled) return false
     if (!hasSVGFilterSupport) return false
-    // Don't apply heavy SVG displacement filters to small components (like buttons, small badges, tabs)
-    if (width < 120 || height < 120) return false
+    // A liquid lens needs enough *surface*, but does not need to be a square.
+    // The old 120×120 gate excluded every intentional pill in Novo: the mobile
+    // navigation rail is wide but only ~60px tall, and the expanded sidebar
+    // route is a 40px-high strip. Those are the exact controls where the
+    // product uses glass as a navigation cue. Keep circles/badges out while
+    // allowing a sufficiently wide, shallow lens.
+    const shortestSide = Math.min(width, height)
+    const longestSide = Math.max(width, height)
+    if (shortestSide < 36 || longestSide < 96 || width * height < 3456) return false
 
     // Respect showAnimations / performance settings via DOM attribute
     const reduceEffects = typeof document !== 'undefined' &&
@@ -264,7 +287,7 @@ export function useLiquidGlass({
     if (reduceEffects) return false
 
     return true
-  }, [hasSVGFilterSupport, width, height])
+  }, [enabled, hasSVGFilterSupport, width, height])
 
   // Orchestrate active SVG filters to keep browser rasterization lightweight
   useEffect(() => {
@@ -282,12 +305,17 @@ export function useLiquidGlass({
 
       if (registered) return
 
-      // Try to register as an active SVG filter
+      // Claim the local lease *before* the registry broadcasts. The registry
+      // intentionally notifies waiting surfaces synchronously; previously the
+      // same listener re-entered while `registered` was still false and could
+      // consume all five global slots by itself. On a dashboard this made later
+      // liquid surfaces look randomly flat even though Settings were correct.
+      registered = true
       const success = registerSVGFilter()
       if (success) {
-        registered = true
         setUseSVGFilter(true)
       } else {
+        registered = false
         setUseSVGFilter(false)
       }
     }

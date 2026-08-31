@@ -3,6 +3,7 @@ import { Repeat2, ArrowRight } from 'lucide-react'
 import { Routine } from '@/types/routine'
 import { RoutineCard } from './routine-card'
 import { springConfig } from '@/lib/design-tokens'
+import { useTranslation } from '@/lib/i18n'
 
 interface RoutinesListProps {
   routines: Routine[]
@@ -13,6 +14,10 @@ interface RoutinesListProps {
 }
 
 export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransitionId }: RoutinesListProps) {
+  const { language } = useTranslation()
+  const copy = language === 'es'
+    ? { emptyTitle: 'Tu día todavía no tiene rutinas', emptyDescription: 'Crea una rutina sencilla y Novo aprenderá cuándo te resulta más fácil mantenerla.', hint: 'Empieza con el botón', action: 'Añadir rutina' }
+    : { emptyTitle: 'Your day has no routines yet', emptyDescription: 'Create one simple routine and Novo will learn when it is easiest for you to keep it.', hint: 'Start with the', action: 'Add routine' }
   if (routines.length === 0) {
     return (
       <motion.div
@@ -32,11 +37,10 @@ export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransit
         {/* Narrative — Cognitive Compression: not "no routines", but "what you gain" */}
         <div className="max-w-sm space-y-2">
           <p className="text-base font-bold text-foreground/80">
-            Your consistency layer is empty
+            {copy.emptyTitle}
           </p>
           <p className="text-sm text-foreground/35 leading-relaxed">
-            Routines let Novo predict your day, balance your workload, and protect
-            your peak focus hours automatically.
+            {copy.emptyDescription}
           </p>
         </div>
 
@@ -46,7 +50,7 @@ export function RoutinesList({ routines, onEdit, onDelete, onView, activeTransit
           style={{ background: 'rgba(255,255,255,0.025)' }}
         >
           <ArrowRight className="w-3.5 h-3.5 text-primary/60" />
-          Use the <span className="text-primary/80 font-black">+ New Routine</span> button above to begin
+          {copy.hint} <span className="text-primary/80 font-black">+ {copy.action}</span>
         </div>
       </motion.div>
     )

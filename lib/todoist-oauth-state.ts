@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 
 export const INTEGRATION_OAUTH_STATE_TTL_MS = 10 * 60 * 1000
 export const TODOIST_OAUTH_STATE_TTL_MS = INTEGRATION_OAUTH_STATE_TTL_MS
-export type IntegrationOAuthProvider = 'todoist' | 'notion' | 'slack'
+export type IntegrationOAuthProvider = 'todoist' | 'notion' | 'slack' | 'github'
 export type IntegrationOAuthPayload = { nonce: string; userId: string; issuedAt: number; provider: IntegrationOAuthProvider }
 export type TodoistOAuthPayload = IntegrationOAuthPayload & { provider: 'todoist' }
 
@@ -30,7 +30,7 @@ export function parseIntegrationOAuthState(value: string | null, provider?: Inte
     const expected = crypto.createHmac('sha256', secret()).update(body).digest('base64url')
     if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
     const p = JSON.parse(Buffer.from(body, 'base64url').toString()) as IntegrationOAuthPayload
-    if ((provider && p.provider !== provider) || !['todoist', 'notion', 'slack'].includes(p.provider) || typeof p.nonce !== 'string' || !/^[A-Za-z0-9_-]{32,}$/.test(p.nonce) || typeof p.userId !== 'string' || !p.userId || !Number.isFinite(p.issuedAt)) return null
+    if ((provider && p.provider !== provider) || !['todoist', 'notion', 'slack', 'github'].includes(p.provider) || typeof p.nonce !== 'string' || !/^[A-Za-z0-9_-]{32,}$/.test(p.nonce) || typeof p.userId !== 'string' || !p.userId || !Number.isFinite(p.issuedAt)) return null
     if (Date.now() - p.issuedAt > INTEGRATION_OAUTH_STATE_TTL_MS || p.issuedAt - Date.now() > 30_000) return null
     return p
   } catch { return null }

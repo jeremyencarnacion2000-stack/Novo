@@ -1,10 +1,13 @@
 /**
  * Notion Plugin — fetches pages/tasks from Notion API and maps them into
- * BehavioralSignal rows so the Cognitive Twin can learn from them.
+ * durable aggregate observations so the Cognitive Twin can learn from them.
  */
 
 import { prisma } from '@/lib/prisma';
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin';
+import { upsertNovoSignals } from '@/lib/cognitive/signal-ledger';
+
+const MAX_SELECTED_DATABASES = 20;
 
 interface NotionPage {
   id: string;
@@ -34,23 +37,16 @@ interface NotionSyncResult {
   error?: string;
 }
 
-async function fetchNotionPages(accessToken: string, databaseId?: string): Promise<NotionPage[]> {
-  const endpoint = databaseId
-    ? `https://api.notion.com/v1/databases/${databaseId}/query`
-    : 'https://api.notion.com/v1/search';
-
-  const body = databaseId
-    ? { page_size: 50, filter: { property: 'Done', checkbox: { equals: false } } }
-    : { filter: { value: 'page', property: 'object' }, page_size: 50 };
-
-  const res = await fetch(endpoint, {
+async function fetchNotionPages(accessToken: string, databaseId: string, signal?: AbortSignal): Promise<NotionPage[]> {
+  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Notion-Version': '2022-06-28',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ page_size: 50 }),
+    signal,
   });
 
   if (!res.ok) throw new Error(`Notion API ${res.status}: ${await res.text()}`);
@@ -92,7 +88,7 @@ function isDone(page: NotionPage): boolean {
   return false;
 }
 
-export async function syncNotionPlugin(userId: string): Promise<NotionSyncResult> {
+export async function syncNotionPlugin(userId: string, options: { signal?: AbortSignal } = {}): Promise<NotionSyncResult> {
   try {
     const account = await prisma.integrationAccount.findUnique({
       where: { userId_provider: { userId, provider: 'notion' } },
@@ -103,10 +99,18 @@ export async function syncNotionPlugin(userId: string): Promise<NotionSyncResult
       return { pagesRead: 0, tasksFound: 0, overdueTasks: 0, signalsEmitted: 0, error: 'not_connected' };
     }
 
-    const meta = account.metadata as any;
-    const databaseId: string | undefined = meta?.databaseId;
+    const meta = account.metadata as { databaseIds?: unknown } | null;
+    const databaseIds = Array.isArray(meta?.databaseIds)
+      ? meta.databaseIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+    if (databaseIds.length === 0) {
+      return { pagesRead: 0, tasksFound: 0, overdueTasks: 0, signalsEmitted: 0, error: 'scope_not_selected' };
+    }
 
-    const pages = await fetchNotionPages(account.accessToken, databaseId);
+    const pages = (await Promise.all(
+      [...new Set(databaseIds)].slice(0, MAX_SELECTED_DATABASES)
+        .map((databaseId) => fetchNotionPages(account.accessToken, databaseId, options.signal)),
+    )).flat();
 
     const tasks: NotionTask[] = pages.map((p) => ({
       id: p.id,
@@ -133,36 +137,30 @@ export async function syncNotionPlugin(userId: string): Promise<NotionSyncResult
       ? Number(Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0]?.[0])
       : undefined;
 
-    // Emit behavioral signals
-    let signalsEmitted = 0;
+    // Polling observes a replaceable aggregate snapshot. It must not create a
+    // new behavioral event every 15 minutes for the same selected databases.
+    await upsertNovoSignals(userId, [{
+      source: 'notion',
+      sourceRef: 'selected-databases',
+      signalType: 'task_state_observed',
+      label: `Notion observed: ${pendingTasks.length} pending tasks, ${overdueTasks.length} overdue`,
+      observedAt: now,
+      reliability: 'direct',
+    }]);
 
-    if (overdueTasks.length >= 2) {
-      const twin = await getOrCreateTwin(userId);
-      await prisma.behavioralSignal.create({
-        data: {
-          userId,
-          twinId: twin.id,
-          signal: 'task_deferred',
-          occurredAt: new Date(),
-          metadata: {
-            source: 'notion',
-            overdueCount: overdueTasks.length,
-            titles: overdueTasks.slice(0, 5).map((t) => t.title),
-          },
-        },
-      });
-      signalsEmitted++;
-    }
+    const twin = await getOrCreateTwin(userId);
 
     // Update twin's chronotype if we have enough data
     if (peakHour !== undefined && editHours.length >= 10) {
-      await prisma.cognitiveTwinRecord.updateMany({
+      const existing = (twin.energyCurve as Record<string, unknown> | null) ?? {};
+      await prisma.cognitiveTwinRecord.update({
         where: { userId },
         data: {
           energyCurve: {
+            ...existing,
             notionPeakHour: peakHour,
             notionDataPoints: editHours.length,
-          } as any,
+          },
         },
       });
     }
@@ -191,11 +189,11 @@ export async function syncNotionPlugin(userId: string): Promise<NotionSyncResult
       pagesRead: pages.length,
       tasksFound: pendingTasks.length,
       overdueTasks: overdueTasks.length,
-      signalsEmitted,
+      signalsEmitted: 1,
       peakHour,
     };
-  } catch (err) {
-    console.error('[NotionPlugin] Error:', err);
-    return { pagesRead: 0, tasksFound: 0, overdueTasks: 0, signalsEmitted: 0, error: String(err) };
+  } catch {
+    console.error('[NotionPlugin] Provider read failed');
+    return { pagesRead: 0, tasksFound: 0, overdueTasks: 0, signalsEmitted: 0, error: 'unavailable' };
   }
 }

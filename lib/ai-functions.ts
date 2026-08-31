@@ -236,9 +236,9 @@ export async function executeFunctionCall(
                     .then(() => ({ success: true, message: 'Email sent successfully' }))
                     .catch((error: any) => ({ success: false, message: `Failed to send email: ${error.message}` }));
             case 'calendar_list_events':
-                return await calendarService.listEvents(undefined, args.limit).then(data => ({ success: true, message: `Found ${data.length} events`, data }));
+                return await calendarService.listEventsForUser(userId, undefined, args.limit).then(data => ({ success: true, message: `Found ${data.length} events`, data }));
             case 'calendar_create_event':
-                return await calendarService.createEvent(args.summary, args.description || '', args.startTime, args.endTime).then(data => ({ success: true, message: 'Event created', data }));
+                return await calendarService.createEventForUser(userId, args.summary, args.description || '', args.startTime, args.endTime).then(data => ({ success: true, message: 'Event created', data }));
             case 'fitness_get_steps':
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);

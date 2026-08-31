@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CircleAlert, RotateCw, Square } from 'lucide-react'
 import { mergeNovoActivityEvents, type NovoActivityEvent } from '@/lib/ai/activity-contract'
-import { NovoThinkingOrb } from '@/components/ai/novo-thinking-orb'
+import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader'
 
 type ActivityRun = { id: string; status: string; sequence: number; phase: string; errorMessage?: string | null }
 
@@ -111,15 +111,24 @@ export function NovoActivitySurface({ runId, onCancel }: { runId: string | null;
     setConnectionAttempt((value) => value + 1)
   }
   const terminalPhase = current?.phase ?? run?.phase
+  const companionVariant = terminal && run?.status === 'completed'
+    ? 'resolved'
+    : terminalPhase === 'awaiting_confirmation'
+      ? 'listening'
+      : 'thinking'
   return <section className="rounded-2xl border border-foreground/10 bg-foreground/[0.025] p-3 text-foreground">
     <div className="flex items-center gap-3">
-      <NovoThinkingOrb
-        phase={terminalPhase}
-        status={terminal ? (run?.status as 'completed' | 'failed' | 'cancelled' | 'expired') : disconnected ? 'disconnected' : 'active'}
-        label={terminal ? copy.done : copy.label}
+      <NovoSpriteLoader
+        className="-my-2 -ml-1"
+        size="xs"
+        variant={companionVariant}
       />
       {disconnected && <CircleAlert className="size-4 text-amber-500" aria-hidden />}
-      <div className="min-w-0 flex-1"><p aria-live="polite" aria-atomic="true" className="text-xs font-semibold">{terminal ? copy.done : copy.label}</p>{detail && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</p>}</div>
+      <div className="min-w-0 flex-1">
+        <p className="mb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-primary/70">Twin operating loop</p>
+        <p aria-live="polite" aria-atomic="true" className="text-xs font-semibold">{terminal ? copy.done : copy.label}</p>
+        {detail && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</p>}
+      </div>
       {!terminal && onCancel && <button onClick={onCancel} className="rounded-full p-2 text-muted-foreground hover:bg-foreground/10" aria-label="Detener ejecución"><Square className="size-3.5" /></button>}
       {disconnected && <button onClick={retryConnection} className="rounded-full p-2 text-muted-foreground hover:bg-foreground/10" aria-label="Reintentar conexión"><RotateCw className="size-3.5" /></button>}
       <button onClick={() => setExpanded((value) => !value)} className="rounded-full px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:bg-foreground/10" aria-expanded={expanded}>{expanded ? 'Ocultar' : 'Detalles'}</button>

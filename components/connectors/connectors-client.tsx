@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import {
   Link2, RefreshCw, Upload, Database, Search, ChevronLeft, ChevronRight,
   Plus, Trash2, Sparkles, BookOpen, BrainCircuit, Eye, MessageCircle, ShieldCheck,
+  CalendarDays, Mail, ListChecks, CheckCircle2, Settings2,
 } from 'lucide-react'
 import type { IconType } from 'react-icons'
 import {
@@ -60,6 +61,15 @@ const CATEGORIES: { id: Connector['category']; label: string; description: strin
 
 const PAGE_SIZE = 4
 
+// Google treats these grants as separate capabilities. Request exactly one
+// connector scope per consent screen so Drive, YouTube and Contacts can never
+// be combined accidentally by the UI.
+function googleConnectorScope(id: string): string {
+  if (id === 'contacts') return 'https://www.googleapis.com/auth/contacts.readonly'
+  if (id === 'books') return 'https://www.googleapis.com/auth/books'
+  return 'https://www.googleapis.com/auth/youtube.readonly'
+}
+
 function getTwinIntegrationDetail(id: string, language: string) {
   const es = {
     notion: { observes: 'Bases seleccionadas y tareas pendientes sincronizadas.', learns: 'Detecta acumulación de tareas y horas de edición cuando hay suficiente actividad.', uses: 'Las tareas importadas entran al contexto de planificación del Twin.', citation: 'El chat muestra Notion cuando esos registros se consultaron.' },
@@ -86,6 +96,11 @@ function getTwinIntegrationDetail(id: string, language: string) {
     calendar: { observes: 'Kalendertermine und verfügbare Zeitblöcke des Tages.', learns: 'Schätzt Meetinglast und sinnvolle Fokusfenster.', uses: 'Der Zwilling kann Termine vorschlagen; Änderungen brauchen deine Zustimmung.', citation: 'Der Chat zeigt Google Calendar, wenn der Kalender Kontext lieferte.' },
   }
   const dictionary = language === 'es' ? es : language === 'fr' ? fr : language === 'de' ? de : en
+  if (id === 'github') {
+    return language === 'es'
+      ? { observes: 'Actividad agregada de tus repositorios autorizados.', learns: 'Detecta ventanas de coding, trabajo fuera de horario y carga sostenida.', uses: 'Ajusta el siguiente paso sin guardar cÃ³digo ni mensajes de commits.', citation: 'El chat muestra GitHub cuando esa seÃ±al aportÃ³ contexto.' }
+      : { observes: 'Aggregate activity from your authorised repositories.', learns: 'Detects coding windows, after-hours work, and sustained load.', uses: 'Adjusts the next step without storing code or commit messages.', citation: 'Chat shows GitHub when that activity signal informed context.' }
+  }
   return dictionary[id as keyof typeof dictionary] ?? null
 }
 
@@ -261,6 +276,12 @@ export function ConnectorsClient() {
   const [gmailLoading, setGmailLoading] = useState(false)
   const [unreadEmails, setUnreadEmails] = useState<{ id?: string | null; subject: string; from: string; snippet?: string | null }[] | null>(null)
 
+  // GitHub status is intentionally aggregate-only: the UI never receives the
+  // OAuth token, repository contents, or commit messages.
+  const [githubStatus, setGithubStatus] = useState<{ connected: boolean; login?: string | null; repoCount?: number | null; lastSyncedAt?: string | null; syncStatus?: string | null } | null>(null)
+  const [githubSyncing, setGithubSyncing] = useState(false)
+  const [githubLoading, setGithubLoading] = useState(false)
+
   // ── Google/Spotify grant status (Contacts, Books, YouTube ride the same
   //    Google consent; Spotify is its own provider) ───────────────────────────
   const [grantStatus, setGrantStatus] = useState<{ google: boolean; spotify: boolean } | null>(null)
@@ -313,7 +334,7 @@ export function ConnectorsClient() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('integrationStatus') !== 'unconfigured') return
     const provider = params.get('provider')
-    const labels: Record<string, string> = { todoist: 'Todoist', slack: 'Slack', notion: 'Notion' }
+    const labels: Record<string, string> = { todoist: 'Todoist', slack: 'Slack', notion: 'Notion', github: 'GitHub' }
     const label = provider ? labels[provider] : undefined
     toast({
       title: label ? `${label} todavía no está configurado` : 'Integración todavía no configurada',
@@ -325,6 +346,32 @@ export function ConnectorsClient() {
     const url = new URL(window.location.href)
     url.search = params.toString()
     window.history.replaceState({}, '', url.toString())
+  }, [toast])
+
+  // A provider may retain a stale scope in its database row after a basic
+  // Google login replaced the access token. The chat links here so the user
+  // can re-authorize Gmail in the existing connector detail surface.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reconnect') !== 'gmail') return
+    setUnreadEmails(null)
+    setSelectedId('gmail')
+    params.delete('reconnect')
+    const url = new URL(window.location.href)
+    url.search = params.toString()
+    window.history.replaceState({}, '', url.toString())
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('githubStatus')
+    if (!status) return
+    if (status === 'connected') toast({ title: 'GitHub conectado', description: 'El Twin ya puede observar actividad agregada de tus repositorios.' })
+    else toast({ title: 'FallÃ³ la conexiÃ³n con GitHub', description: `Motivo: ${params.get('reason') ?? 'unknown'}`, variant: 'destructive' })
+    params.delete('githubStatus'); params.delete('reason')
+    const url = new URL(window.location.href); url.search = params.toString(); window.history.replaceState({}, '', url.toString())
   }, [toast])
 
   // Handle ?todoistStatus= query param from OAuth callback redirect (mirrors Notion)
@@ -412,6 +459,7 @@ export function ConnectorsClient() {
     fetch('/api/integration/drive').then(r => r.json()).then(setDriveStatus).catch(() => setDriveStatus({ connected: false, hasScope: false }))
     fetch('/api/integration/calendar').then(r => r.json()).then(setCalendarStatus).catch(() => setCalendarStatus({ connected: false, hasScope: false }))
     fetch('/api/integration/gmail').then(r => r.json()).then(setGmailStatus).catch(() => setGmailStatus({ connected: false, hasScope: false }))
+    fetch('/api/integration/github').then(r => r.json()).then(setGithubStatus).catch(() => setGithubStatus({ connected: false }))
     fetch('/api/integration/status').then(r => r.json()).then(setGrantStatus).catch(() => setGrantStatus({ google: false, spotify: false }))
     refreshCustomConnectors()
   }, [session?.user?.id])
@@ -649,6 +697,36 @@ export function ConnectorsClient() {
   }
 
   // ── Custom connector helpers ─────────────────────────────────────────────
+  const handleGitHubConnect = () => { window.location.href = '/api/integration/github/connect' }
+
+  const handleGitHubDisconnect = async () => {
+    setGithubLoading(true)
+    try {
+      await fetch('/api/integration/github', { method: 'DELETE' })
+      setGithubStatus({ connected: false })
+      toast({ title: 'GitHub desconectado' })
+    } catch {
+      toast({ title: 'No se pudo desconectar GitHub', variant: 'destructive' })
+    } finally {
+      setGithubLoading(false)
+    }
+  }
+
+  const handleGitHubSync = async () => {
+    setGithubSyncing(true)
+    try {
+      const res = await fetch('/api/integration/github?action=sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Sync failed')
+      setGithubStatus(prev => prev ? { ...prev, lastSyncedAt: new Date().toISOString(), syncStatus: 'connected' } : prev)
+      toast({ title: 'GitHub sincronizado', description: data.result?.summary?.commitsAnalyzed !== undefined ? `${data.result.summary.commitsAnalyzed} commits agregados al contexto del Twin.` : 'La actividad agregada ya está disponible para el Twin.' })
+    } catch (err: any) {
+      toast({ title: 'FallÃ³ la sincronizaciÃ³n con GitHub', description: err.message, variant: 'destructive' })
+    } finally {
+      setGithubSyncing(false)
+    }
+  }
+
   const handleDeleteCustom = async (provider: string) => {
     await fetch(`/api/integration/custom?provider=${encodeURIComponent(provider)}`, { method: 'DELETE' })
     setSelectedId(null)
@@ -693,8 +771,30 @@ export function ConnectorsClient() {
     { name: 'Todoist', connected: !!todoistStatus?.connected },
     { name: 'Slack', connected: !!slackStatus?.connected },
     { name: 'Google Calendar', connected: !!calendarStatus?.connected && !!calendarStatus?.hasScope },
+    { name: 'Gmail', connected: !!gmailStatus?.connected && !!gmailStatus?.hasScope },
+    { name: 'GitHub', connected: !!githubStatus?.connected },
   ]
   const activeLearningSources = learningSources.filter(source => source.connected)
+  const googleContextReady = !!calendarStatus?.connected && !!calendarStatus?.hasScope && !!gmailStatus?.connected && !!gmailStatus?.hasScope
+  const taskContextReady = !!todoistStatus?.connected || !!notionStatus?.connected
+  const setupCompleted = Number(googleContextReady) + Number(taskContextReady)
+  const setupCopy = language === 'es'
+    ? {
+        eyebrow: 'EMPIEZA AQUÍ', title: 'Conecta solo lo necesario',
+        description: 'Novo necesita una vista de tu tiempo y una fuente de tareas. El resto puede esperar.',
+        progress: `${setupCompleted} de 2 fuentes esenciales listas`,
+        google: 'Tu tiempo y comunicación', googleDetail: 'Autoriza Calendar y Gmail por separado para mantener permisos claros.',
+        tasks: 'Dónde viven tus tareas', tasksDetail: 'Elige Todoist o Notion. No necesitas conectar ambos.',
+        ready: 'Listo', optional: 'Elige una', refresh: 'Construir contexto ahora', advanced: 'Conexiones avanzadas',
+      }
+    : {
+        eyebrow: 'START HERE', title: 'Connect only what matters',
+        description: 'Novo needs a view of your time and one task source. Everything else can wait.',
+        progress: `${setupCompleted} of 2 essential sources ready`,
+        google: 'Your time and communication', googleDetail: 'Authorise Calendar and Gmail separately so permissions stay clear.',
+        tasks: 'Where your tasks live', tasksDetail: 'Choose Todoist or Notion. You do not need both.',
+        ready: 'Ready', optional: 'Choose one', refresh: 'Build context now', advanced: 'Advanced connections',
+      }
 
   const handleTwinSync = async () => {
     setTwinSyncing(true)
@@ -804,10 +904,15 @@ export function ConnectorsClient() {
         id: 'github',
         category: 'productivity',
         name: 'GitHub',
-        description: 'Convierte issues y PRs en tareas dentro de Novo.',
-        detail: 'Sincroniza issues y pull requests asignados como tareas rastreables en Novo.',
+        description: 'Aprende tu ritmo de trabajo en repositorios autorizados.',
+        detail: 'Observa actividad agregada de repositorios autorizados para detectar ventanas de coding y ajustar el siguiente paso del Twin. No guarda cÃ³digo ni mensajes de commits.',
+        capabilities: [
+          'Observa commits recientes de tus repositorios autorizados',
+          'Aprende tus ventanas de coding y seÃ±ales de carga sostenida',
+          'Aporta contexto al planificador sin guardar contenido del cÃ³digo',
+        ],
         icon: <BrandIcon icon={SiGithub} />,
-        status: 'soon',
+        status: githubStatus?.connected ? 'connected' : 'available',
       },
       {
         id: 'whatsapp',
@@ -968,7 +1073,7 @@ export function ConnectorsClient() {
       },
       ...custom,
     ]
-  }, [notionStatus, todoistStatus, slackStatus, driveStatus, calendarStatus, gmailStatus, grantStatus, customConnectors])
+  }, [notionStatus, todoistStatus, slackStatus, driveStatus, calendarStatus, gmailStatus, githubStatus, grantStatus, customConnectors])
 
   const selected = connectors.find(c => c.id === selectedId) ?? null
 
@@ -1003,22 +1108,68 @@ export function ConnectorsClient() {
             {language === 'es' ? 'Conecta Novo con las herramientas que ya usas.' : language === 'fr' ? 'Connectez Novo aux outils que vous utilisez déjà.' : language === 'de' ? 'Verbinde Novo mit den Tools, die du bereits nutzt.' : 'Connect Novo with the tools you already use.'}
           </p>
         </div>
-        <button
-          onClick={() => setAddCustomOpen(true)}
-          data-flip-from="btn-add-custom-connector"
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70 flex-shrink-0 self-start md:self-auto active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          Conectar API personalizada
-        </button>
-        <a
-          href="/settings/mcp"
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-all text-primary flex-shrink-0 self-start md:self-auto active:scale-95"
-        >
-          <BrainCircuit className="w-4 h-4" />
-          Conectar un dispositivo
-        </a>
       </div>
+
+      <section className="relative overflow-hidden rounded-[28px] border border-foreground/[0.08] bg-background/70 p-5 shadow-[0_24px_70px_-44px_rgba(0,0,0,0.45)] md:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-20 size-48 rounded-full bg-primary/[0.09] blur-3xl" />
+        <div className="relative">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-[10px] font-black tracking-[0.22em] text-primary">{setupCopy.eyebrow}</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-foreground">{setupCopy.title}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/52">{setupCopy.description}</p>
+            </div>
+            <span className="w-fit rounded-full border border-primary/15 bg-primary/[0.06] px-3 py-1.5 text-[11px] font-semibold text-primary">{setupCopy.progress}</span>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl border border-foreground/[0.07] bg-foreground/[0.018] p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/[0.09] text-primary"><CalendarDays className="size-4" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground/82">{setupCopy.google}</p>
+                    {googleContextReady && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400"><CheckCircle2 className="size-3.5" />{setupCopy.ready}</span>}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground/42">{setupCopy.googleDetail}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setSelectedId('calendar')} className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/[0.08] bg-background/55 px-3 text-xs font-semibold text-foreground/68 transition-colors hover:bg-foreground/[0.05]"><CalendarDays className="size-3.5" />Calendar{calendarStatus?.hasScope ? <CheckCircle2 className="size-3 text-emerald-400" /> : null}</button>
+                    <button type="button" onClick={() => setSelectedId('gmail')} className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/[0.08] bg-background/55 px-3 text-xs font-semibold text-foreground/68 transition-colors hover:bg-foreground/[0.05]"><Mail className="size-3.5" />Gmail{gmailStatus?.hasScope ? <CheckCircle2 className="size-3 text-emerald-400" /> : null}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-foreground/[0.07] bg-foreground/[0.018] p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/[0.09] text-primary"><ListChecks className="size-4" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground/82">{setupCopy.tasks}</p>
+                    {taskContextReady && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400"><CheckCircle2 className="size-3.5" />{setupCopy.ready}</span>}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground/42">{setupCopy.tasksDetail}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setSelectedId('todoist')} className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/[0.08] bg-background/55 px-3 text-xs font-semibold text-foreground/68 transition-colors hover:bg-foreground/[0.05]">Todoist{todoistStatus?.connected ? <CheckCircle2 className="size-3 text-emerald-400" /> : null}</button>
+                    <button type="button" onClick={() => setSelectedId('notion')} className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/[0.08] bg-background/55 px-3 text-xs font-semibold text-foreground/68 transition-colors hover:bg-foreground/[0.05]">Notion{notionStatus?.connected ? <CheckCircle2 className="size-3 text-emerald-400" /> : null}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 border-t border-foreground/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <button type="button" onClick={handleTwinSync} disabled={twinSyncing || activeLearningSources.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground transition-[filter,transform] hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw className={cn('size-3.5', twinSyncing && 'animate-spin')} />{setupCopy.refresh}</button>
+            <details className="group text-xs text-foreground/48">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-2 py-2 transition-colors hover:text-foreground/75"><Settings2 className="size-3.5" />{setupCopy.advanced}<ChevronRight className="size-3 transition-transform group-open:rotate-90" /></summary>
+              <div className="mt-2 flex flex-wrap gap-2 sm:justify-end">
+                <button onClick={() => setAddCustomOpen(true)} data-flip-from="btn-add-custom-connector" className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/10 px-3 font-semibold text-foreground/60 hover:bg-foreground/[0.04]"><Plus className="size-3.5" />API personalizada</button>
+                <a href="/settings/mcp" className="inline-flex h-9 items-center gap-2 rounded-xl border border-foreground/10 px-3 font-semibold text-foreground/60 hover:bg-foreground/[0.04]"><BrainCircuit className="size-3.5" />Dispositivo o agente</a>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
 
       <section className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/[0.10] via-background to-background p-5 md:p-6">
         <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-primary/15 blur-3xl" />
@@ -1103,13 +1254,27 @@ export function ConnectorsClient() {
           )}
         </div>
       ) : (
-        CATEGORIES.map(category => {
-          const items = connectors.filter(c => c.category === category.id)
+        <>
+        {CATEGORIES.map(category => {
+          const items = connectors.filter(c => c.category === category.id && c.status !== 'soon' && c.status !== 'pending')
           if (items.length === 0) return null
           return (
             <CategorySection key={category.id} category={category} items={items} onCardClick={handleCardClick} />
           )
-        })
+        })}
+        {connectors.some(c => c.status === 'soon' || c.status === 'pending') && (
+          <details className="group rounded-2xl border border-foreground/[0.06] bg-foreground/[0.012] p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground/58">
+              <span>{language === 'es' ? 'En preparación' : 'In preparation'}</span>
+              <span className="inline-flex items-center gap-2 text-[10px] font-medium text-foreground/32">{connectors.filter(c => c.status === 'soon' || c.status === 'pending').length}<ChevronRight className="size-3.5 transition-transform group-open:rotate-90" /></span>
+            </summary>
+            <p className="mt-1 text-xs text-foreground/34">{language === 'es' ? 'Estos conectores todavía no forman parte de la experiencia operativa.' : 'These connectors are not part of the operational experience yet.'}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {connectors.filter(c => c.status === 'soon' || c.status === 'pending').map(connector => <ConnectorCard key={connector.id} connector={connector} onClick={() => handleCardClick(connector)} />)}
+            </div>
+          </details>
+        )}
+        </>
       )}
 
       <p className="text-[10px] text-foreground/20 text-center pb-2">
@@ -1161,6 +1326,12 @@ export function ConnectorsClient() {
               gmailLoading={gmailLoading}
               unreadEmails={unreadEmails}
               onGmailListUnread={handleGmailListUnread}
+              githubStatus={githubStatus}
+              githubLoading={githubLoading}
+              githubSyncing={githubSyncing}
+              onGitHubConnect={handleGitHubConnect}
+              onGitHubDisconnect={handleGitHubDisconnect}
+              onGitHubSync={handleGitHubSync}
               onDeleteCustom={handleDeleteCustom}
             />
           )}
@@ -1191,6 +1362,7 @@ function ConnectorDetail({
   driveStatus, driveBackingUp, onDriveBackup,
   calendarStatus, calendarSyncing, onCalendarSync,
   gmailStatus, gmailLoading, unreadEmails, onGmailListUnread,
+  githubStatus, githubLoading, githubSyncing, onGitHubConnect, onGitHubDisconnect, onGitHubSync,
   onDeleteCustom,
 }: {
   connector: Connector
@@ -1234,6 +1406,12 @@ function ConnectorDetail({
   gmailLoading: boolean
   unreadEmails: { id?: string | null; subject: string; from: string; snippet?: string | null }[] | null
   onGmailListUnread: () => void
+  githubStatus: { connected: boolean; login?: string | null; repoCount?: number | null; lastSyncedAt?: string | null; syncStatus?: string | null } | null
+  githubLoading: boolean
+  githubSyncing: boolean
+  onGitHubConnect: () => void
+  onGitHubDisconnect: () => void
+  onGitHubSync: () => void
   onDeleteCustom: (provider: string) => void
 }) {
   const { language } = useTranslation()
@@ -1506,6 +1684,37 @@ function ConnectorDetail({
         )
       )}
 
+      {connector.id === 'github' && (
+        githubStatus?.connected ? (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl bg-foreground/[0.03] px-3 py-2 text-xs text-foreground/55">
+              {githubStatus.login ? <span className="font-semibold text-foreground/75">@{githubStatus.login}</span> : 'Cuenta de GitHub'}
+              {typeof githubStatus.repoCount === 'number' ? ` · ${githubStatus.repoCount} repositorios observados` : ''}
+              {githubStatus.lastSyncedAt ? <span className="block mt-1 text-[11px] text-foreground/35">Última lectura: {new Date(githubStatus.lastSyncedAt).toLocaleString()}</span> : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onGitHubSync}
+                disabled={githubSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 transition-all text-foreground/70 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', githubSyncing && 'animate-spin')} />
+                {githubSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
+              </button>
+              <button onClick={onGitHubDisconnect} disabled={githubLoading} className="text-[11px] text-foreground/30 hover:text-red-400 transition-colors font-medium">Desconectar</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onGitHubConnect}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
+          >
+            <Link2 className="w-4 h-4" />
+            Conectar GitHub
+          </button>
+        )
+      )}
+
       {connector.id === 'drive' && (
         driveStatus?.connected && driveStatus?.hasScope ? (
           <button
@@ -1559,6 +1768,18 @@ function ConnectorDetail({
               <RefreshCw className={cn('w-4 h-4', gmailLoading && 'animate-spin')} />
               {gmailLoading ? 'Cargando...' : 'Ver no leídos'}
             </button>
+            <button
+              type="button"
+              onClick={() => signIn('google', { callbackUrl: '/connectors?reconnect=gmail' }, {
+                scope: 'openid profile email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
+                access_type: 'offline',
+                prompt: 'consent',
+                include_granted_scopes: 'false',
+              })}
+              className="text-xs font-semibold text-foreground/45 underline underline-offset-4 transition-colors hover:text-foreground/75"
+            >
+              Volver a autorizar Gmail
+            </button>
             {unreadEmails && (
               unreadEmails.length === 0 ? (
                 <p className="text-xs text-foreground/35 text-center py-2">No tienes correos sin leer.</p>
@@ -1598,7 +1819,11 @@ function ConnectorDetail({
           </a>
         ) : (
           <button
-            onClick={() => signIn('google', undefined, { scope: 'openid profile email https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/books https://www.googleapis.com/auth/youtube.readonly' })}
+            onClick={() => signIn('google', undefined, {
+              scope: `openid profile email ${googleConnectorScope(connector.id)}`,
+              prompt: 'consent',
+              include_granted_scopes: 'false',
+            })}
             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 hover:border-foreground/20 transition-all text-foreground/70"
           >
             <Link2 className="w-4 h-4" />

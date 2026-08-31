@@ -21,6 +21,7 @@ const PROVIDERS: Record<string, Pick<ContextSource, 'provider' | 'label' | 'deta
   gcal: { provider: 'gcal', label: 'Google Calendar', detail: 'Agenda y bloques de tiempo' },
   google_calendar: { provider: 'gcal', label: 'Google Calendar', detail: 'Agenda y bloques de tiempo' },
   calendar: { provider: 'gcal', label: 'Google Calendar', detail: 'Agenda y bloques de tiempo' },
+  gmail: { provider: 'gmail', label: 'Gmail', detail: 'Correos no leídos consultados bajo demanda' },
 };
 
 export function getContextSource(provider: string): ContextSource | null {

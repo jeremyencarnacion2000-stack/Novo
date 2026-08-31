@@ -110,6 +110,8 @@ export async function GET(req: NextRequest) {
                 provider: 'slack',
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
+                providerAccountId: tokenData.team?.id ?? null,
+                syncStatus: 'connected',
                 metadata: {
                     teamId: tokenData.team?.id ?? null,
                     teamName: tokenData.team?.name ?? null,
@@ -121,6 +123,10 @@ export async function GET(req: NextRequest) {
             update: {
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
+                providerAccountId: tokenData.team?.id ?? null,
+                syncStatus: 'connected',
+                syncErrorCode: null,
+                syncErrorMessage: null,
                 metadata: {
                     ...existingMeta,
                     teamId: tokenData.team?.id ?? null,

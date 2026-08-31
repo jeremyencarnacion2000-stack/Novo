@@ -84,6 +84,7 @@ export default function FocusPage() {
                             blur={1}
                             strength={50}
                             chromaticAberration={14}
+                            refractive
                             backgroundColor="transparent"
                             elevation="low"
                             aria-hidden
@@ -320,4 +321,3 @@ export default function FocusPage() {
         </div>
     );
 }
-

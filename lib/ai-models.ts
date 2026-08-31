@@ -209,40 +209,12 @@ export class AIModelManager {
       throw new Error('Model not loaded');
     }
 
-    // Only run transformers on client side
-    if (typeof window === 'undefined') {
-      return this.generateMockResponse(message, context);
-    }
-
-    try {
-      // Dynamic import to avoid SSR issues with onnxruntime-node
-      const { pipeline } = await import('@xenova/transformers');
-
-      let generator;
-      if (this.loadedModel.type === 'lora') {
-        // For LoRA, we'd need to load base model + apply LoRA
-        // This is a simplified implementation
-        generator = await pipeline('text-generation', this.loadedModel.baseModel || 'microsoft/DialoGPT-small');
-      } else {
-        // For base models, load directly
-        generator = await pipeline('text-generation', 'microsoft/DialoGPT-small');
-      }
-
-      // Generate response with context
-      const prompt = `Context: ${context}\nUser: ${message}\nAssistant:`;
-      const output = await generator(prompt, {
-        max_new_tokens: 100,
-        temperature: 0.7,
-        do_sample: true,
-        pad_token_id: generator.tokenizer.sep_token_id
-      });
-
-      return (output[0] as any).generated_text.split('Assistant:')[1]?.trim() || this.generateMockResponse(message, context);
-    } catch (error) {
-      console.error('Inference failed:', error);
-      // Fallback to mock
-      return this.generateMockResponse(message, context);
-    }
+    // Uploaded-model execution was previously wired to a legacy browser
+    // runtime that ignored the uploaded weights and always loaded a fixed
+    // demo model. Besides being misleading, that dependency carried a
+    // critical parser advisory. Keep the existing safe fallback until a real
+    // sandboxed local-model runtime is implemented and independently gated.
+    return this.generateMockResponse(message, context);
   }
 
   private generateMockResponse(message: string, context: string): string {

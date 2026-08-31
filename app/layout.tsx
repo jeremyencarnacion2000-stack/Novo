@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
+  manifest: '/manifest.json',
   generator: 'v0.app',
   openGraph: {
     title: TITLE,
@@ -29,11 +30,13 @@ export const metadata: Metadata = {
     siteName: 'Novo',
     locale: 'es',
     type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Novo — Shared context' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description: DESCRIPTION,
+    images: ['/opengraph-image'],
   },
   icons: {
     icon: [

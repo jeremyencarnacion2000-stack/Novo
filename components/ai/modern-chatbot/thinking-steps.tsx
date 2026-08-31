@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity } from 'lucide-react';
-import { GlowingOrb } from './glowing-orb';
+import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader';
 import { useTranslation } from '@/lib/i18n';
 
 const INTENT_LABEL: Record<string, string> = {
@@ -29,11 +29,13 @@ export function ThinkingSteps({
     intent,
     fallback,
     agentMode = false,
+    showCompanion = true,
 }: {
     modelLabel: string | null;
     intent: string | null;
     fallback: boolean;
     agentMode?: boolean;
+    showCompanion?: boolean;
 }) {
     const { language } = useTranslation();
     const copy = {
@@ -59,7 +61,9 @@ export function ThinkingSteps({
 
     return (
         <div className="flex items-center gap-3 px-4 sm:px-6 py-4">
-            <GlowingOrb state="thinking" size="sm" />
+            {showCompanion ? (
+                <NovoSpriteLoader className="-my-2 -ml-2" size="xs" variant="thinking" />
+            ) : null}
             <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
                     <Activity className="w-3 h-3 text-primary animate-pulse" />

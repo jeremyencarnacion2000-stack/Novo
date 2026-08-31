@@ -35,7 +35,7 @@
   animation: landing-ambient-drift 26s ease-in-out infinite alternate;
 }
 .landing-ambient::after { z-index: -1; opacity: .14; mix-blend-mode: soft-light; background-image: var(--glass-noise); background-size: 180px 180px; }
-@media (prefers-reduced-motion: reduce) { .landing-ambient::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) { .landing-ambient::before { animation: none; } }
 
 [data-app-viewport] {
   position: relative;
@@ -102,6 +102,52 @@ body.has-bg-image [data-app-wallpaper] {
 .novo-glass-backdrop {
   background: var(--novo-glass-background, transparent);
   backdrop-filter: var(--novo-glass-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--novo-glass-backdrop-filter, none);
+}
+
+.novo-glass-refractive {
+  background: transparent;
+  opacity: var(--novo-glass-refractive-opacity, 0.72);
+  backdrop-filter: var(--novo-glass-refractive-filter, none);
+  -webkit-backdrop-filter: var(--novo-glass-refractive-filter, none);
+  /* Clip only the refraction output, not the content surface. This removes
+     the occasional dark seam that can show when a displaced RGB channel
+     reaches the rounded edge of a card. */
+  overflow: hidden;
+  isolation: isolate;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* The SVG lens is the high-fidelity path. A shallow CSS optical fallback is
+   intentionally still a real material, not a flat transparent box: it keeps
+   the same settings-driven blur beneath it and adds only an internal volume
+   cue. This is used for compact navigation controls and for browsers that do
+   not expose SVG backdrop filters. */
+.novo-glass-refractive[data-glass-refractive-mode='css'] {
+  background:
+    radial-gradient(130% 92% at 10% -18%, rgba(255, 255, 255, 0.24), transparent 50%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0.075), transparent 38%, rgba(255, 255, 255, 0.025));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035),
+    inset 1px 0 0 rgba(250, 181, 214, 0.035),
+    inset -1px 0 0 rgba(126, 210, 255, 0.028);
+}
+
+.novo-glass-sheen {
+  opacity: var(--novo-glass-sheen-opacity, 0.32);
+  background:
+    linear-gradient(
+      118deg,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(255, 255, 255, 0.11) 13%,
+      transparent 39%,
+      transparent 70%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+  mix-blend-mode: soft-light;
 }
 
 /* Appearance changes are a single handoff rather than a flash of individual
@@ -770,17 +816,17 @@ html[data-appearance-transition] body.has-bg-image::before {
   box-shadow: var(--novo-context-box-shadow);
 }
 
-/* Glass Blur Utility — heavier for 'milky' look */
+/* Glass Blur Utilities — resolved from Settings' material contract. */
 @utility glass-blur {
   backdrop-filter: var(--novo-context-backdrop-filter);
 }
 
 @utility glass-blur-sm {
-  backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: var(--novo-context-backdrop-filter);
 }
 
 @utility glass-blur-lg {
-  backdrop-filter: blur(48px) saturate(200%);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
 }
 
 /* Card Hierarchy System - Soft Frosted */
@@ -874,13 +920,14 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 .card-bg-tertiary {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--novo-context-background);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  border: var(--novo-context-border);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 @utility glass-blur-xl {
-  backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
 }
 
 /* 2. COLUMNS / CARDS (Tarjetas internas - Glass dentro de glass) */
@@ -952,9 +999,10 @@ html[data-appearance-transition] body.has-bg-image::before {
 /* 2.5 Column Headers */
 @utility glass-header {
   @apply rounded-xl border p-4 transition-all duration-300;
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(12px);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: var(--novo-context-background);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  border-color: var(--novo-context-border);
+  box-shadow: var(--novo-context-box-shadow);
 }
 
 @utility scrollbar-hide {
@@ -1284,6 +1332,22 @@ html[data-appearance-transition] body.has-bg-image::before {
   }
 }
 
+/* The floating sidebar is a single filtered surface. Keeping the size-changing
+   wrapper and its backdrop in stable compositor layers prevents Chromium from
+   briefly painting a stale edge/shadow while the sidebar collapses or expands. */
+[data-slot='sidebar-container'] {
+  will-change: width, left, right;
+  transform: translateZ(0);
+}
+
+[data-slot='sidebar-inner'] {
+  isolation: isolate;
+  contain: paint;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
 .novo-context-glass {
   background: var(--novo-context-background);
   backdrop-filter: var(--novo-context-backdrop-filter);
@@ -1343,8 +1407,8 @@ html[data-appearance-transition] body.has-bg-image::before {
   .novo-sidebar-nav-button:hover,
   .novo-sidebar-nav-button:focus-visible {
     background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
-    backdrop-filter: blur(9px) saturate(145%);
-    -webkit-backdrop-filter: blur(9px) saturate(145%);
+    backdrop-filter: var(--novo-context-backdrop-filter);
+    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.16),
       0 3px 14px rgba(0, 0, 0, 0.08);
@@ -1395,23 +1459,15 @@ html[data-appearance-transition] body.has-bg-image::before {
   border-color: transparent !important;
 }
 
-/* Respect the platform's reduced-transparency preference without changing
-   Novo's spacing, color language or hierarchy. Opaque materials keep text
-   readable over user wallpapers while preserving the same elevation cues. */
-@media (prefers-reduced-transparency: reduce) {
-  .novo-context-glass,
-  .novo-focus-surface,
-  .novo-premium-field,
-  .novo-settings-nav,
-  .glass-surface,
-  .glass-floating,
-  .glass-active,
-  .glass-card,
-  .glass-panel {
-    background: var(--background) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
+/* Do not silently disable the configured liquid material because an operating
+   system reports reduced transparency. That media preference was disabling the
+   only refraction layer on desktop while the Appearance sliders still showed
+   non-zero values. A user may explicitly opt into the fallback via this data
+   attribute; otherwise the app's own material settings remain authoritative. */
+html[data-accessibility-reduce-glass='true'] [data-glass-refractive] {
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Cognitive Engine surfaces use a few legacy white-on-glass utilities. Keep
@@ -1466,8 +1522,8 @@ html:not(.dark) .cognitive-page .liquid-glass-premium {
 }
 
 .cognitive-shell {
-  backdrop-filter: blur(6px) saturate(112%);
-  -webkit-backdrop-filter: blur(6px) saturate(112%);
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
 }
 
 .cognitive-chart {
@@ -1525,13 +1581,13 @@ html:not(.dark) .cognitive-chart {
     position: relative;
     isolation: isolate;
     border-radius: 2rem;
-    background: linear-gradient(180deg, rgba(4, 14, 9, 0.2), rgba(4, 14, 9, 0.5));
-    backdrop-filter: blur(5px) saturate(115%);
-    -webkit-backdrop-filter: blur(5px) saturate(115%);
+    background: var(--novo-context-background);
+    backdrop-filter: var(--novo-context-backdrop-filter);
+    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
   }
 
   html:not(.dark) .settings-page-shell {
-    background: linear-gradient(180deg, rgba(246, 249, 242, 0.34), rgba(238, 245, 235, 0.52));
+    background: var(--novo-context-background);
   }
 
   /* Typography - Systemic Micro-copy */
@@ -2098,10 +2154,15 @@ html:not(.dark) .cognitive-chart {
 
 /* --- Context Hub GPU Acceleration Layer --- */
 .context-hub-layer {
-  will-change: width, height, transform;
+  will-change: width, height, transform, border-radius, box-shadow;
   contain: layout style;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.context-hub-layer [data-hub-motion-panel] {
+  will-change: transform, opacity;
   transform: translateZ(0);
 }
 
@@ -2144,7 +2205,6 @@ html, body, * {
   .glass-card,
   .glass-panel,
   [data-novo-glass] {
-    backdrop-filter: blur(12px) !important;
     transition: none !important;
     animation: none !important;
   }
@@ -2256,15 +2316,11 @@ html.cognitive-reduced-capacity {
   transition: filter 3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* Reduce contrast on all glass panels and cards */
-html.cognitive-reduced-capacity .glass-card,
-html.cognitive-reduced-capacity .card,
-html.cognitive-reduced-capacity [data-slot="card"] {
-  background: rgba(9, 9, 11, 0.40) !important; /* bg-zinc-950/40 equivalent */
-  backdrop-filter: blur(8px) !important;
-  border-color: rgba(255, 255, 255, 0.03) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-}
+/* Keep the active material contract in reduced-capacity mode. A previous
+   emergency override painted every card with a fixed dark fill and blur(8px),
+   which bypassed the Settings sliders and made the desktop dashboard look
+   opaque. The page-level tone reduction above and the secondary-element rule
+   below already lower cognitive load without changing surface physics. */
 
 /* Blur and de-saturate elements flagged as secondary during cognitive overload */
 html.cognitive-reduced-capacity [data-cognitive-secondary="true"],
@@ -2476,10 +2532,25 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
   inset: 0;
   width: 400%;
   height: 200%;
-  background: url('/art/novo-companion-sprite.png') 0 0 / 100% 100% no-repeat;
+  background: var(--novo-sprite-asset, url('/art/novo-companion-sprite.png')) 0 0 / 100% 100% no-repeat;
   transform: translate3d(0, 0, 0);
   will-change: transform;
-  animation: novo-companion-build 1.12s steps(1, end) infinite;
+  animation: novo-companion-build var(--novo-sprite-duration, 1.12s) steps(1, end) infinite;
+}
+
+.novo-sprite-loader[data-variant="thinking"] {
+  --novo-sprite-asset: url('/art/novo-companion-thinking.png');
+  --novo-sprite-duration: 1.44s;
+}
+
+.novo-sprite-loader[data-variant="listening"] {
+  --novo-sprite-asset: url('/art/novo-companion-listening.png');
+  --novo-sprite-duration: 1.28s;
+}
+
+.novo-sprite-loader[data-variant="resolved"] {
+  --novo-sprite-asset: url('/art/novo-companion-resolved.png');
+  --novo-sprite-duration: 1.52s;
 }
 
 /* Respect Novo's own animation preference as well as the operating system

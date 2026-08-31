@@ -1,5 +1,26 @@
+# Local QA captures and one-off audit artefacts are not application sources.
+.env
+.env.*
+!.env.example
+.gstack/
+.next/
+out/
+coverage/
+.tmp-*
+tmp-*
+.codex/
+notebooklm-mcp/
+*.sql
+p.$disconnect())
+p.())
+stepbro-reference.png
+task-*-rereview*.md
+todoist-vertical-rereview.md
 .codex-remote-attachments/
 .codex-dev-stdout.log
 .codex-dev-stderr.log
 vercel_deploy.log
+# This local pnpm lock is not part of Novo's npm deployment contract. Including it
+# makes Vercel select pnpm and reject the otherwise valid npm lockfile.
+pnpm-lock.yaml
 public/art/novo-companion-sprite-source.png

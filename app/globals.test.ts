@@ -85,6 +85,13 @@ describe('liquid glass card tiers', () => {
     )
   })
 
+  it('keeps desktop liquid refraction controlled by Novo rather than an implicit OS media override', () => {
+    const root = stylesheet()
+
+    expect(root.toString()).not.toContain('@media (prefers-reduced-transparency: reduce)')
+    expect(backdropFilterFor(root, "html[data-accessibility-reduce-glass='true'] [data-glass-refractive]")).toBe('none')
+  })
+
   it('keeps the established card hierarchy instead of forcing every tier to Focus', () => {
     const root = stylesheet()
 

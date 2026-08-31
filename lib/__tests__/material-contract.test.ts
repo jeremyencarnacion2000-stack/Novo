@@ -46,10 +46,10 @@ describe('resolveMaterialContract', () => {
         cardLiquidIntensity: 0,
       })
 
-      expect(contract.contextGlass.background).toBe(expectedContextFill)
-      expect(contract.contextGlass.backdropFilter).toContain('blur(12px)')
-      expect(contract.focusSurface.background).toBe(expectedFocusFill)
-      expect(contract.focusSurface.backdropFilter).toContain('blur(18px)')
+      expect(contract.contextGlass.background).toBe('rgba(255, 255, 255, 0)')
+      expect(contract.contextGlass.backdropFilter).toContain('blur(0px)')
+      expect(contract.focusSurface.background).toBe('rgba(255, 255, 255, 0)')
+      expect(contract.focusSurface.backdropFilter).toContain('blur(0px)')
     },
   )
 
@@ -66,10 +66,10 @@ describe('resolveMaterialContract', () => {
       cardLiquidIntensity: 0,
     })
 
-    expect(contract.canvas.background).toContain('rgba(0, 0, 0, 0.35)')
-    expect(contract.canvas.backdropFilter).toBe('blur(10px)')
-    expect(contract.contextGlass.backdropFilter).toContain('blur(12px)')
-    expect(contract.focusSurface.backdropFilter).toContain('blur(18px)')
+    expect(contract.canvas.background).toContain('rgba(0, 0, 0, 0)')
+    expect(contract.canvas.backdropFilter).toBe('blur(0px)')
+    expect(contract.contextGlass.backdropFilter).toContain('blur(0px)')
+    expect(contract.focusSurface.backdropFilter).toContain('blur(0px)')
   })
 
   it('preserves the requested flat-canvas opacity and blur without adding visual floors', () => {

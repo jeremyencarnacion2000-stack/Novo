@@ -25,6 +25,7 @@ import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader'
 import { redirectWhenSessionMissing } from '@/lib/auth-navigation'
 import { MobileOverlayProvider } from '@/components/mobile-overlay-provider'
 import { CognitiveRouteShell } from '@/components/cognitive/cognitive-route-shell'
+import { AmbientContextHeartbeat } from '@/components/ambient-context-heartbeat'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -322,6 +323,7 @@ export default function ClientLayout({
     <MotionConfig reducedMotion="user">
       <AppProviders>
         <CognitiveThemeSyncer />
+        <AmbientContextHeartbeat />
         <CognitiveTwinProvider>
           <MobileOverlayProvider>
             <RoutePlayerBoundary>

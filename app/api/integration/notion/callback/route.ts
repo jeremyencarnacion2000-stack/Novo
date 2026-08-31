@@ -121,6 +121,8 @@ export async function GET(req: NextRequest) {
                 provider: 'notion',
                 accessToken: tokenData.access_token,
                 tokenType: tokenData.token_type,
+                providerAccountId: tokenData.workspace_id ?? tokenData.bot_id ?? null,
+                syncStatus: 'connected',
                 metadata: {
                     workspaceId: tokenData.workspace_id ?? null,
                     workspaceName: tokenData.workspace_name ?? null,
@@ -132,6 +134,10 @@ export async function GET(req: NextRequest) {
             update: {
                 accessToken: tokenData.access_token,
                 tokenType: tokenData.token_type,
+                providerAccountId: tokenData.workspace_id ?? tokenData.bot_id ?? null,
+                syncStatus: 'connected',
+                syncErrorCode: null,
+                syncErrorMessage: null,
                 metadata: {
                     ...existingMeta,
                     workspaceId: tokenData.workspace_id ?? null,

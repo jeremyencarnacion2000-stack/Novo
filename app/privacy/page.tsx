@@ -45,7 +45,8 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <span className="text-white/90">Datos de integraciones que conectes tú mismo:</span>{' '}
-                Google Calendar, Google Drive, Notion, Spotify o Google Fit — solo accedemos a lo
+                Google Calendar, Gmail, Google Drive, Notion, Todoist, Slack, Spotify, YouTube Music o
+                Google Fit — solo accedemos a lo
                 estrictamente necesario para la función que activas, y solo si das tu consentimiento
                 explícito al conectar cada servicio.
               </li>
@@ -69,7 +70,10 @@ export default function PrivacyPage() {
                 través de proveedores de IA de terceros (Google Gemini, Groq, OpenRouter) únicamente para
                 generar la respuesta — no se usan para publicidad.
               </li>
-              <li>Para procesar pagos y gestionar tu suscripción, a través de Stripe.</li>
+              <li>
+                Para procesar pagos y gestionar tu suscripción, a través de Lemon Squeezy. Stripe se
+                conserva únicamente para administrar suscripciones heredadas creadas antes de la migración.
+              </li>
               <li>Para dar soporte cuando nos contactas.</li>
             </ul>
           </section>
@@ -83,10 +87,13 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-1.5 text-white/70 mt-2">
               <li>Neon (Postgres) y Vercel — alojamiento de la base de datos y la aplicación.</li>
               <li>Google, Groq y OpenRouter — procesamiento de solicitudes al asistente de IA.</li>
-              <li>Stripe — procesamiento de pagos.</li>
               <li>
-                Google Calendar, Google Drive, Notion, Spotify, Google Fit — solo si tú conectas
-                explícitamente esa integración desde Configuración.
+                Lemon Squeezy — procesamiento de pagos, impuestos, recibos y gestión de suscripciones.
+                Stripe — portal y continuidad de suscripciones heredadas.
+              </li>
+              <li>
+                Google Calendar, Gmail, Google Drive, Notion, Todoist, Slack, Spotify, YouTube Music y
+                Google Fit — solo si tú conectas explícitamente esa integración desde Configuración.
               </li>
             </ul>
           </section>

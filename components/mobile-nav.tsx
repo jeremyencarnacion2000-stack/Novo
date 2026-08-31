@@ -73,6 +73,7 @@ export function MobileNav() {
                             blur={1}
                             strength={24}
                             chromaticAberration={2.5}
+                            refractive
                             backgroundColor="rgba(255,255,255,0.055)"
                             elevation="low"
                             className="pointer-events-none absolute inset-0 z-0 h-full w-full"
@@ -122,6 +123,7 @@ export function MobileNav() {
                         blur={1}
                         strength={24}
                         chromaticAberration={2.5}
+                        refractive
                         backgroundColor="rgba(255,255,255,0.055)"
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full"
@@ -164,6 +166,7 @@ export function MobileNav() {
                                                 blur={1}
                                                 strength={28}
                                                 chromaticAberration={3.5}
+                                                refractive
                                                 backgroundColor="rgba(255,255,255,0.1)"
                                                 elevation="low"
                                                 className="h-full w-full"
@@ -212,6 +215,7 @@ export function MobileNav() {
                         blur={1}
                         strength={24}
                         chromaticAberration={2.25}
+                        refractive
                         backgroundColor="rgba(255,255,255,0.14)"
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full"

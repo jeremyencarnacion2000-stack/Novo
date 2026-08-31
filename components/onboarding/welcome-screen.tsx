@@ -2,53 +2,51 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronRight, Sparkles, LayoutDashboard, Music, ArrowRight, CheckCircle2, Brain, Timer } from 'lucide-react'
+import { ChevronRight, Sparkles, LayoutDashboard, ArrowRight, CheckCircle2, Brain, ShieldCheck, CalendarDays, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 
-const slides = [
-    {
-        tag: "Cognitive OS",
-        title: "Novo",
-        subtitle: "Your Cognitive\nSanctuary",
-        description: "An adaptive Cognitive Operating System that learns from your goals, check-ins, commitments, and observed work patterns using only information you choose to share.",
-        icon: LayoutDashboard,
-        features: [
-            { icon: CheckCircle2, text: "Evidence-based context" },
-            { icon: Timer, text: "Time and focus preferences" },
+const WELCOME_COPY = {
+    en: {
+        skip: 'Sign in', continue: 'Continue', start: 'Start with Novo', slideLabel: 'Go to screen',
+        slides: [
+            { tag: 'YOUR DAY', subtitle: 'Clarity before\ncomplexity.', description: 'Novo brings your calendar, tasks, and commitments into one calm view so you know what matters now.', icon: LayoutDashboard, features: [{ icon: CalendarDays, text: 'Your real schedule and commitments' }, { icon: CheckCircle2, text: 'A useful first day, not an empty dashboard' }] },
+            { tag: 'LEARNS WITH YOU', subtitle: 'Your work becomes\nshared context.', description: 'Connect only the tools you choose. Novo notices patterns over time and shows where every signal came from.', icon: Brain, features: [{ icon: ListChecks, text: 'Calendar, email, and task signals' }, { icon: Sparkles, text: 'Understanding that improves with use' }] },
+            { tag: 'YOU STAY IN CONTROL', subtitle: 'One clear\nnext move.', description: 'Novo explains its recommendation and asks before sensitive actions. You can correct it whenever it gets something wrong.', icon: ShieldCheck, features: [{ icon: ShieldCheck, text: 'Explicit permissions and reversible access' }, { icon: CheckCircle2, text: 'Recommendations you can inspect and correct' }] },
         ],
-        gradient: "from-violet-600/30 via-purple-500/10 to-transparent",
-        accent: "violet",
     },
-    {
-        tag: "Intelligence",
-        title: "Cognitive Twin",
-        subtitle: "Your Intelligent\nPartner",
-        description: "A contextual companion that connects your commitments, decisions, and outcomes to recommend one clear next move.",
-        icon: Sparkles,
-        features: [
-            { icon: Brain, text: "Context-aware signals" },
-            { icon: Sparkles, text: "Explainable recommendations" },
+    es: {
+        skip: 'Iniciar sesión', continue: 'Continuar', start: 'Comenzar con Novo', slideLabel: 'Ir a la pantalla',
+        slides: [
+            { tag: 'TU DÍA', subtitle: 'Claridad antes\nde complejidad.', description: 'Novo reúne tu agenda, tareas y compromisos en una vista serena para mostrarte qué importa ahora.', icon: LayoutDashboard, features: [{ icon: CalendarDays, text: 'Tu agenda y compromisos reales' }, { icon: CheckCircle2, text: 'Un primer día útil, no un panel vacío' }] },
+            { tag: 'APRENDE CONTIGO', subtitle: 'Tu trabajo se vuelve\ncontexto compartido.', description: 'Conecta solo las herramientas que elijas. Novo aprende patrones con el tiempo y muestra de dónde salió cada señal.', icon: Brain, features: [{ icon: ListChecks, text: 'Señales de agenda, correo y tareas' }, { icon: Sparkles, text: 'Una comprensión que mejora con el uso' }] },
+            { tag: 'TÚ TIENES EL CONTROL', subtitle: 'Un siguiente paso\nclaro.', description: 'Novo explica su recomendación y pide permiso antes de actuar. Puedes corregirlo cuando interprete algo mal.', icon: ShieldCheck, features: [{ icon: ShieldCheck, text: 'Permisos explícitos y acceso revocable' }, { icon: CheckCircle2, text: 'Recomendaciones que puedes revisar y corregir' }] },
         ],
-        gradient: "from-blue-600/30 via-cyan-500/10 to-transparent",
-        accent: "blue",
     },
-    {
-        tag: "Focus",
-        title: "Deep Flow",
-        subtitle: "Rhythm in\nMotion",
-        description: "Integrated ambient soundscapes, focus timers, and smart notifications configured dynamically by your Cognitive Twin to maintain flow.",
-        icon: Music,
-        features: [
-            { icon: Music, text: "Integrated soundscapes" },
-            { icon: Timer, text: "Flexible focus timer" },
+    fr: {
+        skip: 'Se connecter', continue: 'Continuer', start: 'Commencer avec Novo', slideLabel: 'Aller à l’écran',
+        slides: [
+            { tag: 'VOTRE JOURNÉE', subtitle: 'La clarté avant\nla complexité.', description: 'Novo réunit votre agenda, vos tâches et vos engagements pour montrer ce qui compte maintenant.', icon: LayoutDashboard, features: [{ icon: CalendarDays, text: 'Votre agenda et vos engagements réels' }, { icon: CheckCircle2, text: 'Une première journée utile' }] },
+            { tag: 'APPREND AVEC VOUS', subtitle: 'Votre travail devient\nun contexte partagé.', description: 'Connectez uniquement les outils choisis. Novo apprend avec le temps et cite chaque source.', icon: Brain, features: [{ icon: ListChecks, text: 'Agenda, e-mail et tâches' }, { icon: Sparkles, text: 'Une compréhension qui progresse' }] },
+            { tag: 'VOUS GARDEZ LE CONTRÔLE', subtitle: 'Une prochaine étape\nclaire.', description: 'Novo explique ses recommandations et demande votre accord avant toute action sensible.', icon: ShieldCheck, features: [{ icon: ShieldCheck, text: 'Autorisations explicites et révocables' }, { icon: CheckCircle2, text: 'Des recommandations corrigibles' }] },
         ],
-        gradient: "from-emerald-600/30 via-teal-500/10 to-transparent",
-        accent: "emerald",
-    }
-]
+    },
+    de: {
+        skip: 'Anmelden', continue: 'Weiter', start: 'Mit Novo starten', slideLabel: 'Zum Bildschirm',
+        slides: [
+            { tag: 'DEIN TAG', subtitle: 'Klarheit vor\nKomplexität.', description: 'Novo verbindet Kalender, Aufgaben und Verpflichtungen und zeigt, was jetzt zählt.', icon: LayoutDashboard, features: [{ icon: CalendarDays, text: 'Dein echter Zeitplan' }, { icon: CheckCircle2, text: 'Ein nützlicher erster Tag' }] },
+            { tag: 'LERNT MIT DIR', subtitle: 'Deine Arbeit wird\ngemeinsamer Kontext.', description: 'Verbinde nur ausgewählte Werkzeuge. Novo lernt mit der Zeit und nennt jede Quelle.', icon: Brain, features: [{ icon: ListChecks, text: 'Kalender-, E-Mail- und Aufgabensignale' }, { icon: Sparkles, text: 'Verständnis, das sich verbessert' }] },
+            { tag: 'DU BEHÄLTST DIE KONTROLLE', subtitle: 'Ein klarer\nnächster Schritt.', description: 'Novo erklärt Empfehlungen und fragt vor sensiblen Aktionen nach deiner Zustimmung.', icon: ShieldCheck, features: [{ icon: ShieldCheck, text: 'Explizite, widerrufbare Berechtigungen' }, { icon: CheckCircle2, text: 'Prüf- und korrigierbare Empfehlungen' }] },
+        ],
+    },
+} as const
 
 export function WelcomeCarousel() {
     const [current, setCurrent] = useState(0)
+    const { language } = useTranslation()
+    const locale = language === 'es' || language === 'fr' || language === 'de' ? language : 'en'
+    const copy = WELCOME_COPY[locale]
+    const slides = copy.slides
 
     const nextSlide = () => {
         if (current < slides.length - 1) {
@@ -58,7 +56,7 @@ export function WelcomeCarousel() {
 
     const goToSignIn = () => {
         // Use window.location for reliable navigation in Capacitor WebView
-        window.location.href = '/auth/signin'
+        window.location.href = '/auth/signin?callbackUrl=%2Fonboarding'
     }
 
     const slide = slides[current]
@@ -73,7 +71,7 @@ export function WelcomeCarousel() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.8 }}
-                    className={cn("absolute inset-0 bg-gradient-to-b", slide.gradient)}
+                    className="absolute inset-0 bg-[radial-gradient(circle_at_35%_15%,rgba(52,211,153,0.22),transparent_34%),radial-gradient(circle_at_80%_80%,rgba(183,243,208,0.08),transparent_38%)]"
                 />
             </AnimatePresence>
 
@@ -95,7 +93,7 @@ export function WelcomeCarousel() {
                     onClick={goToSignIn}
                     className="text-white/40 text-xs font-medium tracking-wider uppercase hover:text-white/70 transition-colors"
                 >
-                    Skip
+                    {copy.skip}
                 </button>
             </div>
 
@@ -114,16 +112,12 @@ export function WelcomeCarousel() {
                         <div className="flex items-center gap-2">
                             <div className={cn(
                                 "h-6 w-6 rounded-lg flex items-center justify-center",
-                                slide.accent === 'violet' && "bg-violet-500/20",
-                                slide.accent === 'blue' && "bg-blue-500/20",
-                                slide.accent === 'emerald' && "bg-emerald-500/20",
+                                "bg-emerald-400/15",
                             )}>
                                 {React.createElement(slide.icon, {
                                     className: cn(
                                         "h-3.5 w-3.5",
-                                        slide.accent === 'violet' && "text-violet-400",
-                                        slide.accent === 'blue' && "text-blue-400",
-                                        slide.accent === 'emerald' && "text-emerald-400",
+                                        "text-emerald-200",
                                     )
                                 })}
                             </div>
@@ -173,7 +167,7 @@ export function WelcomeCarousel() {
                         <span key={i} className="relative flex items-center justify-center">
                             <button
                                 onClick={() => setCurrent(i)}
-                                aria-label={`Go to slide ${i + 1}`}
+                                aria-label={`${copy.slideLabel} ${i + 1}`}
                                 aria-current={i === current ? 'true' : undefined}
                                 className={cn(
                                     "relative h-1 rounded-full transition-all duration-500",
@@ -192,7 +186,7 @@ export function WelcomeCarousel() {
                             onClick={nextSlide}
                             className="h-14 px-8 rounded-2xl bg-white text-black font-bold text-sm flex items-center gap-2 active:scale-95 transition-transform"
                         >
-                            Continue
+                            {copy.continue}
                             <ChevronRight className="h-4 w-4" />
                         </button>
                     ) : (
@@ -200,7 +194,7 @@ export function WelcomeCarousel() {
                             onClick={goToSignIn}
                             className="h-14 px-8 rounded-2xl bg-white text-black font-bold text-sm flex items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-white/10"
                         >
-                            Get Started
+                            {copy.start}
                             <ArrowRight className="h-4 w-4" />
                         </button>
                     )}

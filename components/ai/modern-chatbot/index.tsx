@@ -122,30 +122,35 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                             {/* Backdrop */}
                             <motion.div
                                 key="drawer-backdrop"
+                                data-testid="conversation-history-backdrop"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.22 }}
                                 onClick={() => setIsDrawerOpen(false)}
-                                className="fixed inset-0 bg-background/92 dark:bg-black/85 backdrop-blur-md z-[590]"
+                                className="fixed inset-0 bg-black/45 dark:bg-black/60 backdrop-blur-sm z-[590]"
                             />
                             {/* Panel */}
                             <motion.div
                                 key="drawer-panel"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Historial de conversaciones"
                                 initial={{ x: '-100%' }}
                                 animate={{ x: 0 }}
                                 exit={{ x: '-100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                                className="fixed inset-0 w-full bg-background z-[600] flex flex-col shadow-2xl backdrop-blur-3xl"
+                                className="fixed inset-y-0 left-0 w-full md:w-[360px] max-w-full bg-background z-[600] flex flex-col border-r border-border/40 shadow-2xl backdrop-blur-3xl"
                             >
                                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
                                     <div className="flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
-                                        <span className="text-[11px] font-bold text-white/60 tracking-[0.2em] uppercase">Conversations</span>
+                                        <span className="text-[11px] font-bold text-muted-foreground tracking-[0.2em] uppercase">Historial</span>
                                     </div>
                                     <button
                                         onClick={() => setIsDrawerOpen(false)}
-                                        className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-all"
+                                        aria-label="Cerrar historial"
+                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>

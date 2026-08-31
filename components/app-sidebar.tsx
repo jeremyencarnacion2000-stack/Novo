@@ -42,7 +42,6 @@ import {
   SidebarHeader,
   SidebarFooter,
   useSidebar,
-  SidebarRail,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { springConfig } from '@/lib/design-tokens'
@@ -299,6 +298,7 @@ export function AppSidebar() {
                                     blur={1}
                                     strength={20}
                                     chromaticAberration={2.75}
+                                    refractive
                                     backgroundColor="transparent"
                                     elevation="low"
                                     aria-hidden
@@ -530,7 +530,6 @@ export function AppSidebar() {
             })()}
           </div>
         </SidebarFooter>
-        <SidebarRail />
       </div>
     </Sidebar>
   )

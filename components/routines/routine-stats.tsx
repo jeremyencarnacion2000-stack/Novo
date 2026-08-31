@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRoutineStats } from '@/hooks/use-swr'
 import { Card, CardContent } from '@/components/ui/card'
 import { Flame, Trophy, TrendingUp, Calendar } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 interface RoutineStats {
     totalCompletions: number
@@ -15,6 +16,7 @@ interface RoutineStats {
 export function RoutineStatsCard() {
     const { data: statsData, isLoading } = useRoutineStats()
     const stats = statsData?.stats
+    const { language } = useTranslation()
 
 
     if (isLoading) {
@@ -37,28 +39,28 @@ export function RoutineStatsCard() {
 
     const statCards = [
         {
-            label: 'Consistency Momentum',
+            label: language === 'es' ? 'Racha actual' : 'Current streak',
             value: `${stats.currentStreak}d`,
             subtext: stats.currentStreak === 1 ? 'active daily streak' : 'active daily streak',
             icon: Flame,
             accentColor: 'bg-orange-500',
         },
         {
-            label: 'Execution Fidelity',
+            label: language === 'es' ? 'Rutinas completadas' : 'Routines completed',
             value: `${stats.completionRate}%`,
             subtext: 'of scheduled routines',
             icon: TrendingUp,
             accentColor: 'bg-emerald-500',
         },
         {
-            label: 'Total Completed',
+            label: language === 'es' ? 'Total completado' : 'Total completed',
             value: stats.totalCompletions.toString(),
             subtext: 'routines completed',
             icon: Trophy,
             accentColor: 'bg-amber-500',
         },
         {
-            label: 'Momentum Signal',
+            label: language === 'es' ? 'Tendencia' : 'Trend',
             value: stats.completionRate >= 70 ? 'Building' : stats.completionRate >= 50 ? 'Stable' : 'Slipping',
             subtext: stats.completionRate >= 70 ? '↑ consistency is increasing' : stats.completionRate >= 50 ? '→ routines are holding steady' : '↓ focus is fragmented lately',
             icon: Calendar,
@@ -104,10 +106,10 @@ export function RoutineStatsCard() {
                 }}
             >
                 <div className="flex items-center gap-3">
-                    <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse flex-shrink-0" />
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
                     <span className="text-xs text-foreground/70">
                         {stats.completionRate >= 70
-                            ? `Execution fidelity is high (${stats.completionRate}%). Your afternoon alignment shows optimal consistency momentum.`
+                            ? (language === 'es' ? `Vas muy bien: completaste el ${stats.completionRate}% de tus rutinas.` : `You are doing well: you completed ${stats.completionRate}% of your routines.`)
                             : `Consistency momentum dropped — completion rate is at ${stats.completionRate}%. Afternoon slots present the primary gap.`
                         }
                     </span>
@@ -117,7 +119,7 @@ export function RoutineStatsCard() {
                         const btn = document.querySelector('[data-slot="sidebar-menu-button"][href="/routines"]');
                         if (btn) (btn as HTMLButtonElement).click();
                     }}
-                    className="text-[10px] font-black tracking-widest uppercase text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0 cursor-pointer"
+                    className="text-[10px] font-black tracking-widest uppercase text-primary hover:text-primary/80 transition-colors flex-shrink-0 cursor-pointer"
                 >
                     Review Afternoon Routine →
                 </button>

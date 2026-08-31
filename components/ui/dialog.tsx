@@ -69,36 +69,62 @@ function FlipAnchoredPositioner({
   children: React.ReactNode
 }) {
   const ref = React.useRef<HTMLDivElement>(null)
+  const [anchored, setAnchored] = React.useState(false)
+  const [anchorPosition, setAnchorPosition] = React.useState({ left: 0, top: 0 })
 
   React.useLayoutEffect(() => {
     const wrapper = ref.current
     const origin = document.querySelector<HTMLElement>(`[data-flip-from="${flipId}"]`)
-    if (!wrapper || !origin) return
+    if (!wrapper || !origin) {
+      setAnchored(false)
+      return
+    }
 
     const margin = 16
     const gap = 8
-    const originRect = origin.getBoundingClientRect()
+    const surface = wrapper.firstElementChild as HTMLElement | null
 
-    wrapper.style.left = `${originRect.left}px`
-    wrapper.style.top = `${originRect.bottom + gap}px`
+    const place = () => {
+      const originRect = origin.getBoundingClientRect()
+      const rect = (surface ?? wrapper).getBoundingClientRect()
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+      const maxLeft = Math.max(margin, viewportWidth - rect.width - margin)
+      const maxTop = Math.max(margin, viewportHeight - rect.height - margin)
+      const left = Math.min(Math.max(margin, originRect.left), maxLeft)
+      let top = originRect.bottom + gap
+      if (top > maxTop) top = originRect.top - rect.height - gap
+      top = Math.min(Math.max(margin, top), maxTop)
+      wrapper.style.left = `${left}px`
+      wrapper.style.top = `${top}px`
+      setAnchorPosition({ left, top })
+      setAnchored(true)
+    }
+
+    place()
+    const resizeObserver = surface && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null
+    if (resizeObserver && surface) resizeObserver.observe(surface)
+    window.addEventListener('resize', place)
+    window.visualViewport?.addEventListener('resize', place)
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', place)
+      window.visualViewport?.removeEventListener('resize', place)
+    }
 
     // Now that it's placed, measure its real size and clamp to the viewport
     // — flipping above the trigger if there's no room below.
-    const rect = wrapper.getBoundingClientRect()
-    let left = originRect.left
-    let top = originRect.bottom + gap
-    if (left + rect.width > window.innerWidth - margin) {
-      left = Math.max(margin, window.innerWidth - rect.width - margin)
-    }
-    if (top + rect.height > window.innerHeight - margin) {
-      top = Math.max(margin, originRect.top - rect.height - gap)
-    }
-    wrapper.style.left = `${Math.max(margin, left)}px`
-    wrapper.style.top = `${Math.max(margin, top)}px`
   }, [flipId])
 
   return (
-    <div ref={ref} className="fixed z-[5001] pointer-events-none" style={{ left: 0, top: 0 }}>
+    <div
+      ref={ref}
+      className={cn(
+        'fixed z-[5001] pointer-events-none',
+        !anchored && 'inset-0 flex items-center justify-center',
+      )}
+      style={{ left: anchored ? anchorPosition.left : 0, top: anchored ? anchorPosition.top : 0 }}
+    >
       {children}
     </div>
   )
@@ -120,7 +146,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  flipAnchored = false,
+  flipAnchored,
   contextualRect,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
@@ -149,7 +175,7 @@ function DialogContent({
         // in a non-scrolling wrapper, gets cropped equally from top and
         // bottom with no way to scroll to the cropped part. dvh tracks the
         // real visual viewport instead.
-        'bg-background pointer-events-auto relative w-full max-w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
+        'bg-background pointer-events-auto relative box-border w-full max-w-[calc(100vw-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
         isFlipModal
           ? 'modal-flip-target'
           : isContextualModal
@@ -179,7 +205,7 @@ function DialogContent({
         {...(isFlipModal ? { 'data-flip-overlay': flipId } as any : {})}
         {...(isMaterialOverlay ? { 'data-overlay-material': true } as any : {})}
       />
-      {isFlipModal && flipAnchored ? (
+      {isFlipModal && flipAnchored !== false ? (
         <FlipAnchoredPositioner flipId={flipId!}>{content}</FlipAnchoredPositioner>
       ) : (
         <div

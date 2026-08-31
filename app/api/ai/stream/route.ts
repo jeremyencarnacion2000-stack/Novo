@@ -8,6 +8,7 @@ import {
 import { classifyIntent, requiresSystemContext } from '@/lib/ai/classifier';
 import type { IntentType } from '@/lib/ai/classifier';
 import { buildUserContext } from '@/lib/ai/context-builder';
+import { shouldConsultGmail } from '@/lib/ai/gmail-context';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. MEMORY LAYER (3-Layer Context)
-        const context = await buildUserContext(userId, { twinMode });
+        const context = await buildUserContext(userId, { twinMode, includeGmail: shouldConsultGmail(message || '') });
         await appendActivityEvent(userId, { runId: activityRunId, phase: 'interpreting_signals', label: 'Interpretando las señales disponibles', sourceCount: context.structured.sources?.length ?? 0 });
         const userContext = context.summary;
 

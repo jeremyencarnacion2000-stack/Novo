@@ -129,6 +129,11 @@ export async function GET(req: NextRequest) {
                 accessToken: tokenData.access_token,
                 tokenType: 'Bearer',
                 providerAccountId,
+                refreshToken: typeof tokenData.refresh_token === 'string' ? tokenData.refresh_token : undefined,
+                expiresAt: typeof tokenData.expires_in === 'number' ? new Date(Date.now() + tokenData.expires_in * 1000) : null,
+                syncStatus: 'connected',
+                syncErrorCode: null,
+                syncErrorMessage: null,
                 metadata: {
                     ...existingMeta,
                     projectIds: existingMeta.projectIds ?? [],

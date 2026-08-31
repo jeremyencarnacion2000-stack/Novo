@@ -5,18 +5,24 @@ function response(body: unknown, ok = true, status = 200) {
 }
 
 describe('Todoist selected-project reconciliation client', () => {
-  it('pulls only the explicit selected projects and normalizes completion-capable activity', async () => {
+  it('uses unified API v1, explicit project scope and date-bounded completion activity', async () => {
     const requested: string[] = []
     const fetchImpl = jest.fn(async (input: string | URL | Request) => {
       const url = String(input)
       requested.push(url)
-      if (url.includes('/rest/v2/tasks')) {
-        return response([{ id: 'task-1', content: 'One', priority: 4, project_id: 'project-1', due: null }])
+      if (url.includes('/api/v1/tasks')) {
+        return response({
+          results: [{ id: 'task-1', content: 'One', priority: 4, project_id: 'project-1', due: null }],
+          next_cursor: null,
+        })
       }
-      return response({ events: [{
-        id: 'event-1', object_type: 'item', event_type: 'completed', object_id: 'task-1',
-        event_date: '2026-08-11T12:00:00.000Z',
-      }] })
+      return response({
+        results: [{
+          id: 'event-1', object_type: 'item', event_type: 'completed', object_id: 'task-1',
+          parent_project_id: 'project-1', event_date: '2026-08-11T12:00:00.000Z',
+        }],
+        next_cursor: null,
+      })
     })
 
     const result = await pullTodoistSelectedProjects({
@@ -29,6 +35,10 @@ describe('Todoist selected-project reconciliation client', () => {
 
     expect(requested).toHaveLength(2)
     expect(requested.every((url) => url.includes('project-1'))).toBe(true)
+    expect(requested[0]).toContain('/api/v1/tasks')
+    expect(requested[1]).toContain('/api/v1/activities')
+    expect(requested[1]).toContain('date_from=2026-08-11T11%3A00%3A00.000Z')
+    expect(requested[1]).toContain('date_to=2026-08-11T12%3A01%3A00.000Z')
     expect(result).toMatchObject({
       cursorAfter: '2026-08-11T12:01:00.000Z',
       activeTasks: [{ id: 'task-1', projectId: 'project-1', text: 'One', priority: 'high', dueDate: null }],
@@ -36,9 +46,31 @@ describe('Todoist selected-project reconciliation client', () => {
     })
   })
 
+  it('follows cursor pagination without confusing provider cursors with Novo time cursors', async () => {
+    const fetchImpl = jest.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/tasks')) {
+        return url.searchParams.get('cursor')
+          ? response({ results: [{ id: 'task-2', content: 'Two', priority: 1, project_id: 'project-1' }], next_cursor: null })
+          : response({ results: [{ id: 'task-1', content: 'One', priority: 4, project_id: 'project-1' }], next_cursor: 'provider-page-2' })
+      }
+      return response({ results: [], next_cursor: null })
+    })
+
+    const result = await pullTodoistSelectedProjects({
+      accessToken: 'token', projectIds: ['project-1'], cursor: null,
+      fetchImpl: fetchImpl as typeof fetch,
+    })
+
+    expect(result.activeTasks.map((task) => task.id)).toEqual(['task-1', 'task-2'])
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
   it('fails the whole bounded pull when one selected project fails', async () => {
     const fetchImpl = jest.fn(async (input: string | URL | Request) => (
-      String(input).includes('project-b') ? response({}, false, 503) : response([])
+      String(input).includes('project-b')
+        ? response({}, false, 503)
+        : response({ results: [], next_cursor: null })
     ))
 
     await expect(pullTodoistSelectedProjects({
@@ -47,23 +79,24 @@ describe('Todoist selected-project reconciliation client', () => {
     })).rejects.toThrow('todoist_active_pull_failed')
   })
 
-  it('rejects a truncated completion window before returning observations', async () => {
-    const events = Array.from({ length: 100 }, (_, index) => ({
-      id: `event-${index}`, object_type: 'item', event_type: 'completed', object_id: `task-${index}`,
-      event_date: '2026-08-11T12:00:00.000Z',
-    }))
+  it('rejects a provider cursor loop before returning observations', async () => {
     const fetchImpl = jest.fn(async (input: string | URL | Request) => (
-      String(input).includes('/rest/v2/tasks') ? response([]) : response({ events })
+      String(input).includes('/api/v1/tasks')
+        ? response({ results: [], next_cursor: null })
+        : response({ results: [], next_cursor: 'same-cursor' })
     ))
 
     await expect(pullTodoistSelectedProjects({
       accessToken: 'token', projectIds: ['project-1'], cursor: '2026-08-11T11:00:00.000Z',
       fetchImpl: fetchImpl as typeof fetch,
-    })).rejects.toThrow('todoist_completion_window_truncated')
+    })).rejects.toThrow('todoist_response_invalid')
   })
 
-  it('rejects a malformed selected-project task row instead of advancing past it', async () => {
-    const fetchImpl = jest.fn(async () => response([{ id: 'task-1' }]))
+  it('rejects a malformed or cross-project task row', async () => {
+    const fetchImpl = jest.fn(async () => response({
+      results: [{ id: 'task-1', content: 'Wrong lane', project_id: 'project-2' }],
+      next_cursor: null,
+    }))
 
     await expect(pullTodoistSelectedProjects({
       accessToken: 'token', projectIds: ['project-1'], cursor: null,
@@ -72,18 +105,14 @@ describe('Todoist selected-project reconciliation client', () => {
   })
 
   it.each([
-    {
-      events: [{ object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: '2026-08-11T12:00:00.000Z' }],
-    },
-    {
-      events: [{ id: 'event-1', object_type: 'item', event_type: 'completed', event_date: '2026-08-11T12:00:00.000Z' }],
-    },
-    {
-      events: [{ id: 'event-1', object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: 'not-a-date' }],
-    },
-  ])('rejects a malformed completion-capable event row', async ({ events }) => {
+    [{ object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: '2026-08-11T12:00:00.000Z' }],
+    [{ id: 'event-1', object_type: 'item', event_type: 'completed', event_date: '2026-08-11T12:00:00.000Z' }],
+    [{ id: 'event-1', object_type: 'item', event_type: 'completed', object_id: 'task-1', event_date: 'not-a-date' }],
+  ])('rejects a malformed completion-capable event row', async (events) => {
     const fetchImpl = jest.fn(async (input: string | URL | Request) => (
-      String(input).includes('/rest/v2/tasks') ? response([]) : response({ events })
+      String(input).includes('/api/v1/tasks')
+        ? response({ results: [], next_cursor: null })
+        : response({ results: events, next_cursor: null })
     ))
 
     await expect(pullTodoistSelectedProjects({

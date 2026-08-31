@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin';
+import { upsertNovoSignals } from '@/lib/cognitive/signal-ledger';
 
 interface SlackMessage {
   ts: string;
@@ -30,35 +31,37 @@ interface SlackSyncResult {
   error?: string;
 }
 
-async function fetchSlackChannels(token: string): Promise<SlackChannel[]> {
+async function fetchSlackChannels(token: string, signal?: AbortSignal): Promise<SlackChannel[]> {
   const res = await fetch('https://slack.com/api/conversations.list?limit=20&types=public_channel,private_channel', {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
   const data = await res.json();
   if (!data.ok) return [];
   return (data.channels ?? []).filter((c: SlackChannel) => c.is_member);
 }
 
-async function fetchChannelHistory(token: string, channelId: string): Promise<SlackMessage[]> {
+async function fetchChannelHistory(token: string, channelId: string, signal?: AbortSignal): Promise<SlackMessage[]> {
   const oldest = String(Math.floor((Date.now() - 48 * 60 * 60 * 1000) / 1000));
   const res = await fetch(
     `https://slack.com/api/conversations.history?channel=${channelId}&oldest=${oldest}&limit=100`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: { Authorization: `Bearer ${token}` }, signal },
   );
   const data = await res.json();
   if (!data.ok) return [];
   return data.messages ?? [];
 }
 
-async function fetchSlackUserId(token: string): Promise<string | null> {
+async function fetchSlackUserId(token: string, signal?: AbortSignal): Promise<string | null> {
   const res = await fetch('https://slack.com/api/auth.test', {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
   const data = await res.json();
   return data.ok ? data.user_id : null;
 }
 
-export async function syncSlackPlugin(userId: string): Promise<SlackSyncResult> {
+export async function syncSlackPlugin(userId: string, options: { signal?: AbortSignal } = {}): Promise<SlackSyncResult> {
   try {
     const account = await prisma.integrationAccount.findUnique({
       where: { userId_provider: { userId, provider: 'slack' } },
@@ -70,8 +73,8 @@ export async function syncSlackPlugin(userId: string): Promise<SlackSyncResult> 
     }
 
     const [slackUserId, channels] = await Promise.all([
-      fetchSlackUserId(account.accessToken),
-      fetchSlackChannels(account.accessToken),
+      fetchSlackUserId(account.accessToken, options.signal),
+      fetchSlackChannels(account.accessToken, options.signal),
     ]);
 
     if (!slackUserId) {
@@ -82,7 +85,7 @@ export async function syncSlackPlugin(userId: string): Promise<SlackSyncResult> 
     const topChannels = channels.slice(0, 5);
     const allMessages = (
       await Promise.all(
-        topChannels.map((channel) => fetchChannelHistory(account.accessToken, channel.id))
+        topChannels.map((channel) => fetchChannelHistory(account.accessToken, channel.id, options.signal))
       )
     ).flat();
 
@@ -98,70 +101,57 @@ export async function syncSlackPlugin(userId: string): Promise<SlackSyncResult> 
     const afterHoursRatio = myMessages.length > 0 ? afterHours.length / myMessages.length : 0;
     const burnoutRiskDetected = afterHoursRatio > 0.3 || afterHours.length > 10;
 
-    let signalsEmitted = 0;
-
-    if (burnoutRiskDetected) {
-      const twin = await getOrCreateTwin(userId);
-      await prisma.behavioralSignal.create({
-        data: {
-          userId,
-          twinId: twin.id,
-          signal: 'task_deferred', // closest existing signal for overwork
-          occurredAt: new Date(),
-          metadata: {
-            source: 'slack',
-            type: 'after_hours_activity',
-            afterHoursMessages: afterHours.length,
-            totalMessages: myMessages.length,
-            afterHoursRatio: afterHoursRatio.toFixed(2),
-          },
-        },
-      });
-      signalsEmitted++;
-
-      // Directly boost burnout index in twin
-      if (twin) {
-        const metrics = (twin.metrics as any) ?? {};
-        const currentBurnout = metrics.burnoutIndex ?? 0;
-        const newBurnout = Math.min(100, currentBurnout + afterHours.length * 2);
-        await prisma.cognitiveTwinRecord.update({
-          where: { userId },
-          data: {
-            metrics: { ...metrics, burnoutIndex: newBurnout, slackAfterHoursDetected: true },
-          },
-        });
-      }
-    }
-
     // Calculate message volume → cognitive load signal
     const last24hMessages = myMessages.filter(
       (m) => Number(m.ts) * 1000 > Date.now() - 24 * 60 * 60 * 1000,
     );
-    if (last24hMessages.length > 40) {
-      const twin = await prisma.cognitiveTwinRecord.findUnique({ where: { userId } });
-      if (twin) {
-        const metrics = (twin.metrics as any) ?? {};
-        await prisma.cognitiveTwinRecord.update({
-          where: { userId },
-          data: {
-            metrics: {
-              ...metrics,
-              currentCognitiveLoad: Math.min(100, (metrics.currentCognitiveLoad ?? 50) + 15),
-              slackMessageVolume24h: last24hMessages.length,
-            },
-          },
-        });
-      }
-    }
+    const slackBurnoutRiskScore = Math.min(
+      100,
+      Math.round(Math.max(afterHoursRatio * 100, afterHours.length * 6)),
+    );
+    const slackCognitiveLoadEstimate = Math.min(
+      100,
+      Math.round((last24hMessages.length / 40) * 75),
+    );
+
+    // A provider poll is a replaceable snapshot, not a new human action. The
+    // stable sourceRef keeps overlapping 48h windows on one durable ledger row.
+    await upsertNovoSignals(userId, [{
+      source: 'slack',
+      sourceRef: 'activity-window',
+      signalType: 'activity_observed',
+      label: `Slack activity observed: ${myMessages.length} messages in 48h, ${afterHours.length} after hours, ${last24hMessages.length} in 24h`,
+      observedAt: new Date(),
+      reliability: 'direct',
+    }]);
+
+    const twin = await getOrCreateTwin(userId);
+    const metrics = (twin.metrics as Record<string, unknown> | null) ?? {};
+    await prisma.cognitiveTwinRecord.update({
+      where: { userId },
+      data: {
+        metrics: {
+          ...metrics,
+          burnoutIndex: Math.max(Number(metrics.burnoutIndex ?? 0), slackBurnoutRiskScore),
+          currentCognitiveLoad: Math.max(Number(metrics.currentCognitiveLoad ?? 0), slackCognitiveLoadEstimate),
+          slackAfterHoursDetected: burnoutRiskDetected,
+          slackBurnoutRiskScore,
+          slackCognitiveLoadEstimate,
+          slackAfterHoursMessages: afterHours.length,
+          slackMessagesObserved48h: myMessages.length,
+          slackMessageVolume24h: last24hMessages.length,
+        },
+      },
+    });
 
     return {
       messagesAnalyzed: myMessages.length,
       afterHoursMessages: afterHours.length,
-      signalsEmitted,
+      signalsEmitted: 1,
       burnoutRiskDetected,
     };
-  } catch (err) {
-    console.error('[SlackPlugin] Error:', err);
-    return { messagesAnalyzed: 0, afterHoursMessages: 0, signalsEmitted: 0, burnoutRiskDetected: false, error: String(err) };
+  } catch {
+    console.error('[SlackPlugin] Provider read failed');
+    return { messagesAnalyzed: 0, afterHoursMessages: 0, signalsEmitted: 0, burnoutRiskDetected: false, error: 'unavailable' };
   }
 }
