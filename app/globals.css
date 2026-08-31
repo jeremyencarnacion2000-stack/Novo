@@ -37,6 +37,34 @@
 .landing-ambient::after { z-index: -1; opacity: .14; mix-blend-mode: soft-light; background-image: var(--glass-noise); background-size: 180px 180px; }
 @media (prefers-reduced-motion: reduce) and (max-width: 1023px) { .landing-ambient::before { animation: none; } }
 
+/* A flat bg-black reads as a plain rectangle; this is the same fractal-noise
+   grain the landing page already uses (see .landing-ambient::after above),
+   applied as its own layer so any solid-color surface can opt in without
+   fighting that surface's own background/blur. Static (no animation, no
+   reduced-motion branch needed) since it's a texture, not motion.
+
+   Deliberately no `isolation: isolate` here (unlike .landing-ambient) and no
+   z-index bump on children: this class is meant to drop onto containers that
+   may host a position:fixed full-viewport child (e.g. the chatbot's voice
+   overlay, z-[200]) — isolation would trap that fixed descendant inside this
+   element's stacking context instead of the viewport. The ::after relies on
+   z-index:1 plus normal paint order; give any sibling that must sit above it
+   its own z-index (the chatbot's content wrapper already does, at z-10). */
+.novo-grain {
+  position: relative;
+}
+.novo-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: soft-light;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+}
+
 [data-app-viewport] {
   position: relative;
   isolation: isolate;
