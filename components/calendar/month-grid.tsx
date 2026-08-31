@@ -62,8 +62,12 @@ export function MonthGrid({
         ))}
       </div>
 
-      {/* Day cells */}
-      <div className="grid grid-cols-7 flex-1 w-full gap-px bg-foreground/5 rounded-2xl overflow-hidden border border-foreground/5">
+      {/* Day cells — WeekGrid/DayGrid already scroll their own overflow;
+          this grid didn't, so a compact viewport (or a month whose 6 rows
+          exceed the available height) silently clipped the bottom weeks
+          with no way to reach them. */}
+      <div className="flex-1 min-h-0 w-full overflow-y-auto rounded-2xl">
+      <div className="grid grid-cols-7 w-full gap-px bg-foreground/5 border border-foreground/5">
         {days.map((d) => {
           const dayEvents = eventsOnDay(d);
           const visible = dayEvents.slice(0, MAX_VISIBLE);
@@ -106,7 +110,6 @@ export function MonthGrid({
                     className="w-full text-left px-1.5 py-0.5 rounded-md text-[10px] font-semibold truncate transition-opacity"
                     style={{
                       backgroundColor: `${ev.color}22`,
-                      borderLeft: `3px solid ${ev.color}`,
                       color: ev.color,
                       opacity: dimmed ? 0.25 : 1,
                     }}
@@ -124,6 +127,7 @@ export function MonthGrid({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

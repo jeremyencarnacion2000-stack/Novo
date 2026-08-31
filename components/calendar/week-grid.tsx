@@ -112,7 +112,6 @@ export function WeekGrid({ currentDate, events, onSelectEvent, fatigueDimSources
                         top: `${top}px`,
                         height: `${height}px`,
                         backgroundColor: `${ev.color}28`,
-                        borderLeft: `3px solid ${ev.color}`,
                         color: ev.color,
                         opacity: dimmed ? 0.25 : 1,
                       }}

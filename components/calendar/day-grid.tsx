@@ -61,7 +61,6 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
               className="px-3 py-1.5 rounded-lg text-xs font-semibold truncate max-w-[200px] transition-opacity hover:opacity-80"
               style={{
                 backgroundColor: `${ev.color}22`,
-                borderLeft: `3px solid ${ev.color}`,
                 color: ev.color,
               }}
             >
@@ -115,7 +114,6 @@ export function DayGrid({ currentDate, events, onSelectEvent, fatigueDimSources 
                     top: `${top}px`,
                     height: `${height}px`,
                     backgroundColor: `${ev.color}22`,
-                    borderLeft: `4px solid ${ev.color}`,
                     color: ev.color,
                     opacity: dimmed ? 0.25 : 1,
                   }}

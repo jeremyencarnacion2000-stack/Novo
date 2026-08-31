@@ -129,6 +129,50 @@ function killActive(id: string) {
   }
 }
 
+// A trigger this much smaller than its destination panel (in either
+// dimension) doesn't read as "the same object transforming" — it reads as
+// the trigger exploding into an unrelated big box. Small calendar-event
+// chips (~24px tall, 10px text) growing into a ~450px modal are the extreme
+// case, but any small pill/icon-button-to-modal pairing hits the same
+// problem. Below this ratio, use the plain fade/scale entrance instead of
+// the full container-transform.
+const MIN_ORIGIN_RATIO = 0.15
+
+/** Smooth modal scale/fade entrance — used when there's no sensible shared-element travel. */
+function runFadeEntrance(id: string, target: HTMLElement, overlay: HTMLElement | null, reducedMotion: boolean, onDone?: () => void) {
+  gsap.set(target, { opacity: 0, x: 0, y: 8, scaleX: 0.96, scaleY: 0.96, transformOrigin: '50% 50%' })
+  if (overlay) gsap.set(overlay, { opacity: 0 })
+
+  const tlFallback = gsap.timeline({
+    onComplete: () => {
+      gsap.set(target, { clearProps: 'transform,transformOrigin,opacity' })
+      activeTimelines.delete(id)
+      onDone?.()
+    },
+  })
+  tlFallback.to(target, { opacity: 1, x: 0, y: 0, scaleX: 1, scaleY: 1, duration: reducedMotion ? 0.01 : 0.32, ease: EASE_ENTRANCE }, 0)
+  if (overlay) tlFallback.to(overlay, { opacity: 1, duration: reducedMotion ? 0.01 : 0.25 }, 0)
+
+  activeTimelines.set(id, tlFallback)
+}
+
+/** Matching close for runFadeEntrance — plain fade/scale exit, no origin travel. */
+function runFadeExit(id: string, target: HTMLElement, overlay: HTMLElement | null, reducedMotion: boolean, onDone?: () => void) {
+  const tlFallback = gsap.timeline({
+    onComplete: () => {
+      target.classList.remove('modal-flip-active')
+      if (overlay) overlay.classList.remove('modal-flip-active')
+      gsap.set(target, { clearProps: 'transform,transformOrigin,opacity' })
+      activeTimelines.delete(id)
+      onDone?.()
+    },
+  })
+  tlFallback.to(target, { opacity: 0, y: 8, scaleX: 0.96, scaleY: 0.96, transformOrigin: '50% 50%', duration: reducedMotion ? 0.01 : 0.24, ease: EASE_EXIT }, 0)
+  if (overlay) tlFallback.to(overlay, { opacity: 0, duration: reducedMotion ? 0.01 : 0.2 }, 0)
+
+  activeTimelines.set(id, tlFallback)
+}
+
 // ─── Public API ────────────────────────────────────────────────────────────
 
 export const modalFlip = {
@@ -170,20 +214,19 @@ export const modalFlip = {
 
     // If origin is missing, perform a smooth modal scale/fade entrance fallback
     if (!origin) {
-      gsap.set(target, { opacity: 0, x: 0, y: 8, scaleX: 0.96, scaleY: 0.96, transformOrigin: '50% 50%' })
-      if (overlay) gsap.set(overlay, { opacity: 0 })
+      runFadeEntrance(id, target, overlay, reducedMotion, onDone)
+      return
+    }
 
-      const tlFallback = gsap.timeline({
-        onComplete: () => {
-          gsap.set(target, { clearProps: 'transform,transformOrigin,opacity' })
-          activeTimelines.delete(id)
-          onDone?.()
-        },
-      })
-      tlFallback.to(target, { opacity: 1, x: 0, y: 0, scaleX: 1, scaleY: 1, duration: reducedMotion ? 0.01 : 0.32, ease: EASE_ENTRANCE }, 0)
-      if (overlay) tlFallback.to(overlay, { opacity: 1, duration: reducedMotion ? 0.01 : 0.25 }, 0)
-
-      activeTimelines.set(id, tlFallback)
+    // An origin far smaller than the target (in either dimension) can't
+    // "grow" into it without an explosive, non-uniform stretch — the trigger
+    // never gets hidden/touched in this branch, so it's left exactly as-is.
+    const originRect  = origin.getBoundingClientRect()
+    const naturalRect = target.getBoundingClientRect()
+    const widthRatio  = naturalRect.width  ? originRect.width  / naturalRect.width  : 1
+    const heightRatio = naturalRect.height ? originRect.height / naturalRect.height : 1
+    if (widthRatio < MIN_ORIGIN_RATIO || heightRatio < MIN_ORIGIN_RATIO) {
+      runFadeEntrance(id, target, overlay, reducedMotion, onDone)
       return
     }
 
@@ -194,9 +237,7 @@ export const modalFlip = {
     // low-power GPUs and makes the handoff feel like a teleport.
     gsap.set(origin, { opacity: 0 })
 
-    const originRect   = origin.getBoundingClientRect()
     const originRadius = getComputedStyle(origin).borderRadius
-    const naturalRect  = target.getBoundingClientRect()
     const naturalRadius = getComputedStyle(target).borderRadius
     const sharedPairs  = findSharedItemPairs(origin, target)
 
@@ -375,6 +416,16 @@ export const modalFlip = {
     const originRect   = origin.getBoundingClientRect()
     const originRadius = getComputedStyle(origin).borderRadius
     const currentRect  = target.getBoundingClientRect()
+
+    // Mirror of the toggle()-side ratio guard: an origin this much smaller
+    // than the panel can't "shrink" back into it convincingly either.
+    const widthRatio  = currentRect.width  ? originRect.width  / currentRect.width  : 1
+    const heightRatio = currentRect.height ? originRect.height / currentRect.height : 1
+    if (widthRatio < MIN_ORIGIN_RATIO || heightRatio < MIN_ORIGIN_RATIO) {
+      origin.classList.remove('modal-flip-source-active')
+      runFadeExit(id, target, overlay, reducedMotion, onDone)
+      return
+    }
 
     const sharedPairs  = findSharedItemPairs(origin, target)
     const flyingItems  = flyingRegistry.get(id) || []
