@@ -1,5 +1,6 @@
 import { classifyIntent } from './classifier';
 import { buildUserContext } from './context-builder';
+import { shouldConsultGmail } from './gmail-context';
 import { COGNITIVE_CORE_PROMPT, SYSTEM_AGENT_PROMPT } from './system-prompt';
 import { AIResponse, AIAction } from './types';
 
@@ -13,7 +14,9 @@ export async function runAI(message: string, history: any[] = [], userId: string
     const classification = classifyIntent(message);
 
     // 2. MEMORY LAYER
-    const context = await buildUserContext(userId);
+    const context = await buildUserContext(userId, {
+        includeGmail: shouldConsultGmail(message),
+    });
     const userContext = context.summary;
 
     // 3. COGNITIVE CORE (Model A)

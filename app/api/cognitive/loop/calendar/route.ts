@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getGoogleAccessToken } from '@/lib/google'
+import { findGoogleAccountForScopes } from '@/lib/google-account'
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { trackNovoLoopEvent } from '@/lib/cognitive/events'
@@ -43,12 +44,10 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: 'Calendar action is already being processed.', execution: existing }, { status: 409 })
   }
-  const account = await prisma.account.findFirst({ where: { userId, provider: 'google' }, select: { scope: true } })
-  const scopes = account?.scope?.split(' ') ?? []
-  const permitted = scopes.some((scope) => ['calendar', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events'].includes(scope))
-  if (!permitted) { await prisma.externalActionExecution.update({ where: { id: execution.id }, data: { status: 'failed', safeErrorCode: 'missing_calendar_scope', failedAt: new Date() } }); return NextResponse.json({ error: 'Google Calendar permission is required.' }, { status: 403 }) }
+  const account = await findGoogleAccountForScopes(userId, ['calendar'])
+  if (!account) { await prisma.externalActionExecution.update({ where: { id: execution.id }, data: { status: 'failed', safeErrorCode: 'missing_calendar_scope', failedAt: new Date() } }); return NextResponse.json({ error: 'Google Calendar permission is required.' }, { status: 403 }) }
   if (runId) { const run = await getActivityRun(userId, runId); if (!run || ['cancelled', 'expired'].includes(run.run.status)) { await prisma.externalActionExecution.update({ where: { id: execution.id }, data: { status: 'cancelled' } }); return NextResponse.json({ error: 'This execution was cancelled.' }, { status: 409 }) } }
-  const accessToken = await getGoogleAccessToken(userId, session.accessToken)
+  const accessToken = await getGoogleAccessToken(userId, ['calendar'])
   if (!accessToken) { await prisma.externalActionExecution.update({ where: { id: execution.id }, data: { status: 'failed', safeErrorCode: 'expired_calendar_connection', failedAt: new Date() } }); return NextResponse.json({ error: 'Google Calendar connection expired.' }, { status: 403 }) }
   try {
     const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET)

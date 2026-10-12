@@ -5,8 +5,8 @@ import { useSession, signIn } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
 import { useTranslation } from '@/lib/i18n'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 import { cn } from '@/lib/utils'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
@@ -98,7 +98,7 @@ function getTwinIntegrationDetail(id: string, language: string) {
   const dictionary = language === 'es' ? es : language === 'fr' ? fr : language === 'de' ? de : en
   if (id === 'github') {
     return language === 'es'
-      ? { observes: 'Actividad agregada de tus repositorios autorizados.', learns: 'Detecta ventanas de coding, trabajo fuera de horario y carga sostenida.', uses: 'Ajusta el siguiente paso sin guardar cÃ³digo ni mensajes de commits.', citation: 'El chat muestra GitHub cuando esa seÃ±al aportÃ³ contexto.' }
+      ? { observes: 'Actividad agregada de tus repositorios autorizados.', learns: 'Detecta ventanas de coding, trabajo fuera de horario y carga sostenida.', uses: 'Ajusta el siguiente paso sin guardar código ni mensajes de commits.', citation: 'El chat muestra GitHub cuando esa señal aportó contexto.' }
       : { observes: 'Aggregate activity from your authorised repositories.', learns: 'Detects coding windows, after-hours work, and sustained load.', uses: 'Adjusts the next step without storing code or commit messages.', citation: 'Chat shows GitHub when that activity signal informed context.' }
   }
   return dictionary[id as keyof typeof dictionary] ?? null
@@ -144,7 +144,9 @@ function ConnectorCard({ connector, onClick }: { connector: Connector; onClick: 
       onClick={onClick}
       data-flip-from={`connector-${connector.id}`}
       className={cn(
-        'text-left rounded-2xl border p-4 flex flex-col gap-4 transition-all duration-300 active:scale-95 hover:scale-[1.02]',
+        // Keep connector cards calm while status requests resolve: only
+        // optical properties should animate, never the card's measured box.
+        'text-left rounded-2xl border p-4 flex flex-col gap-4 transition-[background-color,border-color,box-shadow,opacity,transform] duration-300 active:scale-95 hover:scale-[1.02]',
         isSoon
           ? 'border-foreground/[0.05] bg-foreground/[0.01] opacity-60 cursor-default'
           : 'border-foreground/[0.06] bg-foreground/[0.015] hover:bg-foreground/[0.04] hover:border-foreground/10 cursor-pointer',
@@ -266,6 +268,7 @@ export function ConnectorsClient() {
   // ── Drive state ──────────────────────────────────────────────────────────
   const [driveStatus, setDriveStatus] = useState<{ connected: boolean; hasScope: boolean } | null>(null)
   const [driveBackingUp, setDriveBackingUp] = useState(false)
+  const driveBackupIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   // ── Calendar state ───────────────────────────────────────────────────────
   const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; hasScope: boolean } | null>(null)
@@ -295,8 +298,18 @@ export function ConnectorsClient() {
   const [query, setQuery] = useState('')
   const [twinSyncing, setTwinSyncing] = useState(false)
 
-  const refreshCustomConnectors = () => {
-    fetch('/api/integration/custom').then(r => r.json()).then(d => setCustomConnectors(d.connectors ?? [])).catch(() => {})
+  const refreshCustomConnectors = (signal?: AbortSignal) => {
+    fetch('/api/integration/custom', { cache: 'no-store', signal })
+      .then((response) => response.ok ? response.json() : { connectors: [] })
+      .then((data) => {
+        if (!signal?.aborted) setCustomConnectors(Array.isArray(data.connectors) ? data.connectors : [])
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string })?.name !== 'AbortError' && !signal?.aborted) {
+          // Keep the last known catalog on transient failures. A connector
+          // list should not disappear just because one status request failed.
+        }
+      })
   }
 
   // Handle ?notionStatus= query param from OAuth callback redirect
@@ -369,7 +382,7 @@ export function ConnectorsClient() {
     const status = params.get('githubStatus')
     if (!status) return
     if (status === 'connected') toast({ title: 'GitHub conectado', description: 'El Twin ya puede observar actividad agregada de tus repositorios.' })
-    else toast({ title: 'FallÃ³ la conexiÃ³n con GitHub', description: `Motivo: ${params.get('reason') ?? 'unknown'}`, variant: 'destructive' })
+    else toast({ title: 'Falló la conexión con GitHub', description: `Motivo: ${params.get('reason') ?? 'unknown'}`, variant: 'destructive' })
     params.delete('githubStatus'); params.delete('reason')
     const url = new URL(window.location.href); url.search = params.toString(); window.history.replaceState({}, '', url.toString())
   }, [toast])
@@ -452,16 +465,52 @@ export function ConnectorsClient() {
   }, [slackStatus])
 
   useEffect(() => {
-    if (!session?.user?.id) return
-    fetch('/api/integration/notion').then(r => r.json()).then(setNotionStatus).catch(() => setNotionStatus({ connected: false }))
-    fetch('/api/integration/todoist').then(r => r.json()).then(setTodoistStatus).catch(() => setTodoistStatus({ connected: false }))
-    fetch('/api/integration/slack').then(r => r.json()).then(setSlackStatus).catch(() => setSlackStatus({ connected: false }))
-    fetch('/api/integration/drive').then(r => r.json()).then(setDriveStatus).catch(() => setDriveStatus({ connected: false, hasScope: false }))
-    fetch('/api/integration/calendar').then(r => r.json()).then(setCalendarStatus).catch(() => setCalendarStatus({ connected: false, hasScope: false }))
-    fetch('/api/integration/gmail').then(r => r.json()).then(setGmailStatus).catch(() => setGmailStatus({ connected: false, hasScope: false }))
-    fetch('/api/integration/github').then(r => r.json()).then(setGithubStatus).catch(() => setGithubStatus({ connected: false }))
-    fetch('/api/integration/status').then(r => r.json()).then(setGrantStatus).catch(() => setGrantStatus({ google: false, spotify: false }))
-    refreshCustomConnectors()
+    const userId = session?.user?.id
+    if (!userId) {
+      // Clear provider state immediately on sign-out/account switch so a
+      // previous user's connection badges cannot flash in the next session.
+      setNotionStatus(null)
+      setTodoistStatus(null)
+      setSlackStatus(null)
+      setDriveStatus(null)
+      setCalendarStatus(null)
+      setGmailStatus(null)
+      setGithubStatus(null)
+      setGrantStatus(null)
+      setCustomConnectors([])
+      return
+    }
+
+    const controller = new AbortController()
+    const load = async <T,>(
+      path: string,
+      fallback: T,
+      setter: (value: T) => void,
+    ) => {
+      try {
+        const response = await fetch(path, { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) throw new Error(`Connector status request failed: ${response.status}`)
+        const value = await response.json() as T
+        if (!controller.signal.aborted) setter(value)
+      } catch (error: unknown) {
+        if ((error as { name?: string })?.name === 'AbortError' || controller.signal.aborted) return
+        if (!controller.signal.aborted) setter(fallback)
+      }
+    }
+
+    void Promise.all([
+      load('/api/integration/notion', { connected: false }, setNotionStatus),
+      load('/api/integration/todoist', { connected: false }, setTodoistStatus),
+      load('/api/integration/slack', { connected: false }, setSlackStatus),
+      load('/api/integration/drive', { connected: false, hasScope: false }, setDriveStatus),
+      load('/api/integration/calendar', { connected: false, hasScope: false }, setCalendarStatus),
+      load('/api/integration/gmail', { connected: false, hasScope: false }, setGmailStatus),
+      load('/api/integration/github', { connected: false }, setGithubStatus),
+      load('/api/integration/status', { google: false, spotify: false }, setGrantStatus),
+    ])
+    refreshCustomConnectors(controller.signal)
+
+    return () => controller.abort()
   }, [session?.user?.id])
 
   // ── Notion helpers (verbatim) ───────────────────────────────────────────────
@@ -640,15 +689,22 @@ export function ConnectorsClient() {
 
   // ── Drive helper (verbatim) ──────────────────────────────────────────────
   const handleDriveBackup = async () => {
+    const fingerprint = JSON.stringify(settings ?? {})
+    const previousIntent = driveBackupIntentRef.current
+    const intent = previousIntent?.fingerprint === fingerprint
+      ? previousIntent
+      : { fingerprint, key: createClientIdempotencyKey() }
+    driveBackupIntentRef.current = intent
     setDriveBackingUp(true)
     try {
       const res = await fetch('/api/integration/drive', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify({ settings }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Backup failed')
+      driveBackupIntentRef.current = null
       toast({ title: 'Respaldo guardado en Drive', description: data.fileName })
     } catch (err: any) {
       toast({ title: 'Falló el respaldo en Drive', description: err.message, variant: 'destructive' })
@@ -721,7 +777,7 @@ export function ConnectorsClient() {
       setGithubStatus(prev => prev ? { ...prev, lastSyncedAt: new Date().toISOString(), syncStatus: 'connected' } : prev)
       toast({ title: 'GitHub sincronizado', description: data.result?.summary?.commitsAnalyzed !== undefined ? `${data.result.summary.commitsAnalyzed} commits agregados al contexto del Twin.` : 'La actividad agregada ya está disponible para el Twin.' })
     } catch (err: any) {
-      toast({ title: 'FallÃ³ la sincronizaciÃ³n con GitHub', description: err.message, variant: 'destructive' })
+      toast({ title: 'Falló la sincronización con GitHub', description: err.message, variant: 'destructive' })
     } finally {
       setGithubSyncing(false)
     }
@@ -802,9 +858,21 @@ export function ConnectorsClient() {
       const response = await fetch('/api/plugins/sync-all', { method: 'POST' })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'sync_failed')
+      const providerLabels: Record<string, string> = {
+        notion: 'Notion', todoist: 'Todoist', slack: 'Slack', gcal: 'Calendar', github: 'GitHub', gmail: 'Gmail',
+      }
+      const failures = Array.isArray(result.results)
+        ? result.results.filter((entry: { status?: string }) => entry.status === 'error')
+        : []
+      const failureNames = failures
+        .map((entry: { provider?: string }) => providerLabels[entry.provider ?? ''] ?? entry.provider)
+        .filter(Boolean)
+        .join(', ')
       toast({
-        title: twinCopy.synced,
-        description: result.totalSignals > 0
+        title: failures.length > 0 ? 'Contexto actualizado parcialmente' : twinCopy.synced,
+        description: failures.length > 0
+          ? `${failureNames} no respondió. Las demás fuentes sí se actualizaron.`
+          : result.totalSignals > 0
           ? `${result.totalSignals} ${language === 'es' ? 'señal(es) nueva(s) para el Twin.' : language === 'fr' ? 'nouveau(x) signal(aux) pour le Jumeau.' : language === 'de' ? 'neue(s) Signal(e) für den Zwilling.' : 'new signal(s) for the Twin.'}`
           : twinCopy.noSignals,
       })
@@ -905,11 +973,11 @@ export function ConnectorsClient() {
         category: 'productivity',
         name: 'GitHub',
         description: 'Aprende tu ritmo de trabajo en repositorios autorizados.',
-        detail: 'Observa actividad agregada de repositorios autorizados para detectar ventanas de coding y ajustar el siguiente paso del Twin. No guarda cÃ³digo ni mensajes de commits.',
+        detail: 'Observa actividad agregada de repositorios autorizados para detectar ventanas de coding y ajustar el siguiente paso del Twin. No guarda código ni mensajes de commits.',
         capabilities: [
           'Observa commits recientes de tus repositorios autorizados',
-          'Aprende tus ventanas de coding y seÃ±ales de carga sostenida',
-          'Aporta contexto al planificador sin guardar contenido del cÃ³digo',
+          'Aprende tus ventanas de coding y señales de carga sostenida',
+          'Aporta contexto al planificador sin guardar contenido del código',
         ],
         icon: <BrandIcon icon={SiGithub} />,
         status: githubStatus?.connected ? 'connected' : 'available',
@@ -1096,8 +1164,7 @@ export function ConnectorsClient() {
     : null
 
   const detailFlipKey = selected ? `connector-${selected.id}` : ''
-  const closeDetailFlip = useModalFlip(detailFlipKey, !!selected)
-  const handleCloseDetail = () => closeDetailFlip(() => setSelectedId(null))
+  const handleCloseDetail = () => setSelectedId(null)
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
@@ -1282,7 +1349,7 @@ export function ConnectorsClient() {
       </p>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && handleCloseDetail()}>
-        <DialogContent data-flip-to={detailFlipKey} className="rounded-3xl max-w-md">
+        <DialogContent motionId={detailFlipKey} className="rounded-3xl max-w-md">
           {selected && (
             <ConnectorDetail
               connector={selected}
@@ -1888,8 +1955,7 @@ function AddCustomConnectorDialog({
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
 
-  const closeCustomFlip = useModalFlip('btn-add-custom-connector', open)
-  const handleClose = () => closeCustomFlip(() => { onOpenChange(false); reset() })
+  const handleClose = () => { onOpenChange(false); reset() }
 
   const reset = () => { setName(''); setBaseUrl(''); setApiKey('') }
 
@@ -1914,7 +1980,7 @@ function AddCustomConnectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent data-flip-to="btn-add-custom-connector" className="rounded-3xl max-w-md">
+      <DialogContent motionId="btn-add-custom-connector" className="rounded-3xl max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">Conectar API personalizada</DialogTitle>
           <DialogDescription className="text-foreground/50">

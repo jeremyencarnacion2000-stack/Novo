@@ -3,7 +3,7 @@
 jest.mock('@/lib/prisma', () => ({ prisma: {
   integrationAccount: { findUnique: jest.fn() },
   cognitiveTwinRecord: { update: jest.fn() },
-  checklistItem: { findMany: jest.fn(), createMany: jest.fn() },
+  checklistItem: { findMany: jest.fn(), createMany: jest.fn(), updateMany: jest.fn() },
 } }))
 jest.mock('@/lib/cognitive/get-or-create-twin', () => ({ getOrCreateTwin: jest.fn() }))
 jest.mock('@/lib/cognitive/signal-ledger', () => ({ upsertNovoSignals: jest.fn() }))
@@ -23,6 +23,7 @@ describe('Todoist ambient plugin', () => {
     ;(getOrCreateTwin as jest.Mock).mockResolvedValue({ id: 'twin-1', energyCurve: {} })
     ;(prisma.checklistItem.findMany as jest.Mock).mockResolvedValue([])
     ;(prisma.checklistItem.createMany as jest.Mock).mockResolvedValue({ count: 0 })
+    ;(prisma.checklistItem.updateMany as jest.Mock).mockResolvedValue({ count: 1 })
     ;(prisma.cognitiveTwinRecord.update as jest.Mock).mockResolvedValue({})
   })
 
@@ -90,6 +91,26 @@ describe('Todoist ambient plugin', () => {
 
     await expect(syncTodoistPlugin('user-1')).resolves.toMatchObject({ error: 'unavailable' })
     expect(upsertNovoSignals).not.toHaveBeenCalled()
+    expect(prisma.checklistItem.createMany).not.toHaveBeenCalled()
+  })
+
+  it('refreshes an existing overdue row instead of keeping stale provider data', async () => {
+    ;(prisma.integrationAccount.findUnique as jest.Mock).mockResolvedValue({
+      accessToken: 'token', metadata: { projectIds: ['project-1'] },
+    })
+    ;(prisma.checklistItem.findMany as jest.Mock).mockResolvedValue([{ id: 'local-1', sourceId: 'task-1' }])
+    global.fetch = jest.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      return url.pathname.endsWith('/tasks')
+        ? response({ results: [{ id: 'task-1', content: 'Renamed task', priority: 1, project_id: 'project-1', due: { date: '2020-01-01' } }], next_cursor: null })
+        : response({ results: [], next_cursor: null })
+    }) as jest.Mock
+
+    await expect(syncTodoistPlugin('user-1')).resolves.toMatchObject({ overdueTasks: 1 })
+    expect(prisma.checklistItem.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: 'user-1', source: 'todoist', sourceId: 'task-1' },
+      data: expect.objectContaining({ text: 'Renamed task', completed: false, priority: 'low' }),
+    }))
     expect(prisma.checklistItem.createMany).not.toHaveBeenCalled()
   })
 })

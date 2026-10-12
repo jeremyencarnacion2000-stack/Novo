@@ -22,6 +22,13 @@ jest.mock('@/lib/prisma', () => ({
             findFirst: jest.fn(),
             findMany: jest.fn(),
         },
+        course: {
+            findFirst: jest.fn(),
+        },
+        grade: {
+            create: jest.fn(),
+            findFirst: jest.fn(),
+        },
         workoutLog: {
             create: jest.fn(),
             update: jest.fn(),
@@ -35,6 +42,11 @@ jest.mock('@/lib/prisma', () => ({
             findFirst: jest.fn(),
             findMany: jest.fn(),
             count: jest.fn(),
+        },
+        calendarEvent: {
+            create: jest.fn(),
+            update: jest.fn(),
+            findFirst: jest.fn(),
         },
         quickNote: {
             create: jest.fn(),
@@ -59,6 +71,15 @@ describe('AI Executor', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // The idempotency boundary is only exercised by the focused retry
+        // tests below; keeping it opt-in preserves the lightweight legacy
+        // mocks used by the rest of this suite.
+        (prisma as any).mutationRequest = {
+            findUnique: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+        };
+        (prisma as any).$transaction = jest.fn(async (callback: (tx: any) => Promise<unknown>) => callback(prisma as any));
     });
 
     it('should create a routine', async () => {
@@ -100,6 +121,126 @@ describe('AI Executor', () => {
 
         expect(result.success).toBe(true);
         expect(prisma.workoutLog.create).toHaveBeenCalled();
+    });
+
+    it('replays a START_WORKOUT intent instead of creating a second log', async () => {
+        const key = 'workout-start-intent';
+        const mutationRequest = (prisma as any).mutationRequest;
+        const createdLog = { id: 'log-replay', routineId: 'routine-1' };
+        mutationRequest.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            fingerprint: JSON.stringify({ routineId: 'routine-1' }),
+            resourceId: createdLog.id,
+        });
+        (prisma.routine.findFirst as jest.Mock).mockResolvedValue({ id: 'routine-1', name: 'Test Routine' });
+        (prisma.routine.findUnique as jest.Mock).mockResolvedValue({ id: 'routine-1', name: 'Test Routine' });
+        (prisma.workoutLog.create as jest.Mock).mockResolvedValue(createdLog);
+        (prisma.workoutLog.findFirst as jest.Mock).mockResolvedValue(createdLog);
+
+        await executeAIAction({ type: 'START_WORKOUT', payload: { routineId: 'routine-1' } } as any, userId, undefined, key);
+        const replay = await executeAIAction({ type: 'START_WORKOUT', payload: { routineId: 'routine-1' } } as any, userId, undefined, key);
+
+        expect(replay.success).toBe(true);
+        expect(prisma.workoutLog.create).toHaveBeenCalledTimes(1);
+        expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith({
+            where: { id: createdLog.id, routine: { userId } },
+        });
+    });
+
+    it('replays a day-plan task when a model retry changes its wording', async () => {
+        const key = 'day-plan:user:onboarding:2026-09-17';
+        const mutationRequest = (prisma as any).mutationRequest;
+        const createdTask = { id: 'task-day-plan', title: 'Plan original' };
+        mutationRequest.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            fingerprint: JSON.stringify({ index: 0 }),
+            resourceId: createdTask.id,
+        });
+        (prisma.task.create as jest.Mock).mockResolvedValue(createdTask);
+        (prisma.task.findFirst as jest.Mock).mockResolvedValue(createdTask);
+
+        await executeAIAction({
+            type: 'CREATE_TASKS',
+            payload: { tasks: [{ title: 'Plan original', category: 'Work', priority: 3 }] },
+        } as any, userId, undefined, key);
+        const replay = await executeAIAction({
+            type: 'CREATE_TASKS',
+            payload: { tasks: [{ title: 'Plan reformulado por el modelo', category: 'Work', priority: 1 }] },
+        } as any, userId, undefined, key);
+
+        expect(replay.success).toBe(true);
+        expect(prisma.task.create).toHaveBeenCalledTimes(1);
+        expect(prisma.task.findFirst).toHaveBeenCalledWith({ where: { id: createdTask.id, userId } });
+    });
+
+    it('replays a day-plan event when a model retry changes its wording', async () => {
+        const key = 'day-plan:user:onboarding:2026-09-17';
+        const mutationRequest = (prisma as any).mutationRequest;
+        const createdEvent = {
+            id: 'event-day-plan',
+            title: 'Bloque original',
+            start: new Date('2026-09-18T09:00:00.000Z'),
+            end: new Date('2026-09-18T10:00:00.000Z'),
+        };
+        mutationRequest.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            fingerprint: JSON.stringify({ dayPlan: true }),
+            resourceId: createdEvent.id,
+        });
+        (prisma.calendarEvent.create as jest.Mock).mockResolvedValue(createdEvent);
+        (prisma.calendarEvent.findFirst as jest.Mock).mockResolvedValue(createdEvent);
+
+        await executeAIAction({
+            type: 'CREATE_EVENT',
+            payload: {
+                title: 'Bloque original',
+                description: 'Trabajo profundo',
+                start: '2026-09-18T09:00:00.000Z',
+                end: '2026-09-18T10:00:00.000Z',
+                allDay: false,
+            },
+        } as any, userId, undefined, key);
+        const replay = await executeAIAction({
+            type: 'CREATE_EVENT',
+            payload: {
+                title: 'Bloque reformulado por el modelo',
+                description: 'Mismo bloque con otra descripción',
+                start: '2026-09-18T09:00:00.000Z',
+                end: '2026-09-18T10:00:00.000Z',
+                allDay: false,
+            },
+        } as any, userId, undefined, key);
+
+        expect(replay.success).toBe(true);
+        expect(prisma.calendarEvent.create).toHaveBeenCalledTimes(1);
+        expect(prisma.calendarEvent.findFirst).toHaveBeenCalledWith({ where: { id: createdEvent.id, userId } });
+    });
+
+    it('replays an ADD_GRADE intent instead of duplicating the grade', async () => {
+        const key = 'grade-create-intent';
+        const mutationRequest = (prisma as any).mutationRequest;
+        const grade = { id: 'grade-replay', courseId: 'course-1', name: 'Midterm' };
+        const fingerprint = JSON.stringify({
+            category: 'Exam',
+            courseId: 'course-1',
+            date: '2026-09-17',
+            maxScore: 100,
+            name: 'Midterm',
+            score: 90,
+            weight: 20,
+        });
+        mutationRequest.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ fingerprint, resourceId: grade.id });
+        (prisma.course.findFirst as jest.Mock).mockResolvedValue({ id: 'course-1' });
+        (prisma.grade.create as jest.Mock).mockResolvedValue(grade);
+        (prisma.grade.findFirst as jest.Mock).mockResolvedValue(grade);
+        const action = {
+            type: 'ADD_GRADE',
+            payload: { courseId: 'course-1', name: 'Midterm', score: 90, maxScore: 100, weight: 20, category: 'Exam', date: '2026-09-17' },
+        };
+
+        await executeAIAction(action as any, userId, undefined, key);
+        const replay = await executeAIAction(action as any, userId, undefined, key);
+
+        expect(replay.success).toBe(true);
+        expect(prisma.grade.create).toHaveBeenCalledTimes(1);
+        expect(prisma.grade.findFirst).toHaveBeenCalledWith({ where: { id: grade.id, userId } });
     });
 
     it('should analyze progress', async () => {

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Artifact generation error:', error);
+    console.error('Artifact generation request failed.');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

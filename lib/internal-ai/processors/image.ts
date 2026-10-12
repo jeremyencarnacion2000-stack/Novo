@@ -26,8 +26,8 @@ export const registerImageProcessor = (service: IInternalAIService) => {
                     suggestedTheme: 'dark' // Mock theme suggestion
                 }
             };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'IMAGE_PROCESSING_FAILED' };
         }
     });
 };

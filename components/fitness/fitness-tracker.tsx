@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { Activity, Footprints } from 'lucide-react'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 const WORKOUT_TYPES = [
     'Running',
@@ -43,9 +44,10 @@ export function FitnessTracker() {
 
         setIsLogging(true)
         try {
+            const idempotencyKey = createClientIdempotencyKey()
             const response = await fetch('/api/fitness/steps', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
                 body: JSON.stringify({ steps: parseInt(steps) })
             })
 
@@ -79,9 +81,10 @@ export function FitnessTracker() {
 
         setIsLogging(true)
         try {
+            const idempotencyKey = createClientIdempotencyKey()
             const response = await fetch('/api/fitness/workout', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
                 body: JSON.stringify({
                     name: workoutType,
                     durationMinutes: parseInt(duration)

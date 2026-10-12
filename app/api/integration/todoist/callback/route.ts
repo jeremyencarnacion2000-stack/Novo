@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const error = searchParams.get('error');
 
     if (error || !code) {
-        console.error('[Todoist Callback] OAuth error or missing code:', error);
+        console.error('[Todoist Callback] OAuth error or missing code.');
         return NextResponse.redirect(`${settingsUrl}error&reason=denied`);
     }
 
@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        console.log(`✅ [Todoist] Connected for user ${session.user.id}`);
+        console.log('[Todoist] Connection persisted.');
     } catch (err) {
         console.error('[Todoist Callback] Failed to upsert IntegrationAccount:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);

@@ -41,7 +41,9 @@ export async function logAICall<T extends { tokensIn?: number; tokensOut?: numbe
         purpose: params.purpose,
         latencyMs: Date.now() - start,
         success: false,
-        errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+        // Provider responses can contain prompts, account identifiers or
+        // transport diagnostics. Persist only a stable operational code.
+        errorMessage: 'provider_call_failed',
       },
     }).catch(err => console.error('[AICallLog] Failed to persist failure log:', err))
     throw error

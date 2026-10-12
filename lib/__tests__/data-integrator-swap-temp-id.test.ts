@@ -1,4 +1,19 @@
-import { swapTempId } from '../data-integrator'
+import { backupImportKey, swapTempId } from '../data-integrator'
+
+describe('backupImportKey', () => {
+  it('is stable for the same backup item and scoped to the backup timestamp', () => {
+    const item = { id: 'task-1', title: 'Finish consent flow' }
+    expect(backupImportKey('task', item, '2026-09-12T10:00:00.000Z', 0))
+      .toBe(backupImportKey('task', item, '2026-09-12T10:00:00.000Z', 0))
+    expect(backupImportKey('task', item, '2026-09-12T10:00:00.000Z', 0))
+      .not.toBe(backupImportKey('task', item, '2026-09-13T10:00:00.000Z', 0))
+  })
+
+  it('keeps the server key within the accepted header limit', () => {
+    expect(backupImportKey('task', { id: 'x'.repeat(500) }, '2026-09-12T10:00:00.000Z', 0).length)
+      .toBeLessThanOrEqual(128)
+  })
+})
 
 describe('swapTempId', () => {
   it('replaces the id of the matching item, leaving others untouched', () => {

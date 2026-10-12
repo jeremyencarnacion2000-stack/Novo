@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,26 @@ export function SettingsPreferences() {
   const { settings, updateSettings } = useSettings()
   const { isSupported, permission, requestPermission, settings: notificationSettings, updateSettings: updateNotificationSettings } = useNotifications()
   const { data: session } = useSession()
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false)
+
+  const handlePasswordReset = async () => {
+    const email = session?.user?.email
+    if (!email || passwordResetLoading) return
+    setPasswordResetLoading(true)
+    try {
+      const response = await fetch('/api/auth/password/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!response.ok) throw new Error('reset_request_failed')
+      toast({ title: 'Reset link sent', description: 'Check your inbox to choose a new password.' })
+    } catch {
+      toast({ title: 'Could not send reset link', description: 'Try again in a moment.', variant: 'destructive' })
+    } finally {
+      setPasswordResetLoading(false)
+    }
+  }
 
   const handleRequestPermission = async () => {
     const result = await requestPermission()
@@ -44,12 +64,13 @@ export function SettingsPreferences() {
     if (settings.autoBackup && session?.user?.id) {
       DataIntegrator.scheduleAutoBackup(session.user.id, settings.backupFrequency)
     } else {
-      const existingTimer = localStorage.getItem('novo-auto-backup-timer')
-      if (existingTimer) {
-        clearInterval(parseInt(existingTimer))
-        localStorage.removeItem('novo-auto-backup-timer')
-      }
+      DataIntegrator.cancelAutoBackup()
     }
+
+    // The timer is process-local. Always cancel the previous user's timer on
+    // unmount or before the next preference change; a localStorage interval id
+    // cannot cancel a live timer and was leaving backups running after logout.
+    return () => DataIntegrator.cancelAutoBackup()
   }, [settings.autoBackup, settings.backupFrequency, session?.user?.id])
 
   return (
@@ -84,9 +105,9 @@ export function SettingsPreferences() {
 
           <div className="space-y-2">
             <Label>{t('settings.password')}</Label>
-            <Button variant="outline" className="w-full border-foreground/10 hover:bg-foreground/5">
+            <Button type="button" variant="outline" onClick={handlePasswordReset} disabled={passwordResetLoading || !session?.user?.email} className="w-full border-foreground/10 hover:bg-foreground/5">
               <Lock className="mr-2 h-4 w-4" />
-              {t('settings.change_password')}
+              {passwordResetLoading ? 'Sending reset link…' : t('settings.change_password')}
             </Button>
           </div>
         </div>

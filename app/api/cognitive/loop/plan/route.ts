@@ -13,6 +13,8 @@ const generatePlanSchema = z.object({
   runId: z.string().uuid().optional(),
 })
 
+const MAX_PLAN_BODY_BYTES = 32_000
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -28,7 +30,15 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const parsed = generatePlanSchema.safeParse(await request.json())
+
+  const contentLength = Number(request.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_PLAN_BODY_BYTES) {
+    return NextResponse.json({ error: 'Plan payload is too large' }, { status: 413 })
+  }
+
+  // A truncated/replayed browser request must be a client error, not an
+  // opaque 500 from `request.json()` escaping before the planner boundary.
+  const parsed = generatePlanSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid plan request', details: parsed.error.flatten() }, { status: 400 })
   try {
     const result = await planUserContext({ userId: session.user.id, ...parsed.data, trigger: 'user_request' })

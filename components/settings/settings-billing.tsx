@@ -108,9 +108,17 @@ export function SettingsBilling() {
   const loadStatus = () => fetch('/api/billing/status').then(res => res.json())
 
   useEffect(() => {
+    let active = true
     loadStatus()
-      .then(setStatus)
-      .catch(() => toast({ title: copy.loadError, variant: 'destructive' }))
+      .then((next) => {
+        if (active) setStatus(next)
+      })
+      .catch(() => {
+        if (active) toast({ title: copy.loadError, variant: 'destructive' })
+      })
+    return () => {
+      active = false
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The billing webhook can take a few seconds to land after checkout
@@ -118,10 +126,12 @@ export function SettingsBilling() {
   // plan flip happens server-side and isn't guaranteed to have landed yet.
   useEffect(() => {
     if (!confirmingUpgrade) return
+    let active = true
     let attempts = 0
     const interval = setInterval(async () => {
       attempts++
       const next = await loadStatus().catch(() => null)
+      if (!active) return
       if (next) setStatus(next)
       if (next?.plan === 'pro' || attempts >= 8) {
         clearInterval(interval)
@@ -132,7 +142,10 @@ export function SettingsBilling() {
         router.replace('/settings')
       }
     }, 1500)
-    return () => clearInterval(interval)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
   }, [confirmingUpgrade]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const goToPortal = async () => {

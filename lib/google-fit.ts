@@ -81,11 +81,10 @@ async function fetchGoogleFitAggregate(
     })
 
     if (!response.ok) {
-      const errorBody = await response.text()
-      console.error(
-        `[GoogleFit] Aggregate request failed (${response.status}):`,
-        errorBody
-      )
+      // Provider bodies can contain account and request details; retain only
+      // the status class needed for operational diagnosis.
+      await response.text().catch(() => '')
+      console.error(`[GoogleFit] Aggregate request failed (${response.status}).`)
 
       // 401/403 = token expired or insufficient scopes
       if (response.status === 401 || response.status === 403) {
@@ -97,8 +96,8 @@ async function fetchGoogleFitAggregate(
     }
 
     return (await response.json()) as GoogleFitAggregateResponse
-  } catch (networkError) {
-    console.error('[GoogleFit] Network error:', networkError)
+  } catch {
+    console.error('[GoogleFit] Network error.')
     return null
   }
 }

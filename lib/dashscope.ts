@@ -49,7 +49,6 @@ export const dashscopeAPI = {
         console.log('DashScope API: Sending request', {
             model,
             messageCount: messages.length,
-            lastMessage: message.slice(0, 100)
         });
 
         try {
@@ -73,16 +72,16 @@ export const dashscopeAPI = {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('DashScope API error:', errorText);
-                throw new Error(`DashScope API error: ${response.status} ${response.statusText}`);
+                await response.arrayBuffer().catch(() => undefined);
+                console.error('DashScope API request failed', { status: response.status });
+                throw new Error('dashscope_provider_unavailable');
             }
 
             const data = await response.json();
 
             if (data.code && data.code !== '') {
-                console.error('DashScope API returned error code:', data);
-                throw new Error(`DashScope API error: ${data.message || data.code}`);
+                console.error('DashScope API returned an error code');
+                throw new Error('dashscope_provider_unavailable');
             }
 
             console.log('DashScope API: Response received', {
@@ -97,7 +96,9 @@ export const dashscopeAPI = {
                 functionCalls: []
             };
         } catch (error) {
-            console.error('Error calling DashScope API:', error);
+            console.error('DashScope API request failed', {
+                reason: error instanceof Error ? error.name : 'unknown',
+            });
             throw error;
         }
     }

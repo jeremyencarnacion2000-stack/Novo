@@ -60,14 +60,14 @@ export async function GET(req: NextRequest) {
       try {
         const { maybeRunDailyInsights } = await import('@/lib/inngest/functions/daily-insights');
         await maybeRunDailyInsights();
-      } catch (e) {
-        console.warn('[cognitive-engine] daily-insights trigger failed:', (e as Error).message);
+      } catch {
+        console.warn('[cognitive-engine] daily-insights trigger failed.');
       }
       try {
         const { maybeRunReengagement } = await import('@/lib/inngest/functions/user-reengagement');
         await maybeRunReengagement();
-      } catch (e) {
-        console.warn('[cognitive-engine] reengagement trigger failed:', (e as Error).message);
+      } catch {
+        console.warn('[cognitive-engine] reengagement trigger failed.');
       }
     });
 
@@ -171,10 +171,14 @@ export async function GET(req: NextRequest) {
     let calendarSignal: CalendarSignal = {
       connected: false, meetingCount: 0, meetingMinutesToday: 0, largestFreeGapMinutes: null,
     };
+    // Keep the provider payload so threshold persistence can reuse the same
+    // read. The engine is called frequently; fetching Calendar twice in one
+    // request needlessly adds latency and can trip provider rate limits.
+    let calendarEvents: Awaited<ReturnType<typeof calendarService.listEventsForUser>> = [];
     try {
       const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
-      const events = await calendarService.listEventsForUser(userId, todayStart.toISOString(), 50, dayEndIso);
-      calendarSignal = computeCalendarSignal(events as any, now);
+      calendarEvents = await calendarService.listEventsForUser(userId, todayStart.toISOString(), 50, dayEndIso);
+      calendarSignal = computeCalendarSignal(calendarEvents as any, now);
     } catch {
       // Not connected, or the Google API call failed — no calendar signal this run.
     }
@@ -183,23 +187,15 @@ export async function GET(req: NextRequest) {
     // the same mechanism already powering the Bitácora and Twin Insight Toast.
     // persistNewPlatformSignals dedupes per changeType per day on its own.
     //
-    // This re-fetches events and re-derives the signal via its own try/catch
-    // rather than reusing the `events`/`calendarSignal` locals above, so a
-    // failure here can never affect the prompt-generation path above it.
-    // GoogleCalendarConnector (Task 3) is not called from here directly —
-    // this route already has the raw calendarService/computeCalendarSignal
-    // building blocks in scope, so calling the connector wrapper would mean
-    // fetching Google Calendar twice in the same request. The connector
-    // exists as the proven, reusable pattern for the *next* platform that
-    // doesn't already have this data sitting in scope.
-    if (twinRecord && calendarSignal.connected) {
+    // Reuse the already-fetched events for persistence. This keeps a provider
+    // failure isolated to the optional signal write without a second network
+    // request on every cognitive-engine refresh.
+    if (twinRecord && calendarSignal.connected && calendarEvents.length > 0) {
       try {
-        const dayEndIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
-        const events = await calendarService.listEventsForUser(userId, todayStart.toISOString(), 50, dayEndIso);
         const energyCurve = (twinRecord.energyCurve as any) || {};
         const peakStart = energyCurve.peakFocusStart || '09:00';
         const peakEnd = energyCurve.peakFocusEnd || '11:00';
-        const thresholdSignals = evaluateCalendarThresholds(events as any, calendarSignal, peakStart, peakEnd, now);
+        const thresholdSignals = evaluateCalendarThresholds(calendarEvents as any, calendarSignal, peakStart, peakEnd, now);
         await persistNewPlatformSignals(twinRecord.id, userId, thresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
@@ -275,9 +271,22 @@ export async function GET(req: NextRequest) {
           where: { userId },
           orderBy: { endedAt: 'desc' },
           take: 5,
-          select: { startedAt: true, endedAt: true },
+          select: { startedAt: true, endedAt: true, surface: true },
         });
-        const deviceThresholdSignals = evaluateDevicePresence(recentSessions, now);
+        // Prisma represents the additive `surface` column as a string. Keep
+        // the cognitive-domain boundary strict so a legacy/unrecognised row
+        // cannot become an assumed device class.
+        const deviceThresholdSignals = evaluateDevicePresence(
+          recentSessions.map((session) => ({
+            ...session,
+            surface: (
+              ['web_desktop', 'web_mobile', 'pwa_desktop', 'pwa_mobile'] as const
+            ).includes(session.surface as 'web_desktop' | 'web_mobile' | 'pwa_desktop' | 'pwa_mobile')
+              ? session.surface as 'web_desktop' | 'web_mobile' | 'pwa_desktop' | 'pwa_mobile'
+              : undefined,
+          })),
+          now,
+        );
         await persistNewPlatformSignals(twinRecord.id, userId, deviceThresholdSignals);
       } catch {
         // Non-critical — the report itself doesn't depend on this succeeding.
@@ -290,7 +299,11 @@ export async function GET(req: NextRequest) {
     // re-implemented).
     let biometrics: BiometricPayload | null = null;
     try {
-      const fitAccessToken = await getGoogleAccessToken(userId, (session as any)?.accessToken);
+      const fitAccessToken = await getGoogleAccessToken(userId, [
+        'fitness.activity.read',
+        'fitness.heart_rate.read',
+        'fitness.sleep.read',
+      ]);
       biometrics = fitAccessToken
         ? await fetchBiometricPayload(fitAccessToken, userId)
         : await fetchDbBiometricPayload(userId);
@@ -600,8 +613,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
             let geminiResult;
             try {
               geminiResult = await model.generateContent(prompt);
-            } catch (e) {
-              console.warn('[Cognitive API] gemini-flash-latest failed, trying gemini-3.5-flash:', e);
+              } catch {
+                console.warn('[Cognitive API] gemini-flash-latest failed, trying gemini-3.5-flash.');
               modelName = 'gemini-3.5-flash';
               model = genAI.getGenerativeModel({ model: modelName });
               geminiResult = await model.generateContent(prompt);
@@ -615,8 +628,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
         );
         text = result.content;
         successModel = 'gemini';
-      } catch (geminiError) {
-        console.error('[Cognitive API] Gemini request failed:', geminiError);
+      } catch {
+        console.error('[Cognitive API] Gemini request failed.');
       }
     }
 
@@ -640,8 +653,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
         );
         text = result.content.trim();
         successModel = 'groq';
-      } catch (groqError) {
-        console.error('[Cognitive API] Groq request failed:', groqError);
+      } catch {
+        console.error('[Cognitive API] Groq request failed.');
       }
     }
 
@@ -652,8 +665,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
         const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         cognitiveReport = JSON.parse(cleaned);
         console.log(`[Cognitive API] Successfully parsed report generated by ${successModel}`);
-      } catch (parseError) {
-        console.error('[Cognitive API] Failed to parse generated JSON content:', parseError);
+      } catch {
+        console.error('[Cognitive API] Failed to parse generated JSON content.');
       }
     }
 
@@ -831,7 +844,7 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
             cognitiveEngineCache: { report: cognitiveReport, signals: responseSignals, generatedAt, modelUsed: successModel, twin },
           },
         },
-      }).catch((err) => console.error('[Cognitive API] cache write failed:', err));
+      }).catch(() => console.error('[Cognitive API] cache write failed.'));
     }
 
     // Attach computed timeline and raw signals to response
@@ -844,8 +857,8 @@ ${isColdStart ? '- CRITICAL: this user has zero task/focus history. NEVER claim 
       twin,
     });
 
-  } catch (error) {
-    console.error('[COGNITIVE ENGINE ERROR]', error);
+  } catch {
+    console.error('[COGNITIVE ENGINE ERROR] Request failed.');
     return NextResponse.json({ error: 'Engine failed to process signals' }, { status: 500 });
   }
 }

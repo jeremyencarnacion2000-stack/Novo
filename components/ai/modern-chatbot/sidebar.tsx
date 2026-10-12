@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, Search, Plus, MessageSquare, Trash2, MoreHorizontal, Edit, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Plus, MessageSquare, Trash2, MoreHorizontal } from 'lucide-react';
 import { useChatbot } from './context';
 
 export function Sidebar({ embedded = false }: { embedded?: boolean }) {
@@ -74,7 +74,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
 
     return (
         <div
-            className={`relative h-full bg-background border-border transition-all duration-500 ease-in-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : embedded ? 'w-full' : 'w-full md:w-72 lg:w-80'
+            className={`relative h-full bg-background border-border transition-[width,background-color,border-color,opacity] duration-300 ease-out flex flex-col backdrop-blur-3xl z-40 overflow-hidden ${sidebarCollapsed ? 'w-16' : embedded ? 'w-full' : 'w-full md:w-72 lg:w-80'
                 }`}
         >
             {/* Header — the embedded drawer supplies its own title/close button */}

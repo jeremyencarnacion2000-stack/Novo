@@ -1,70 +1,102 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
 
-export async function POST(request: Request) {
+const stepsSchema = z.object({
+    steps: z.number().finite().int().min(0).max(2_000_000),
+    date: z.string().datetime().optional(),
+});
+
+const STEPS_SCOPE = 'fitness_steps_upsert';
+
+function isUniqueConstraint(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+}
+
+function replayResponse(entry: unknown) {
+    const response = NextResponse.json({ success: true, message: 'Steps already logged', data: entry });
+    response.headers.set('X-Idempotent-Replay', 'true');
+    return response;
+}
+
+export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
-        const { steps, date } = body;
-
-        if (typeof steps !== 'number' || steps < 0) {
+        const parsed = stepsSchema.safeParse(await request.json().catch(() => null));
+        if (!parsed.success) {
             return NextResponse.json({ error: 'Invalid steps value' }, { status: 400 });
         }
 
-        // Parse date or use today
+        const { steps, date } = parsed.data;
         const entryDate = date ? new Date(date) : new Date();
-        entryDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        entryDate.setHours(0, 0, 0, 0);
+        const nextDate = new Date(entryDate.getTime() + 24 * 60 * 60 * 1000);
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() || null;
+        if (request.headers.has('Idempotency-Key') && (!idempotencyKey || idempotencyKey.length > 128)) {
+            return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
+        }
+        const fingerprint = JSON.stringify({ steps, date: entryDate.toISOString() });
 
-        // Check if entry exists for this date
-        const existing = await prisma.fitnessEntry.findFirst({
-            where: {
-                userId: session.user.id,
-                date: {
-                    gte: entryDate,
-                    lt: new Date(entryDate.getTime() + 24 * 60 * 60 * 1000) // Next day
+        if (idempotencyKey) {
+            const existingMutation = await prisma.mutationRequest.findUnique({
+                where: { userId_scope_idempotencyKey: { userId: session.user.id, scope: STEPS_SCOPE, idempotencyKey } },
+            });
+            if (existingMutation) {
+                if (existingMutation.fingerprint !== fingerprint) {
+                    return NextResponse.json({ error: 'Idempotency key was already used for another request' }, { status: 409 });
                 }
+                const existingEntry = await prisma.fitnessEntry.findFirst({ where: { id: existingMutation.resourceId, userId: session.user.id } });
+                if (existingEntry) return replayResponse(existingEntry);
             }
-        });
-
-        let entry;
-        if (existing) {
-            // Update existing entry
-            entry = await prisma.fitnessEntry.update({
-                where: { id: existing.id },
-                data: { steps }
-            });
-        } else {
-            // Create new entry
-            entry = await prisma.fitnessEntry.create({
-                data: {
-                    userId: session.user.id,
-                    steps,
-                    date: entryDate
-                }
-            });
         }
 
-        return NextResponse.json({
+        let entry;
+        try {
+            entry = await prisma.$transaction(async (tx) => {
+                const existing = await tx.fitnessEntry.findFirst({
+                    where: { userId: session.user.id, date: { gte: entryDate, lt: nextDate } },
+                });
+                const saved = existing
+                    ? await tx.fitnessEntry.update({ where: { id: existing.id }, data: { steps } })
+                    : await tx.fitnessEntry.create({ data: { userId: session.user.id, steps, date: entryDate } });
+                if (idempotencyKey) {
+                    await tx.mutationRequest.create({
+                        data: { userId: session.user.id, scope: STEPS_SCOPE, idempotencyKey, fingerprint, resourceType: 'fitness_entry', resourceId: saved.id },
+                    });
+                }
+                return saved;
+            });
+        } catch (error) {
+            if (idempotencyKey && isUniqueConstraint(error)) {
+                const winner = await prisma.mutationRequest.findUnique({
+                    where: { userId_scope_idempotencyKey: { userId: session.user.id, scope: STEPS_SCOPE, idempotencyKey } },
+                });
+                if (winner && winner.fingerprint !== fingerprint) {
+                    return NextResponse.json({ error: 'Idempotency key was already used for another request' }, { status: 409 });
+                }
+                if (winner) {
+                    const existingEntry = await prisma.fitnessEntry.findFirst({ where: { id: winner.resourceId, userId: session.user.id } });
+                    if (existingEntry) return replayResponse(existingEntry);
+                }
+            }
+            throw error;
+        }
+
+        const response = NextResponse.json({
             success: true,
             message: 'Steps logged successfully',
-            data: entry
+            data: entry,
         });
-    } catch (error: any) {
-        console.error('Error logging steps:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code
-        });
-        return NextResponse.json({
-            error: 'Failed to log steps',
-            details: error.message
-        }, { status: 500 });
+        response.headers.set('X-Idempotent-Replay', 'false');
+        return response;
+    } catch {
+        console.error('Error logging steps.');
+        return NextResponse.json({ error: 'Failed to log steps' }, { status: 500 });
     }
 }

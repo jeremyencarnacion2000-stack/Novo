@@ -11,6 +11,7 @@ import type { PlatformSignal } from '@/lib/platform-connectors/types';
 export interface DeviceActivitySample {
   startedAt: Date;
   endedAt: Date;
+  surface?: 'web_desktop' | 'web_mobile' | 'pwa_desktop' | 'pwa_mobile';
 }
 
 const LONG_SESSION_THRESHOLD_MS = 2 * 60 * 60 * 1000;

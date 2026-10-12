@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
+import { useSession } from 'next-auth/react'
 import { notificationScheduler } from './notification-scheduler'
 import { useSettings } from '@/lib/settings-context'
 
@@ -37,8 +38,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [settings, setSettings] = useState<NotificationSettings>(defaultNotificationSettings)
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
+  const notificationSettingsDirtyRef = useRef(false)
+  const { data: session } = useSession()
 
   const { settings: appSettings, updateSettings: updateAppSettings } = useSettings()
+
+  useEffect(() => {
+    notificationScheduler.setStorageScope(
+      session?.user?.id ? `user:${session.user.id}` : null
+    )
+  }, [session?.user?.id])
 
   // Check if notifications are supported
   useEffect(() => {
@@ -53,23 +62,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Sync notification settings with app settings
   useEffect(() => {
     if (appSettings.preferences?.notificationSettings) {
+      notificationSettingsDirtyRef.current = false
       setSettings({ ...defaultNotificationSettings, ...appSettings.preferences.notificationSettings })
     }
-    // Load scheduled notifications
-    notificationScheduler.loadFromStorage()
   }, [appSettings.preferences])
 
   // Save settings to app settings (DB) instead of localStorage
   useEffect(() => {
-    // Only update if changed and loaded
-    if (JSON.stringify(settings) !== JSON.stringify(appSettings.preferences?.notificationSettings)) {
-      updateAppSettings({
-        preferences: {
-          ...appSettings.preferences,
-          notificationSettings: settings
-        }
-      })
+    if (!notificationSettingsDirtyRef.current) return
+    const storedSettings = appSettings.preferences?.notificationSettings
+    if (JSON.stringify(settings) === JSON.stringify(storedSettings)) {
+      notificationSettingsDirtyRef.current = false
+      return
     }
+
+    // A user action is the only path that persists notification preferences.
+    // Defaults stay local until the user changes one, avoiding a full settings
+    // write during every authenticated boot.
+    notificationSettingsDirtyRef.current = false
+    updateAppSettings({
+      preferences: {
+        ...appSettings.preferences,
+        notificationSettings: settings
+      }
+    })
   }, [settings])
 
   // Register service worker - DISABLED to fix redirect error
@@ -159,10 +175,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     // Use service worker if available for background notifications
     if (swRegistration) {
-      swRegistration.showNotification(title, defaultOptions)
+      void swRegistration.showNotification(title, defaultOptions).catch(() => {})
     } else {
       // Fallback to direct notification
-      new Notification(title, defaultOptions)
+      try {
+        new Notification(title, defaultOptions)
+      } catch {
+        // Permission can be revoked between the check above and construction,
+        // especially in embedded webviews. Notifications are optional and
+        // must never interrupt a user action.
+      }
     }
   }
 
@@ -185,11 +207,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Fallback: use setTimeout in main thread (won't work when page is closed)
       setTimeout(() => {
         showNotification(title, { body, data })
-      }, delay)
+      }, Math.max(0, delay))
     }
   }
 
   const updateSettings = (updates: Partial<NotificationSettings>) => {
+    notificationSettingsDirtyRef.current = true
     setSettings((prev) => ({ ...prev, ...updates }))
   }
 

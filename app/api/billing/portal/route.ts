@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getLemonSqueezySubscription } from '@/lib/lemonsqueezy'
+import { stripe } from '@/lib/stripe'
 
 // Redirects an existing Pro subscriber into Lemon Squeezy's hosted Customer
 // Portal — avoids building custom cancel/update-card/invoice-history UI.
@@ -15,11 +16,25 @@ export async function POST(request: NextRequest) {
   }
 
   const subscription = await prisma.subscription.findUnique({ where: { userId: session.user.id } })
-  if (!subscription?.lemonsqueezySubscriptionId) {
+  if (!subscription) {
     return NextResponse.json({ error: 'No billing account found' }, { status: 404 })
   }
 
-  const lsSubscription = await getLemonSqueezySubscription(subscription.lemonsqueezySubscriptionId)
+  if (subscription.provider === 'lemonsqueezy' && subscription.lemonsqueezySubscriptionId) {
+    const lsSubscription = await getLemonSqueezySubscription(subscription.lemonsqueezySubscriptionId)
+    return NextResponse.json({ url: lsSubscription.attributes.urls.customer_portal })
+  }
 
-  return NextResponse.json({ url: lsSubscription.attributes.urls.customer_portal })
+  // Existing subscribers created before the Lemon Squeezy migration keep a
+  // working self-service portal until their subscription naturally migrates.
+  if (subscription.provider === 'stripe' && subscription.stripeCustomerId) {
+    const appUrl = (process.env.NEXTAUTH_URL || request.nextUrl.origin).replace(/\/$/, '')
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: subscription.stripeCustomerId,
+      return_url: `${appUrl}/settings?tab=billing`,
+    })
+    return NextResponse.json({ url: portal.url })
+  }
+
+  return NextResponse.json({ error: 'Billing portal is unavailable for this account' }, { status: 409 })
 }

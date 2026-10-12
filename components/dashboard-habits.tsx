@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react'
@@ -10,9 +10,11 @@ import { cn } from '@/lib/utils'
 import { eventBus } from '@/lib/events/event-bus'
 import { useTrackers } from '@/hooks/use-swr'
 import { sileo } from '@/lib/sileo-bell'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 export const DashboardHabits = React.memo(function DashboardHabits() {
   const { data, mutate } = useTrackers()
+  const entryIntentKeys = useRef(new Map<string, string>())
   const habits: Tracker[] = Array.isArray(data) ? data.filter((t: any) => t?.type === 'habit').slice(0, 3) : []
 
   const handleToggleHabit = async (id: string) => {
@@ -22,13 +24,22 @@ export const DashboardHabits = React.memo(function DashboardHabits() {
 
     try {
       if (hasEntry) {
-        await fetch(`/api/trackers/${id}/entries?date=${today}`, { method: 'DELETE' })
+        const response = await fetch(`/api/trackers/${id}/entries?date=${today}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error('Failed to clear habit')
       } else {
-        await fetch(`/api/trackers/${id}/entries`, {
+        const intentId = `${id}:${today}:1`
+        const intentKey = entryIntentKeys.current.get(intentId) ?? createClientIdempotencyKey()
+        entryIntentKeys.current.set(intentId, intentKey)
+        const response = await fetch(`/api/trackers/${id}/entries`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': intentKey,
+          },
           body: JSON.stringify({ date: today, value: 1 })
         })
+        if (!response.ok) throw new Error('Failed to log habit')
+        entryIntentKeys.current.delete(intentId)
         eventBus.dispatch('HabitCompleted', { habitId: id, habitName: habit?.name, type: 'habit' })
         sileo.success({
           title: 'Habit Completed',
@@ -39,6 +50,11 @@ export const DashboardHabits = React.memo(function DashboardHabits() {
       mutate() // revalidate via SWR — no manual re-fetch needed
     } catch (error) {
       console.error('Failed to toggle habit:', error)
+      sileo.error({
+        title: 'Could not update habit',
+        description: 'Your change was not saved. Try again in a moment.',
+        duration: 4500,
+      })
     }
   }
 

@@ -1,8 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Lenis from 'lenis'
+import { useSettings } from '@/lib/settings-context'
 
 const LenisContext = createContext<Lenis | null>(null)
 
@@ -18,8 +19,10 @@ interface SmoothScrollProviderProps {
 
 export function SmoothScrollProvider({ children, scrollRef, scrollElement }: SmoothScrollProviderProps) {
     const lenisRef = useRef<Lenis | null>(null)
+    const [lenisInstance, setLenisInstance] = useState<Lenis | null>(null)
     const pathname = usePathname()
     const rafIdRef = useRef<number | null>(null)
+    const { settings } = useSettings()
 
     // Reset scroll on navigation
     useEffect(() => {
@@ -40,7 +43,12 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
     useEffect(() => {
         // Resolve the wrapper element: prefer scrollElement, fallback to scrollRef
         const wrapper = scrollElement ?? scrollRef?.current
-        if (!wrapper) return
+        if (!wrapper || !settings.showAnimations) {
+            lenisRef.current?.destroy()
+            lenisRef.current = null
+            setLenisInstance(null)
+            return
+        }
 
         const lenis = new Lenis({
             wrapper,
@@ -54,6 +62,7 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
         })
 
         lenisRef.current = lenis
+        setLenisInstance(lenis)
 
         const resizeObserver = new ResizeObserver(() => {
             lenis.resize()
@@ -63,21 +72,72 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
             resizeObserver.observe(wrapper.firstElementChild)
         }
 
+        let running = false
+        let idleFrames = 0
+        function stop() {
+            running = false
+            if (rafIdRef.current !== null) {
+                cancelAnimationFrame(rafIdRef.current)
+                rafIdRef.current = null
+            }
+        }
         function raf(time: number) {
+            if (!running) return
             lenis.raf(time)
+
+            // The marketing surface deliberately keeps its continuous Lenis
+            // rhythm. Authenticated app scrollers sleep after settling and
+            // wake only for input/native scroll, removing an idle 60fps loop.
+            const isSettled = lenis.isScrolling === false && Math.abs(lenis.velocity) < 0.01
+            if (!pathname?.startsWith('/landing') && isSettled) {
+                idleFrames += 1
+                if (idleFrames >= 2) {
+                    stop()
+                    return
+                }
+            } else {
+                idleFrames = 0
+            }
             rafIdRef.current = requestAnimationFrame(raf)
         }
-        rafIdRef.current = requestAnimationFrame(raf)
+        function start() {
+            if (running || document.hidden) return
+            running = true
+            idleFrames = 0
+            rafIdRef.current = requestAnimationFrame(raf)
+        }
+        const wake = () => start()
+        function handleVisibilityChange() {
+            if (document.hidden) stop()
+            else if (pathname?.startsWith('/landing')) start()
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        const isLandingRoute = pathname?.startsWith('/landing')
+        if (isLandingRoute) {
+            start()
+        } else {
+            wrapper.addEventListener('wheel', wake, { passive: true })
+            wrapper.addEventListener('touchstart', wake, { passive: true })
+            wrapper.addEventListener('touchmove', wake, { passive: true })
+            wrapper.addEventListener('scroll', wake, { passive: true })
+            wrapper.addEventListener('pointerdown', wake, { passive: true })
+        }
 
         return () => {
             resizeObserver.disconnect()
-            if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current)
-            }
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            wrapper.removeEventListener('wheel', wake)
+            wrapper.removeEventListener('touchstart', wake)
+            wrapper.removeEventListener('touchmove', wake)
+            wrapper.removeEventListener('scroll', wake)
+            wrapper.removeEventListener('pointerdown', wake)
+            stop()
             lenis.destroy()
             lenisRef.current = null
+            setLenisInstance(null)
         }
-    }, [scrollRef, scrollElement])
+    }, [scrollRef, scrollElement, settings.showAnimations, pathname])
 
-    return <LenisContext.Provider value={lenisRef.current}>{children}</LenisContext.Provider>
+    return <LenisContext.Provider value={lenisInstance}>{children}</LenisContext.Provider>
 }

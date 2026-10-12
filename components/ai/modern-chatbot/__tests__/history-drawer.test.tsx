@@ -46,8 +46,8 @@ describe('ModernChatbot conversation history', () => {
     await user.click(screen.getByRole('button', { name: 'Ver historial' }))
 
     const drawer = screen.getByRole('dialog', { name: 'Historial de conversaciones' })
-    expect(drawer).toHaveClass('md:w-[360px]')
+    expect(drawer).toHaveClass('md:!w-[360px]')
     expect(drawer).not.toHaveClass('inset-0')
-    expect(screen.getByTestId('conversation-history-backdrop')).toHaveClass('bg-black/45')
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).toHaveClass('bg-black/50')
   })
 })

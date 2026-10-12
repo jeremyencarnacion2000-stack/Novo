@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "name": "project-landing-motion-contract",
+  "scrollProgress": { "range": [0, 1], "sharedPerScene": true },
+  "depthPlanes": [
+    { "id": "atmosphere", "depth": 0.04 },
+    { "id": "ambient", "depth": 0.1 },
+    { "id": "background", "depth": 0.18 },
+    { "id": "subject", "depth": 0.32 },
+    { "id": "foreground", "depth": 0.52 },
+    { "id": "product-or-type", "depth": 0.82 },
+    { "id": "direction-path", "depth": 0.94 }
+  ],
+  "chapters": [
+    { "id": "promise", "progress": [0, 0.22] },
+    { "id": "assembly", "progress": [0.16, 0.54] },
+    { "id": "proof", "progress": [0.42, 0.78] },
+    { "id": "direction", "progress": [0.74, 1] }
+  ],
+  "motion": {
+    "cardEntranceMs": [420, 700],
+    "pathDrawMs": [900, 1600],
+    "ambientCycleMs": [18000, 32000],
+    "preferredEase": "power3.out",
+    "avoidGlobalBounce": true
+  },
+  "fallback": {
+    "reducedMotion": "static-composition",
+    "essentialCopyAlwaysVisible": true,
+    "decorativeLayersAriaHidden": true
+  }
+}

@@ -127,7 +127,7 @@ export async function GET() {
             }
         })
     } catch (error) {
-        console.error('Error generating recommendations:', error)
+        console.error('Error generating recommendations.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

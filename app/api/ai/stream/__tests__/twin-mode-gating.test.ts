@@ -29,7 +29,7 @@ jest.mock('@/lib/ai/activity', () => ({
 }));
 
 import { buildUserContext } from '@/lib/ai/context-builder';
-import { finishActivityRun, recordFirstVisibleActivityContent } from '@/lib/ai/activity';
+import { createActivityRun, finishActivityRun, recordFirstVisibleActivityContent } from '@/lib/ai/activity';
 
 describe('Twin Mode server-side gating', () => {
   beforeEach(() => {
@@ -60,6 +60,47 @@ describe('Twin Mode server-side gating', () => {
     await POST(request as any);
 
     expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: true, includeGmail: false });
+  });
+
+  it('rejects malformed chat payloads before creating an activity run', async () => {
+    const { POST } = await import('../route');
+    const response = await POST(new Request('http://localhost/api/ai/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not-json',
+    }) as any);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid chat request' });
+    expect(createActivityRun).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty chat request before creating an activity run', async () => {
+    const { POST } = await import('../route');
+    const response = await POST(new Request('http://localhost/api/ai/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: '', history: [], attachments: [] }),
+    }) as any);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Message or attachment is required' });
+    expect(createActivityRun).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized attachment payloads before invoking the model', async () => {
+    const { POST } = await import('../route');
+    const response = await POST(new Request('http://localhost/api/ai/stream', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: 'analiza esto',
+        history: [],
+        attachments: [{ name: 'huge.png', type: 'image/png', url: 'x'.repeat(2_500_001) }],
+      }),
+    }) as any);
+
+    expect(response.status).toBe(400);
+    expect(buildUserContext).not.toHaveBeenCalled();
   });
 
   it('includes the persisted run identifier in the no-provider fallback stream', async () => {

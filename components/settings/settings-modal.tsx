@@ -1,11 +1,17 @@
 'use client'
 
-import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { SettingsControlCenter } from './settings-control-center'
+import dynamic from 'next/dynamic'
 import { useSettings } from '@/lib/settings-context'
 import { cn } from '@/lib/utils'
-import { safeViewTransition } from '@/hooks/use-view-transition'
+
+const SettingsControlCenter = dynamic(
+    () => import('./settings-control-center').then((module) => ({ default: module.SettingsControlCenter })),
+    {
+        ssr: false,
+        loading: () => <div className="min-h-[240px] animate-pulse rounded-2xl bg-foreground/[0.03]" aria-hidden="true" />,
+    },
+)
 
 export function SettingsModal() {
     const { isSettingsOpen, setSettingsOpen } = useSettings()
@@ -13,14 +19,11 @@ export function SettingsModal() {
     return (
         <Dialog 
             open={isSettingsOpen} 
-            onOpenChange={(open) => {
-                safeViewTransition(() => {
-                    setSettingsOpen(open);
-                });
-            }}
+            onOpenChange={setSettingsOpen}
         >
             <DialogContent
-                style={{ viewTransitionName: 'settings-window' } as React.CSSProperties}
+                motionPreset="center"
+                mobilePresentation="fullscreen"
                 data-overlay-material
                 className={cn(
                 "max-w-4xl md:max-w-5xl w-full md:w-[94vw] h-[100dvh] md:h-[85vh] p-0 shadow-2xl outline-none",

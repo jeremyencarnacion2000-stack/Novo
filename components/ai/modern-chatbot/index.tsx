@@ -8,11 +8,12 @@ import { ChatInput } from './chat-input';
 import { DesktopHero, MobileHero, VoiceListeningOverlay } from './welcome-hero';
 import {
   Maximize2, Minimize2, Plus,
-  X, Home, PanelLeft
+  Home, PanelLeft
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 interface ModernChatbotProps {
     // Provided when this is rendered inside the mobile fullscreen chat sheet
@@ -116,56 +117,30 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
             <div className="relative z-10 flex h-full w-full overflow-hidden">
 
                 {/* ── Sidebar Drawer (desktop) ───────────────────────────── */}
-                <AnimatePresence>
-                    {isDrawerOpen && (
-                        <>
-                            {/* Backdrop */}
-                            <motion.div
-                                key="drawer-backdrop"
-                                data-testid="conversation-history-backdrop"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.22 }}
-                                onClick={() => setIsDrawerOpen(false)}
-                                className="fixed inset-0 bg-black/45 dark:bg-black/60 backdrop-blur-sm z-[590]"
-                            />
-                            {/* Panel */}
-                            <motion.div
-                                key="drawer-panel"
-                                role="dialog"
-                                aria-modal="true"
-                                aria-label="Historial de conversaciones"
-                                initial={{ x: '-100%' }}
-                                animate={{ x: 0 }}
-                                exit={{ x: '-100%' }}
-                                transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                                className="fixed inset-y-0 left-0 w-full md:w-[360px] max-w-full bg-background z-[600] flex flex-col border-r border-border/40 shadow-2xl backdrop-blur-3xl"
-                            >
-                                <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
-                                        <span className="text-[11px] font-bold text-muted-foreground tracking-[0.2em] uppercase">Historial</span>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsDrawerOpen(false)}
-                                        aria-label="Cerrar historial"
-                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-hidden" onClick={(e) => {
-                                    if ((e.target as HTMLElement).closest('[data-conversation-item]')) {
-                                        setTimeout(() => setIsDrawerOpen(false), 280);
-                                    }
-                                }}>
-                                    <Sidebar embedded />
-                                </div>
-                            </motion.div>
-                        </>
-                    )}
-                </AnimatePresence>
+                <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                    <SheetContent
+                        side="left"
+                        aria-label="Historial de conversaciones"
+                        aria-describedby={undefined}
+                        className="z-[600] !w-full max-w-full gap-0 border-r border-border/40 bg-background p-0 shadow-2xl backdrop-blur-3xl md:!w-[360px]"
+                    >
+                        <div className="flex items-center border-b border-white/[0.05] px-5 py-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" />
+                                <SheetTitle className="text-[11px] font-bold text-muted-foreground tracking-[0.2em] uppercase">
+                                    Historial<span className="sr-only"> de conversaciones</span>
+                                </SheetTitle>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-hidden" onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('[data-conversation-item]')) {
+                                setTimeout(() => setIsDrawerOpen(false), 280);
+                            }
+                        }}>
+                            <Sidebar embedded />
+                        </div>
+                    </SheetContent>
+                </Sheet>
 
                 {/* ── Main area ─────────────────────────────────────────── */}
                 <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">

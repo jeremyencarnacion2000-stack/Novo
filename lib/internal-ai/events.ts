@@ -36,13 +36,17 @@ class InternalAIEventBus {
             try {
                 handler(event);
             } catch (error) {
-                console.error('Error in AI event handler:', error);
+                console.error('Error in AI event handler', {
+                    reason: error instanceof Error ? error.name : 'unknown',
+                });
             }
         });
 
         // Log to console in dev
         if (process.env.NODE_ENV === 'development') {
-            console.log(`[Internal AI] ${event.type}`, event);
+            // Events may contain private notes, prompts or provider payloads;
+            // keep development diagnostics to the stable event type only.
+            console.log(`[Internal AI] ${event.type}`);
         }
     }
 

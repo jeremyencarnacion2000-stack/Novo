@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { safeViewTransition } from '@/hooks/use-view-transition'
 import {
   Dialog,
   DialogContent,
@@ -21,19 +20,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import * as pdfjsLib from 'pdfjs-dist'
-import mammoth from 'mammoth'
-import { useModalFlip } from '@/hooks/use-modal-flip'
-
-// Initialize PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
-}
 
 interface ImportRoutineDialogProps {
   open: boolean
   onClose: () => void
-  onImport: (payload: any) => void
+  /** Resolves true only after the server has accepted the import. */
+  onImport: (payload: any) => Promise<boolean> | boolean
 }
 
 export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDialogProps) {
@@ -84,6 +76,8 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
   }
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
+    const pdfjsLib = await import('pdfjs-dist')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
     const arrayBuffer = await file.arrayBuffer()
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
     let fullText = ''
@@ -97,6 +91,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
   }
 
   const extractTextFromDocx = async (file: File): Promise<string> => {
+    const mammoth = (await import('mammoth')).default
     const arrayBuffer = await file.arrayBuffer()
     const result = await mammoth.extractRawText({ arrayBuffer })
     return result.value
@@ -140,7 +135,7 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
     }
   }
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!parsedData) return;
 
     const payload: any = {
@@ -158,29 +153,33 @@ export function ImportRoutineDialog({ open, onClose, onImport }: ImportRoutineDi
       });
     }
 
-    onImport(payload);
-    handleClose();
+    setIsProcessing(true)
+    try {
+      // Keep the dialog open while the request is in flight. This lets the
+      // parent retain the same idempotency key for a safe retry if the
+      // response is lost, instead of making a second import intent.
+      const didImport = await onImport(payload)
+      if (didImport) handleClose()
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-  const closeFlip = useModalFlip('btn-import-routine', open)
-
   const handleClose = () => {
-    closeFlip(() => {
-      setFile(null)
-      setParsedText('')
-      setError('')
-      setIsProcessing(false)
-      setStep('upload')
-      setParsedData(null)
-      setSelectedBlocks({})
-      onClose()
-    })
+    setFile(null)
+    setParsedText('')
+    setError('')
+    setIsProcessing(false)
+    setStep('upload')
+    setParsedData(null)
+    setSelectedBlocks({})
+    onClose()
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        data-flip-to="btn-import-routine"
+        motionId="btn-import-routine"
         className="max-w-2xl max-h-[90dvh] overflow-y-auto"
       >
         <DialogHeader>

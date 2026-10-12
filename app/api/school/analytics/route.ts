@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
             currentSemester: semesterGPA[semesterGPA.length - 1]?.semester || null,
         });
     } catch (error) {
-        console.error('Error fetching analytics:', error);
+        console.error('Error fetching analytics.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

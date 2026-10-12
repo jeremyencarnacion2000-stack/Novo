@@ -4,37 +4,53 @@ import React, { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
-    Calendar, BarChart3, Timer,
+    Calendar, BarChart3, Timer, X,
     ListChecks, CheckSquare, KanbanSquare, TrendingUp,
     BookOpen, Music,
-    Settings, User, Search, Plug, Mic
+    Settings, User, Search, Plug, Mic,
+    House, Brain, MessageCircle, Activity, Sparkles,
+    type LucideIcon,
 } from 'lucide-react'
 
-import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { GlassSurface } from '@/components/ui/GlassSurface'
 
 interface MobileSectionDrawerProps {
+    open?: boolean
     onClose: (options?: { historyAction?: 'back' | 'replace' | 'none' }) => void
     onOpenVoice?: () => void
+    onExitComplete?: () => void
 }
 
-export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawerProps) {
+export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitComplete }: MobileSectionDrawerProps) {
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
     const { setModalOpen } = useMobileOverlay()
 
     useEffect(() => {
-        setModalOpen(true)
+        setModalOpen(open)
         return () => setModalOpen(false)
-    }, [setModalOpen])
-    const handleDismiss = () => onClose()
-    const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({ onDismiss: handleDismiss })
+    }, [open, setModalOpen])
 
-    // Primary navigation lives in MobileNav. This drawer is deliberately
-    // secondary: workspace context first, then legacy/labs modules.
-    const sections = [
+    // The drawer replaces the rail during the morph, so the same primary
+    // destinations must remain reachable from the expanded surface.
+    const sections: Array<{
+        title: string
+        items: Array<{ title: string; href: string; icon: LucideIcon; sharedId?: string }>
+    }> = [
+        {
+            title: t('sidebar.overview'),
+            items: [
+                { title: t('sidebar.dashboard'), href: '/', icon: House, sharedId: 'mobile-nav-item-dashboard' },
+                { title: t('sidebar.cognitive_engine'), href: '/cognitive', icon: Brain, sharedId: 'mobile-nav-item-cognitive' },
+                { title: t('sidebar.chat'), href: '/chat', icon: MessageCircle, sharedId: 'mobile-nav-item-chat' },
+                { title: t('sidebar.companion'), href: '/companion', icon: Sparkles },
+                { title: t('sidebar.activity'), href: '/activity', icon: Activity, sharedId: 'mobile-nav-item-activity' },
+            ],
+        },
         {
             title: t('sidebar.workspace'),
             items: [
@@ -66,43 +82,46 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
     }
 
     return (
-        <>
-            {/* Backdrop — opacity driven by the same GSAP timeline as the panel */}
-            <div
-                data-flip-overlay="mobile-nav-panel"
-                data-testid="workspace-backdrop"
-                aria-hidden="true"
-                className="modal-flip-overlay fixed inset-0 z-[5000] bg-black/60 md:hidden"
-                onClick={handleDismiss}
-            />
-
-            {/* Same left-4/right-4/bottom-4 bounds as the nav bar's own
-                wrapper (components/mobile-nav.tsx) — the panel should read as
-                that exact bar having grown upward, not a differently-inset
-                sheet that happens to start near it. */}
-            <div
-                ref={dragSurfaceRef}
-                data-flip-to="mobile-nav-panel"
-                data-mobile-overlay="navigation"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Workspace menu"
-                className="modal-flip-target novo-focus-surface fixed left-4 right-4 z-[5001] pointer-events-auto rounded-[32px] overflow-hidden md:hidden"
-                style={{
-                    bottom: 'var(--mobile-navigation-bottom)',
-                    // Primary navigation must stay legible over arbitrary dashboard
-                    // content, not just a custom wallpaper. novo-focus-surface's
-                    // opacity is Settings-driven (cardOpacity, default 15%) and only
-                    // gets an auto-contrast floor when a wallpaper is set, so this
-                    // sheet forces the real solid background instead of inheriting
-                    // that decorative-card opacity.
-                    backgroundColor: 'var(--background)',
+        <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+            <DialogContent
+                motionPreset="shared"
+                motionId="mobile-nav-panel"
+                overlayClassName="md:hidden"
+                overlayProps={{
+                    'data-testid': 'workspace-backdrop',
+                    className: 'bg-black/60 md:hidden',
                 }}
-            >
+                showCloseButton={false}
+                data-mobile-overlay="navigation"
+                aria-label="Workspace menu"
+                onCloseAutoFocus={() => {
+                    if (!open) onExitComplete?.()
+                }}
+                className="!fixed !left-4 !right-4 !top-auto !bottom-[var(--mobile-navigation-bottom)] !w-auto !max-w-none !translate-x-0 !translate-y-0 rounded-[32px] border border-border/20 !bg-transparent novo-mobile-nav-panel overflow-hidden p-0 shadow-[0_10px_34px_rgba(0,0,0,0.18)] md:hidden"
+                >
+                    <DialogTitle className="sr-only">Workspace menu</DialogTitle>
+                    <GlassSurface
+                        aria-hidden
+                        data-testid="workspace-panel-glass-surface"
+                        preset="navigation"
+                        refractive
+                        refractivePriority="interactive"
+                        webComponent
+                        backgroundColor="rgba(255,255,255,0.055)"
+                        elevation="low"
+                        className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[32px]"
+                        style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+                    />
+                    <DialogClose
+                        aria-label="Close menu"
+                        className="novo-nav-glass-control absolute right-3 top-2 z-20 flex size-10 items-center justify-center rounded-full border border-foreground/[0.08] bg-foreground/[0.035] text-foreground/55 transition-colors hover:bg-foreground/[0.07] hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-95"
+                    >
+                        <X data-shared-item="mobile-nav-close" className="size-4" strokeWidth={1.8} />
+                    </DialogClose>
                     {/* Handle — drag down from here to dismiss with native physics */}
                     <div
                         aria-hidden="true"
-                        className="flex justify-center pt-3.5 pb-3 pointer-events-none select-none"
+                        className="relative z-10 flex justify-center pt-3.5 pb-3 pointer-events-none select-none"
                     >
                         <div className="w-9 h-[4px] rounded-full bg-foreground/15 hover:bg-foreground/30 transition-colors" />
                     </div>
@@ -110,7 +129,7 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                     {/* Sections */}
                     <div
                         data-modal-content
-                        className="px-5 pb-6 max-h-[65dvh] overflow-y-auto scrollbar-hide"
+                        className="relative z-10 px-5 pb-6 max-h-[65dvh] overflow-y-auto scrollbar-hide"
                     >
                         {sections.map((section) => (
                             <div key={section.title} className="mb-5 last:mb-2">
@@ -120,25 +139,47 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                     {section.items.map((item) => {
                                         const Icon = item.icon
-                                        const active = pathname === item.href
+                                        const currentPath = pathname ?? ''
+                                        const active = item.href === '/'
+                                            ? currentPath === '/'
+                                            : currentPath === item.href || currentPath.startsWith(item.href + '/')
                                         return (
                                             <button
                                                 key={item.href}
                                                 onClick={() => handleNavigate(item.href)}
                                                 className={cn(
-                                                    "flex flex-col items-center gap-2.5 py-4 px-2 rounded-[22px] transition-all duration-200 active:scale-95",
+                                                    "novo-nav-glass-control relative flex flex-col items-center gap-2.5 py-4 px-2 rounded-[22px] transition-all duration-200 active:scale-95",
                                                     active
                                                         ? "bg-primary/12 text-primary ring-1 ring-primary/20"
                                                         : "bg-foreground/[0.02] text-foreground/35 hover:bg-foreground/[0.04] hover:text-foreground/50"
                                                 )}
+                                                data-active={active}
                                             >
                                                 <div className={cn(
-                                                    "h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
+                                                    "relative h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
                                                     active
                                                         ? "bg-primary/15"
                                                         : "bg-foreground/[0.03]"
                                                 )}>
-                                                    <Icon className="h-[20px] w-[20px]" strokeWidth={active ? 1.8 : 1.4} />
+                                                    {active && (
+                                                        <GlassSurface
+                                                            aria-hidden
+                                                            data-testid="workspace-active-glass-indicator"
+                                                            preset="navigation"
+                                                            refractive
+                                                            refractivePriority="interactive"
+                                                            webComponent
+                                                            backgroundColor="rgba(255,255,255,0.055)"
+                                                            elevation="low"
+                                                            className="pointer-events-none absolute inset-0 h-full w-full rounded-2xl"
+                                                            style={{ position: 'absolute', inset: 0, borderRadius: 'inherit' }}
+                                                        />
+                                                    )}
+                                                    <Icon
+                                                        data-shared-item={item.sharedId}
+                                                        className="relative z-10 h-[20px] w-[20px]"
+                                                        strokeWidth={active ? 1.8 : 1.4}
+                                                    />
                                                 </div>
                                                 <span className={cn(
                                                     "text-[10px] font-medium tracking-tight",
@@ -158,7 +199,7 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                             {onOpenVoice && (
                                 <button
                                     onClick={onOpenVoice}
-                                    className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                    className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                                 >
                                     <Mic className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                     <span className="text-[11px] font-medium tracking-wide">Voz</span>
@@ -169,28 +210,28 @@ export function MobileSectionDrawer({ onClose, onOpenVoice }: MobileSectionDrawe
                                     window.dispatchEvent(new CustomEvent('open-command-palette'))
                                     onClose({ historyAction: 'none' })
                                 }}
-                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <Search className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">Buscar</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/settings')}
-                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <Settings className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.settings')}</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/profile')}
-                                className="min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
                             >
                                 <User className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.profile')}</span>
                             </button>
                         </div>
                     </div>
-                </div>
-        </>
+            </DialogContent>
+        </Dialog>
     )
 }

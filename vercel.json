@@ -1,5 +1,6 @@
 {
-  "buildCommand": "pnpm run vercel-build",
+  "installCommand": "npm ci --legacy-peer-deps",
+  "buildCommand": "npm run vercel-build",
   "framework": "nextjs",
   "crons": [
     {
@@ -9,6 +10,14 @@
     {
       "path": "/api/cron/reengagement",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/ambient-context",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/activity-retention",
+      "schedule": "0 2 * * *"
     }
   ]
 }

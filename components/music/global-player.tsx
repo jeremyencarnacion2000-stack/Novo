@@ -3,9 +3,11 @@
 import { ReactNode, useEffect, useRef } from 'react'
 import { usePlayerStore } from '@/lib/player-store'
 import { useToast } from '@/components/ui/use-toast'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 interface GlobalPlayerProps {
-  children: ReactNode
+  children?: ReactNode
+  initialLoadRequested?: boolean
 }
 
 declare global {
@@ -15,26 +17,26 @@ declare global {
   }
 }
 
-export function GlobalPlayer({ children }: GlobalPlayerProps) {
+export function GlobalPlayer({ children, initialLoadRequested = false }: GlobalPlayerProps) {
   const playerRef = useRef<any>(null)
   const apiLoadedRef = useRef(false)
   
-  const {
-    currentTrack,
-    isPlaying,
-    volume,
-    nextTrack,
-    setProgress,
-    setReady,
-    isReady
-  } = usePlayerStore()
+  const currentTrack = usePlayerStore((state) => state.currentTrack)
+  const isPlaying = usePlayerStore((state) => state.isPlaying)
+  const volume = usePlayerStore((state) => state.volume)
+  const nextTrack = usePlayerStore((state) => state.nextTrack)
+  const setProgress = usePlayerStore((state) => state.setProgress)
+  const setReady = usePlayerStore((state) => state.setReady)
+  const isReady = usePlayerStore((state) => state.isReady)
 
   const { toast } = useToast()
 
   // Refs to prevent redundant triggers
   const lastProcessedTrackId = useRef<string | null>(null)
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const syncVisibilityHandlerRef = useRef<(() => void) | null>(null)
   const consecutiveErrors = useRef<number>(0)
+  const historyIntentRef = useRef<{ trackId: string; key: string } | null>(null)
 
   // ─── Mobile detection (pointer coarse = touch device) ────────────────────
   // On mobile, we NEVER auto-load the YouTube script reactively.
@@ -96,7 +98,7 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
         playerRef.current.destroy()
         playerRef.current = null
       }
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
+      stopProgressSync()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -104,6 +106,12 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
   // ─── Auto-load only on DESKTOP when a track is selected programmatically ──
   // On mobile (isMobile=true), we skip this reactive trigger entirely to
   // prevent main-thread injection during hydration.
+  // Preserve an explicit mobile tap that happened before this lazy chunk loaded.
+  useEffect(() => {
+    if (initialLoadRequested) loadYouTubeAPI()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoadRequested])
+
   useEffect(() => {
     if (!isMobile && currentTrack?.id) {
       loadYouTubeAPI()
@@ -121,17 +129,32 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
   }
 
   function startProgressSync() {
-    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
-    syncIntervalRef.current = setInterval(() => {
+    stopProgressSync()
+    const tick = () => {
       const currentTime = playerRef.current?.getCurrentTime?.()
       if (currentTime > 0) setProgress(Math.floor(currentTime * 1000))
-    }, 1000)
+    }
+    const startInterval = () => {
+      if (document.visibilityState === 'hidden' || syncIntervalRef.current) return
+      syncIntervalRef.current = setInterval(tick, 1000)
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') stopProgressSync(false)
+      else startInterval()
+    }
+    syncVisibilityHandlerRef.current = handleVisibility
+    document.addEventListener('visibilitychange', handleVisibility)
+    startInterval()
   }
 
-  function stopProgressSync() {
+  function stopProgressSync(removeListener = true) {
     if (syncIntervalRef.current) {
       clearInterval(syncIntervalRef.current)
       syncIntervalRef.current = null
+    }
+    if (removeListener && syncVisibilityHandlerRef.current) {
+      document.removeEventListener('visibilitychange', syncVisibilityHandlerRef.current)
+      syncVisibilityHandlerRef.current = null
     }
   }
 
@@ -215,10 +238,16 @@ export function GlobalPlayer({ children }: GlobalPlayerProps) {
               playerRef.current.pauseVideo();
             }
 
-            // Persistence: Record History
+            // Persistence: record one history intent per loaded track. The
+            // key protects against Strict Mode/effect replays and a transport
+            // retry after the database commit.
+            const historyIntent = historyIntentRef.current?.trackId === currentTrack.id
+              ? historyIntentRef.current
+              : { trackId: currentTrack.id, key: createClientIdempotencyKey() }
+            historyIntentRef.current = historyIntent
             fetch('/api/music/history', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'Idempotency-Key': historyIntent.key },
               body: JSON.stringify({
                 trackId: currentTrack.id,
                 title: currentTrack.name,

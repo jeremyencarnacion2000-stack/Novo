@@ -15,6 +15,10 @@ function isBoxSized(el: HTMLElement): boolean {
   return tag === 'svg' || tag === 'img' || el.children.length > 0
 }
 
+export function isTextFlightElement(el: HTMLElement): boolean {
+  return !isBoxSized(el) && Boolean(el.textContent?.trim())
+}
+
 /**
  * Clones `originEl` into a fixed-position floating element matching its
  * exact current rect/appearance. Animates position, size, font properties,
@@ -23,6 +27,12 @@ function isBoxSized(el: HTMLElement): boolean {
 export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLElement {
   const rect = originEl.getBoundingClientRect()
   const cs = getComputedStyle(originEl)
+  const inline = originEl.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }
+  const read = (property: keyof CSSStyleDeclaration) => {
+    const computed = cs[property] as string | undefined
+    const authored = inline[property] as string | undefined
+    return computed || authored || ''
+  }
   const clone = originEl.cloneNode(true) as HTMLElement
   clone.removeAttribute('data-shared-item')
   clone.setAttribute('data-flying-clone', '')
@@ -34,9 +44,20 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
     width: `${rect.width}px`,
     height: `${rect.height}px`,
     margin: '0',
-    borderRadius: cs.borderRadius,
-    backgroundColor: cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : 'transparent',
-    boxShadow: cs.boxShadow !== 'none' ? cs.boxShadow : 'none',
+    borderRadius: read('borderRadius'),
+    border: read('border'),
+    borderColor: read('borderColor'),
+    borderStyle: read('borderStyle'),
+    borderWidth: read('borderWidth'),
+    backgroundColor: read('backgroundColor') !== 'rgba(0, 0, 0, 0)' ? read('backgroundColor') : 'transparent',
+    backgroundImage: read('backgroundImage') !== 'none' ? read('backgroundImage') : 'none',
+    backgroundSize: read('backgroundSize'),
+    backgroundPosition: read('backgroundPosition'),
+    backgroundBlendMode: read('backgroundBlendMode'),
+    boxShadow: read('boxShadow') !== 'none' ? read('boxShadow') : 'none',
+    backdropFilter: read('backdropFilter'),
+    WebkitBackdropFilter: inline.webkitBackdropFilter || read('backdropFilter'),
+    mixBlendMode: read('mixBlendMode'),
     zIndex: String(zIndex),
     pointerEvents: 'none',
     transition: 'none',
@@ -51,19 +72,44 @@ export function createFlyingClone(originEl: HTMLElement, zIndex = 5003): HTMLEle
     // here forces a reflow on every frame and is the source of the visible
     // hitch when a shared element crosses into a dialog.
     willChange: 'transform, border-radius, background-color',
-  } as CSSStyleDeclaration)
+  } as Record<string, string>)
 
   if (!isBoxSized(originEl)) {
-    clone.style.fontSize = cs.fontSize
-    clone.style.fontWeight = cs.fontWeight
-    clone.style.color = cs.color
-    clone.style.letterSpacing = cs.letterSpacing
-    clone.style.lineHeight = cs.lineHeight
+    clone.style.fontSize = read('fontSize')
+    clone.style.fontWeight = read('fontWeight')
+    clone.style.color = read('color')
+    clone.style.letterSpacing = read('letterSpacing')
+    clone.style.lineHeight = read('lineHeight')
     clone.style.whiteSpace = 'nowrap'
   }
 
   document.body.appendChild(clone)
   return clone
+}
+
+/**
+ * Creates two typography layers at their real rendered sizes. The layers move
+ * by translation only and crossfade mid-flight, avoiding stretched glyphs
+ * when a compact button label becomes a larger dialog heading.
+ */
+export function createTextCrossfadeFlight(
+  originEl: HTMLElement,
+  targetEl: HTMLElement,
+  zIndex = 5003,
+) {
+  const compact = createFlyingClone(originEl, zIndex)
+  const expanded = createFlyingClone(targetEl, zIndex + 1)
+  compact.dataset.flyingTextLayer = 'compact'
+  expanded.dataset.flyingTextLayer = 'expanded'
+  expanded.style.opacity = '0'
+
+  return {
+    compact,
+    expanded,
+    originRect: originEl.getBoundingClientRect(),
+    targetRect: targetEl.getBoundingClientRect(),
+    nodes: [compact, expanded],
+  }
 }
 
 /** Adds a tween animating a flying clone to match `destEl`'s current rect/style. */
@@ -73,7 +119,7 @@ export function flyTo(
   destEl: HTMLElement,
   duration: number,
   position: number,
-  options: { blur?: number } = {},
+  options: { blur?: number; ease?: string | ((progress: number) => number) } = {},
 ) {
   const sourceRect = el.getBoundingClientRect()
   const rect = destEl.getBoundingClientRect()
@@ -86,6 +132,7 @@ export function flyTo(
     scaleY: sourceRect.height ? rect.height / sourceRect.height : 1,
     duration,
     filter: `blur(${options.blur ?? 0}px)`,
+    ease: options.ease,
   }
 
   if (cs.borderRadius && cs.borderRadius !== '0px') {

@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, Loader2, Wand2 } from 'lucide-react'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 
@@ -20,13 +19,11 @@ export function QuickCapture({ onCreated }: QuickCaptureProps) {
     const [categorizing, setCategorizing] = useState(false)
     const [tags, setTags] = useState<string[]>([])
     const [color, setColor] = useState('bg-background')
+    const createIntentKey = useRef<string | null>(null)
     const { toast } = useToast()
 
-    const closeFlip = useModalFlip('btn-quick-note', open)
-
     const handleOpenChange = (o: boolean) => {
-        if (!o) closeFlip(() => setOpen(false))
-        else setOpen(true)
+        setOpen(o)
     }
 
     const handleCategorize = async () => {
@@ -64,15 +61,19 @@ export function QuickCapture({ onCreated }: QuickCaptureProps) {
     const handleSubmit = async () => {
         if (!content.trim()) return
 
+        const intentKey = createIntentKey.current || crypto.randomUUID()
+        createIntentKey.current = intentKey
         setLoading(true)
         try {
             const response = await fetch('/api/notes', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intentKey },
                 body: JSON.stringify({ content, tags, color })
             })
 
             if (!response.ok) throw new Error('Failed to create note')
+
+            createIntentKey.current = null
 
             toast({
                 title: 'Note created',
@@ -103,7 +104,7 @@ export function QuickCapture({ onCreated }: QuickCaptureProps) {
                     <span data-shared-item="text">Quick Note</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent data-flip-to="btn-quick-note" flipAnchored className={`sm:max-w-[380px] transition-colors duration-300 ${color}`}>
+            <DialogContent motionId="btn-quick-note" flipAnchored className={`sm:max-w-[380px] transition-colors duration-300 ${color}`}>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Plus data-shared-item="icon" className="h-5 w-5" />

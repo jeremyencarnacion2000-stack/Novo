@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma';
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin';
 import { upsertNovoSignals } from '@/lib/cognitive/signal-ledger';
+import { withProviderSyncLock } from '@/lib/provider-sync-lock';
 
 const MAX_SELECTED_DATABASES = 20;
 
@@ -165,25 +166,37 @@ export async function syncNotionPlugin(userId: string, options: { signal?: Abort
       });
     }
 
-    // Upsert task records into Novo for triage
-    for (const task of pendingTasks.slice(0, 20)) {
-      const existing = await prisma.checklistItem.findFirst({
-        where: { userId, sourceId: task.id, source: 'notion' },
-      });
-      if (!existing) {
-        await prisma.checklistItem.create({
-          data: {
-            userId,
-            text: task.title,
-            completed: false,
-            priority: 'medium',
-            source: 'notion',
-            sourceId: task.id,
-            dueDate: task.dueDate ? new Date(task.dueDate) : null,
-          },
+    // Upsert task records into Novo for triage. The advisory lock closes the
+    // find-then-create race when a heartbeat and a manual sync overlap.
+    await withProviderSyncLock(prisma, `novo:checklist-sync:${userId}:notion`, async (db) => {
+      for (const task of pendingTasks.slice(0, 20)) {
+        const existing = await db.checklistItem.findFirst({
+          where: { userId, sourceId: task.id, source: 'notion' },
         });
+        if (existing) {
+          await db.checklistItem.updateMany({
+            where: { id: existing.id, userId, source: 'notion', sourceId: task.id },
+            data: {
+              text: task.title,
+              completed: false,
+              dueDate: task.dueDate ? new Date(task.dueDate) : null,
+            },
+          });
+        } else {
+          await db.checklistItem.create({
+            data: {
+              userId,
+              text: task.title,
+              completed: false,
+              priority: 'medium',
+              source: 'notion',
+              sourceId: task.id,
+              dueDate: task.dueDate ? new Date(task.dueDate) : null,
+            },
+          });
+        }
       }
-    }
+    });
 
     return {
       pagesRead: pages.length,

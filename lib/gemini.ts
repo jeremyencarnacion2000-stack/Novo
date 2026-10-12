@@ -110,7 +110,7 @@ export class GeminiAPIClient {
         const text = response.text();
         return { content: text, functionCalls };
       } catch (error: any) {
-        console.warn(`[GeminiAPIClient] Model ${modelName} failed, trying next fallback:`, error?.message || error);
+        console.warn(`[GeminiAPIClient] Model ${modelName} failed, trying next fallback.`);
         lastError = error;
       }
     }

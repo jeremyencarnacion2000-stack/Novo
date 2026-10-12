@@ -255,8 +255,8 @@ export async function GET(request: NextRequest) {
                 longest: await calculateLongestStreak(user.id),
             },
         });
-    } catch (error) {
-        console.error('Error fetching productivity stats:', error);
+    } catch {
+        console.error('Error fetching productivity stats.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

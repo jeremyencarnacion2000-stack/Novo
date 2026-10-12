@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(subject)
   } catch (error) {
-    console.error('Error fetching subject:', error)
+    console.error('Error fetching subject.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -72,7 +72,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating subject:', error)
+    console.error('Error updating subject.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -102,7 +102,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting subject:', error)
+    console.error('Error deleting subject.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

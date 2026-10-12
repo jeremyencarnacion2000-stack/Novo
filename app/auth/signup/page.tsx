@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { InfinityOrbit } from '@/components/auth/infinity-orbit'
+import { AuthEditorialPanel } from '@/components/auth/auth-editorial-panel'
 
 export default function SignUpPage() {
     const router = useRouter()
@@ -20,9 +21,11 @@ export default function SignUpPage() {
     const [success, setSuccess] = useState(false)
 
     const getCallbackUrl = () => {
-        if (typeof window === 'undefined') return '/onboarding'
+        // Keep the app resolver as the canonical post-auth destination. It
+        // sends new users to onboarding and returning users to the product.
+        if (typeof window === 'undefined') return '/app'
         const raw = new URLSearchParams(window.location.search).get('callbackUrl')
-        return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/onboarding'
+        return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/app'
     }
 
     const getIntent = () => typeof window === 'undefined'
@@ -103,7 +106,7 @@ export default function SignUpPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="flex flex-col items-center justify-center space-y-4 text-center relative z-10"
                 >
-                    <CheckCircle2 className="h-16 w-16 text-green-500 animate-bounce-slow" />
+                    <CheckCircle2 className="h-16 w-16 text-green-500" />
                     <h2 className="text-2xl font-bold tracking-tight">¡Cuenta creada!</h2>
                     <p className="text-foreground/40">Redirigiendo al inicio de sesión...</p>
                 </motion.div>
@@ -113,37 +116,7 @@ export default function SignUpPage() {
 
     return (
         <div className="min-h-dvh w-full flex bg-background text-foreground overflow-hidden">
-            {/* Left — decorative panel, own fixed-dark surface (Kreative-style, matches /auth/signin) */}
-            <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-10 overflow-hidden bg-[#0a0a0d]">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/30 via-teal-400/10 to-black" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(74,222,128,0.30),_transparent_55%)]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(45,212,191,0.22),_transparent_50%)]" />
-
-                <div className="relative z-10 flex justify-center">
-                    <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-xl px-4 py-2 shadow-lg">
-                        <span className="h-2 w-2 rounded-full bg-red-400/80" />
-                        <span className="h-2 w-2 rounded-full bg-yellow-400/80" />
-                        <span className="h-2 w-2 rounded-full bg-green-400/80" />
-                        <span className="ml-2 text-[11px] font-medium text-white/50 tracking-wide">productivitynovo.app</span>
-                    </div>
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center text-center gap-10 my-auto">
-                    <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white/90 leading-tight italic max-w-sm">
-                        Information isn&apos;t the problem.
-                    </h1>
-
-                    <InfinityOrbit />
-
-                    <p className="text-sm text-white/40 leading-relaxed max-w-xs -mt-4">
-                        Crea tu cuenta y deja que tu Gemelo Cognitivo empiece a aprender desde el primer día.
-                    </p>
-                </div>
-
-                <p className="relative z-10 text-center text-[11px] text-white/25 font-medium tracking-wide">
-                    © {new Date().getFullYear()} Novo — Todos los derechos reservados
-                </p>
-            </div>
+            <AuthEditorialPanel mode="signup" />
 
             {/* Right — form panel, theme-adaptive */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative overflow-y-auto">
@@ -151,10 +124,10 @@ export default function SignUpPage() {
                 <div className="w-full max-w-sm space-y-7 relative z-10 py-8">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2.5 mb-6 lg:hidden">
-                            <div className="h-9 w-9 rounded-full bg-foreground flex items-center justify-center">
-                                <div className="h-3.5 w-3.5 bg-background rounded-full" />
-                            </div>
-                            <span className="text-sm font-bold tracking-tight text-foreground/40">NOVO</span>
+                            <span className="grid size-9 place-items-center overflow-hidden rounded-full border border-foreground/10 bg-foreground/[0.04]">
+                                <Image src="/icon.svg" alt="" width={24} height={24} className="size-6 object-contain" priority />
+                            </span>
+                            <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-foreground/55">Novo</span>
                         </div>
                         <h2 className="text-3xl font-black tracking-tight">Crea tu cuenta</h2>
                         <p className="text-sm text-foreground/40 leading-relaxed">Empieza gratis. Sin tarjeta de crédito.</p>
@@ -241,6 +214,9 @@ export default function SignUpPage() {
                                 />
                                 <button
                                     type="button"
+                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    aria-pressed={showPassword}
+                                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground/40 transition-colors"
                                 >

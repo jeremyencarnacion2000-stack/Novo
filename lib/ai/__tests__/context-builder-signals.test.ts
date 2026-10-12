@@ -13,6 +13,7 @@ jest.mock('@/lib/prisma', () => ({
     outcomeEvent: { findMany: jest.fn() },
     novoSignalLedger: { findMany: jest.fn() },
     novoSignalSourcePreference: { findMany: jest.fn() },
+    companionWorkContext: { findFirst: jest.fn() },
   },
 }))
 jest.mock('@/lib/calendar-aggregator', () => ({ CalendarAggregator: { getEventsForRange: jest.fn() } }))
@@ -40,6 +41,7 @@ describe('buildUserContext provider signal bridge', () => {
     ;(prisma.integrationAccount.findMany as jest.Mock).mockResolvedValue([])
     ;(prisma.actionPlan.findFirst as jest.Mock).mockResolvedValue(null)
     ;(prisma.outcomeEvent.findMany as jest.Mock).mockResolvedValue([])
+    ;(prisma.companionWorkContext.findFirst as jest.Mock).mockResolvedValue(null)
     ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{ source: 'slack' }])
     ;(prisma.novoSignalLedger.findMany as jest.Mock).mockResolvedValue([
       { source: 'github', signalType: 'activity_window', label: 'GitHub observed: 7 commits in 14 days', observedAt: new Date('2026-08-27T10:00:00.000Z'), reliability: 'deterministic' },

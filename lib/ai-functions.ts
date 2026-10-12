@@ -234,7 +234,7 @@ export async function executeFunctionCall(
             case 'gmail_send':
                 return await emailService.sendFormattedReminder(args.to, args.subject, args.body)
                     .then(() => ({ success: true, message: 'Email sent successfully' }))
-                    .catch((error: any) => ({ success: false, message: `Failed to send email: ${error.message}` }));
+                    .catch(() => ({ success: false, message: 'No se pudo enviar el correo.' }));
             case 'calendar_list_events':
                 return await calendarService.listEventsForUser(userId, undefined, args.limit).then(data => ({ success: true, message: `Found ${data.length} events`, data }));
             case 'calendar_create_event':
@@ -266,10 +266,12 @@ export async function executeFunctionCall(
                 };
         }
     } catch (error) {
-        console.error(`Error executing ${functionName}:`, error);
+        console.error(`Error executing ${functionName}`, {
+            reason: error instanceof Error ? error.name : 'unknown',
+        });
         return {
             success: false,
-            message: `Error: ${error instanceof Error ? error.message : String(error)}`
+            message: 'No se pudo completar la acción.'
         };
     }
 }

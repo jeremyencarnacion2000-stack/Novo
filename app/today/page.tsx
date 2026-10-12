@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Sun, AlertTriangle, CheckCircle2, Circle, Clock,
@@ -17,7 +17,7 @@ interface IntegratedTask {
     text: string;
     completed: boolean;
     priority: 'low' | 'medium' | 'high';
-    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'ai-task';
+    source: 'routine' | 'project' | 'manual' | 'school' | 'notion' | 'todoist' | 'ai-task';
     sourceId: string;
     dueDate?: string;
     timeOfDay?: string;
@@ -72,7 +72,7 @@ function ProgressRing({ progress, completed, total }: { progress: number; comple
     return (
         <div className="relative flex items-center justify-center w-16 h-16">
             <svg width="64" height="64" className="-rotate-90">
-                <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+                <circle cx="32" cy="32" r={r} fill="none" stroke="var(--foreground)" strokeOpacity="0.1" strokeWidth="4" />
                 <circle
                     cx="32" cy="32" r={r} fill="none"
                     stroke="var(--primary)" strokeWidth="4"
@@ -111,6 +111,7 @@ function SourceIcon({ source }: { source: string }) {
         school:  <GraduationCap className="w-3 h-3" />,
         manual:  <Pencil className="w-3 h-3" />,
         notion:  <Link2 className="w-3 h-3" />,
+        todoist: <Link2 className="w-3 h-3" />,
     };
     return <span className="text-foreground/30">{map[source] ?? map.manual}</span>;
 }
@@ -182,7 +183,7 @@ function TaskRow({ task, onToggle }: { task: IntegratedTask; onToggle: (t: Integ
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent: string }> = {
-    scheduled: { label: 'Organizado por IA', icon: <Zap className="w-4 h-4" />,   accent: 'text-primary' },
+    scheduled: { label: 'Programado', icon: <Clock className="w-4 h-4" />,   accent: 'text-primary' },
     morning:   { label: 'Mañana',    icon: <Sun className="w-4 h-4" />,           accent: 'text-amber-400' },
     afternoon: { label: 'Tarde',     icon: <Zap className="w-4 h-4" />,           accent: 'text-orange-400' },
     evening:   { label: 'Noche',     icon: <Circle className="w-4 h-4" />,        accent: 'text-indigo-400' },
@@ -192,6 +193,7 @@ const sectionMeta: Record<string, { label: string; icon: React.ReactNode; accent
     manual:    { label: 'Manual',    icon: <Pencil className="w-4 h-4" />,        accent: 'text-foreground/50' },
     'ai-task': { label: 'Del Asistente', icon: <Pencil className="w-4 h-4" />,    accent: 'text-primary/70' },
     notion:    { label: 'Notion',    icon: <Link2 className="w-4 h-4" />,        accent: 'text-teal-400' },
+    todoist:   { label: 'Todoist',   icon: <Link2 className="w-4 h-4" />,        accent: 'text-rose-400' },
 };
 
 function SectionCard({
@@ -299,46 +301,86 @@ export default function TodayPage() {
     const [tasks, setTasks] = useState<IntegratedTask[]>([]);
     const [urgentItems, setUrgentItems] = useState<UrgentItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const loadControllerRef = useRef<AbortController | null>(null);
+    const loadRequestIdRef = useRef(0);
+    const pendingToggleIdsRef = useRef(new Set<string>());
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async (signal?: AbortSignal) => {
+        const requestId = ++loadRequestIdRef.current;
         try {
             const [todayRes, urgentRes] = await Promise.all([
-                fetch('/api/integration/today'),
-                fetch('/api/integration/urgent'),
+                fetch('/api/integration/today', { cache: 'no-store', signal }),
+                fetch('/api/integration/urgent', { cache: 'no-store', signal }),
             ]);
+            if (signal?.aborted || requestId !== loadRequestIdRef.current) return;
             if (todayRes.ok) {
                 const { tasks: t } = await todayRes.json();
-                setTasks(t ?? []);
+                setTasks(Array.isArray(t) ? t : []);
             }
             if (urgentRes.ok) {
                 const { urgentItems: u } = await urgentRes.json();
-                setUrgentItems(u ?? []);
+                setUrgentItems(Array.isArray(u) ? u : []);
             }
-        } catch {
+        } catch (error: unknown) {
+            if ((error as { name?: string })?.name === 'AbortError' || signal?.aborted) return;
             toast({
                 title: 'No se pudo cargar tus tareas',
                 description: 'Revisa tu conexión e intenta de nuevo.',
                 variant: 'destructive',
             });
         } finally {
-            setLoading(false);
+            if (!signal?.aborted && requestId === loadRequestIdRef.current) setLoading(false);
         }
-    };
+    }, [toast]);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        const refresh = () => {
+            loadControllerRef.current?.abort();
+            const controller = new AbortController();
+            loadControllerRef.current = controller;
+            setLoading(true);
+            void fetchData(controller.signal).finally(() => {
+                if (loadControllerRef.current === controller) loadControllerRef.current = null;
+            });
+        };
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') refresh();
+        };
+        refresh();
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => {
+            loadRequestIdRef.current += 1;
+            loadControllerRef.current?.abort();
+            loadControllerRef.current = null;
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [fetchData]);
 
     const handleToggle = async (task: IntegratedTask) => {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
+        if (pendingToggleIdsRef.current.has(task.id)) return;
+        pendingToggleIdsRef.current.add(task.id);
+        const nextCompleted = !task.completed;
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t));
         try {
             const res = await fetch('/api/integration/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: task.id, completed: !task.completed }),
+                body: JSON.stringify({ taskId: task.id, completed: nextCompleted }),
             });
             if (!res.ok) throw new Error();
+            const result = await res.json().catch(() => ({}));
+            if (result.externalSync === 'failed') {
+                const provider = result.source === 'notion' ? 'Notion' : 'Todoist';
+                toast({
+                    title: 'Guardado en Novo',
+                    description: `No se pudo reflejar el cambio en ${provider}. Revisa su conexión para sincronizarlo.`,
+                });
+            }
         } catch {
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: task.completed } : t));
+            setTasks(prev => prev.map(t => t.id === task.id && t.completed === nextCompleted ? { ...t, completed: task.completed } : t));
             toast({ title: 'No se pudo actualizar la tarea', description: 'Intenta de nuevo.', variant: 'destructive' });
+        } finally {
+            pendingToggleIdsRef.current.delete(task.id);
         }
     };
 
@@ -367,6 +409,7 @@ export default function TodayPage() {
         { key: 'manual',    tasks: unscheduled.filter(t => t.source === 'manual') },
         { key: 'ai-task',   tasks: unscheduled.filter(t => t.source === 'ai-task') },
         { key: 'notion',    tasks: unscheduled.filter(t => t.source === 'notion') },
+        { key: 'todoist',   tasks: unscheduled.filter(t => t.source === 'todoist') },
     ].filter(g => g.tasks.length > 0);
 
     const dayLabel = new Date().toLocaleDateString('es', { weekday: 'long', month: 'long', day: 'numeric' });

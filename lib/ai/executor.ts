@@ -31,6 +31,7 @@ import {
 } from './actions';
 import { ACTION_PERMISSIONS, AIPermission } from './permissions';
 import { calendarService, gmailService, getGoogleAccessToken } from '@/lib/google';
+import { createMutationFingerprint, runIdempotentCreate } from '@/lib/server-idempotency';
 
 // --- Interfaces ---
 
@@ -92,9 +93,26 @@ export interface AIActionResult<T = any> {
     };
 }
 
+/**
+ * Convert an executor failure into a stable client-facing code.
+ * Provider/database exception messages can contain tokens, SQL details or
+ * upstream diagnostics, so they must never cross the API boundary.
+ */
+export function toSafeActionErrorCode(error: unknown): string {
+    const value = typeof error === 'string' ? error : '';
+    if (value === 'Free plan monthly AI action limit reached') return value;
+    if (value === 'Gmail not connected') return value;
+    if (value.startsWith('Invalid action:')) return 'Invalid action';
+    if (value.startsWith('Database verification failed:')) return 'Resource not found';
+    if (value.startsWith('Recipient, subject, and body are required')) return 'Invalid email payload';
+    return 'ACTION_FAILED';
+}
+
 export interface ExecutionContext {
     userId: string;
     prisma: typeof prisma;
+    /** Stable parent intent used by automated plans and safe transport retries. */
+    idempotencyKey?: string;
     // Add other context items here (e.g., logger, analytics)
 }
 
@@ -119,13 +137,15 @@ export function registerActionHandler<T extends AIAction>(
 export async function executeAIAction(
     action: AIAction,
     userId: string,
-    prismaClient: typeof prisma = prisma
+    prismaClient: typeof prisma = prisma,
+    idempotencyKey?: string
 ): Promise<AIActionResult> {
     const startTime = Date.now();
 
     const context: ExecutionContext = {
         userId,
         prisma: prismaClient,
+        idempotencyKey,
     };
 
     // Programmatic ID Verification Layer to prevent LLM ID hallucinations
@@ -253,7 +273,8 @@ export async function executeAIAction(
 
         return {
             success: false,
-            error: errorMessage,
+            error: toSafeActionErrorCode(errorMessage),
+            message: 'No se pudo completar la acción. Intenta de nuevo.',
             metadata: {
                 executionTime,
             },
@@ -382,20 +403,31 @@ registerActionHandler<CreateRoutineAction>('CREATE_ROUTINE', async (action, ctx)
         daysData = [{ name: 'Day 1', order: 0, exercises: { create: [] } }];
     }
 
-    const routine = await ctx.prisma.routine.create({
-        data: {
-            name,
-            description: description || '',
-            daysOfWeek: daysOfWeek ? JSON.stringify(daysOfWeek) : '[]',
-            userId: ctx.userId,
-            duration: 60,
-            timeOfDay: 'anytime',
-            days: {
-                create: daysData
-            },
-        },
-        include: { days: { include: { exercises: true } } },
+    const routineInput = {
+        name,
+        description: description || '',
+        daysOfWeek: daysOfWeek ? JSON.stringify(daysOfWeek) : '[]',
+        userId: ctx.userId,
+        duration: 60,
+        timeOfDay: 'anytime',
+        days: { create: daysData },
+    };
+    const routineResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_routine_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ ...routineInput, userId: undefined }),
+        resourceType: 'routine',
+        create: (db) => db.routine.create({
+            data: routineInput,
+            include: { days: { include: { exercises: true } } },
+        }),
+        findResource: (resourceId, db) => db.routine.findFirst({
+            where: { id: resourceId, userId: ctx.userId },
+            include: { days: { include: { exercises: true } } },
+        }),
     });
+    const routine = routineResult.resource;
     return {
         success: true,
         data: routine,
@@ -446,14 +478,28 @@ registerActionHandler<StartWorkoutAction>('START_WORKOUT', async (action, ctx) =
 
     if (!routine) throw new Error("Routine not found");
 
-    const log = await ctx.prisma.workoutLog.create({
-        data: {
-            routineId,
-            duration: 0,
-            completed: false,
-            date: new Date(),
-        },
+    // A chat retry must not open a second workout session.  WorkoutLog is
+    // owned through its routine (it has no userId column), so the replay
+    // lookup keeps that ownership boundary explicit as well.
+    const logResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_workout_start',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ routineId }),
+        resourceType: 'workout_log',
+        create: (db) => db.workoutLog.create({
+            data: {
+                routineId,
+                duration: 0,
+                completed: false,
+                date: new Date(),
+            },
+        }),
+        findResource: (resourceId, db) => db.workoutLog.findFirst({
+            where: { id: resourceId, routine: { userId: ctx.userId } },
+        }),
     });
+    const log = logResult.resource;
 
     return {
         success: true,
@@ -471,23 +517,39 @@ registerActionHandler<FinishWorkoutAction>('FINISH_WORKOUT', async (action, ctx)
     const log = await ctx.prisma.workoutLog.findUnique({ where: { id: workoutLogId } });
     if (!log) throw new Error("Workout log not found");
 
-    const updatedLog = await ctx.prisma.workoutLog.update({
-        where: { id: workoutLogId },
-        data: {
-            duration,
-            completed: true,
-            exercises: {
-                create: exercises.map((ex: any) => ({
-                    exerciseName: ex.exerciseName,
-                    setsDone: ex.setsDone,
-                    repsDone: ex.repsDone,
-                    weight: ex.weight,
-                    notes: ex.notes,
-                })),
-            },
+    const finishData = {
+        duration,
+        completed: true,
+        exercises: {
+            create: exercises.map((ex: any) => ({
+                exerciseName: ex.exerciseName,
+                setsDone: ex.setsDone,
+                repsDone: ex.repsDone,
+                weight: ex.weight,
+                notes: ex.notes,
+            })),
         },
-        include: { exercises: true },
+    };
+    // Finishing is an update, but it also creates child exercise rows.  Run it
+    // through the same durable intent boundary so a repeated request replays
+    // the completed log instead of appending the exercise rows again.
+    const finishResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_workout_finish',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ workoutLogId, ...finishData }),
+        resourceType: 'workout_log',
+        create: (db) => db.workoutLog.update({
+            where: { id: workoutLogId },
+            data: finishData,
+            include: { exercises: true },
+        }),
+        findResource: (resourceId, db) => db.workoutLog.findFirst({
+            where: { id: resourceId, routine: { userId: ctx.userId } },
+            include: { exercises: true },
+        }),
     });
+    const updatedLog = finishResult.resource;
     return { success: true, data: updatedLog, message: "Workout finished and logged successfully!" };
 });
 
@@ -499,16 +561,18 @@ registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
     const finalPriority = (p === 3 || p === 'high' || p === '3') ? 'high' :
         (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
 
-    const task = await ctx.prisma.task.create({
-        data: {
-            title,
-            status: 'todo',
-            priority: finalPriority,
-            dueDate,
-            tags: JSON.stringify([category]),
-            userId: ctx.userId,
-        },
+    const result = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_task_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ title, priority: finalPriority, dueDate: dueDate ?? null, category: category ?? null }),
+        resourceType: 'task',
+        create: (db) => db.task.create({
+            data: { title, status: 'todo', priority: finalPriority, dueDate, tags: JSON.stringify([category]), userId: ctx.userId },
+        }),
+        findResource: (resourceId, db) => db.task.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const task = result.resource;
     return {
         success: true,
         data: task,
@@ -523,26 +587,38 @@ registerActionHandler<CreateTaskAction>('CREATE_TASK', async (action, ctx) => {
 registerActionHandler<CreateTasksAction>('CREATE_TASKS', async (action, ctx) => {
     const { tasks } = action.payload;
     const createdTasks = await Promise.all(
-        tasks.map(t => {
+        tasks.map((t, index) => {
             const p = t.priority as any;
             const finalPriority = (p === 3 || p === 'high' || p === '3') ? 'high' :
                 (p === 2 || p === 'medium' || p === '2') ? 'medium' : 'low';
-            return ctx.prisma.task.create({
-                data: {
-                    title: dropHallucinatedPlaceholder(t.title) || 'Tarea sin título',
-                    status: 'todo',
-                    priority: finalPriority,
-                    dueDate: t.dueDate,
-                    tags: JSON.stringify([t.category]),
-                    userId: ctx.userId,
-                },
+            const title = dropHallucinatedPlaceholder(t.title) || 'Tarea sin título';
+            const childKey = ctx.idempotencyKey ? `${ctx.idempotencyKey}:task:${index}` : null;
+            // Day-plan generation is model-backed. A transport retry can ask
+            // the model again and receive different wording, but it is still
+            // the same durable intent. Keep the child fingerprint tied to
+            // its position so the original task is replayed instead of
+            // raising a false idempotency conflict (or creating a duplicate).
+            const fingerprint = ctx.idempotencyKey?.startsWith('day-plan:')
+                ? createMutationFingerprint({ index })
+                : createMutationFingerprint({ index, title, priority: finalPriority, dueDate: t.dueDate ?? null, category: t.category ?? null });
+            return runIdempotentCreate(ctx.prisma, {
+                userId: ctx.userId,
+                scope: 'ai_task_batch_create',
+                idempotencyKey: childKey,
+                fingerprint,
+                resourceType: 'task',
+                create: (db) => db.task.create({
+                    data: { title, status: 'todo', priority: finalPriority, dueDate: t.dueDate, tags: JSON.stringify([t.category]), userId: ctx.userId },
+                }),
+                findResource: (resourceId, db) => db.task.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
             });
         })
     );
+    const createdTaskRows = createdTasks.map((result) => result.resource);
     return {
         success: true,
-        data: createdTasks,
-        message: `Se han creado ${createdTasks.length} tareas nuevas en tu lista.`,
+        data: createdTaskRows,
+        message: `Se han creado ${createdTaskRows.length} tareas nuevas en tu lista.`,
         metadata: {
             sectionName: 'Tareas',
             redirectPath: '/tasks'
@@ -587,17 +663,18 @@ registerActionHandler<DeleteTaskAction>('DELETE_TASK', async (action, ctx) => {
 registerActionHandler<CreateProjectAction>('CREATE_PROJECT', async (action, ctx) => {
     const { description, status, priority, dueDate, tags } = action.payload;
     const title = dropHallucinatedPlaceholder(action.payload.title) || 'Proyecto sin título';
-    const project = await ctx.prisma.project.create({
-        data: {
-            title,
-            description,
-            status,
-            priority,
-            dueDate,
-            tags: JSON.stringify(tags || []),
-            userId: ctx.userId,
-        },
+    const projectResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_project_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ title, description, status, priority, dueDate, tags: tags || [] }),
+        resourceType: 'project',
+        create: (db) => db.project.create({
+            data: { title, description, status, priority, dueDate, tags: JSON.stringify(tags || []), userId: ctx.userId },
+        }),
+        findResource: (resourceId, db) => db.project.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const project = projectResult.resource;
     return {
         success: true,
         data: project,
@@ -644,22 +721,37 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
     const title = dropHallucinatedPlaceholder(action.payload.title) || 'Evento sin título';
     if (!start || !end) throw new Error("Event start and end times are required");
 
-    const event = await ctx.prisma.calendarEvent.create({
-        data: {
-            title,
-            description: description || null,
-            start: new Date(start),
-            end: new Date(end),
-            allDay: !!allDay,
-            source: 'ai',
-            userId: ctx.userId,
-        },
+    // A day-plan retry may receive different wording from the model while it
+    // still represents the same deep-work slot. Keep the durable intent tied
+    // to that slot so the original event is replayed instead of conflicting.
+    const fingerprint = ctx.idempotencyKey?.startsWith('day-plan:')
+        ? createMutationFingerprint({ dayPlan: true })
+        : createMutationFingerprint({ title, description: description ?? null, start, end, allDay: Boolean(allDay) });
+    const result = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_calendar_event_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint,
+        resourceType: 'calendar_event',
+        create: (db) => db.calendarEvent.create({
+            data: { title, description: description || null, start: new Date(start), end: new Date(end), allDay: !!allDay, source: 'ai', userId: ctx.userId },
+        }),
+        findResource: (resourceId, db) => db.calendarEvent.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const event = result.resource;
 
     // Best-effort push to the user's real Google Calendar. Never let a sync
     // failure (no Google connection, expired token, API error) break event
     // creation — most users don't have Google connected at all.
     try {
+        if (result.replay) {
+            return {
+                success: true,
+                data: event,
+                message: `Evento "${event.title}" agendado en tu calendario.`,
+                metadata: { sectionName: 'Calendario', redirectPath: '/calendar' },
+            };
+        }
         const googleEvent = await calendarService.createEventForUser(
             ctx.userId,
             title,
@@ -673,8 +765,8 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
                 data: { googleEventId: googleEvent.id },
             });
         }
-    } catch (err) {
-        console.warn('[AI Executor] Google Calendar push sync failed (non-blocking):', err);
+    } catch {
+        console.warn('[AI Executor] Google Calendar push sync failed (non-blocking).');
     }
 
     return {
@@ -702,7 +794,7 @@ registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
     const body = dropHallucinatedPlaceholder(action.payload.body);
     if (!to || !subject || !body) throw new Error("Recipient, subject, and body are required to send an email");
 
-    const token = await getGoogleAccessToken(ctx.userId);
+    const token = await getGoogleAccessToken(ctx.userId, ['gmail.send']);
     if (!token) {
         return {
             success: false,
@@ -723,10 +815,10 @@ registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
             }
         };
     } catch (err: any) {
-        console.error('[AI Executor] Gmail send failed:', err);
+        console.error('[AI Executor] Gmail send failed.');
         return {
             success: false,
-            error: err?.message || 'Gmail send failed',
+            error: 'GMAIL_SEND_FAILED',
             message: 'No se pudo enviar el correo. Verifica tu conexión con Gmail e intenta de nuevo.',
         };
     }
@@ -738,15 +830,18 @@ registerActionHandler<CreateTrackerAction>('CREATE_TRACKER', async (action, ctx)
     const name = dropHallucinatedPlaceholder(action.payload.name);
     if (!name) throw new Error("Tracker name is required");
 
-    const tracker = await ctx.prisma.tracker.create({
-        data: {
-            name,
-            type: type === 'metric' ? 'metric' : 'habit',
-            unit: unit || 'veces',
-            goal: goal ?? 1,
-            userId: ctx.userId,
-        },
+    const trackerResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_tracker_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ name, type: type === 'metric' ? 'metric' : 'habit', unit: unit || 'veces', goal: goal ?? 1 }),
+        resourceType: 'tracker',
+        create: (db) => db.tracker.create({
+            data: { name, type: type === 'metric' ? 'metric' : 'habit', unit: unit || 'veces', goal: goal ?? 1, userId: ctx.userId },
+        }),
+        findResource: (resourceId, db) => db.tracker.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const tracker = trackerResult.resource;
     return {
         success: true,
         data: tracker,
@@ -762,18 +857,18 @@ registerActionHandler<CreateTrackerAction>('CREATE_TRACKER', async (action, ctx)
 registerActionHandler<CreateCourseAction>('CREATE_COURSE', async (action, ctx) => {
     const { code, credits, semester, year, professor, color } = action.payload;
     const name = dropHallucinatedPlaceholder(action.payload.name) || 'Curso sin título';
-    const course = await ctx.prisma.course.create({
-        data: {
-            name,
-            code,
-            credits,
-            semester,
-            year,
-            professor,
-            color: color || '#3b82f6',
-            userId: ctx.userId,
-        },
+    const courseResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_course_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ name, code, credits, semester, year, professor, color: color || '#3b82f6' }),
+        resourceType: 'course',
+        create: (db) => db.course.create({
+            data: { name, code, credits, semester, year, professor, color: color || '#3b82f6', userId: ctx.userId },
+        }),
+        findResource: (resourceId, db) => db.course.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const course = courseResult.resource;
     return {
         success: true,
         data: course,
@@ -814,18 +909,29 @@ registerActionHandler<DeleteCourseAction>('DELETE_COURSE', async (action, ctx) =
 registerActionHandler<AddGradeAction>('ADD_GRADE', async (action, ctx) => {
     const { courseId, score, maxScore, weight, category, date } = action.payload;
     const name = dropHallucinatedPlaceholder(action.payload.name) || 'Evaluación sin título';
-    const grade = await ctx.prisma.grade.create({
-        data: {
-            courseId,
-            name,
-            score,
-            maxScore,
-            weight,
-            category,
-            date: new Date(date),
-            userId: ctx.userId,
-        },
+    const gradeResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_grade_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ courseId, name, score, maxScore, weight, category, date }),
+        resourceType: 'grade',
+        create: (db) => db.grade.create({
+            data: {
+                courseId,
+                name,
+                score,
+                maxScore,
+                weight,
+                category,
+                date: new Date(date),
+                userId: ctx.userId,
+            },
+        }),
+        findResource: (resourceId, db) => db.grade.findFirst({
+            where: { id: resourceId, userId: ctx.userId },
+        }),
     });
+    const grade = gradeResult.resource;
     return {
         success: true,
         data: grade,
@@ -871,14 +977,19 @@ registerActionHandler<CreateNoteAction>('CREATE_NOTE', async (action, ctx) => {
     const { tags } = action.payload;
     const title = dropHallucinatedPlaceholder(action.payload.title);
     const content = dropHallucinatedPlaceholder(action.payload.content);
-    const note = await ctx.prisma.quickNote.create({
-        data: {
-            content: title ? `${title}\n\n${content}` : content,
-            tags,
-            userId: ctx.userId,
-            type: 'note',
-        },
+    const noteContent = title ? `${title}\n\n${content}` : content;
+    const noteResult = await runIdempotentCreate(ctx.prisma, {
+        userId: ctx.userId,
+        scope: 'ai_note_create',
+        idempotencyKey: ctx.idempotencyKey ?? null,
+        fingerprint: createMutationFingerprint({ content: noteContent, tags }),
+        resourceType: 'quick_note',
+        create: (db) => db.quickNote.create({
+            data: { content: noteContent, tags, userId: ctx.userId, type: 'note' },
+        }),
+        findResource: (resourceId, db) => db.quickNote.findFirst({ where: { id: resourceId, userId: ctx.userId } }),
     });
+    const note = noteResult.resource;
     return {
         success: true,
         data: note,
@@ -1165,9 +1276,10 @@ registerActionHandler('COGNITIVE_PIPELINE', async (action: any, ctx) => {
     }
 
     const results = [];
-    for (const subAction of actions) {
+    for (const [index, subAction] of actions.entries()) {
         console.log(`[Cognitive Pipeline] Executing sub-action: ${subAction.type}`);
-        const subResult = await executeAIAction(subAction, ctx.userId, ctx.prisma);
+        const subKey = ctx.idempotencyKey ? `${ctx.idempotencyKey}:pipeline:${index}` : undefined;
+        const subResult = await executeAIAction(subAction, ctx.userId, ctx.prisma, subKey);
         results.push({
             type: subAction.type,
             result: subResult

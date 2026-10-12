@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { BookOpen, Star, Clock, CheckCircle, BookMarked, Smartphone, Headphones } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { springConfig } from '@/lib/design-tokens'
+import { normalizeBookStatus } from '@/lib/books/status'
 
 interface LibraryGridProps {
     books: any[]
@@ -39,7 +40,7 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
     }
 
     const getStatusIcon = (status: string) => {
-        switch (status) {
+        switch (normalizeBookStatus(status)) {
             case 'read': return <CheckCircle className="h-3.5 w-3.5 text-green-500" />
             case 'reading': return <BookOpen className="h-3.5 w-3.5 text-blue-500" />
             default: return <Clock className="h-3.5 w-3.5 text-gray-400" />
@@ -47,9 +48,10 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
     }
 
     const getStatusLabel = (status: string) => {
-        switch (status) {
+        switch (normalizeBookStatus(status)) {
             case 'read': return 'Read'
             case 'reading': return 'Reading'
+            case 'dropped': return 'Dropped'
             default: return 'To Read'
         }
     }
@@ -65,6 +67,7 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
             {books.map((book, i) => {
+                const bookStatus = normalizeBookStatus(book.status)
                 const progress = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0
 
                 return (
@@ -123,7 +126,7 @@ export function LibraryGrid({ books, isLoading, onBookClick }: LibraryGridProps)
                                 {book.author}
                             </p>
 
-                            {book.status === 'reading' && (
+                            {bookStatus === 'reading' && (
                                 <div className="space-y-1">
                                     <Progress value={progress} className="h-1.5" />
                                     <div className="flex justify-between items-center">

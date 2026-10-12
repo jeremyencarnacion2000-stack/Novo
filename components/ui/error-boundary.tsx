@@ -23,8 +23,10 @@ export class ErrorBoundary extends Component<Props, State> {
         return { hasError: true, error }
     }
 
-    public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error('Uncaught error:', error, errorInfo)
+    public componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
+        // React errors can contain private provider/database payloads. Keep the
+        // client log operational and use the generic fallback below.
+        console.error('Uncaught UI error.', error?.name || 'UnknownError')
     }
 
     private handleReset = () => {
@@ -42,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
                     <h2 className="text-lg font-bold text-foreground mb-2">Something went wrong</h2>
                     <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                        {this.state.error?.message || 'An unexpected error occurred. Please try again.'}
+                        An unexpected error occurred. Please try again.
                     </p>
                     <Button onClick={this.handleReset} variant="outline" className="gap-2">
                         <RefreshCcw className="h-4 w-4" />

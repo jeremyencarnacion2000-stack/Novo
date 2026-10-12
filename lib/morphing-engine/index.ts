@@ -6,6 +6,7 @@
 
 // Re-export NIX JSX components and Framer Motion elements
 export * from './morph'
+import { safeViewTransition } from '@/lib/view-transition'
 
 // ─── LEVEL 1: View Transition API Fallback Wrapper ──────────────────────────────
 
@@ -14,20 +15,17 @@ export * from './morph'
  * Triggers document view transition if supported, otherwise performs callback synchronously.
  */
 export function startMorphTransition(callback: () => void | Promise<void>) {
-  if (
-    typeof document !== 'undefined' &&
-    'startViewTransition' in document &&
-    typeof (document as any).startViewTransition === 'function'
-  ) {
-    ;(document as any).startViewTransition(callback)
-  } else {
-    const res = callback()
-    if (res instanceof Promise) {
-      res.catch((err) => console.error('[NIX] startViewTransition failed', err))
-    }
+  if (typeof document !== 'undefined' && typeof (document as any).startViewTransition === 'function') {
+    safeViewTransition(() => {
+      const result = callback()
+      if (result instanceof Promise) result.catch(() => undefined)
+    })
+    return
   }
-}
 
+  const result = callback()
+  if (result instanceof Promise) result.catch((err) => console.error('[NIX] morph transition failed', err))
+}
 // ─── LEVEL 2: FLIP Animation helper ─────────────────────────────────────────────
 
 /**

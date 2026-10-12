@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { CognitiveGraphEdge, CognitiveGraphNode } from '@/lib/cognitive-graph/types'
+import { shouldReduceNovoMotion } from '@/hooks/use-novo-motion-policy'
 
 type GraphMode = 'explore' | 'focus' | 'why'
 
@@ -173,7 +174,7 @@ export function TwinBrainMap({ nodes, edges, selectedId, onSelectNode, mode = 'f
       return
     }
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduceMotion = shouldReduceNovoMotion()
 
     let renderer: THREE.WebGLRenderer
     try {
@@ -184,7 +185,11 @@ export function TwinBrainMap({ nodes, edges, selectedId, onSelectNode, mode = 'f
     }
 
     setWebgl(true)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    // A very high devicePixelRatio multiplies every sphere, halo and edge
+    // fragment without improving the CSS-sized canvas proportionally. Keep
+    // desktop Retina crisp while avoiding a 4x mobile framebuffer.
+    const maxPixelRatio = window.innerWidth < 768 ? 1.5 : 1.75
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio))
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(40, 2, 0.1, 100)
@@ -259,21 +264,43 @@ export function TwinBrainMap({ nodes, edges, selectedId, onSelectNode, mode = 'f
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
     let frame = 0
+    let inViewport = true
+    let isVisible = document.visibilityState !== 'hidden'
 
     const resize = () => {
       const width = canvas.clientWidth || 1
       const height = canvas.clientHeight || 1
-      if (canvas.width !== width || canvas.height !== height) {
+      // `WebGLRenderer#setPixelRatio` stores the backing canvas in physical
+      // pixels while `clientWidth/clientHeight` are CSS pixels. Comparing the
+      // two directly makes the condition true on every frame on Retina/high
+      // DPI displays, forcing a GPU resize/reallocation continuously. Compare
+      // against the backing dimensions instead, but keep the camera in CSS
+      // pixel space for stable pointer math and layout.
+      const pixelRatio = renderer.getPixelRatio()
+      const backingWidth = Math.floor(width * pixelRatio)
+      const backingHeight = Math.floor(height * pixelRatio)
+      if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
         renderer.setSize(width, height, false)
         camera.aspect = width / Math.max(height, 1)
         camera.updateProjectionMatrix()
       }
     }
 
-    const render = () => {
+    let lastRenderAt = 0
+    const reducedFrameInterval = 1000 / 30
+    const render = (frameTime = performance.now()) => {
+      if (!isVisible) {
+        frame = 0
+        return
+      }
       frame = window.requestAnimationFrame(render)
+      // Reduced motion keeps the graph visually stable, so rendering it at
+      // 60 fps only burns GPU time without improving the result. Full mode
+      // keeps the original fluid cadence.
+      if (reduceMotion && frameTime - lastRenderAt < reducedFrameInterval) return
+      lastRenderAt = frameTime
       resize()
-      const t = performance.now() * 0.001
+      const t = frameTime * 0.001
       root.rotation.set(
         rotationRef.current.x + (reduceMotion ? 0 : Math.sin(t * 0.18) * 0.016),
         rotationRef.current.y + (reduceMotion ? 0 : Math.cos(t * 0.14) * 0.018),
@@ -284,6 +311,27 @@ export function TwinBrainMap({ nodes, edges, selectedId, onSelectNode, mode = 'f
 
     const observer = new ResizeObserver(resize)
     observer.observe(canvas)
+    const visibilityObserver = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver(([entry]) => {
+          inViewport = entry.isIntersecting
+          isVisible = inViewport && document.visibilityState !== 'hidden'
+          if (isVisible && frame === 0) render()
+          if (!isVisible && frame) {
+            window.cancelAnimationFrame(frame)
+            frame = 0
+          }
+        }, { rootMargin: '160px' })
+      : null
+    visibilityObserver?.observe(canvas)
+    const handleDocumentVisibility = () => {
+      isVisible = inViewport && document.visibilityState !== 'hidden'
+      if (isVisible && frame === 0) render()
+      if (!isVisible && frame) {
+        window.cancelAnimationFrame(frame)
+        frame = 0
+      }
+    }
+    document.addEventListener('visibilitychange', handleDocumentVisibility)
     render()
 
     const selectFromCanvas = (event: MouseEvent) => {
@@ -304,6 +352,8 @@ export function TwinBrainMap({ nodes, edges, selectedId, onSelectNode, mode = 'f
       window.cancelAnimationFrame(frame)
       canvas.removeEventListener('click', selectFromCanvas)
       observer.disconnect()
+      visibilityObserver?.disconnect()
+      document.removeEventListener('visibilitychange', handleDocumentVisibility)
       scene.traverse((item) => {
         const mesh = item as THREE.Mesh
         if (mesh.geometry) mesh.geometry.dispose()

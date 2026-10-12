@@ -8,7 +8,7 @@ import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime'
 const mutation = z.object({
   signalId: z.string().cuid().optional(),
   action: z.enum(['exclude', 'restore', 'correct', 'exclude_source', 'restore_source']),
-  source: z.enum(['checkin', 'goal', 'task', 'calendar', 'outcome']).optional(),
+  source: z.enum(['checkin', 'goal', 'task', 'calendar', 'outcome', 'device', 'github', 'vercel']).optional(),
   reason: z.string().trim().max(240).optional(),
   correction: z.string().trim().min(1).max(240).optional(),
 })

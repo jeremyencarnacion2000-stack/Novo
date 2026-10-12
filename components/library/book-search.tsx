@@ -21,12 +21,17 @@ export function BookSearch({ onAddBook }: BookSearchProps) {
     const [hasSearched, setHasSearched] = useState(false)
     const { toast } = useToast()
     const debounceTimer = useRef<NodeJS.Timeout | null>(null)
+    const searchController = useRef<AbortController | null>(null)
+    const searchGeneration = useRef(0)
 
     // Real-time search with debounce
     const debouncedSearch = useCallback((searchQuery: string) => {
         if (debounceTimer.current) {
             clearTimeout(debounceTimer.current)
         }
+        searchController.current?.abort()
+        searchController.current = null
+        const generation = ++searchGeneration.current
 
         if (!searchQuery.trim()) {
             setResults([])
@@ -37,12 +42,16 @@ export function BookSearch({ onAddBook }: BookSearchProps) {
         if (searchQuery.trim().length < 2) return
 
         debounceTimer.current = setTimeout(async () => {
+            const controller = new AbortController()
+            searchController.current = controller
             setIsSearching(true)
             setHasSearched(true)
             try {
-                const books = await searchBooks(searchQuery)
+                const books = await searchBooks(searchQuery, { signal: controller.signal })
+                if (generation !== searchGeneration.current || controller.signal.aborted) return
                 setResults(books)
             } catch (error) {
+                if (controller.signal.aborted) return
                 console.error('Search failed:', error)
                 toast({
                     title: 'Search failed',
@@ -50,7 +59,7 @@ export function BookSearch({ onAddBook }: BookSearchProps) {
                     variant: 'destructive',
                 })
             } finally {
-                setIsSearching(false)
+                if (generation === searchGeneration.current) setIsSearching(false)
             }
         }, 400) // 400ms debounce
     }, [toast])
@@ -59,6 +68,7 @@ export function BookSearch({ onAddBook }: BookSearchProps) {
         debouncedSearch(query)
         return () => {
             if (debounceTimer.current) clearTimeout(debounceTimer.current)
+            searchController.current?.abort()
         }
     }, [query, debouncedSearch])
 
@@ -74,6 +84,7 @@ export function BookSearch({ onAddBook }: BookSearchProps) {
                 coverUrl,
                 totalPages: book.number_of_pages_median || 0,
                 isbn: book.isbn?.[0],
+                externalId: book.key,
                 genre,
                 status: 'to-read'
             })

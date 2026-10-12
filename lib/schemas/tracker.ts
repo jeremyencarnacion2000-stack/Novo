@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const trackerEntrySchema = z.object({
   id: z.string().optional(),
-  date: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD'),
   value: z.number().min(0)
 })
 

@@ -23,6 +23,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePlayerStore } from '@/lib/player-store'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
+import { safeViewTransition } from '@/lib/view-transition'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const GEMINI_LIVE_MODEL = 'models/gemini-2.0-flash-exp'
@@ -37,7 +39,6 @@ export interface UseGeminiLiveAgentOptions {
 
 export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
   const router = useRouter()
-  const playerStore = usePlayerStore()
   const cognitiveEngine = useCognitiveEngine()
 
   // ─── State ─────────────────────────────────────────────────────────────────
@@ -64,6 +65,38 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
   // Playback queue tracking variables
   const nextPlayTimeRef = useRef<number>(0)
   const isAgentGeneratingRef = useRef<boolean>(false)
+  // A provider may retry the same tool call after an interrupted response.
+  // Retain a key only briefly so that retry converges, while a later, deliberate
+  // identical voice command remains a new user intent.
+  const mutationIntentKeysRef = useRef(new Map<string, string>())
+  const mutationIntentTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  const getMutationIntentKey = (scope: string, args: Record<string, unknown>) => {
+    const fingerprint = `${scope}:${JSON.stringify(args)}`
+    const existing = mutationIntentKeysRef.current.get(fingerprint)
+    if (existing) return { fingerprint, key: existing }
+    const key = createClientIdempotencyKey()
+    mutationIntentKeysRef.current.set(fingerprint, key)
+    const timeout = setTimeout(() => {
+      mutationIntentKeysRef.current.delete(fingerprint)
+      mutationIntentTimersRef.current.delete(fingerprint)
+    }, 90_000)
+    mutationIntentTimersRef.current.set(fingerprint, timeout)
+    return { fingerprint, key }
+  }
+
+  const completeMutationIntent = (fingerprint: string) => {
+    mutationIntentKeysRef.current.delete(fingerprint)
+    const timeout = mutationIntentTimersRef.current.get(fingerprint)
+    if (timeout) clearTimeout(timeout)
+    mutationIntentTimersRef.current.delete(fingerprint)
+  }
+
+  useEffect(() => () => {
+    mutationIntentTimersRef.current.forEach((timeout) => clearTimeout(timeout))
+    mutationIntentTimersRef.current.clear()
+    mutationIntentKeysRef.current.clear()
+  }, [])
 
   // ─── Downsampling Helper ────────────────────────────────────────────────────
   /**
@@ -127,7 +160,6 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
 
   // ─── Purge Audio Playback Queue (Interruption) ──────────────────────────────
   const purgeAudioQueue = useCallback(() => {
-    console.log('[GeminiLiveAgent] User barged in: Interrupting active playback queue')
     activeSourcesRef.current.forEach(source => {
       try {
         source.stop()
@@ -185,8 +217,6 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
 
   // ─── Local Function Execution (Function Calling) ──────────────────────────
   const executeLocalTool = useCallback(async (name: string, args: any) => {
-    console.log(`[GeminiLiveAgent] Executing tool: ${name}`, args)
-
     // ── Signal THINKING state to the UI ──
     const thinkingLabels: Record<string, string> = {
       MapsToSection: `Navegando a ${args.sectionName || '...'}`,
@@ -211,16 +241,11 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
         else if (section === 'music') targetPath = '/music'
         else if (section === 'settings') targetPath = '/settings'
         
-        console.log(`[GeminiLiveAgent] Navigation trigger: routing to ${targetPath}`)
-        
-        // Use View Transitions API if supported for fluid premium morphing
-        if ((document as any).startViewTransition) {
-          (document as any).startViewTransition(() => {
-            router.push(targetPath)
-          })
-        } else {
+        // Keep route transitions single-flight so rapid agent commands do not
+        // abort a previous capture or leave stale DOM references behind.
+        safeViewTransition(() => {
           router.push(targetPath)
-        }
+        })
 
         setThinkingMessage(null)
         return { status: 'success', navigatedTo: section, path: targetPath }
@@ -228,7 +253,6 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
       
       if (name === 'playCircadianMusic') {
         const mood = args.moodPreference || 'focus'
-        console.log(`[GeminiLiveAgent] Play circadian music triggered: Mood = ${mood}`)
         
         // Dispatch Custom Event to wake the ContextHub and switch tabs
         window.dispatchEvent(new CustomEvent('cognitive:play-music', {
@@ -242,16 +266,15 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
       if (name === 'scheduleCognitiveEvent') {
         const title = args.title || 'Focus block'
         const duration = args.durationMinutes || 25
-        
-        console.log(`[GeminiLiveAgent] Schedule cognitive event: "${title}" for ${duration} min`)
+        const intent = getMutationIntentKey('cognitive_event', { title, durationMinutes: duration })
         
         // ── Semantic CRUD: Persist to DB via /api/checklist ──
         try {
           const dueDate = new Date()
           dueDate.setMinutes(dueDate.getMinutes() + duration)
-          await fetch('/api/checklist', {
+          const response = await fetch('/api/checklist', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
             body: JSON.stringify({
               text: `${title} (${duration} min)`,
               priority: 'high',
@@ -259,9 +282,12 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
               dueDate: dueDate.toISOString(),
             }),
           })
-          console.log(`[GeminiLiveAgent] Event persisted to DB: "${title}"`)
-        } catch (dbErr) {
-          console.warn('[GeminiLiveAgent] Failed to persist event to DB:', dbErr)
+          if (!response.ok) throw new Error('checklist_write_failed')
+          completeMutationIntent(intent.fingerprint)
+        } catch {
+          console.warn('[GeminiLiveAgent] Failed to persist event.')
+          setThinkingMessage(null)
+          return { status: 'error', message: 'No pude guardar ese bloque. Inténtalo de nuevo.' }
         }
 
         // Log cognitive fatigue cost
@@ -278,20 +304,19 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
 
       if (name === 'manageTask') {
         const { action, taskId, title, status, priority, projectId } = args
-        console.log(`[GeminiLiveAgent] manageTask: ${action}`, args)
-        
         if (action === 'create') {
           if (!title) return { status: 'error', message: 'Title is required to create a task.' }
+          const intent = getMutationIntentKey('task_create', { title, status: status || 'todo', priority: priority || 'medium', projectId: projectId || null })
           const res = await fetch('/api/tasks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
             body: JSON.stringify({ title, status: status || 'todo', priority: priority || 'medium', projectId }),
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to create task.', details: errData }
+            return { status: 'error', message: 'Failed to create task.' }
           }
           const task = await res.json()
+          completeMutationIntent(intent.fingerprint)
           
           window.dispatchEvent(new CustomEvent('voice-command-executed', {
             detail: { action: 'create_task', data: task }
@@ -309,8 +334,7 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
             body: JSON.stringify({ title, status, priority, projectId }),
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to update task.', details: errData }
+            return { status: 'error', message: 'Failed to update task.' }
           }
           const task = await res.json()
           
@@ -328,8 +352,7 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
             method: 'DELETE',
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to delete task.', details: errData }
+            return { status: 'error', message: 'Failed to delete task.' }
           }
           
           window.dispatchEvent(new CustomEvent('voice-command-executed', {
@@ -360,26 +383,25 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
       
       if (name === 'manageProject') {
         const { action, projectId, title, description, status, priority } = args
-        console.log(`[GeminiLiveAgent] manageProject: ${action}`, args)
-        
         if (action === 'create') {
           if (!title) return { status: 'error', message: 'Title is required to create a project.' }
+          const intent = getMutationIntentKey('project_create', { title, description: description || '', status: status || 'not-started', priority: priority || 'medium' })
           const res = await fetch('/api/projects', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
             body: JSON.stringify({
               title,
               description: description || '',
-              status: status || 'planning',
+              status: status || 'not-started',
               priority: priority || 'medium',
               subtasks: [],
             }),
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to create project.', details: errData }
+            return { status: 'error', message: 'Failed to create project.' }
           }
           const project = await res.json()
+          completeMutationIntent(intent.fingerprint)
           
           window.dispatchEvent(new CustomEvent('voice-command-executed', {
             detail: { action: 'create_project', data: project }
@@ -397,8 +419,7 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
             body: JSON.stringify({ title, description, status, priority }),
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to update project.', details: errData }
+            return { status: 'error', message: 'Failed to update project.' }
           }
           const project = await res.json()
           
@@ -416,8 +437,7 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
             method: 'DELETE',
           })
           if (!res.ok) {
-            const errData = await res.json()
-            return { status: 'error', message: 'Failed to delete project.', details: errData }
+            return { status: 'error', message: 'Failed to delete project.' }
           }
           
           window.dispatchEvent(new CustomEvent('voice-command-executed', {
@@ -441,9 +461,8 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
       }
       
       if (name === 'manageMusic') {
+        const playerStore = usePlayerStore.getState()
         const { action, volumeLevel, trackName } = args
-        console.log(`[GeminiLiveAgent] manageMusic: ${action}`, args)
-        
         if (action === 'play') {
           if (trackName) {
             const searchRes = await fetch(`/api/ytmusic/search?q=${encodeURIComponent(trackName)}&limit=1`)
@@ -500,12 +519,12 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
       
       setThinkingMessage(null)
       return { status: 'error', message: 'Function not recognized' }
-    } catch (e: any) {
-      console.error(`[GeminiLiveAgent] Failed executing tool: ${name}`, e)
+    } catch {
+      console.error('[GeminiLiveAgent] Failed executing tool.')
       setThinkingMessage(null)
-      return { status: 'error', error: e.message }
+      return { status: 'error', error: 'tool_execution_failed' }
     }
-  }, [router, cognitiveEngine, playerStore])
+  }, [router, cognitiveEngine])
 
   // ─── WebSocket Event Handling ───────────────────────────────────────────────
   const startSession = useCallback(async (customApiKey?: string) => {
@@ -532,13 +551,10 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
 
       // Establish WebSocket connection
       const socketUrl = `${GEMINI_WS_URL}?key=${finalApiKey}`
-      console.log('[GeminiLiveAgent] Establishing bidirectional connection to Gemini Live API...')
-      
       const ws = new WebSocket(socketUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
-        console.log('[GeminiLiveAgent] Bidirectional connection established!')
         setIsConnected(true)
         setAgentState('listening')
 
@@ -816,33 +832,30 @@ export function useGeminiLiveAgent(options: UseGeminiLiveAgentOptions = {}) {
             }
           }
         } catch (err) {
-          console.error('[GeminiLiveAgent] Error parsing server message', err)
+          console.error('[GeminiLiveAgent] Error parsing server message.')
         }
       }
 
       ws.onerror = (e) => {
-        console.error('[GeminiLiveAgent] WebSocket error:', e)
+        console.error('[GeminiLiveAgent] WebSocket error.')
         setError('Error connecting to Gemini Multimodal Live Server.')
         setAgentState('error')
       }
 
       ws.onclose = () => {
-        console.log('[GeminiLiveAgent] WebSocket connection closed.')
         setIsConnected(false)
         setIsRecording(false)
         setAgentState('idle')
       }
 
-    } catch (e: any) {
-      console.error('[GeminiLiveAgent] Session initialization failed:', e)
-      setError(e.message || 'Microphone access or WebSocket connection failed.')
+    } catch {
+      console.error('[GeminiLiveAgent] Session initialization failed.')
+      setError('Microphone access or WebSocket connection failed.')
       setAgentState('error')
     }
   }, [options.apiKey, options.systemInstruction, scheduleAudioChunk, executeLocalTool, downsampleBuffer, purgeAudioQueue])
 
   const stopSession = useCallback(() => {
-    console.log('[GeminiLiveAgent] Terminating session...')
-    
     // 1. Close WebSocket
     if (wsRef.current) {
       wsRef.current.close()

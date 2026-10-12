@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
         proposals: proposals.length,
       },
     });
-  } catch (err) {
-    console.error('[twin-agent/run] Error:', err);
+  } catch {
+    // Keep provider/database diagnostics server-side and out of logs returned
+    // through hosted observability. The client only needs the safe 500 state.
+    console.error('[twin-agent/run] Request failed.');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -71,8 +73,8 @@ export async function GET(req: NextRequest) {
       confirmationRequired: true,
       twin: twin ? { confidenceScore: twin.confidenceScore, trustLevel: twin.trustLevel } : null,
     });
-  } catch (err) {
-    console.error('[twin-agent/logs] Error:', err);
+  } catch {
+    console.error('[twin-agent/logs] Request failed.');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

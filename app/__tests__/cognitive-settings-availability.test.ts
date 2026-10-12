@@ -10,7 +10,16 @@ describe('Cognitive route settings availability', () => {
     // valid guard by string coincidence.
     expect(source).toContain('function RouteAppShell')
     expect(source).toContain('<CognitiveRouteShell>{children}</CognitiveRouteShell>')
-    expect(source).toContain('{!isCognitiveRoute && <CommandPalette />}')
     expect(source).toContain('<SettingsModal />')
+  })
+
+  it('routes the in-app animation preference into Framer Motion', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'app', 'client-layout.tsx'), 'utf8')
+
+    expect(source).toContain('function AppMotionSettings')
+    expect(source).toContain('useNovoMotionPolicy(settings.showAnimations)')
+    expect(source).toContain("reducedMotion={mode === 'full' ? 'never' : 'always'}")
+    expect(source).toContain('<AppMotionSettings>')
+    expect(source).not.toContain('<MotionConfig reducedMotion="user">')
   })
 })

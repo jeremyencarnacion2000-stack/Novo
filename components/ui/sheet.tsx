@@ -6,6 +6,11 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+import { useNativeDialogMotion, type NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
+
+const SheetMotionContext = React.createContext<{
+  registerController: (controller: NativeDialogMotionController | null) => void
+} | null>(null)
 
 function MobileSheetDragHandle({ side }: { side: string }) {
   if (side !== 'bottom') return null
@@ -19,8 +24,50 @@ function MobileSheetDragHandle({ side }: { side: string }) {
   )
 }
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  const [present, setPresent] = React.useState(open ?? defaultOpen ?? false)
+  const controllerRef = React.useRef<NativeDialogMotionController | null>(null)
+  const previousOpenRef = React.useRef(open)
+  const registerController = React.useCallback((controller: NativeDialogMotionController | null) => {
+    controllerRef.current = controller
+  }, [])
+  const finishClose = React.useCallback((notify: boolean) => {
+    const complete = () => {
+      setPresent(false)
+      if (notify) onOpenChange?.(false)
+    }
+    const controller = controllerRef.current
+    if (controller) controller.close(complete)
+    else complete()
+  }, [onOpenChange])
+
+  React.useLayoutEffect(() => {
+    if (open === undefined) return
+    const wasOpen = previousOpenRef.current
+    previousOpenRef.current = open
+    if (open) {
+      if (!present) setPresent(true)
+      else if (wasOpen === false) controllerRef.current?.open()
+    } else if (wasOpen === true && present) {
+      finishClose(false)
+    }
+  }, [finishClose, open, present])
+
+  const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    if (nextOpen) {
+      setPresent(true)
+      onOpenChange?.(true)
+    } else {
+      finishClose(true)
+    }
+  }, [finishClose, onOpenChange])
+
+  const context = React.useMemo(() => ({ registerController }), [registerController])
+  return (
+    <SheetMotionContext.Provider value={context}>
+      <SheetPrimitive.Root {...props} data-slot="sheet" open={present} onOpenChange={handleOpenChange} />
+    </SheetMotionContext.Provider>
+  )
 }
 
 function SheetTrigger({
@@ -49,7 +96,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50',
+        'fixed inset-0 z-50 bg-black/50 opacity-0',
         className,
       )}
       {...props}
@@ -61,44 +108,73 @@ function SheetContent({
   className,
   children,
   side = 'right',
+  showCloseButton = true,
+  overlayClassName,
+  overlayProps,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
+  showCloseButton?: boolean
+  /** Extra styling/attributes for the shared backdrop (useful for responsive shells). */
+  overlayClassName?: string
+  overlayProps?: React.ComponentProps<typeof SheetPrimitive.Overlay> & Record<string, unknown>
 }) {
+  const surfaceRef = React.useRef<HTMLDivElement | null>(null)
+  const overlayRef = React.useRef<HTMLDivElement | null>(null)
+  const motionContext = React.useContext(SheetMotionContext)
   const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
     enabled: side === 'bottom',
     onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="sheet-close"]')?.click(),
   })
+  const setSurfaceRef = React.useCallback((node: HTMLDivElement | null) => {
+    surfaceRef.current = node
+    dragSurfaceRef.current = node
+  }, [dragSurfaceRef])
+
+  useNativeDialogMotion({
+    surfaceRef,
+    overlayRef,
+    preset: 'sheet',
+    sheetSide: side,
+    enabled: true,
+    registerController: motionContext?.registerController,
+  })
 
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay ref={overlayRef} className={overlayClassName} {...overlayProps} />
       <SheetPrimitive.Content
-        ref={dragSurfaceRef}
+        ref={setSurfaceRef}
         data-slot="sheet-content"
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-[cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:duration-[240ms] data-[state=open]:duration-[380ms] will-change-transform',
+          // Keep the sheet itself as the scroll boundary. Without an internal
+          // overflow region, long app forms (especially on mobile) extend
+          // below the visual viewport and leave the primary action unreachable.
+          // `min-h-0` lets the flex item actually shrink before scrolling.
+          'bg-background fixed z-50 flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain shadow-lg will-change-transform',
           side === 'right' &&
-            'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm',
+            'inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm',
           side === 'left' &&
-            'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm',
+            'inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm',
           side === 'top' &&
-            'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b',
+            'inset-x-0 top-0 h-auto border-b',
           side === 'bottom' &&
-            'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t rounded-t-3xl',
+            'inset-x-0 bottom-0 h-auto border-t rounded-t-3xl',
           className,
         )}
         {...props}
       >
         <MobileSheetDragHandle side={side} />
         {children}
-        <SheetPrimitive.Close
-          data-slot="sheet-close"
-          className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none"
-        >
-          <XIcon className="size-4" />
-          <span className="sr-only">Close</span>
-        </SheetPrimitive.Close>
+        {showCloseButton && (
+          <SheetPrimitive.Close
+            data-slot="sheet-close"
+            className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-[background-color,color,opacity,transform] hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none"
+          >
+            <XIcon className="size-4" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        )}
       </SheetPrimitive.Content>
     </SheetPortal>
   )

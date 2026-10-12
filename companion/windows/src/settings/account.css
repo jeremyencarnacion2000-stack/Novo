@@ -1,0 +1,54 @@
+/* Account and privacy share the same Novo settings typography and controls. */
+.novo-account-content { min-width: 0; }
+.novo-account-pane .presence-card { display: flex; flex-direction: row; align-items: center; gap: 16px; padding: 24px 0 16px; border-bottom: 1px solid var(--line); }
+.presence-copy { flex: 1; }
+.presence-title { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+.muted { color: var(--muted); font-size: 12px; }
+.status-led, .live-dot, .signal-dot { width: 8px; height: 8px; border-radius: 50%; background: #6e8175; flex: 0 0 auto; }
+.status-led.on, .live-dot.on { background: var(--green); }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-heading h2 { font: 700 15px/1.4 var(--font); }
+.body-copy { color: var(--dim); font: 400 12.5px/1.7 var(--font); max-width: 70ch; }
+.privacy-tag { font-size: 11px; color: var(--sage); white-space: nowrap; }
+.consent-row { display: flex; align-items: flex-start; gap: 10px; padding-block: 6px; cursor: pointer; }
+.consent-row input { flex: 0 0 auto; margin-top: 2px; }
+.consent-row strong, .consent-row small { display: block; }
+.consent-row strong { font-size: 12.5px; font-weight: 600; }
+.consent-row small { margin-top: 4px; color: var(--dim); font-size: 12px; }
+.capture-controls, .input-row, .live-row, .app-item, .signal-item { display: flex; align-items: center; gap: 10px; }
+.capture-controls { flex-wrap: wrap; }
+.primary-button { background: var(--sage); color: #14221f; }
+.primary-button:hover:not(:disabled) { background: #d6ebc6; }
+.quiet-button { background: rgba(255,255,255,.06); }
+.live-row { flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.live-row b { font-weight: 600; color: var(--ink); }
+.live-row small { margin-left: auto; }
+.mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-block: 4px; }
+.mini-stats strong { font-size: 22px; font-weight: 700; }
+.mini-stats strong small { font-size: 12px; font-weight: 400; }
+.mini-stats span { display: block; color: var(--dim); font-size: 12px; margin-top: 3px; }
+.app-list { display: grid; gap: 8px; }
+.app-item { justify-content: space-between; font-size: 12px; color: var(--dim); }
+.empty-row { color: var(--dim); font-size: 12px; line-height: 1.65; }
+.field-label, .exclusions > label { display: block; font-size: 12px; font-weight: 600; color: var(--dim); margin-block: 12px 6px; }
+.input-row { flex-wrap: wrap; }
+.input-row input { flex: 1 1 200px; min-width: 0; }
+.text-input { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: rgba(255,255,255,.035); font-size: 13px; }
+.text-input:focus { outline: none; border-color: #a5bcae; }
+.current-work-card textarea { resize: vertical; min-height: 76px; }
+.text-button { align-self: flex-start; padding: 5px 0; color: var(--sage); background: transparent; border-radius: 3px; font-size: 12px; }
+.text-button:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.text-button.danger { color: #edb6a7; background: transparent; }
+.refresh-button { min-height: 32px; min-width: 32px; padding: 4px 8px; font-size: 18px; }
+.signal-list { display: grid; gap: 12px; }
+.signal-item { align-items: flex-start; font-size: 12px; }
+.signal-dot { margin-top: 5px; background: #baa67f; }
+.signal-item p { line-height: 1.65; overflow-wrap: anywhere; }
+.signal-item small { display: block; margin-top: 5px; color: var(--dim); font-size: 11px; }
+.novo-account-feedback { padding: 14px 0; color: var(--sage); font-size: 12px; line-height: 1.6; border-bottom: 1px solid var(--line); }
+.account-address-settings { font-size: 12px; }
+.novo-account-pane .eyebrow { display: none; }
+.novo-account-pane .authorization-prompt { background: #14221f; }
+.novo-account-pane .authorization-prompt > small, .novo-account-pane .manual-token p { font-size: 12px; }
+.novo-account-pane .manual-token summary { font-size: 12px; }
+.novo-account-pane .verification-link { font-size: 13px; }

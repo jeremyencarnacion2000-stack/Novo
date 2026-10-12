@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Star, Trash2, Save, BookOpen, ExternalLink, Smartphone, BookMarked, Headphones } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useModalFlip } from '@/hooks/use-modal-flip'
+import { normalizeBookStatus, type BookStatus } from '@/lib/books/status'
 
 interface BookDetailsDialogProps {
     book: any
@@ -24,7 +24,7 @@ interface BookDetailsDialogProps {
 
 export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetailsDialogProps) {
     const [currentPage, setCurrentPage] = useState(0)
-    const [status, setStatus] = useState('to-read')
+    const [status, setStatus] = useState<BookStatus>('to-read')
     const [rating, setRating] = useState(0)
     const [review, setReview] = useState('')
     const [notes, setNotes] = useState('')
@@ -39,13 +39,12 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
     const noteInputRef = useRef<HTMLInputElement>(null)
 
     const flipKey = `book-${book?.id}`
-    const closeFlip = useModalFlip(flipKey, isOpen && !!book)
-    const handleClose = () => closeFlip(onClose)
+    const handleClose = onClose
 
     useEffect(() => {
         if (book) {
             setCurrentPage(book.currentPage || 0)
-            setStatus(book.status || 'to-read')
+            setStatus(normalizeBookStatus(book.status))
             setRating(book.rating || 0)
             setReview(book.review || '')
             setNotes(book.notes || '')
@@ -154,7 +153,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <DialogContent data-flip-to={flipKey} className="max-w-3xl max-h-[90dvh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
+            <DialogContent motionId={flipKey} className="max-w-3xl max-h-[90dvh] overflow-hidden flex flex-col bg-background/90 backdrop-blur-xl border-border/50 rounded-3xl shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight">Book Details</DialogTitle>
                 </DialogHeader>
@@ -179,7 +178,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
 
                         <div className="space-y-2">
                             <Label>Status</Label>
-                            <Select value={status} onValueChange={setStatus}>
+                            <Select value={status} onValueChange={(value) => setStatus(normalizeBookStatus(value))}>
                                 <SelectTrigger className="rounded-xl bg-background/50 border-border/50">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -187,6 +186,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
                                     <SelectItem value="to-read">To Read</SelectItem>
                                     <SelectItem value="reading">Reading</SelectItem>
                                     <SelectItem value="read">Read</SelectItem>
+                                    <SelectItem value="dropped">Dropped</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

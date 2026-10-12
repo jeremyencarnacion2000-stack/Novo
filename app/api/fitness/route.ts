@@ -48,8 +48,8 @@ export async function GET() {
                 startTime: w.date.toISOString()
             }))
         });
-    } catch (error) {
-        console.error('Error fetching fitness data:', error);
+    } catch {
+        console.error('Error fetching fitness data.');
         return NextResponse.json({ error: 'Failed to fetch fitness data' }, { status: 500 });
     }
 }

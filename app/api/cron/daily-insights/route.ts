@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
     try {
         const result = await maybeRunDailyInsights();
         return NextResponse.json(result);
-    } catch (error) {
-        console.error('[Cron: daily-insights] Run failed:', (error as Error).message);
+    } catch {
+        console.error('[Cron: daily-insights] Run failed.');
         return NextResponse.json({ error: 'Cron run failed' }, { status: 500 });
     }
 }

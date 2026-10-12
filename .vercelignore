@@ -24,3 +24,30 @@ vercel_deploy.log
 # makes Vercel select pnpm and reject the otherwise valid npm lockfile.
 pnpm-lock.yaml
 public/art/novo-companion-sprite-source.png
+# Legacy landing renders with no active references; keep source copies locally
+# without sending them to the production asset bundle.
+public/landing/hero-atmosphere.png
+public/landing/cognitive-sculpture.png
+public/landing/context-field.webp
+public/landing/product-ai.png
+
+# Native source belongs in GitHub; Vercel builds only the web application.
+/companion/
+/android/
+/ios/
+/native-shell/
+*.db
+.gstack-*
+app-response.html
+headers.txt
+browse-audit.jsonl
+landing-*-audit*.png
+landing-*-final.png
+landing-title-*.png
+native-login-check.png
+apple-liquid-morph-lab-v*/
+apple-liquid-morphing-lab.html
+command-center-liquid-nav-v2.html
+liquid-glass-repo-video-variant*/
+index(9).html
+index(10).html

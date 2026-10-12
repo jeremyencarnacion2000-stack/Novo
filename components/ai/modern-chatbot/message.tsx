@@ -8,11 +8,11 @@ import remarkGfm from 'remark-gfm';
 
 const SyntaxHighlighter = dynamic(
     () => Promise.all([
-        import('react-syntax-highlighter'),
+        import('react-syntax-highlighter/dist/esm/prism-async-light'),
         import('react-syntax-highlighter/dist/esm/styles/prism'),
-    ]).then(([{ Prism }, { oneDark }]) => {
+    ]).then(([{ default: PrismAsyncLight }, { oneDark }]) => {
         return function HighlighterWithStyle(props: any) {
-            return <Prism {...props} style={oneDark} />;
+            return <PrismAsyncLight {...props} style={oneDark} />;
         };
     }),
     { ssr: false, loading: () => <div className="animate-pulse bg-white/[0.03] rounded-lg h-24 m-4" /> }

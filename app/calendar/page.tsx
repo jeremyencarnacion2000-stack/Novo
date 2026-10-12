@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
-import { modalFlip } from '@/lib/modal-flip';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import { MonthGrid, CalendarEvent } from '@/components/calendar/month-grid';
 import { WeekGrid } from '@/components/calendar/week-grid';
 import { DayGrid } from '@/components/calendar/day-grid';
 import { safeViewTransition } from '@/hooks/use-view-transition';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCognitiveState } from '@/lib/cognitive-context';
@@ -40,10 +41,13 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: '', date: new Date(), startTime: '09:00', endTime: '10:00' });
+  const createEventIntentKeyRef = useRef<string | null>(null)
+  const eventsRequestRef = useRef<AbortController | null>(null)
   const [isCreating, setIsCreating]     = useState(false);
   const [searchQuery, setSearchQuery]   = useState('');
   const [contacts, setContacts]         = useState<any[]>([]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const contactsRequestRef = useRef<AbortController | null>(null)
 
   const [filters, setFilters] = useState({
     google: true, checklist: true, project: true, school: true,
@@ -64,25 +68,39 @@ export default function CalendarPage() {
 
   // ── Fetch events ──
   const fetchEvents = useCallback(async () => {
+    eventsRequestRef.current?.abort()
+    const controller = new AbortController()
+    eventsRequestRef.current = controller
     setLoading(true);
     try {
       const start = startOfMonth(currentDate);
       const end   = endOfMonth(addMonths(currentDate, 1));
       const enabledSources = Object.entries(filters).filter(([, v]) => v).map(([k]) => k);
       const res = await fetch(
-        `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}&sources=${enabledSources.join(',')}`
+        `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}&sources=${enabledSources.join(',')}`,
+        { signal: controller.signal },
       );
       if (!res.ok) throw new Error('Failed to fetch events');
       const { events: raw } = await res.json();
+      if (controller.signal.aborted) return
       setEvents(raw.map((e: any) => ({ ...e, start: new Date(e.start), end: new Date(e.end) })));
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) return
       toast({ title: 'Error', description: 'Failed to load calendar events', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      if (eventsRequestRef.current === controller) {
+        eventsRequestRef.current = null
+        setLoading(false);
+      }
     }
   }, [currentDate, filters, toast]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  useEffect(() => () => {
+    eventsRequestRef.current?.abort()
+    eventsRequestRef.current = null
+  }, []);
 
   // ── Cognitive schedule-event listener (voice agent integration) ──
   useEffect(() => {
@@ -93,20 +111,32 @@ export default function CalendarPage() {
 
   // ── Contact search ──
   useEffect(() => {
-    if (searchQuery.length < 2) { setContacts([]); return; }
+    contactsRequestRef.current?.abort()
+    contactsRequestRef.current = null
+    const query = searchQuery.trim().toLowerCase()
+    if (query.length < 2) { setContacts([]); return; }
+    const controller = new AbortController()
+    contactsRequestRef.current = controller
     const t = setTimeout(async () => {
       try {
-        const res = await fetch('/api/clients');
-        if (res.ok) {
+        const res = await fetch('/api/clients', { signal: controller.signal });
+        if (res.ok && !controller.signal.aborted && contactsRequestRef.current === controller) {
           const all = await res.json();
+          if (controller.signal.aborted || contactsRequestRef.current !== controller) return
           setContacts(all.filter((c: any) =>
-            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.email?.toLowerCase().includes(searchQuery.toLowerCase())
+            c.name?.toLowerCase().includes(query) ||
+            c.email?.toLowerCase().includes(query)
           ));
         }
-      } catch { /* silent */ }
+      } catch (error: unknown) {
+        if ((error as { name?: string })?.name !== 'AbortError') return
+      }
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t)
+      controller.abort()
+      if (contactsRequestRef.current === controller) contactsRequestRef.current = null
+    }
   }, [searchQuery]);
 
   // ── Navigation ──
@@ -138,28 +168,8 @@ export default function CalendarPage() {
     setSelectedEvent(event);
   };
 
-  // Fire the flip *after* React has committed the new DOM (dialog/detail div
-  // mounted) and the browser has had a frame to lay it out — a fixed
-  // setTimeout() raced the render and could fire before the target existed,
-  // leaving the modal permanently invisible (data-flip-target defaults to
-  // opacity:0 and only modalFlip's own success path clears that).
-  useLayoutEffect(() => {
-    if (!isCreateDialogOpen) return
-    modalFlip.toggle('btn-create-event')
-  }, [isCreateDialogOpen])
-
-  useLayoutEffect(() => {
-    if (!selectedEvent) return
-    modalFlip.toggle(`event-${selectedEvent.id}`)
-  }, [selectedEvent])
-
   const handleCloseCreateDialog = () => {
-    modalFlip.untoggle('btn-create-event', () => setIsCreateDialogOpen(false));
-  };
-
-  const handleCloseSelectedEvent = () => {
-    if (selectedEvent) modalFlip.untoggle(`event-${selectedEvent.id}`, () => setSelectedEvent(null));
-    else setSelectedEvent(null);
+    setIsCreateDialogOpen(false);
   };
 
   const submitCreateEvent = async () => {
@@ -174,7 +184,10 @@ export default function CalendarPage() {
     try {
       const res = await fetch('/api/calendar/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': createEventIntentKeyRef.current ??= createClientIdempotencyKey(),
+        },
         body: JSON.stringify({ title: newEvent.title, start, end, allDay: false }),
       });
       if (!res.ok) throw new Error('Failed to create event');
@@ -189,6 +202,7 @@ export default function CalendarPage() {
         color: sourceLabels['novo']?.color ?? '#818CF8',
       };
       setEvents(prev => [...prev, created]);
+      createEventIntentKeyRef.current = null
       handleCloseCreateDialog();
       toast({ title: 'Success', description: 'Event created successfully' });
     } catch {
@@ -217,13 +231,8 @@ export default function CalendarPage() {
             </Button>
           </div>
 
-          {/* Sidebar */}
-          <div className={`lg:w-[280px] shrink-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible transition-all duration-300 ${showMobileSidebar ? 'fixed inset-0 z-50 bg-background/95 backdrop-blur-xl p-6' : 'hidden lg:flex w-full'}`}>
-            {showMobileSidebar && (
-              <div className="flex justify-end lg:hidden mb-4">
-                <Button variant="ghost" size="icon" onClick={() => setShowMobileSidebar(false)}><X className="h-6 w-6" /></Button>
-              </div>
-            )}
+          {/* Sidebar — desktop stays in the page; mobile uses the shared Sheet */}
+          <div className="hidden lg:flex lg:w-[280px] shrink-0 flex-col gap-6 overflow-y-auto lg:overflow-visible">
             <CalendarSidebar
               date={currentDate}
               onDateChange={(d) => { if (d) setCurrentDate(d); setShowMobileSidebar(false); }}
@@ -233,6 +242,22 @@ export default function CalendarPage() {
               onCreateEvent={() => { handleCreateEvent(); setShowMobileSidebar(false); }}
             />
           </div>
+
+          <Sheet open={showMobileSidebar} onOpenChange={setShowMobileSidebar}>
+            <SheetContent side="left" showCloseButton className="w-[min(88vw,360px)] max-w-none border-r border-border/20 bg-background/95 p-5 backdrop-blur-2xl lg:hidden">
+              <SheetTitle className="sr-only">Calendar filters and events</SheetTitle>
+              <div className="h-full overflow-y-auto pt-4">
+                <CalendarSidebar
+                  date={currentDate}
+                  onDateChange={(d) => { if (d) setCurrentDate(d); setShowMobileSidebar(false); }}
+                  filters={filters}
+                  onToggleFilter={toggleFilter}
+                  sourceLabels={sourceLabels}
+                  onCreateEvent={() => { handleCreateEvent(); setShowMobileSidebar(false); }}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
 
           {/* Main content */}
           <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -349,8 +374,8 @@ export default function CalendarPage() {
       </div>
 
       {/* Create Event Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={(o) => !o && handleCloseCreateDialog()}>
-        <DialogContent data-flip-to="btn-create-event" className="sm:max-w-[425px] glass-panel border-foreground/10">
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent motionId="btn-create-event" className="sm:max-w-[425px] glass-panel border-foreground/10">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
               <Plus data-shared-item="icon" className="h-5 w-5" />
@@ -360,15 +385,15 @@ export default function CalendarPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-title" className="text-right">Title</Label>
-              <Input id="ev-title" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" autoComplete="off" />
+              <Input id="ev-title" value={newEvent.title} onChange={e => { createEventIntentKeyRef.current = null; setNewEvent({ ...newEvent, title: e.target.value }) }} className="col-span-3 bg-foreground/5 border-foreground/10" autoComplete="off" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-start" className="text-right">Start</Label>
-              <Input id="ev-start" type="time" value={newEvent.startTime} onChange={e => setNewEvent({ ...newEvent, startTime: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" />
+              <Input id="ev-start" type="time" value={newEvent.startTime} onChange={e => { createEventIntentKeyRef.current = null; setNewEvent({ ...newEvent, startTime: e.target.value }) }} className="col-span-3 bg-foreground/5 border-foreground/10" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ev-end" className="text-right">End</Label>
-              <Input id="ev-end" type="time" value={newEvent.endTime} onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })} className="col-span-3 bg-foreground/5 border-foreground/10" />
+              <Input id="ev-end" type="time" value={newEvent.endTime} onChange={e => { createEventIntentKeyRef.current = null; setNewEvent({ ...newEvent, endTime: e.target.value }) }} className="col-span-3 bg-foreground/5 border-foreground/10" />
             </div>
           </div>
           <DialogFooter>
@@ -381,15 +406,21 @@ export default function CalendarPage() {
       </Dialog>
 
       {/* Event detail modal */}
-      {selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-        <div data-flip-to={selectedEvent ? `event-${selectedEvent.id}` : ''} data-state="open" className="modal-flip-target glass-panel rounded-3xl shadow-2xl border border-foreground/10 w-full max-w-md overflow-hidden">
+      <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setSelectedEvent(null)}>
+        {selectedEvent && (
+          <DialogContent
+            motionId={`event-${selectedEvent.id}`}
+            showCloseButton={false}
+            className="glass-panel w-full max-w-md overflow-hidden rounded-3xl border-foreground/10 p-0 shadow-2xl"
+          >
             <div className="p-6 space-y-5">
               <div className="flex items-start justify-between">
-                <h3 data-shared-item="text" className="text-xl font-bold leading-none tracking-tight">{selectedEvent.title}</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-foreground/10" onClick={handleCloseSelectedEvent}>
-                  <X className="h-4 w-4" />
-                </Button>
+                <DialogTitle data-shared-item="text" className="text-xl font-bold leading-none tracking-tight">{selectedEvent.title}</DialogTitle>
+                <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2 rounded-full hover:bg-foreground/10">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogClose>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-foreground/5 p-3 rounded-xl">
                 <CalendarIcon className="h-4 w-4 text-primary" />
@@ -408,11 +439,13 @@ export default function CalendarPage() {
               )}
             </div>
             <div className="bg-foreground/5 p-4 flex justify-end border-t border-foreground/10">
-              <Button onClick={handleCloseSelectedEvent} className="rounded-xl px-6">Close</Button>
+              <DialogClose asChild>
+                <Button className="rounded-xl px-6">Close</Button>
+              </DialogClose>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
     </>
   );
 }

@@ -11,7 +11,7 @@ if (process.env.NOVO_ISOLATED_E2E === "true") {
   process.env.DATABASE_URL = testUrl;
 }
 
-export default {
+const prismaConfig = {
   schema: "./prisma/schema.prisma",
   datasource: {
     // Prisma CLI otherwise reloads DATABASE_URL from the schema's env()
@@ -19,3 +19,5 @@ export default {
     url: process.env.DATABASE_URL,
   },
 };
+
+export default prismaConfig;

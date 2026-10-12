@@ -41,7 +41,7 @@ export async function GET(
 
     return NextResponse.json(routine)
   } catch (error) {
-    console.error('Error fetching routine:', error)
+    console.error('Error fetching routine.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -86,10 +86,13 @@ export async function PUT(
         // Upsert tasks
         for (const task of tasks) {
           if (task.id) {
-            await tx.routineTask.update({
-              where: { id: task.id },
+            const updated = await tx.routineTask.updateMany({
+              where: { id: task.id, routineId: id },
               data: { text: task.text, completed: task.completed }
             })
+            if (updated.count === 0) {
+              throw new Error('ROUTINE_TASK_NOT_FOUND')
+            }
           } else {
             await tx.routineTask.create({
               data: {
@@ -155,7 +158,10 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating routine:', error)
+    if (error instanceof Error && error.message === 'ROUTINE_TASK_NOT_FOUND') {
+      return NextResponse.json({ error: 'Routine task not found' }, { status: 404 })
+    }
+    console.error('Error updating routine.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -185,7 +191,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting routine:', error)
+    console.error('Error deleting routine.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

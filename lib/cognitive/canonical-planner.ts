@@ -13,6 +13,19 @@ export async function planUserContext(input: CanonicalPlanInput) {
   const activity = input.runId ? await getActivityRun(userId, input.runId) : { run: await createActivityRun(userId, 'novo_loop'), events: [] }
   if (!activity) throw new Error('activity_run_not_found')
   const runId = activity.run.id
+
+  // A browser retry can reach the planner after the original request already
+  // completed. Reuse the plan recorded on the activity run instead of
+  // superseding it with a second ActionPlan. This is the durable half of the
+  // client intent key: the same run id always converges on one plan.
+  if (input.runId && activity.run.status === 'completed' && activity.run.resultRef) {
+    const replayPlan = await prisma.actionPlan.findFirst({
+      where: { id: activity.run.resultRef, userId },
+      include: { actions: true, goal: { select: { title: true } } },
+    })
+    if (replayPlan) return { plan: replayPlan, runId }
+  }
+
   await appendActivityEvent(userId, { runId, phase: 'retrieving_context', label: 'Recuperando tu contexto', detail: 'Consultando objetivo, estado, tareas y resultados recientes.' })
   const [requestedGoal, latestGoal, snapshot, tasks, recentOutcomes, completedActions, ledgerSignals, sourcePreferences, twin] = await Promise.all([
     input.goalId ? prisma.goal.findFirst({ where: { id: input.goalId, userId, status: 'active' } }) : Promise.resolve(null),

@@ -16,8 +16,6 @@
  *  • SYNAPTIC_FATIGUE detected → defers low-priority tasks, dispatches
  *    `cognitive:recovery-started`, and surfaces an insight with a real
  *    "Iniciar descanso" action that switches the Focus timer to break mode.
- *  • Generates an insight when burnout risk is high (no action — see
- *    pushInsight below for why some insights are FYI-only).
  *  • Polls /api/cognitive/decisions for ambient "Twin evolution" entries
  *    (was a second, uncoordinated toast surface — components/cognitive/
  *    twin-insight-toast.tsx — now folded in here, see the comment above the
@@ -31,7 +29,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
-import { useFocus } from '@/lib/focus-context'
+import { useFocusControls } from '@/lib/focus-context'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import type { CognitivePhase } from '@/lib/cognitive-engine'
 import type { TwinInsight } from '@/lib/cognitive/insight-types'
@@ -63,8 +61,9 @@ const TWIN_EVOLUTION_POLL_MS = 30_000
 export function usePeakTaskOrchestrator() {
   const { bioState } = useCognitiveEngine()
   const router = useRouter()
-  const { addTask, setSelectedTaskId, setMode } = useFocus()
+  const { addTask, setSelectedTaskId, setMode } = useFocusControls()
   const { twin } = useCognitiveTwin()
+  const twinUserId = twin?.userId || null
 
   const [state, setState] = useState<OrchestratorState>({
     focusQueue: [],
@@ -76,6 +75,8 @@ export function usePeakTaskOrchestrator() {
 
   const lastPhaseRef = useRef<CognitivePhase | null>(null)
   const orchestrationLockRef = useRef(false)
+  const orchestrationUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMountedRef = useRef(false)
   // The very first bioState read on mount always looks like a "transition"
   // (lastPhaseRef starts null), which fired the Peak Focus / recovery
   // insight on every single page load whenever the user simply happened to
@@ -93,6 +94,7 @@ export function usePeakTaskOrchestrator() {
   // ponytail: a single guard, not a priority queue — add real ordering only
   // if a third insight source shows up and this stops being enough.
   const pushInsight = useCallback((next: TwinInsight) => {
+    if (!isMountedRef.current) return
     setState(s => {
       if (s.insight?.action && !next.action) return s
       return { ...s, insight: next }
@@ -109,6 +111,17 @@ export function usePeakTaskOrchestrator() {
     })
   }, [])
 
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (orchestrationUnlockTimerRef.current) {
+        clearTimeout(orchestrationUnlockTimerRef.current)
+        orchestrationUnlockTimerRef.current = null
+      }
+    }
+  }, [])
+
   // ── Pull top tasks when entering PEAK_FOCUS ──────────────────────────────
 
   const pullPeakFocusTasks = useCallback(async () => {
@@ -117,10 +130,12 @@ export function usePeakTaskOrchestrator() {
     setState(s => ({ ...s, isOrchestrating: true }))
 
     try {
-      const res = await fetch('/api/tasks?status=todo&priority=high&limit=5')
+      const res = await fetch('/api/tasks?status=todo&priority=high&limit=5', { cache: 'no-store' })
       if (!res.ok) return
 
       const tasks = await res.json()
+      if (!isMountedRef.current) return
+      if (!Array.isArray(tasks)) return
       const queue: FocusTask[] = tasks.map((t: any) => ({
         id: t.id,
         title: t.title,
@@ -130,19 +145,6 @@ export function usePeakTaskOrchestrator() {
       }))
 
       let finalQueue = queue
-
-      if (queue.length === 0) {
-        // A clock-derived peak window is not permission to create a plan or
-        // mutate the user's tasks. The verified Loop creates proposals from
-        // persisted objectives/check-ins and waits for an explicit response.
-        setState(s => ({ ...s, focusQueue: [] }))
-        pushInsight({
-          id: `peak-focus-empty-${Date.now()}`,
-          message: 'No hay tareas prioritarias pendientes para esta ventana.',
-          tone: 'info',
-        })
-        return
-      }
 
       if (queue.length > 0) {
         setState(s => ({ ...s, focusQueue: queue }))
@@ -182,7 +184,8 @@ export function usePeakTaskOrchestrator() {
           })
           if (planRes.ok) {
             const plan = await planRes.json()
-            const planTasks: FocusTask[] = (plan.tasks || []).map((t: any) => ({
+            if (!isMountedRef.current) return
+            const planTasks: FocusTask[] = (Array.isArray(plan?.tasks) ? plan.tasks : []).map((t: any) => ({
               id: t.id,
               title: t.title,
               priority: t.priority,
@@ -241,8 +244,16 @@ export function usePeakTaskOrchestrator() {
         )
       }
     } finally {
+      if (!isMountedRef.current) {
+        orchestrationLockRef.current = false
+        return
+      }
       setState(s => ({ ...s, isOrchestrating: false }))
-      setTimeout(() => { orchestrationLockRef.current = false }, 60_000) // 1 min lock
+      if (orchestrationUnlockTimerRef.current) clearTimeout(orchestrationUnlockTimerRef.current)
+      orchestrationUnlockTimerRef.current = setTimeout(() => {
+        orchestrationLockRef.current = false
+        orchestrationUnlockTimerRef.current = null
+      }, 60_000) // 1 min lock
     }
   }, [bioState?.attentionScore, pushInsight, addTask, setSelectedTaskId, router, twin])
 
@@ -341,82 +352,76 @@ export function usePeakTaskOrchestrator() {
     }
   }, [bioState, pullPeakFocusTasks, handleRecoveryMode])
 
-  // ── Burnout check (runs once on mount, then every 10 min) ────────────────
-
-  useEffect(() => {
-    const checkBurnout = async () => {
-      try {
-        const res = await fetch('/api/cognitive/patterns')
-        if (!res.ok) return
-
-        await res.json()
-        // A productivity-derived "burnout" score is not an observed health
-        // signal. Keep this legacy poll inert until it is replaced by an
-        // explicit, source-led user check-in flow.
-        const risk: string = 'none'
-
-        if (risk === 'high' || risk === 'critical') {
-          // FYI only, deliberately no action — "take a lighter day" isn't a
-          // one-tap operation Novo can perform on the user's behalf.
-          pushInsight({
-            id: `burnout-${risk}-${Date.now()}`,
-            message:
-              risk === 'critical'
-                ? '🚨 Critical burnout trajectory. Take a recovery day. Non-essential tasks deferred.'
-                : '⚠️ High burnout risk over the last 7 days. Schedule a lighter load today.',
-            tone: risk === 'critical' ? 'critical' : 'warning',
-          })
-        }
-      } catch {
-        // Non-critical
-      }
-    }
-
-    checkBurnout()
-    const interval = setInterval(checkBurnout, 10 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [pushInsight])
-
   // ── Ambient "Twin evolution" feed ─────────────────────────────────────────
-  // Was its own component (components/cognitive/twin-insight-toast.tsx)
-  // polling the same /api/cognitive/decisions endpoint and firing a
-  // separate toast() popup. Folded in here because there's no meaningful
-  // distinction for the user between "the twin noticed something during
-  // this live session" (the phase-transition insights above) and "the twin
-  // noticed something and wrote it to TwinEvolutionLog" — both are just the
-  // twin telling you what it saw, so both now go through the same `insight`
-  // slot instead of two competing UI surfaces. pushInsight's guard keeps
-  // this ambient, action-less feed from stomping an actionable insight.
+  // The evolution feed is optional ambient context, so it should not compete
+  // with the first route render or open a network request immediately.
   useEffect(() => {
+    if (!twinUserId) return
+    const seenKey = TWIN_EVOLUTION_SEEN_KEY + ':' + twinUserId
     let lastSeenId: string | null =
-      typeof window !== 'undefined' ? localStorage.getItem(TWIN_EVOLUTION_SEEN_KEY) : null
+      typeof window !== 'undefined' ? localStorage.getItem(seenKey) : null
+
+    let active = true
+    let controller: AbortController | null = null
+    let interval: ReturnType<typeof setInterval> | null = null
+    let warmupTimer: ReturnType<typeof setTimeout> | null = null
 
     const checkTwinEvolution = async () => {
+      if (!active || document.visibilityState === 'hidden') return
+      controller?.abort()
+      controller = new AbortController()
       try {
-        const res = await fetch('/api/cognitive/decisions')
+        const res = await fetch('/api/cognitive/decisions', { cache: 'no-store', signal: controller.signal })
         if (!res.ok) return
-        const entries: { id: string; changeType: string; description: string }[] = await res.json()
-        // ai_action entries are a different signal (the Bitácora's execution
-        // trail), not a Twin "insight" — same exclusion the old toast used.
+        const payload = await res.json()
+        const entries: { id: string; changeType: string; description: string }[] = Array.isArray(payload) ? payload : []
         const latest = entries.find(e => e.changeType !== 'ai_action')
         if (!latest) return
 
-        // First poll just baselines the last-seen id so existing history
-        // doesn't dump a wall of insights on load.
         if (lastSeenId && latest.id !== lastSeenId) {
           pushInsight({ id: latest.id, message: latest.description, tone: 'info' })
         }
         lastSeenId = latest.id
-        localStorage.setItem(TWIN_EVOLUTION_SEEN_KEY, latest.id)
-      } catch {
-        // ponytail: silent — ambient nicety, not a critical path
+        localStorage.setItem(seenKey, latest.id)
+      } catch (error: unknown) {
+        if ((error as { name?: string })?.name === 'AbortError') return
+        // Ambient context is optional; keep failures off the interaction path.
       }
     }
 
-    checkTwinEvolution()
-    const interval = setInterval(checkTwinEvolution, TWIN_EVOLUTION_POLL_MS)
-    return () => clearInterval(interval)
-  }, [pushInsight])
+    const startPolling = () => {
+      if (!active || document.visibilityState === 'hidden' || interval !== null) return
+      void checkTwinEvolution()
+      interval = setInterval(() => void checkTwinEvolution(), TWIN_EVOLUTION_POLL_MS)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (warmupTimer !== null) {
+          clearTimeout(warmupTimer)
+          warmupTimer = null
+        }
+        startPolling()
+      } else if (interval !== null) {
+        clearInterval(interval)
+        interval = null
+        controller?.abort()
+      }
+    }
+
+    warmupTimer = setTimeout(() => {
+      warmupTimer = null
+      startPolling()
+    }, 2500)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      active = false
+      controller?.abort()
+      if (warmupTimer !== null) clearTimeout(warmupTimer)
+      if (interval !== null) clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [pushInsight, twinUserId])
 
   return {
     focusQueue: state.focusQueue,

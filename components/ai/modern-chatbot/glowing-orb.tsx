@@ -85,6 +85,14 @@ const SIZE_MAP = {
   lg: 96,
 };
 
+function withAlpha(color: string, alpha: number) {
+  const match = color.match(/^rgba?\(([^)]+)\)$/i)
+  if (!match) return color
+  const channels = match[1].split(',').map((channel) => channel.trim())
+  if (channels.length < 3) return color
+  return `rgba(${channels.slice(0, 3).join(', ')}, ${alpha})`
+}
+
 export function GlowingOrb({
   state = 'idle',
   size = 'md',
@@ -135,7 +143,14 @@ export function GlowingOrb({
     let curScatter = STATE_CONFIG[stateRef.current].scatterRadius;
     let curDotSize = STATE_CONFIG[stateRef.current].dotSize;
 
+    let isVisible = true;
+    let frame = 0;
+
     function draw(now: number) {
+      if (!isVisible || document.hidden) {
+        frame = 0;
+        return;
+      }
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       timeRef.current += dt;
@@ -154,7 +169,7 @@ export function GlowingOrb({
       // Outer glow
       const glowR = px * 0.45 * cfg.pulseScale;
       const grd = ctx2.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-      grd.addColorStop(0, cfg.glowColor.replace(')', ', 0.9)').replace('rgba', 'rgba'));
+      grd.addColorStop(0, withAlpha(cfg.glowColor, 0.9));
       grd.addColorStop(0.5, cfg.glowColor);
       grd.addColorStop(1, 'transparent');
       ctx2.fillStyle = grd;
@@ -194,11 +209,43 @@ export function GlowingOrb({
       }
 
       ctx2.globalAlpha = 1;
-      animRef.current = requestAnimationFrame(draw);
+      frame = requestAnimationFrame(draw);
+      animRef.current = frame;
     }
 
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
+    const start = () => {
+      if (isVisible && !document.hidden && frame === 0) {
+        frame = requestAnimationFrame(draw);
+        animRef.current = frame;
+      }
+    };
+    const stop = () => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      animRef.current = 0;
+    };
+    const handleVisibility = () => {
+      if (document.hidden) stop();
+      else start();
+    };
+    const visibilityObserver = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver(([entry]) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible) start();
+        else stop();
+      }, { rootMargin: '96px' })
+      : null;
+    visibilityObserver?.observe(canvas);
+    document.addEventListener('visibilitychange', handleVisibility);
+    start();
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+      visibilityObserver?.disconnect();
+    };
   }, [px, size]);
 
   return (

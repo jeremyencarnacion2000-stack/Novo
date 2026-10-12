@@ -34,7 +34,15 @@ export default function ArtistProfilePage() {
   const { id } = useParams() ?? {}
   const [artist, setArtist] = useState<ArtistData | null>(null)
   const [loading, setLoading] = useState(true)
-  const { playTrack, playPlaylist, currentTrack, isPlaying, togglePlayPause, likedTracks, toggleLike, followedArtists, toggleFollow } = usePlayerStore()
+  const playTrack = usePlayerStore((state) => state.playTrack)
+  const playPlaylist = usePlayerStore((state) => state.playPlaylist)
+  const currentTrack = usePlayerStore((state) => state.currentTrack)
+  const isPlaying = usePlayerStore((state) => state.isPlaying)
+  const togglePlayPause = usePlayerStore((state) => state.togglePlayPause)
+  const likedTracks = usePlayerStore((state) => state.likedTracks)
+  const toggleLike = usePlayerStore((state) => state.toggleLike)
+  const followedArtists = usePlayerStore((state) => state.followedArtists)
+  const toggleFollow = usePlayerStore((state) => state.toggleFollow)
 
   useEffect(() => {
     async function fetchArtist() {

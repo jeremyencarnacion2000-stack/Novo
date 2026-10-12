@@ -19,7 +19,6 @@ export async function syncTaskToCalendars(input: {
   title: string
   dueDate?: string | null
   priority?: string | null
-  accessToken?: string | null
 }) {
   const marker = `${MARKER}${input.taskId}`
   const existing = await prisma.calendarEvent.findFirst({
@@ -28,7 +27,7 @@ export async function syncTaskToCalendars(input: {
 
   if (!input.dueDate) {
     if (existing?.googleEventId) {
-      await deleteGoogleEvent(input.userId, existing.googleEventId, input.accessToken)
+      await deleteGoogleEvent(input.userId, existing.googleEventId)
     }
     if (existing) await prisma.calendarEvent.delete({ where: { id: existing.id } })
     return
@@ -45,24 +44,24 @@ export async function syncTaskToCalendars(input: {
         data: { userId: input.userId, title: input.title, description, start, end, allDay: true, source: 'novo' },
       })
 
-  const googleEventId = await upsertGoogleEvent(input.userId, input.title, description, day, existing?.googleEventId, input.accessToken)
+  const googleEventId = await upsertGoogleEvent(input.userId, input.title, description, day, existing?.googleEventId)
   if (googleEventId && googleEventId !== localEvent.googleEventId) {
     localEvent = await prisma.calendarEvent.update({ where: { id: localEvent.id }, data: { googleEventId } })
   }
   return localEvent
 }
 
-async function googleCalendar(userId: string, accessToken?: string | null) {
-  const token = await getGoogleAccessToken(userId, accessToken ?? undefined)
+async function googleCalendar(userId: string) {
+  const token = await getGoogleAccessToken(userId, ['calendar'])
   if (!token) return null
   const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET)
   auth.setCredentials({ access_token: token })
   return google.calendar({ version: 'v3', auth })
 }
 
-async function upsertGoogleEvent(userId: string, title: string, description: string, day: string, eventId?: string | null, accessToken?: string | null) {
+async function upsertGoogleEvent(userId: string, title: string, description: string, day: string, eventId?: string | null) {
   try {
-    const calendar = await googleCalendar(userId, accessToken)
+    const calendar = await googleCalendar(userId)
     if (!calendar) return null
     const requestBody = { summary: title, description, start: { date: day }, end: { date: nextDay(day) } }
     if (eventId) {
@@ -75,18 +74,18 @@ async function upsertGoogleEvent(userId: string, title: string, description: str
     }
     const created = await calendar.events.insert({ calendarId: 'primary', requestBody })
     return created.data.id ?? null
-  } catch (error) {
-    console.warn('[task-calendar-sync] Google Calendar unavailable:', error instanceof Error ? error.message : error)
+  } catch {
+    console.warn('[task-calendar-sync] Google Calendar unavailable.')
     return null
   }
 }
 
-async function deleteGoogleEvent(userId: string, eventId: string, accessToken?: string | null) {
+async function deleteGoogleEvent(userId: string, eventId: string) {
   try {
-    const calendar = await googleCalendar(userId, accessToken)
+    const calendar = await googleCalendar(userId)
     if (calendar) await calendar.events.delete({ calendarId: 'primary', eventId })
-  } catch (error) {
-    console.warn('[task-calendar-sync] Could not delete Google event:', error instanceof Error ? error.message : error)
+  } catch {
+    console.warn('[task-calendar-sync] Could not delete Google event.')
   }
 }
 

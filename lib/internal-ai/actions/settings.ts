@@ -18,8 +18,8 @@ export const registerSettingsActions = (service: IInternalAIService) => {
             }
 
             return { success: true, data: payload };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'SETTINGS_UPDATE_FAILED' };
         }
     });
 };

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { BookSearch } from '@/components/library/book-search'
 import { LibraryGrid } from '@/components/library/library-grid'
 import { BookDetailsDialog } from '@/components/library/book-details-dialog'
@@ -11,6 +11,7 @@ import { Plus, Library as LibraryIcon, Search, ArrowUpDown, Sparkles, X } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 export default function LibraryPage() {
   const [books, setBooks] = useState<any[]>([])
@@ -20,17 +21,18 @@ export default function LibraryPage() {
   const [view, setView] = useState<'library' | 'search' | 'discover'>('library')
   const [sortBy, setSortBy] = useState<'recent' | 'title' | 'author' | 'rating'>('recent')
   const [filterQuery, setFilterQuery] = useState('')
+  const bookIntentKeys = useRef(new Map<string, { fingerprint: string; key: string }>())
   const { toast } = useToast()
 
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/books')
-      if (response.ok) {
-        const data = await response.json()
-        setBooks(data)
-      }
-    } catch (error) {
+      const response = await fetch('/api/books', { cache: 'no-store', signal })
+      if (!response.ok) throw new Error(`Library request failed: ${response.status}`)
+      const data = await response.json()
+      if (!signal?.aborted) setBooks(Array.isArray(data) ? data : [])
+    } catch (error: unknown) {
+      if ((error as { name?: string })?.name === 'AbortError' || signal?.aborted) return
       console.error('Failed to fetch books:', error)
       toast({
         title: 'Error',
@@ -38,13 +40,15 @@ export default function LibraryPage() {
         variant: 'destructive',
       })
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) setIsLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
-    fetchBooks()
-  }, [])
+    const controller = new AbortController()
+    void fetchBooks(controller.signal)
+    return () => controller.abort()
+  }, [fetchBooks])
 
   const handleBookClick = (book: any) => {
     setSelectedBook(book)
@@ -57,18 +61,32 @@ export default function LibraryPage() {
   }
 
   const handleAddBook = async (bookData: any) => {
+    // Keep the same intent key when a response is lost. The server can then
+    // replay the original book instead of inserting a second copy; changing
+    // the payload starts a new intent while repeated adds remain harmless.
+    const identity = String(bookData.externalId || bookData.isbn || `${bookData.title}:${bookData.author}`).trim().toLowerCase()
+    const fingerprint = JSON.stringify(bookData)
+    const previous = bookIntentKeys.current.get(identity)
+    const intent = previous?.fingerprint === fingerprint
+      ? previous
+      : { fingerprint, key: createClientIdempotencyKey() }
+    bookIntentKeys.current.set(identity, intent)
     try {
       const response = await fetch('/api/books', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify(bookData),
       })
 
       if (response.ok) {
+        const replayed = response.headers.get('X-Idempotent-Replay') === 'true'
         toast({
-          title: 'Book added',
-          description: 'Book added to your library successfully.',
+          title: replayed ? 'Already in your library' : 'Book added',
+          description: replayed
+            ? 'Novo kept the existing copy instead of adding a duplicate.'
+            : 'Book added to your library successfully.',
         })
+        bookIntentKeys.current.delete(identity)
         await fetchBooks()
         if (view === 'search') {
           // Stay on search so user can add more

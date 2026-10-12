@@ -107,9 +107,9 @@ export class GroqAPIClient {
             console.log('Groq API: Response status:', response.status);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Groq API error:', errorText);
-                throw new Error(`Groq API error: ${response.status} - ${errorText}`);
+                await response.arrayBuffer().catch(() => undefined);
+                console.error('Groq API request failed', { status: response.status });
+                throw new Error('groq_provider_unavailable');
             }
 
             const data: GroqAPIResponse = await response.json();
@@ -132,7 +132,9 @@ export class GroqAPIClient {
                 tokensOut: data.usage?.completion_tokens,
             };
         } catch (error) {
-            console.error('Groq API error:', error);
+            console.error('Groq API request failed', {
+                reason: error instanceof Error ? error.name : 'unknown',
+            });
             throw error;
         }
     }

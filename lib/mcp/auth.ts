@@ -3,7 +3,8 @@ import { getIssuer, getMcpResourceUri } from './resource'
 import { validateMcpPersonalAccessToken } from './personal-access-token'
 
 export type McpAuthResult =
-  | { ok: true; userId: string; authInfo: AuthInfo }
+  | { ok: true; userId: string; authInfo: AuthInfo; kind: 'pat'; tokenId: string }
+  | { ok: true; userId: string; authInfo: AuthInfo; kind: 'oauth'; grantId: string | null }
   | { ok: false; status: 401 | 403; error: string; description: string }
 
 // Validates the Bearer token on an incoming /api/mcp request. Novo is both
@@ -31,6 +32,8 @@ export async function validateMcpBearerToken(req: Request): Promise<McpAuthResul
       ok: true,
       userId: personalToken.userId,
       authInfo: personalToken.authInfo,
+      kind: 'pat',
+      tokenId: personalToken.tokenId,
     }
   }
   if (token.startsWith('novo_mcp_')) {
@@ -60,6 +63,8 @@ export async function validateMcpBearerToken(req: Request): Promise<McpAuthResul
   return {
     ok: true,
     userId: accessToken.accountId,
+    kind: 'oauth',
+    grantId: typeof accessToken.grantId === 'string' && accessToken.grantId ? accessToken.grantId : null,
     authInfo: {
       token,
       clientId: accessToken.clientId || '',

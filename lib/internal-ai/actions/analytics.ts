@@ -28,10 +28,10 @@ export const registerAnalyticsActions = (service: IInternalAIService) => {
                     details: data.dailyData
                 }
             };
-        } catch (error) {
+        } catch {
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Failed to get weekly summary'
+                error: 'WEEKLY_SUMMARY_FAILED'
             };
         }
     });
@@ -49,10 +49,10 @@ export const registerAnalyticsActions = (service: IInternalAIService) => {
                 success: true,
                 data: metrics
             };
-        } catch (error) {
+        } catch {
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Failed to analyze productivity'
+                error: 'PRODUCTIVITY_ANALYSIS_FAILED'
             };
         }
     });

@@ -10,6 +10,17 @@ const activityHistorySchema = z.object({
   duration: z.number().optional().nullable()
 })
 
+const ACTIVITY_HISTORY_SCOPE = 'activity_history_create'
+
+function validIdempotencyKey(request: NextRequest) {
+  const value = request.headers.get('Idempotency-Key')?.trim()
+  return value && value.length <= 128 ? value : null
+}
+
+function isUniqueConstraint(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -39,8 +50,8 @@ export async function GET(request: NextRequest) {
     response.headers.set('X-Total-Pages', String(Math.ceil(total / limit)))
     response.headers.set('X-Page', String(page))
     return response
-  } catch (error) {
-    console.error('Error fetching activity history:', error)
+  } catch {
+    console.error('Error fetching activity history')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -60,22 +71,75 @@ export async function POST(request: NextRequest) {
     }
 
     const { activity, date, duration } = parsedBody.data
+    const idempotencyKey = validIdempotencyKey(request)
+    if (request.headers.has('Idempotency-Key') && !idempotencyKey) {
+      return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+    }
+    const fingerprint = JSON.stringify({ activity, date, duration: duration ?? null })
 
-    const activityEntry = await prisma.activityHistory.create({
-      data: {
-        activity,
-        date,
-        duration,
-        userId: session.user.id
+    if (idempotencyKey) {
+      const existingMutation = await prisma.mutationRequest.findUnique({
+        where: { userId_scope_idempotencyKey: { userId: session.user.id, scope: ACTIVITY_HISTORY_SCOPE, idempotencyKey } },
+      })
+      if (existingMutation) {
+        if (existingMutation.fingerprint !== fingerprint) {
+          return NextResponse.json({ error: 'Idempotency key was already used for another request' }, { status: 409 })
+        }
+        const existingEntry = await prisma.activityHistory.findFirst({ where: { id: existingMutation.resourceId, userId: session.user.id } })
+        if (existingEntry) {
+          const response = NextResponse.json(existingEntry)
+          response.headers.set('X-Idempotent-Replay', 'true')
+          return response
+        }
       }
-    })
+    }
 
-    return NextResponse.json(activityEntry, { status: 201 })
+    try {
+      const activityEntry = await prisma.$transaction(async (tx) => {
+        const created = await tx.activityHistory.create({
+          data: { activity, date, duration, userId: session.user.id },
+        })
+        if (idempotencyKey) {
+          await tx.mutationRequest.create({
+            data: {
+              userId: session.user.id,
+              scope: ACTIVITY_HISTORY_SCOPE,
+              idempotencyKey,
+              fingerprint,
+              resourceType: 'activity_history',
+              resourceId: created.id,
+            },
+          })
+        }
+        return created
+      })
+      const response = NextResponse.json(activityEntry, { status: 201 })
+      response.headers.set('X-Idempotent-Replay', 'false')
+      return response
+    } catch (error) {
+      if (idempotencyKey && isUniqueConstraint(error)) {
+        const winner = await prisma.mutationRequest.findUnique({
+          where: { userId_scope_idempotencyKey: { userId: session.user.id, scope: ACTIVITY_HISTORY_SCOPE, idempotencyKey } },
+        })
+        if (winner) {
+          if (winner.fingerprint !== fingerprint) {
+            return NextResponse.json({ error: 'Idempotency key was already used for another request' }, { status: 409 })
+          }
+          const existingEntry = await prisma.activityHistory.findFirst({ where: { id: winner.resourceId, userId: session.user.id } })
+          if (existingEntry) {
+            const response = NextResponse.json(existingEntry)
+            response.headers.set('X-Idempotent-Replay', 'true')
+            return response
+          }
+        }
+      }
+      throw error
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error creating activity history:', error)
+    console.error('Error creating activity history')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

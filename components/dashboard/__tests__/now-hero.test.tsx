@@ -1,7 +1,8 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { SWRConfig } from 'swr'
 import { NowHero } from '../now-hero'
+import { RecentActivity } from '@/components/recent-activity'
 
 // SWR's cache is a module-level global by default - without a fresh
 // provider per test, dedupingInterval (5s, see hooks/use-swr.ts) means a
@@ -10,6 +11,13 @@ import { NowHero } from '../now-hero'
 const renderNowHero = () => render(
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
     <NowHero />
+  </SWRConfig>
+)
+
+const renderDashboardNowHero = () => render(
+  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 5000 }}>
+    <NowHero />
+    <RecentActivity />
   </SWRConfig>
 )
 
@@ -31,11 +39,11 @@ describe('NowHero calendar override', () => {
     global.fetch = jest.fn();
   });
 
-  it('uses the original Ahora gradient instead of the global premium material', async () => {
+  it('uses the procedural Ahora field instead of the global premium material', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: () => Promise.resolve([]) })
     const { container } = renderNowHero()
 
-    await waitFor(() => expect(container.querySelector('.bg-gradient-to-br')).not.toBeNull())
+    await waitFor(() => expect(container.querySelector('.novo-now-procedural-fields')).not.toBeNull())
     expect(container.querySelector('.novo-premium-field')).toBeNull()
   })
 
@@ -227,4 +235,64 @@ describe('NowHero calendar override', () => {
     })
     expect(screen.queryByText('{switch_context} 🧠')).not.toBeInTheDocument()
   });
+
+  it('renders an urgent task without waiting for secondary recommendation endpoints', async () => {
+    let resolveActiveSignal!: (response: { ok: boolean; json: () => Promise<unknown> }) => void
+    let resolveAmbient!: (response: { ok: boolean; json: () => Promise<unknown> }) => void
+    const activeSignalPending = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+      resolveActiveSignal = resolve
+    })
+    const ambientPending = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+      resolveAmbient = resolve
+    })
+    const jsonResponse = (data: unknown) => ({ ok: true, json: () => Promise.resolve(data) })
+
+    ;(global.fetch as jest.Mock).mockImplementation((input: string) => {
+      const url = String(input)
+      if (url.includes('/api/tasks')) {
+        return Promise.resolve(jsonResponse([
+          { id: 'urgent-1', title: 'Preparar informe urgente', priority: 'high', dueDate: null },
+        ]))
+      }
+      if (url.includes('/api/checklist')) return Promise.resolve(jsonResponse([]))
+      if (url.includes('/api/cognitive/active-signal')) return activeSignalPending
+      if (url.includes('/api/cognitive/ambient')) return ambientPending
+      return Promise.resolve(jsonResponse({ success: false }))
+    })
+
+    renderNowHero()
+    let renderedBeforeRecommendations = false
+    try {
+      await waitFor(() => {
+        expect(screen.getByText('Preparar informe urgente')).toBeInTheDocument()
+      }, { timeout: 800 })
+      renderedBeforeRecommendations = true
+    } catch {
+      // Release the deferred recommendation requests before reporting the
+      // behavior assertion, even while reproducing the old Promise.all gate.
+    }
+
+    await act(async () => {
+      resolveActiveSignal(jsonResponse({ signal: null }))
+      resolveAmbient(jsonResponse({ state: null }))
+      await Promise.resolve()
+    })
+
+    expect(renderedBeforeRecommendations).toBe(true)
+  })
+
+  it('shares a single checklist request with RecentActivity', async () => {
+    ;(global.fetch as jest.Mock).mockImplementation(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve([]) }),
+    )
+    const fetchMock = global.fetch as jest.Mock
+
+    renderDashboardNowHero()
+
+    await waitFor(() => {
+      expect(document.querySelector('.novo-now-procedural-fields')).not.toBeNull()
+    })
+
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/checklist')).toHaveLength(1)
+  })
 });

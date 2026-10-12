@@ -1,11 +1,14 @@
 import { createHmac, randomBytes } from 'node:crypto'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
+import type { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export const MCP_DEVICE_SCOPES = [
   'tasks:read', 'tasks:write', 'goals:read', 'recommendations:read',
   'recommendations:update', 'activity:write', 'twin:read',
-  'integrations:read', 'integrations:write',
+  'integrations:read', 'integrations:write', 'device:activity:write',
+  'device:connect', 'ai:chat', 'device:activity:read',
+  'device:work-context:read', 'device:work-context:write',
 ] as const
 export type McpDeviceScope = (typeof MCP_DEVICE_SCOPES)[number]
 
@@ -32,6 +35,12 @@ export function normalizeMcpDeviceScopes(scopes: readonly string[]): McpDeviceSc
   if (requested.has('twin:read')) normalized.push('twin:read')
   if (requested.has('integrations:read')) normalized.push('integrations:read')
   if (requested.has('integrations:write')) normalized.push('integrations:write')
+  if (requested.has('device:activity:write')) normalized.push('device:activity:write')
+  if (requested.has('device:connect')) normalized.push('device:connect')
+  if (requested.has('ai:chat')) normalized.push('ai:chat')
+  if (requested.has('device:activity:read')) normalized.push('device:activity:read')
+  if (requested.has('device:work-context:read')) normalized.push('device:work-context:read')
+  if (requested.has('device:work-context:write')) normalized.push('device:work-context:write')
   return normalized
 }
 
@@ -48,10 +57,10 @@ export async function issueMcpPersonalAccessToken(input: {
   name: string
   scopes: readonly string[]
   expiresAt: Date
-}) {
+}, db: Pick<PrismaClient, 'mcpPersonalAccessToken'> = prisma) {
   const token = createMcpPersonalAccessTokenSecret()
   const scopes = normalizeMcpDeviceScopes(input.scopes)
-  const record = await prisma.mcpPersonalAccessToken.create({
+  const record = await db.mcpPersonalAccessToken.create({
     data: {
       userId: input.userId,
       name: input.name.trim(),

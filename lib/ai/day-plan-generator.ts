@@ -161,8 +161,10 @@ ${projectLine}`
   let raw: string
   try {
     raw = (await groqAPI.generateResponse(userMessage, '', [], systemPrompt, 'openai/gpt-oss-120b')).content
-  } catch (groqError) {
-    console.error('[DayPlanGenerator] Groq failed, trying OpenRouter:', groqError)
+  } catch {
+    // Keep provider diagnostics server-side and stable; raw SDK errors can
+    // contain request metadata or response bodies that must never reach logs.
+    console.error('[DayPlanGenerator] Groq failed, trying OpenRouter.', { provider: 'groq' })
     raw = (await openRouterAPI.generateResponse(userMessage, '', [], systemPrompt, 'openai/gpt-oss-20b:free')).content
   }
   const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim()
@@ -262,6 +264,10 @@ export async function generateAndExecuteDayPlan(
   twin: DayPlanTwinInput,
   trigger: DayPlanTrigger
 ): Promise<DayPlanResult> {
+  // A plan is a daily product decision, not a fire-and-forget network event.
+  // Re-running onboarding after a timeout must return the same tasks/event for
+  // that user, trigger and day instead of growing a second parallel plan.
+  const planIntentKey = `day-plan:${userId}:${trigger}:${new Date().toISOString().slice(0, 10)}`
   const [activeProject, userSettings] = await Promise.all([
     findActiveProject(userId).catch(() => null),
     prisma.userSettings.findUnique({ where: { userId }, select: { language: true } }).catch(() => null),
@@ -271,8 +277,8 @@ export async function generateAndExecuteDayPlan(
   let plan: RawPlan
   try {
     plan = await generatePlanWithLLM(twin, activeProject, lang)
-  } catch (error) {
-    console.error(`[DayPlanGenerator] LLM unavailable (trigger=${trigger}), using heuristic fallback:`, error)
+  } catch {
+    console.error(`[DayPlanGenerator] LLM unavailable (trigger=${trigger}), using heuristic fallback.`)
     plan = heuristicPlan(twin, activeProject, lang)
   }
 
@@ -282,7 +288,7 @@ export async function generateAndExecuteDayPlan(
       tasks: plan.tasks.map((t) => ({ title: t.title, category: t.category, priority: t.priority })),
     },
   }
-  const tasksResult = await executeAIAction(tasksAction, userId)
+  const tasksResult = await executeAIAction(tasksAction, userId, prisma, planIntentKey)
   const createdTasks = tasksResult.success ? (tasksResult.data as any[]) ?? [] : []
 
   // Fire-and-forget-ish: a calendar failure must never block the tasks that
@@ -301,10 +307,10 @@ export async function generateAndExecuteDayPlan(
           allDay: false,
         },
       }
-      const eventResult = await executeAIAction(eventAction, userId)
+      const eventResult = await executeAIAction(eventAction, userId, prisma, planIntentKey)
       if (eventResult.success) createdEvent = eventResult.data
     } catch (error) {
-      console.error('[DayPlanGenerator] Calendar event creation failed (non-blocking):', error)
+      console.error('[DayPlanGenerator] Calendar event creation failed (non-blocking).')
     }
   }
 

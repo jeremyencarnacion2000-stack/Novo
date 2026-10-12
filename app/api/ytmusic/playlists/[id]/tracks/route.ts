@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { getYTMusic } from '@/lib/ytmusic';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const p = await params;
   const playlistId = p.id;
   
@@ -31,7 +38,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }));
     
     return NextResponse.json({ items: tracks });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[ytmusic/playlist-tracks] request failed')
+    return NextResponse.json({ error: 'Playlist tracks temporarily unavailable' }, { status: 500 });
   }
 }

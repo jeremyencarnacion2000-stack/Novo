@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(users)
     } catch (error) {
-        console.error('Error searching users:', error)
+        console.error('Error searching users.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

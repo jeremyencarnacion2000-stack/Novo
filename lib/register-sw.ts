@@ -1,11 +1,9 @@
 // lib/register-sw.ts
 // Registers the service worker for offline caching and push notifications
 
-// sw.js's API cache (novo-api-v4) is network-first but falls back to the
-// cached response on a fetch failure — with no per-user keying. Without this,
-// signing out and a second user signing in on the same browser/device could,
-// on a network hiccup right after login, get served the *previous* user's
-// cached /api/* responses (tasks, profile, etc). Call before signOut().
+// API caching is intentionally disabled: Novo's private account data and Twin
+// state must never be kept in browser-wide CacheStorage. Keep this cleanup
+// during rollout so old novo-api-* caches are removed before an account switch.
 export async function clearApiCache() {
     if (typeof window === 'undefined' || !('caches' in window)) return
     try {
@@ -16,8 +14,12 @@ export async function clearApiCache() {
     }
 }
 
+let registrationStarted = false
+let serviceWorkerUpdateInterval: ReturnType<typeof setInterval> | null = null
+
 export function registerServiceWorker() {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || registrationStarted) return
+    registrationStarted = true
 
     if ('serviceWorker' in navigator) {
         // Without this, a new SW can finish activating (skipWaiting +
@@ -32,7 +34,7 @@ export function registerServiceWorker() {
             window.location.reload()
         })
 
-        window.addEventListener('load', async () => {
+        const register = async () => {
             try {
                 const registration = await navigator.serviceWorker.register('/sw.js', {
                     scope: '/',
@@ -40,12 +42,26 @@ export function registerServiceWorker() {
 
                 console.log('[SW] Registered with scope:', registration.scope)
 
-                // Check for updates periodically (every 60 minutes), only while tab is visible
-                setInterval(() => {
+                // Check for updates periodically (every 60 minutes). Stop the
+                // timer entirely while the app is backgrounded instead of
+                // waking every hour just to discover that the tab is hidden.
+                const scheduleUpdateCheck = () => {
+                    if (serviceWorkerUpdateInterval !== null || document.visibilityState === 'hidden') return
+                    serviceWorkerUpdateInterval = setInterval(() => {
+                        void registration.update()
+                    }, 60 * 60 * 1000)
+                }
+                const handleVisibilityChange = () => {
                     if (document.visibilityState === 'visible') {
-                        registration.update()
+                        scheduleUpdateCheck()
+                        void registration.update()
+                    } else if (serviceWorkerUpdateInterval !== null) {
+                        clearInterval(serviceWorkerUpdateInterval)
+                        serviceWorkerUpdateInterval = null
                     }
-                }, 60 * 60 * 1000)
+                }
+                document.addEventListener('visibilitychange', handleVisibilityChange)
+                scheduleUpdateCheck()
 
                 // Listen for new SW waiting to activate
                 registration.addEventListener('updatefound', () => {
@@ -66,6 +82,9 @@ export function registerServiceWorker() {
             } catch (error) {
                 console.error('[SW] Registration failed:', error)
             }
-        })
+        }
+
+        if (document.readyState === 'complete') void register()
+        else window.addEventListener('load', register, { once: true })
     }
 }

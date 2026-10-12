@@ -56,7 +56,7 @@ export async function GET(
             letterGrade,
         });
     } catch (error) {
-        console.error('Error fetching course:', error);
+        console.error('Error fetching course.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -118,7 +118,7 @@ export async function PUT(
 
         return NextResponse.json(updated);
     } catch (error) {
-        console.error('Error updating course:', error);
+        console.error('Error updating course.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -164,9 +164,9 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        console.error('Error deleting course:', error);
+        console.error('Error deleting course.');
         return NextResponse.json(
-            { error: 'Internal server error', details: error.message },
+            { error: 'Unable to delete course right now' },
             { status: 500 }
         );
     }

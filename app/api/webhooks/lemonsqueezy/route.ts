@@ -12,6 +12,10 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get('x-signature')
 
   const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET ?? ''
+  if (!secret) {
+    console.error('[Lemon Squeezy Webhook] Signing secret is not configured')
+    return NextResponse.json({ error: 'Webhook unavailable' }, { status: 503 })
+  }
   const expected = crypto.createHmac('sha256', secret).update(body).digest('hex')
   const signatureBuffer = Buffer.from(signature ?? '', 'utf8')
   const expectedBuffer = Buffer.from(expected, 'utf8')
@@ -24,10 +28,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  const event = JSON.parse(body)
-  const eventName = event.meta?.event_name as string | undefined
-
   try {
+    const event = JSON.parse(body)
+    const eventName = event.meta?.event_name as string | undefined
     if (eventName?.startsWith('subscription_')) {
       const userId = event.meta?.custom_data?.user_id as string | undefined
       if (!userId) {
@@ -36,8 +39,8 @@ export async function POST(request: NextRequest) {
       }
       await upsertSubscription(userId, event.data)
     }
-  } catch (error) {
-    console.error('[Lemon Squeezy Webhook] Handler error:', error)
+  } catch {
+    console.error('[Lemon Squeezy Webhook] Handler error.')
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
   }
 
@@ -45,17 +48,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function upsertSubscription(userId: string, sub: any) {
-  const attrs = sub.attributes
+  const attrs = sub?.attributes
+  if (!attrs || !sub?.id || !attrs.customer_id || !attrs.variant_id || !attrs.status) {
+    throw new Error('invalid_subscription_payload')
+  }
   const status = attrs.status as string
 
   // 'cancelled' keeps access through the paid period already covered —
   // ends_at is when it actually stops. Everything else (past_due, unpaid,
   // paused, expired) does not grant access.
-  const isActive =
-    status === 'active' ||
-    status === 'on_trial' ||
-    (status === 'cancelled' && attrs.ends_at && new Date(attrs.ends_at) > new Date())
-
   const currentPeriodEnd = attrs.renews_at
     ? new Date(attrs.renews_at)
     : attrs.ends_at
@@ -67,34 +68,33 @@ async function upsertSubscription(userId: string, sub: any) {
     variantId === LEMONSQUEEZY_VARIANT_IDS.year ? 'year'
     : variantId === LEMONSQUEEZY_VARIANT_IDS.month ? 'month'
     : null
+  if (!interval) throw new Error('unknown_subscription_variant')
 
-  await prisma.subscription.upsert({
-    where: { userId },
-    create: {
-      userId,
-      provider: 'lemonsqueezy',
-      lemonsqueezyCustomerId: String(attrs.customer_id),
-      lemonsqueezySubscriptionId: sub.id,
-      lemonsqueezyVariantId: variantId,
-      status: isActive ? 'active' : status,
-      interval,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: !!attrs.cancelled,
-    },
-    update: {
-      provider: 'lemonsqueezy',
-      lemonsqueezyCustomerId: String(attrs.customer_id),
-      lemonsqueezySubscriptionId: sub.id,
-      lemonsqueezyVariantId: variantId,
-      status: isActive ? 'active' : status,
-      interval,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: !!attrs.cancelled,
-    },
-  })
+  const isActive =
+    status === 'active' ||
+    status === 'on_trial' ||
+    (status === 'cancelled' && attrs.ends_at && new Date(attrs.ends_at) > new Date())
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { plan: isActive ? 'pro' : 'free' },
-  })
+  const billingData = {
+    provider: 'lemonsqueezy',
+    lemonsqueezyCustomerId: String(attrs.customer_id),
+    lemonsqueezySubscriptionId: String(sub.id),
+    lemonsqueezyVariantId: variantId,
+    status: isActive ? 'active' : status,
+    interval,
+    currentPeriodEnd,
+    cancelAtPeriodEnd: !!attrs.cancelled,
+  }
+
+  await prisma.$transaction([
+    prisma.subscription.upsert({
+      where: { userId },
+      create: { userId, ...billingData },
+      update: billingData,
+    }),
+    prisma.user.update({
+      where: { id: userId },
+      data: { plan: isActive ? 'pro' : 'free' },
+    }),
+  ])
 }

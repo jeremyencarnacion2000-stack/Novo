@@ -3,10 +3,11 @@
 import React from 'react';
 import { Mic, MicOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { GlowingOrb } from './glowing-orb';
 import { SUGGESTIONS } from './chat-input';
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy';
 
 const DESKTOP_SUGGESTIONS = SUGGESTIONS.slice(0, 4);
 
@@ -104,7 +105,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
   // Reduced motion means gentler, not zero — the opacity pulse on "Escuchando..."
   // stays (it aids comprehension), but the continuous scaleY waveform movement
   // is the kind of infinite motion prefers-reduced-motion exists to suppress.
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useNovoMotionPolicy() !== 'full';
 
   return (
     <motion.div

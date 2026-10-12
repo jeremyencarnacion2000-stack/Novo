@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { calculateCourseGrade, percentageToLetter } from '@/lib/gpa-calculator';
+import {
+    createMutationFingerprint,
+    IdempotencyConflictError,
+    readIdempotencyKey,
+    runIdempotentCreate,
+} from '@/lib/server-idempotency';
 
 // GET /api/school/courses - Get all courses for user
 export async function GET(request: NextRequest) {
@@ -60,7 +66,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(coursesWithGrades);
     } catch (error) {
-        console.error('Error fetching courses:', error);
+        console.error('Error fetching courses.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -103,26 +109,42 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const course = await prisma.course.create({
-            data: {
-                userId: user.id,
-                name,
-                code: code || null,
-                credits: credits ? parseFloat(credits) : null,
-                semester,
-                year: parseInt(year),
-                professor: professor || null,
-                color: color || '#3b82f6',
-                educationType: educationType || 'university',
-            },
-            include: {
-                grades: true,
-            },
+        const { key: idempotencyKey, invalid } = readIdempotencyKey(request);
+        if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
+
+        const courseData = {
+            userId: user.id,
+            name: String(name).trim(),
+            code: code || null,
+            credits: credits ? parseFloat(credits) : null,
+            semester: String(semester),
+            year: parseInt(year),
+            professor: professor || null,
+            color: color || '#3b82f6',
+            educationType: educationType || 'university',
+        };
+        const result = await runIdempotentCreate(prisma, {
+            userId: user.id,
+            scope: 'school_course_create',
+            idempotencyKey,
+            fingerprint: createMutationFingerprint(courseData),
+            resourceType: 'course',
+            create: (db) => db.course.create({ data: courseData, include: { grades: true } }),
+            findResource: (resourceId, db) => db.course.findFirst({
+                where: { id: resourceId, userId: user.id },
+                include: { grades: true },
+            }),
         });
 
-        return NextResponse.json(course, { status: 201 });
+        return NextResponse.json(result.resource, {
+            status: result.replay ? 200 : 201,
+            headers: { 'X-Idempotent-Replay': String(result.replay) },
+        });
     } catch (error) {
-        console.error('Error creating course:', error);
+        if (error instanceof IdempotencyConflictError) {
+            return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        console.error('Error creating course.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

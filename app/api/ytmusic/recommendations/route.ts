@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { getYTMusic } from '@/lib/ytmusic';
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const seed_tracks = searchParams.get('seed_tracks');
   const seed_artists = searchParams.get('seed_artists');
-  const limit = parseInt(searchParams.get('limit') || '20');
+  const requestedLimit = Number.parseInt(searchParams.get('limit') || '20', 10)
+  // Recommendations are a compact context signal. Keep the provider and the
+  // browser response bounded even when a stale client or a crafted URL sends
+  // an unexpectedly large value.
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 50)
+    : 20
 
   try {
     const ytmusic = await getYTMusic();
@@ -48,8 +61,8 @@ export async function GET(request: Request) {
         
         // INTERLEAVE: Mix them in!
         tracks = [...tracks, ...additional].sort(() => Math.random() - 0.5);
-      } catch (e) {
-        console.warn(`Could not fetch artist tracks for ${artistId}:`, e);
+      } catch {
+        console.warn('[ytmusic/recommendations] Artist fallback unavailable.')
       }
     }
 
@@ -69,9 +82,20 @@ export async function GET(request: Request) {
       }));
     }
 
-    return NextResponse.json({ tracks: tracks.slice(0, limit) });
-  } catch (error: any) {
-    console.error("Recommendations API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // A provider fallback can overlap the up-next queue. Preserve the first
+    // occurrence of each track so the player never renders duplicate
+    // recommendations or emits the same signal twice in one response.
+    const seenTrackIds = new Set<string>();
+    const uniqueTracks = tracks.filter((track: any) => {
+      const id = String(track?.id || track?.uri || '');
+      if (!id || seenTrackIds.has(id)) return false;
+      seenTrackIds.add(id);
+      return true;
+    });
+
+    return NextResponse.json({ tracks: uniqueTracks.slice(0, limit) });
+  } catch {
+    console.error('[ytmusic/recommendations] request failed')
+    return NextResponse.json({ error: 'Music recommendations temporarily unavailable' }, { status: 500 });
   }
 }

@@ -76,7 +76,7 @@ export function getOidcProvider(): Provider {
     pkce: { required: () => true },
     routes: OAUTH_ROUTES,
     clientDefaults: {
-      grant_types: ['authorization_code', 'refresh_token'],
+      grant_types: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
       response_types: ['code'],
       // MCP clients are typically native/desktop apps that can't keep a
       // secret; PKCE is what actually secures the code exchange. Clients
@@ -88,6 +88,7 @@ export function getOidcProvider(): Provider {
       devInteractions: { enabled: false }, // replaced by our own consent screen
       registration: { enabled: true, initialAccessToken: false },
       revocation: { enabled: true },
+      deviceFlow: { enabled: true },
       resourceIndicators: {
         enabled: true,
         getResourceServerInfo: async (_ctx, resourceIndicator) => {

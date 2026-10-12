@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const runtime = 'nodejs';
+
+// Parsing is CPU/memory intensive (especially for PDFs), so keep this
+// authenticated and bounded before the buffer reaches a parser.
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const MAX_TEXT_LENGTH = 10_000;
 
 // Dynamic imports to avoid issues during build
 async function parsePDF(buffer: Buffer): Promise<string> {
@@ -19,11 +26,20 @@ async function parseDOCX(buffer: Buffer): Promise<string> {
 
 export async function POST(request: NextRequest) {
     try {
-        const formData = await request.formData();
-        const file = formData.get('file') as File | null;
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-        if (!file) {
+        const formData = await request.formData();
+        const file = formData.get('file') as File | string | null;
+
+        if (!file || typeof file === 'string' || typeof file.arrayBuffer !== 'function' || typeof file.size !== 'number' || typeof file.name !== 'string') {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        }
+
+        if (file.size > MAX_DOCUMENT_BYTES) {
+            return NextResponse.json({ error: 'Document is too large. Maximum size is 10 MB.' }, { status: 413 });
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
@@ -43,9 +59,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Truncate if too long (max 10000 characters for context)
-        const maxLength = 10000;
-        const truncated = text.length > maxLength;
-        const content = truncated ? text.substring(0, maxLength) + '\n\n[... documento truncado ...]' : text;
+        const truncated = text.length > MAX_TEXT_LENGTH;
+        const content = truncated ? text.substring(0, MAX_TEXT_LENGTH) + '\n\n[... documento truncado ...]' : text;
 
         return NextResponse.json({
             success: true,
@@ -56,10 +71,8 @@ export async function POST(request: NextRequest) {
             originalLength: text.length
         });
 
-    } catch (error) {
-        console.error('[Document Parse] Error:', error);
-        return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Failed to parse document'
-        }, { status: 500 });
+    } catch {
+        console.error('[Document Parse] Error.');
+        return NextResponse.json({ error: 'Unable to parse this document right now' }, { status: 500 });
     }
 }

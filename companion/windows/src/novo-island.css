@@ -1,0 +1,71 @@
+:root {
+  --ink: #f5f6f8;
+  --ink-2: #c8c9d1;
+  --card: #141417;
+  --card-flat: #101013;
+  --tab-on: #252447;
+  --accent: #6366f1;
+  --green: #34d399;
+  --green-2: #6ee7b7;
+  --hairline: rgba(255,255,255,.09);
+}
+#island { background: #050505; }
+.novo-account {
+  color: #d7d8ff !important;
+  font: 600 12px var(--font);
+  border-radius: 50% !important;
+  border: 1px solid rgba(99,102,241,.45) !important;
+}
+.novo-account:hover { background: #252447 !important; }
+.novo-account:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.novo-chat-body { min-width: 0; gap: 5px; }
+.novo-chat-account { display: flex; align-items: center; gap: 8px; min-height: 18px; }
+.novo-chat-status { color: var(--ink-2); font-size: 11px; flex: 1; min-width: 0; }
+.novo-chat-link { color: var(--ink); font: 500 11px var(--font); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
+.novo-chat-link:disabled { opacity: .6; cursor: default; }
+.novo-chat-selectors { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.novo-choice { position: relative; min-width: 0; }
+.novo-choice-trigger { display: flex; align-items: center; justify-content: space-between; gap: 7px; width: 100%; min-width: 0; padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 8px; color: var(--ink); background: rgba(255,255,255,.045); font: 500 11px var(--font); text-align: left; cursor: pointer; transition: background .14s ease, border-color .14s ease; }
+.novo-choice-trigger:hover:not(:disabled), .novo-choice.open .novo-choice-trigger { background: rgba(255,255,255,.085); border-color: rgba(255,255,255,.17); }
+.novo-choice-trigger:disabled { opacity: .5; cursor: default; }
+.novo-choice-caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.novo-choice-list { display: none; position: absolute; z-index: 20; bottom: calc(100% + 6px); left: 0; width: max(100%, 200px); max-height: 220px; overflow: auto; padding: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: rgba(19,19,23,.97); box-shadow: 0 12px 34px rgba(0,0,0,.42); backdrop-filter: blur(18px); }
+.novo-choice.open .novo-choice-list { display: grid; gap: 2px; }
+.novo-choice-option { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 6px 8px; border: 0; border-radius: 7px; color: var(--ink-2); background: transparent; font: 500 11px var(--font); text-align: left; cursor: pointer; }
+.novo-choice-option:hover, .novo-choice-option:focus-visible, .novo-choice-option[aria-selected="true"] { color: var(--ink); background: rgba(255,255,255,.09); outline: none; }
+.novo-conversations { flex: 1; }
+.novo-models { flex: 0 1 145px; }
+.novo-twin { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--ink-2); }
+.novo-twin input { accent-color: #a1a1aa; }
+.novo-context-panel { display: grid; gap: 4px; min-width: 0; }
+.novo-folder-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.novo-folder-add { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--ink-2); background: rgba(255,255,255,.045); font: 500 10px var(--font); cursor: pointer; }
+.novo-folder-add:hover:not(:disabled) { color: var(--ink); background: rgba(255,255,255,.09); }
+.novo-folder-add:disabled { opacity: .5; cursor: default; }
+.novo-folder-summary, .novo-context-source-summary { min-width: 0; color: var(--ink-2); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.novo-context-source-summary { max-width: 160px; text-align: right; }
+.novo-folder-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.novo-folder-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 2px 6px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--ink-2); background: rgba(255,255,255,.035); font-size: 10px; }
+.novo-folder-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.novo-folder-remove { display: grid; place-items: center; width: 15px; height: 15px; padding: 0; border: 0; border-radius: 50%; color: var(--ink-2); background: transparent; font: 14px/1 var(--font); cursor: pointer; }
+.novo-folder-remove:hover { color: var(--ink); background: rgba(255,255,255,.11); }
+.novo-context-use { color: var(--ink-2); font-size: 10px; line-height: 1.3; }
+.novo-unshared-file { color: var(--ink-2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.novo-chat-error { font-size: 11px; color: #e7c99b; overflow-wrap: anywhere; }
+.novo-chat-body .chat-log { padding-block: 2px; }
+.novo-chat-body [hidden] { display: none; }
+.novo-chat-body button:focus-visible { outline: 2px solid rgba(212,212,216,.82); outline-offset: 2px; }
+.novo-chat-body .chat-input:focus, .novo-chat-body .chat-input:focus-visible { outline: none; border: 0; box-shadow: none; }
+.novo-chat-heading { display: flex; align-items: flex-start; gap: 6px; min-height: 25px; min-width: 0; }
+.novo-chat-settings { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 auto; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); cursor: pointer; }
+.novo-chat-settings:hover { background: rgba(255,255,255,.08); color: var(--ink); }
+.novo-conversations .novo-choice-trigger { border: 0; background: transparent; padding-left: 0; font-size: 12px; }
+.novo-conversations .novo-choice-list { position: static; width: 100%; max-height: none; min-height: 0; margin-top: 4px; box-shadow: none; backdrop-filter: none; }
+.novo-conversations .novo-choice-option { white-space: normal; overflow-wrap: anywhere; }
+.novo-chat-body.history-open .novo-chat-heading { flex: 1; min-height: 0; }
+.novo-chat-body.history-open .novo-conversations { display: flex; flex-direction: column; height: 100%; }
+.novo-chat-body.history-open .novo-choice-list { flex: 1; overflow-y: auto; }
+.novo-chat-body.history-open .chat-log, .novo-chat-body.history-open .novo-unshared-file { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

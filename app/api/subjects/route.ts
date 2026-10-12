@@ -4,6 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createSubjectSchema } from '@/lib/schemas/subject'
 import { z } from 'zod'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(subjects)
   } catch (error) {
-    console.error('Error fetching subjects:', error)
+    console.error('Error fetching subjects.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -40,20 +46,34 @@ export async function POST(request: NextRequest) {
 
     const { name, description } = parsedBody.data
 
-    const subject = await prisma.subject.create({
-      data: {
-        name,
-        description,
-        userId: session.user.id
-      }
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(request)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+
+    const result = await runIdempotentCreate(prisma, {
+      userId: session.user.id,
+      scope: 'subject_create',
+      idempotencyKey,
+      fingerprint: createMutationFingerprint(parsedBody.data),
+      resourceType: 'subject',
+      create: (db) => db.subject.create({
+        data: { name, description, userId: session.user.id },
+      }),
+      findResource: (resourceId, db) => db.subject.findFirst({
+        where: { id: resourceId, userId: session.user.id },
+      }),
     })
 
-    return NextResponse.json(subject, { status: 201 })
+    const response = NextResponse.json(result.resource, { status: result.replay ? 200 : 201 })
+    response.headers.set('X-Idempotent-Replay', String(result.replay))
+    return response
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error creating subject:', error)
+    console.error('Error creating subject.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

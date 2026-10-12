@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { notionService } from '@/lib/notion';
+import { withProviderSyncLock } from '@/lib/provider-sync-lock';
 import { z } from 'zod';
 
 const notionActionSchema = z.enum(['databases', 'save_databases', 'sync']);
@@ -139,46 +140,53 @@ export async function POST(req: NextRequest) {
         try {
             const tasks = await notionService.fetchAllTasks(account.accessToken, databaseIds);
 
-            let created = 0;
-            let updated = 0;
+            const result = await withProviderSyncLock(
+                prisma,
+                `novo:checklist-sync:${session.user.id}:notion`,
+                async (db) => {
+                    let created = 0;
+                    let updated = 0;
 
-            for (const task of tasks) {
-                const existing = await prisma.checklistItem.findFirst({
-                    where: { userId: session.user.id, sourceId: task.sourceId, source: 'notion' },
-                });
+                    for (const task of tasks) {
+                        const existing = await db.checklistItem.findFirst({
+                            where: { userId: session.user.id, sourceId: task.sourceId, source: 'notion' },
+                        });
 
-                if (existing) {
-                    await prisma.checklistItem.update({
-                        where: { id: existing.id },
-                        data: {
-                            text: task.text,
-                            completed: task.completed,
-                            priority: task.priority,
-                            dueDate: task.dueDate ?? null,
-                        },
-                    });
-                    updated++;
-                } else {
-                    await prisma.checklistItem.create({
-                        data: {
-                            userId: session.user.id,
-                            text: task.text,
-                            completed: task.completed,
-                            priority: task.priority,
-                            source: 'notion',
-                            sourceId: task.sourceId,
-                            dueDate: task.dueDate ?? null,
-                        },
-                    });
-                    created++;
-                }
-            }
+                        if (existing) {
+                            await db.checklistItem.update({
+                                where: { id: existing.id },
+                                data: {
+                                    text: task.text,
+                                    completed: task.completed,
+                                    priority: task.priority,
+                                    dueDate: task.dueDate ?? null,
+                                },
+                            });
+                            updated++;
+                        } else {
+                            await db.checklistItem.create({
+                                data: {
+                                    userId: session.user.id,
+                                    text: task.text,
+                                    completed: task.completed,
+                                    priority: task.priority,
+                                    source: 'notion',
+                                    sourceId: task.sourceId,
+                                    dueDate: task.dueDate ?? null,
+                                },
+                            });
+                            created++;
+                        }
+                    }
+
+                    return { created, updated };
+                },
+            );
 
             return NextResponse.json({
                 synced: true,
                 total: tasks.length,
-                created,
-                updated,
+                ...result,
             });
         } catch (err) {
             console.error('[Notion] Sync error:', { name: err instanceof Error ? err.name : 'UnknownError' });

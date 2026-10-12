@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { calendarService } from '@/lib/google';
 import { findGoogleAccountForScopes } from '@/lib/google-account';
+import { withProviderSyncLock } from '@/lib/provider-sync-lock';
 
 // ── GET — Check Connection / Scope Status ────────────────────────────────────
 
@@ -59,44 +60,56 @@ export async function POST(req: NextRequest) {
         const timeMax = new Date(timeMin.getTime() + 30 * 24 * 60 * 60 * 1000);
         const googleEvents = await calendarService.listEventsForUser(session.user.id, timeMin.toISOString(), 250, timeMax.toISOString());
 
-        let created = 0;
-        let updated = 0;
+        // Google reads stay outside the lock so a slow upstream request never
+        // blocks another sync. Only the find/update-or-create reconciliation
+        // window is serialized; otherwise two clicks or a heartbeat racing a
+        // manual sync can both observe a missing event and insert duplicates.
+        const { created, updated } = await withProviderSyncLock(
+            prisma,
+            `novo:calendar-sync:${session.user.id}`,
+            async (db) => {
+                let created = 0;
+                let updated = 0;
 
-        for (const gEvent of googleEvents) {
-            if (!gEvent.id) continue;
+                for (const gEvent of googleEvents) {
+                    if (!gEvent.id) continue;
 
-            const startStr = gEvent.start?.dateTime || gEvent.start?.date;
-            const endStr = gEvent.end?.dateTime || gEvent.end?.date;
-            if (!startStr || !endStr) continue; // skip malformed entries (no start/end)
+                    const startStr = gEvent.start?.dateTime || gEvent.start?.date;
+                    const endStr = gEvent.end?.dateTime || gEvent.end?.date;
+                    if (!startStr || !endStr) continue; // skip malformed entries (no start/end)
 
-            const allDay = !gEvent.start?.dateTime;
-            const data = {
-                title: gEvent.summary || '(Sin título)',
-                description: gEvent.description || null,
-                start: new Date(startStr),
-                end: new Date(endStr),
-                allDay,
-            };
+                    const allDay = !gEvent.start?.dateTime;
+                    const data = {
+                        title: gEvent.summary || '(Sin título)',
+                        description: gEvent.description || null,
+                        start: new Date(startStr),
+                        end: new Date(endStr),
+                        allDay,
+                    };
 
-            const existing = await prisma.calendarEvent.findFirst({
-                where: { userId: session.user.id, googleEventId: gEvent.id },
-            });
+                    const existing = await db.calendarEvent.findFirst({
+                        where: { userId: session.user.id, googleEventId: gEvent.id },
+                    });
 
-            if (existing) {
-                await prisma.calendarEvent.update({ where: { id: existing.id }, data });
-                updated++;
-            } else {
-                await prisma.calendarEvent.create({
-                    data: {
-                        ...data,
-                        source: 'google',
-                        googleEventId: gEvent.id,
-                        userId: session.user.id,
-                    },
-                });
-                created++;
-            }
-        }
+                    if (existing) {
+                        await db.calendarEvent.update({ where: { id: existing.id }, data });
+                        updated++;
+                    } else {
+                        await db.calendarEvent.create({
+                            data: {
+                                ...data,
+                                source: 'google',
+                                googleEventId: gEvent.id,
+                                userId: session.user.id,
+                            },
+                        });
+                        created++;
+                    }
+                }
+
+                return { created, updated };
+            },
+        );
 
         return NextResponse.json({
             success: true,

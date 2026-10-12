@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { eventBus } from '@/lib/events/event-bus'
-import { motion } from 'framer-motion'
 import { Routine, RoutineDay, RoutineExercise } from '@/types/routine'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +15,8 @@ import { useSession } from 'next-auth/react'
 import { trackActivity } from '@/lib/activity-tracker'
 import { mutate } from 'swr'
 import { ROUTINE_STATS_KEY } from '@/hooks/use-swr'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface ActiveWorkoutSessionProps {
     routine: Routine
@@ -30,6 +31,8 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     )
     const [elapsedTime, setElapsedTime] = useState(0)
     const [isTimerRunning, setIsTimerRunning] = useState(true)
+    const [isFinishing, setIsFinishing] = useState(false)
+    const completionIntentKeyRef = useRef<string | null>(null)
 
     // Rest Timer State
     const [isResting, setIsResting] = useState(false)
@@ -141,6 +144,8 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     const { data: session } = useSession()
 
     const handleFinish = async () => {
+        if (isFinishing) return
+        setIsFinishing(true)
         setIsTimerRunning(false)
         setIsResting(false)
 
@@ -171,17 +176,24 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                 await trackActivity('routine', true, { id: routine.id, name: routine.name, module: 'routines' })
 
                 // 2. Specialized routine completions API (for stats)
-                await fetch('/api/routines/completions', {
+                const completionIntentKey = completionIntentKeyRef.current ?? createClientIdempotencyKey()
+                completionIntentKeyRef.current = completionIntentKey
+                const response = await fetch('/api/routines/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Idempotency-Key': completionIntentKey,
+                    },
                     body: JSON.stringify({
                         routineId: routine.id,
                         tasksTotal,
                         tasksCompleted
                     })
                 })
+                if (!response.ok) throw new Error(`Routine completion failed (${response.status})`)
             } catch (e) {
                 console.error('[Workout] Failed to track completion:', e)
+                setIsFinishing(false)
             }
         }
 
@@ -221,14 +233,18 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     const activeDay = routine.days.find(d => d.id === activeDayId) || routine.days[0]
 
     return (
-        <motion.div
-            className="fixed inset-0 h-[100dvh] bg-black z-[9999] flex flex-col font-sans overflow-hidden"
-            data-lenis-prevent
-            initial={{ opacity: 0, y: '100%', scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: '60%', scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 38, mass: 0.9 }}
-        >
+        <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onCancel() }}>
+            <DialogContent
+                motionPreset="fullscreen"
+                showCloseButton={false}
+                aria-label={`${routine.name} workout`}
+                className="!fixed !inset-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-none !rounded-none !border-0 !bg-black !p-0 !overflow-hidden sm:!max-w-none"
+            >
+                <DialogTitle className="sr-only">{routine.name} workout</DialogTitle>
+                <div
+                    className="flex h-full w-full flex-col overflow-hidden bg-black font-sans"
+                    data-lenis-prevent
+                >
             {/* Header Layer */}
             <div className="absolute top-0 left-0 right-0 h-16 bg-black/60 border-b border-white/10 z-[100] flex items-center justify-between px-4 sm:px-6 backdrop-blur-md">
                 <div className="flex items-center gap-4">
@@ -245,8 +261,8 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                         <Timer className="h-4 w-4" />
                         {formatTime(elapsedTime)}
                     </div>
-                    <Button onClick={handleFinish} size="sm" className="rounded-full px-6 font-medium bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5 transition-all hover:scale-105 active:scale-95">
-                        Finish Workout
+                    <Button onClick={handleFinish} disabled={isFinishing} size="sm" className="rounded-full px-6 font-medium bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5 transition-all hover:scale-105 active:scale-95">
+                        {isFinishing ? 'Saving…' : 'Finish Workout'}
                     </Button>
                 </div>
             </div>
@@ -509,6 +525,8 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
                 </div>
             )
         }
-        </motion.div>
+                </div>
+            </DialogContent>
+        </Dialog>
     )
 }

@@ -80,7 +80,6 @@ export class MusicAlgorithm {
 
         scored.sort((a, b) => b.score - a.score);
 
-        console.log(`[MusicAlgo] Best match: ${scored[0].track.name} (Score: ${scored[0].score.toFixed(4)})`);
         return scored[0].track;
     }
 }

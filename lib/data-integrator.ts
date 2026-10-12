@@ -4,6 +4,7 @@ import { Project, Task, Subtask } from "@/types/project"
 import { isSameDay, parseISO } from "date-fns"
 import { trackActivity } from "@/lib/activity-tracker"
 import { eventBus } from "@/lib/events/event-bus"
+import { createClientIdempotencyKey } from "@/lib/client-idempotency"
 
 // IndexedDB utilities for offline storage
 class OfflineStorage {
@@ -114,6 +115,7 @@ class OfflineStorage {
 
 interface OfflineOperation {
   id: number
+  userId: string
   type: 'create' | 'update' | 'delete'
   endpoint: string
   data: any
@@ -121,6 +123,9 @@ interface OfflineOperation {
   timestamp: number
   status: 'pending' | 'conflicted'
   serverData?: any
+  // Every queued create keeps the same key from the first attempt through
+  // offline replay so a network timeout cannot create a second record.
+  idempotencyKey?: string
   // Present only for a 'create' queued while offline that assigned a local
   // temp-<timestamp> id to unblock optimistic UI. Lets syncPendingOperations
   // patch that temp id to the real server-generated one once the queued
@@ -131,6 +136,34 @@ interface OfflineOperation {
 }
 
 const offlineStorage = new OfflineStorage()
+let activeDataIntegratorUserId: string | null = null
+
+const scopedStorageKey = (base: string, userId: string) => `${base}:user:${userId}`
+const backupStorageKey = (userId: string, date: string) => `novo-backup:${userId}:${date}`
+
+export const clearUserLocalData = (userId: string) => {
+  if (typeof window === 'undefined') return
+  const suffix = `:user:${userId}`
+  const directSuffix = `:${userId}`
+  const backupPrefix = `novo-backup:${userId}:`
+  const keysToRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i)
+    if (key && (key.endsWith(suffix) || key.endsWith(directSuffix) || key.startsWith(backupPrefix))) keysToRemove.push(key)
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key))
+}
+
+/**
+ * Select only mutations owned by the active account. This remains pure so the
+ * account boundary can be regression-tested without opening IndexedDB.
+ */
+export function pendingOperationsForUser<T extends { status: string; userId?: string }>(
+  queue: T[],
+  userId: string
+): T[] {
+  return queue.filter(operation => operation.status === 'pending' && operation.userId === userId)
+}
 
 // Network status detection
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -139,27 +172,33 @@ let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true
 // for a 'create' (POST) whose caller already assigned a local temp id to an
 // optimistically-inserted item - see OfflineOperation.reconcile.
 const syncToCloud = async (
+  userId: string,
   url: string,
   data: any,
   method: 'POST' | 'PUT' | 'DELETE' = 'POST',
   reconcile?: { userId: string; cacheKind: string; tempId: string }
 ) => {
+  const idempotencyKey = method === 'POST' ? createClientIdempotencyKey() : undefined
+  const queueOperation = {
+    userId,
+    type: method === 'POST' ? 'create' as const : method === 'PUT' ? 'update' as const : 'delete' as const,
+    endpoint: url,
+    data,
+    method,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+    ...(method === 'POST' && reconcile ? { reconcile } : {}),
+  }
+
   if (!isOnline) {
     // Queue for later sync
-    await offlineStorage.addToQueue({
-      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
-      endpoint: url,
-      data,
-      method,
-      ...(method === 'POST' && reconcile ? { reconcile } : {})
-    })
+    await offlineStorage.addToQueue(queueOperation)
     return
   }
 
   try {
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
       body: JSON.stringify(data)
     })
 
@@ -170,7 +209,7 @@ const syncToCloud = async (
       } else {
         // 4xx error - likely validation or logic error.
         // We shouldn't retry blindly, but we should log it.
-        console.error(`Sync failed with ${response.status}: ${response.statusText}`, await response.text())
+        console.error(`Sync failed with ${response.status}; operation was not queued`)
         return // Don't queue
       }
     }
@@ -178,26 +217,28 @@ const syncToCloud = async (
     // Callers (e.g. createManualTask) need the server-generated record — most
     // ignore this return value, which is safe since it's additive.
     return await response.json().catch(() => undefined)
-  } catch (error) {
+  } catch {
     // Queue for later sync if network fails or server error
-    console.error('Sync failed, queuing for later:', error)
-    await offlineStorage.addToQueue({
-      type: method === 'POST' ? 'create' : method === 'PUT' ? 'update' : 'delete',
-      endpoint: url,
-      data,
-      method,
-      ...(method === 'POST' && reconcile ? { reconcile } : {})
-    })
+    console.error('Sync failed, queuing for later')
+    await offlineStorage.addToQueue(queueOperation)
   }
 }
 
 // Sync pending operations when back online
 async function syncPendingOperations(): Promise<void> {
-  if (!isOnline) return
+  if (!isOnline || !activeDataIntegratorUserId) return
 
   try {
     const queue = await offlineStorage.getQueue()
-    const pendingOperations = queue.filter(op => op.status === 'pending')
+    // Legacy entries created before the queue carried an owner cannot be
+    // safely replayed under the current session. Remove them instead of
+    // risking a cross-account write.
+    const orphanedIds = queue
+      .filter(op => !op.userId)
+      .map(op => op.id)
+    if (orphanedIds.length > 0) await offlineStorage.clearQueue(orphanedIds)
+
+    const pendingOperations = pendingOperationsForUser(queue, activeDataIntegratorUserId)
     if (pendingOperations.length === 0) return
 
     const successfulIds: number[] = []
@@ -206,7 +247,10 @@ async function syncPendingOperations(): Promise<void> {
       try {
         const response = await fetch(operation.endpoint, {
           method: operation.method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(operation.idempotencyKey ? { 'Idempotency-Key': operation.idempotencyKey } : {}),
+          },
           body: JSON.stringify(operation.data)
         })
 
@@ -219,8 +263,8 @@ async function syncPendingOperations(): Promise<void> {
                 const { userId, cacheKind, tempId } = operation.reconcile
                 await reconcileCachedId(cacheKind, userId, tempId, created.id)
               }
-            } catch (reconcileError) {
-              console.error(`Failed to reconcile temp id for operation ${operation.id}:`, reconcileError)
+            } catch {
+              console.error(`Failed to reconcile temp id for operation ${operation.id}`)
             }
           }
         } else if (response.status === 409) {
@@ -240,8 +284,8 @@ async function syncPendingOperations(): Promise<void> {
           successfulIds.push(operation.id) // Treat as "handled" to remove it
         }
         // 5xx errors will be left in queue (pending)
-      } catch (error) {
-        console.error(`Failed to sync operation ${operation.id}:`, error)
+      } catch {
+        console.error(`Failed to sync operation ${operation.id}`)
         // Network error, leave in queue
       }
     }
@@ -254,8 +298,8 @@ async function syncPendingOperations(): Promise<void> {
       const updatedConflicts = await offlineStorage.getQueue()
       window.dispatchEvent(new CustomEvent('sync-conflicts', { detail: updatedConflicts.filter(op => op.status === 'conflicted') }))
     }
-  } catch (error) {
-    console.error('Error syncing pending operations:', error)
+  } catch {
+    console.error('Error syncing pending operations')
   }
 }
 
@@ -376,22 +420,47 @@ export interface BackupData {
   trackers: any[]
 }
 
+/**
+ * A backup import can be retried after a timeout or a partial network failure.
+ * Keep one deterministic key per item/file so the server's MutationRequest
+ * boundary converges a retry instead of creating a second copy. The backup
+ * timestamp intentionally scopes a new export as a new import intent.
+ */
+export function backupImportKey(kind: string, item: any, backupTimestamp: string, index: number) {
+  const identity = String(item?.id ?? item?.externalId ?? item?.title ?? item?.name ?? index)
+    .replace(/[^a-zA-Z0-9._:-]+/g, '-')
+    .slice(0, 72)
+  const timestamp = backupTimestamp.replace(/[^a-zA-Z0-9]+/g, '').slice(0, 32)
+  return `backup:${timestamp}:${kind}:${identity || index}`.slice(0, 128)
+}
+
 // Module-level timer so we can clear it across calls within the same session.
 // localStorage cannot store live timer IDs — they are process-local and meaningless after reload.
 let _autoBackupTimer: ReturnType<typeof setInterval> | null = null
+let _initialSyncTimer: ReturnType<typeof setTimeout> | null = null
 
 export const DataIntegrator = {
+  clearUserLocalData,
   // Initialize sync listeners and run initial sync (idempotent — safe to call multiple times)
   _initialized: false,
   _handleOnline: () => { isOnline = true; syncPendingOperations() },
   _handleOffline: () => { isOnline = false },
 
-  initialize: function() {
+  initialize: function(userId?: string) {
+    // The offline queue lives in a shared IndexedDB database. Bind the
+    // listener to the authenticated account before any replay can run so a
+    // queue created by account A is never flushed while account B is active.
+    activeDataIntegratorUserId = userId ?? null
     if (this._initialized || typeof window === 'undefined') return
     this._initialized = true
 
-    if (navigator.onLine) {
-      syncPendingOperations()
+    if (navigator.onLine && activeDataIntegratorUserId) {
+      // Replaying an offline queue is important, but an IndexedDB open and
+      // any queued requests should not compete with the first route paint.
+      _initialSyncTimer = setTimeout(() => {
+        _initialSyncTimer = null
+        void syncPendingOperations()
+      }, 1200)
     }
 
     window.addEventListener('online', this._handleOnline)
@@ -399,9 +468,15 @@ export const DataIntegrator = {
   },
 
   destroy: function() {
+    activeDataIntegratorUserId = null
+    if (_initialSyncTimer !== null) {
+      clearTimeout(_initialSyncTimer)
+      _initialSyncTimer = null
+    }
     if (!this._initialized || typeof window === 'undefined') return
     window.removeEventListener('online', this._handleOnline)
     window.removeEventListener('offline', this._handleOffline)
+    this.cancelAutoBackup()
     this._initialized = false
   },
 
@@ -422,7 +497,7 @@ export const DataIntegrator = {
     }
 
     try {
-      const settingsStr = localStorage.getItem('novo-settings')
+      const settingsStr = localStorage.getItem(scopedStorageKey('novo-settings', userId))
       if (settingsStr) {
         backup.settings = JSON.parse(settingsStr)
       }
@@ -478,7 +553,8 @@ export const DataIntegrator = {
     // Import settings
     if (backupData.settings && Object.keys(backupData.settings).length > 0) {
       try {
-        const currentSettings = localStorage.getItem('novo-settings')
+        const settingsKey = scopedStorageKey('novo-settings', userId)
+        const currentSettings = localStorage.getItem(settingsKey)
         if (currentSettings && !options.overwrite) {
           result.conflicts.push({
             type: 'settings',
@@ -486,7 +562,7 @@ export const DataIntegrator = {
             incoming: backupData.settings
           })
         } else {
-          localStorage.setItem('novo-settings', JSON.stringify(backupData.settings))
+          localStorage.setItem(settingsKey, JSON.stringify(backupData.settings))
           result.imported.push('settings')
         }
       } catch (error) {
@@ -509,10 +585,13 @@ export const DataIntegrator = {
           for (const item of current) {
             await fetch(`/api/checklist/${item.id}`, { method: 'DELETE' })
           }
-          for (const item of backupData.checklist) {
+          for (const [index, item] of backupData.checklist.entries()) {
             await fetch('/api/checklist', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': backupImportKey('checklist', item, backupData.timestamp, index),
+              },
               body: JSON.stringify(item)
             })
           }
@@ -538,10 +617,13 @@ export const DataIntegrator = {
           for (const item of current) {
             await fetch(`/api/routines/${item.id}`, { method: 'DELETE' })
           }
-          for (const item of backupData.routines) {
+          for (const [index, item] of backupData.routines.entries()) {
             await fetch('/api/routines', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': backupImportKey('routine', item, backupData.timestamp, index),
+              },
               body: JSON.stringify(item)
             })
           }
@@ -567,10 +649,13 @@ export const DataIntegrator = {
           for (const item of current) {
             await fetch(`/api/projects/${item.id}`, { method: 'DELETE' })
           }
-          for (const item of backupData.projects) {
+          for (const [index, item] of backupData.projects.entries()) {
             await fetch('/api/projects', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': backupImportKey('project', item, backupData.timestamp, index),
+              },
               body: JSON.stringify(item)
             })
           }
@@ -596,10 +681,13 @@ export const DataIntegrator = {
           for (const item of current) {
             await fetch(`/api/tasks/${item.id}`, { method: 'DELETE' })
           }
-          for (const item of backupData.tasks) {
+          for (const [index, item] of backupData.tasks.entries()) {
             await fetch('/api/tasks', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': backupImportKey('task', item, backupData.timestamp, index),
+              },
               body: JSON.stringify(item)
             })
           }
@@ -625,10 +713,13 @@ export const DataIntegrator = {
           for (const item of current) {
             await fetch(`/api/trackers/${item.id}`, { method: 'DELETE' })
           }
-          for (const item of backupData.trackers) {
+          for (const [index, item] of backupData.trackers.entries()) {
             await fetch('/api/trackers', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': backupImportKey('tracker', item, backupData.timestamp, index),
+              },
               body: JSON.stringify(item)
             })
           }
@@ -643,13 +734,21 @@ export const DataIntegrator = {
     return result
   },
 
-  // Auto-backup scheduling
-  scheduleAutoBackup: (userId: string, frequency: 'daily' | 'weekly' | 'monthly') => {
-    // Clear the previous interval from this session (module-level ref, not localStorage)
+  // Auto-backup scheduling. The timer lives in memory by design; storing a
+  // browser interval id in localStorage cannot cancel it after a reload and
+  // can leave an old user's export running after logout.
+  cancelAutoBackup: (userId?: string) => {
     if (_autoBackupTimer !== null) {
       clearInterval(_autoBackupTimer)
       _autoBackupTimer = null
     }
+    if (typeof window !== 'undefined' && userId) {
+      localStorage.removeItem(scopedStorageKey('novo-auto-backup-frequency', userId))
+    }
+  },
+
+  scheduleAutoBackup: (userId: string, frequency: 'daily' | 'weekly' | 'monthly') => {
+    DataIntegrator.cancelAutoBackup(userId)
 
     const getInterval = (freq: string) => {
       switch (freq) {
@@ -665,7 +764,7 @@ export const DataIntegrator = {
     const backup = async () => {
       try {
         const data = await DataIntegrator.exportData(userId)
-        const backupKey = `novo-backup-${new Date().toISOString().split('T')[0]}`
+        const backupKey = backupStorageKey(userId, new Date().toISOString().split('T')[0])
         localStorage.setItem(backupKey, JSON.stringify(data))
         console.log('Auto-backup completed:', backupKey)
       } catch (error) {
@@ -674,19 +773,20 @@ export const DataIntegrator = {
     }
 
     _autoBackupTimer = setInterval(backup, interval)
-    localStorage.setItem('novo-auto-backup-frequency', frequency)
+    localStorage.setItem(scopedStorageKey('novo-auto-backup-frequency', userId), frequency)
   },
 
   // Get available backups
-  getAvailableBackups: (): { date: string, data: BackupData }[] => {
+  getAvailableBackups: (userId: string): { date: string, data: BackupData }[] => {
     const backups: { date: string, data: BackupData }[] = []
+    const prefix = `novo-backup:${userId}:`
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (key && key.startsWith('novo-backup-')) {
+      if (key && key.startsWith(prefix)) {
         try {
           const data = JSON.parse(localStorage.getItem(key)!)
           backups.push({
-            date: key.replace('novo-backup-', ''),
+            date: key.replace(prefix, ''),
             data
           })
         } catch (error) {
@@ -699,7 +799,7 @@ export const DataIntegrator = {
 
   // Restore from auto-backup
   restoreFromBackup: async (userId: string, backupDate: string, options: { overwrite?: boolean } = {}): Promise<{ success: boolean, conflicts: any[], imported: string[] }> => {
-    const backupKey = `novo-backup-${backupDate}`
+    const backupKey = backupStorageKey(userId, backupDate)
     const backupStr = localStorage.getItem(backupKey)
     if (!backupStr) {
       throw new Error('Backup not found')
@@ -711,6 +811,10 @@ export const DataIntegrator = {
   // Get all tasks for a specific date (defaults to today)
   getDailyTasks: async (userId: string, date: Date = new Date()): Promise<IntegratedTask[]> => {
     const tasks: IntegratedTask[] = []
+    // A task due today has a linked ChecklistItem mirror. Keep the mirror as
+    // the single daily-queue representation; adding the canonical Task again
+    // below would make one user action appear twice in Checklist/Twin views.
+    const linkedTaskIds = new Set<string>()
 
     try {
       // 1. Get Manual Checklist Items
@@ -721,6 +825,7 @@ export const DataIntegrator = {
       )
       manualItems.forEach((item: ChecklistItem) => {
         if (item.task) {
+          linkedTaskIds.add(item.task.id)
           tasks.push({
             ...item,
             source: 'project-task',
@@ -804,6 +909,7 @@ export const DataIntegrator = {
         'tasks'
       )
       standaloneTasks.forEach((task: Task) => {
+        if (linkedTaskIds.has(task.id)) return
         const isRelevant =
           task.status !== "done" || (task.dueDate && isSameDay(parseISO(task.dueDate), date))
 
@@ -825,28 +931,6 @@ export const DataIntegrator = {
       })
     } catch (error) {
       console.error('Failed to fetch tasks:', error)
-    }
-
-    try {
-      // 5. Get School Tasks (Assignments/Grades)
-      const courses = await fetchWithCache<any[]>('/api/school/courses', userId, 'school-courses')
-      courses.forEach((course: any) => {
-        // Example: Add a task for each course to "Review [Course Name]"
-        tasks.push({
-          id: `school-${course.id}`,
-          text: `Review ${course.name}`,
-          completed: false, // Local state or derived?
-          priority: 'medium',
-          source: 'school',
-          sourceId: course.id,
-          metadata: {
-            subjectName: course.name,
-            dueDate: new Date().toISOString()
-          }
-        })
-      })
-    } catch (error) {
-      console.error('Failed to fetch school tasks:', error)
     }
 
     return tasks
@@ -947,7 +1031,7 @@ export const DataIntegrator = {
 
     try {
       if (task.source === "manual") {
-        await syncToCloud(`/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
+        await syncToCloud(userId, `/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
         const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
         if (checklist) {
           const updatedChecklist = checklist.data.map(item =>
@@ -968,7 +1052,7 @@ export const DataIntegrator = {
               r.id === task.sourceId ? updatedRoutine : r
             )
             await setCachedData('routines', userId, updatedRoutines)
-            await syncToCloud(`/api/routines/${task.sourceId}`, { tasks: updatedTasks }, 'PUT')
+            await syncToCloud(userId, `/api/routines/${task.sourceId}`, { tasks: updatedTasks }, 'PUT')
           }
         }
       } else if (task.source === "project") {
@@ -984,12 +1068,12 @@ export const DataIntegrator = {
               p.id === task.sourceId ? updatedProject : p
             )
             await setCachedData('projects', userId, updatedProjects)
-            await syncToCloud(`/api/projects/${task.sourceId}`, { subtasks: updatedSubtasks }, 'PUT')
+            await syncToCloud(userId, `/api/projects/${task.sourceId}`, { subtasks: updatedSubtasks }, 'PUT')
           }
         }
       } else if (task.source === "standalone") {
         const newStatus = updatedTask.completed ? "done" : "todo"
-        await syncToCloud(`/api/tasks/${task.originalId}`, { status: newStatus }, 'PUT')
+        await syncToCloud(userId, `/api/tasks/${task.originalId}`, { status: newStatus }, 'PUT')
         const tasks = await getCachedData<Task[]>('tasks', userId)
         if (tasks) {
           const updatedTasks = tasks.data.map(t =>
@@ -998,9 +1082,9 @@ export const DataIntegrator = {
           await setCachedData('tasks', userId, updatedTasks)
         }
       } else if (task.source === "project-task") {
-        await syncToCloud(`/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
+        await syncToCloud(userId, `/api/checklist/${task.id}`, { completed: updatedTask.completed }, 'PUT')
         const newStatus = updatedTask.completed ? "done" : "todo"
-        await syncToCloud(`/api/tasks/${task.task?.id}`, { status: newStatus }, 'PUT')
+        await syncToCloud(userId, `/api/tasks/${task.task?.id}`, { status: newStatus }, 'PUT')
         const checklist = await getCachedData<ChecklistItem[]>('checklist', userId)
         if (checklist) {
           const updatedChecklist = checklist.data.map(item =>
@@ -1014,16 +1098,6 @@ export const DataIntegrator = {
             t.id === task.task?.id ? { ...t, status: newStatus } : t
           )
           await setCachedData('tasks', userId, updatedTasks)
-        }
-      } else if (task.source === "school") {
-        // School sync logic placeholder - usually schools tasks are grades or assignments
-        // For now just update local cache
-        const courses = await getCachedData<any[]>('school-courses', userId)
-        if (courses) {
-          const updatedCourses = courses.data.map(c =>
-            c.id === task.sourceId ? { ...c, lastReviewed: new Date().toISOString() } : c
-          )
-          await setCachedData('school-courses', userId, updatedCourses)
         }
       }
     } catch (error) {
@@ -1050,7 +1124,7 @@ export const DataIntegrator = {
       // this goes offline instead, the reconcile context lets
       // syncPendingOperations do the same swap once the queued create
       // actually lands, instead of the temp id surviving forever.
-      const created = await syncToCloud('/api/checklist', taskData, 'POST', { userId, cacheKind: 'checklist', tempId })
+      const created = await syncToCloud(userId, '/api/checklist', taskData, 'POST', { userId, cacheKind: 'checklist', tempId })
       if (created?.id) {
         newTask.id = created.id
       }
@@ -1073,7 +1147,7 @@ export const DataIntegrator = {
         const updatedChecklist = checklist.data.filter(item => item.id !== taskId)
         await setCachedData('checklist', userId, updatedChecklist)
       }
-      await syncToCloud(`/api/checklist/${taskId}`, {}, 'DELETE')
+      await syncToCloud(userId, `/api/checklist/${taskId}`, {}, 'DELETE')
     } catch (error) {
       console.error('Failed to delete manual task:', error)
     }
@@ -1100,7 +1174,7 @@ export const DataIntegrator = {
       // session, and any updateTask/deleteTask on it before a reload 404s
       // server-side while the UI shows the edit/delete as having succeeded.
       // Reconcile context covers the same gap for the offline-queue path.
-      const created = await syncToCloud('/api/tasks', taskData, 'POST', { userId, cacheKind: 'tasks', tempId })
+      const created = await syncToCloud(userId, '/api/tasks', taskData, 'POST', { userId, cacheKind: 'tasks', tempId })
       if (created?.id) {
         newTask.id = created.id
       }
@@ -1131,7 +1205,7 @@ export const DataIntegrator = {
         const updatedTasks = tasks.data.map(t => t.id === taskId ? { ...t, ...updates } : t)
         await setCachedData('tasks', userId, updatedTasks)
       }
-      await syncToCloud(`/api/tasks/${taskId}`, updates, 'PUT')
+      await syncToCloud(userId, `/api/tasks/${taskId}`, updates, 'PUT')
     } catch (error) {
       console.error('Failed to update task:', error)
     }
@@ -1145,7 +1219,7 @@ export const DataIntegrator = {
         const updatedTasks = tasks.data.filter(t => t.id !== taskId)
         await setCachedData('tasks', userId, updatedTasks)
       }
-      await syncToCloud(`/api/tasks/${taskId}`, {}, 'DELETE')
+      await syncToCloud(userId, `/api/tasks/${taskId}`, {}, 'DELETE')
     } catch (error) {
       console.error('Failed to delete task:', error)
     }

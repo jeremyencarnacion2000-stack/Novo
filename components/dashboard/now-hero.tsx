@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ArrowRight, Loader2, Check } from 'lucide-react'
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { useCognitivePhase } from '@/lib/cognitive-context'
 import { springConfig } from '@/lib/design-tokens'
-import { useCognitiveEngine } from '@/hooks/use-swr'
+import { useChecklist, useCognitiveEngine } from '@/hooks/use-swr'
+import type { ChecklistItem } from '@/types/checklist'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 // Calendar-signal changeTypes that mean "your schedule is the problem" (as
 // opposed to e.g. a Notion signal) — the only cases where offering to
@@ -21,16 +23,10 @@ interface TaskLite {
   id: string
   title: string
   priority: string
-  dueDate: string | null
+  dueDate?: string | null
 }
 
-interface ChecklistLite {
-  id: string
-  text: string
-  priority: string
-  dueDate: string | null
-  completed: boolean
-}
+const EMPTY_CHECKLIST: ChecklistItem[] = []
 
 interface PlatformSignalEntry {
   id: string
@@ -105,6 +101,21 @@ const PHASE_COPY: Record<string, string> = {
   REDUCED_CAPACITY_MODE: 'Capacidad reducida ahora mismo — un paso pequeño basta.',
 }
 
+const NOW_PHASE_PALETTE: Record<string, [string, string, string]> = {
+  PEAK_FOCUS: ['#6366f1', '#2563eb', '#22d3ee'],
+  LINEAR_EXECUTION: ['#10b981', '#34d399', '#2563eb'],
+  SYNAPTIC_FATIGUE: ['#f59e0b', '#fb7185', '#8b5cf6'],
+  REDUCED_CAPACITY_MODE: ['#86efac', '#1d4ed8', '#facc15'],
+}
+
+const NOW_THINKING_STATE: Record<string, 'thinking' | 'searching' | 'planning'> = {
+  PEAK_FOCUS: 'thinking',
+  LINEAR_EXECUTION: 'planning',
+  SYNAPTIC_FATIGUE: 'searching',
+  REDUCED_CAPACITY_MODE: 'thinking',
+}
+
+
 export const FRICTION_TIP: Record<string, string> = {
   procrastination: 'Empieza con el paso más pequeño posible — solo 2 minutos.',
   context_switching: 'Cierra todo lo demás y quédate en una sola cosa.',
@@ -159,11 +170,43 @@ export function NowHero() {
   const { twin } = useCognitiveTwin()
   const { t } = useTranslation()
   const phase = useCognitivePhase()
-  const [task, setTask] = useState<TaskLite | null>(null)
-  const [hasAnyTask, setHasAnyTask] = useState(false)
+  const motionMode = useNovoMotionPolicy()
+  const nowCardRef = useRef<HTMLDivElement>(null)
+  const [nowVisible, setNowVisible] = useState(true)
+  const [pageVisible, setPageVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
+  const [taskRows, setTaskRows] = useState<TaskLite[] | null>(null)
   const [platformSignal, setPlatformSignal] = useState<PlatformSignalEntry | null>(null)
   const [ambientState, setAmbientState] = useState<AmbientStateEntry | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: checklistData, error: checklistError, mutate: mutateChecklist } = useChecklist()
+  const checklistRows = Array.isArray(checklistData) ? checklistData : EMPTY_CHECKLIST
+  const { task, hasAnyTask, isUrgentTask } = useMemo(() => {
+    const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
+    const now = Date.now()
+    const taskRowsValue = taskRows ?? []
+    const checklistTasks: TaskLite[] = checklistRows
+      .filter((item) => !item.completed)
+      .map((item) => ({
+        id: 'checklist:' + item.id,
+        title: item.text,
+        priority: item.priority,
+        dueDate: item.dueDate,
+      }))
+    const sorted = [...taskRowsValue, ...checklistTasks].sort((a, b) => {
+      const overdueA = a.dueDate && new Date(a.dueDate).getTime() < now ? 0 : 1
+      const overdueB = b.dueDate && new Date(b.dueDate).getTime() < now ? 0 : 1
+      if (overdueA !== overdueB) return overdueA - overdueB
+      return (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)
+    })
+    const task = sorted[0] ?? null
+    const isUrgentTask = !!task && (
+      (!!task.dueDate && new Date(task.dueDate).getTime() < now) || task.priority === 'high'
+    )
+    return {
+      task,
+      isUrgentTask,
+      hasAnyTask: taskRowsValue.length > 0 || checklistRows.length > 0,
+    }
+  }, [checklistRows, taskRows])
   // Progressive enhancement, not a load-blocking dependency: NowHero renders
   // immediately from local signals, then re-renders with the real read once
   // this (LLM-backed, slower) request resolves. Shares its SWR key with
@@ -171,6 +214,22 @@ export function NowHero() {
   const { data: engineJson } = useCognitiveEngine()
   const engineReport = engineJson?.success ? engineJson.report : null
   const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>('idle')
+
+  useEffect(() => {
+    const element = nowCardRef.current
+    if (!element || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => setNowVisible(entry.isIntersecting), { threshold: 0.05 })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const updatePageVisibility = () => setPageVisible(document.visibilityState !== 'hidden')
+    updatePageVisibility()
+    document.addEventListener('visibilitychange', updatePageVisibility)
+    return () => document.removeEventListener('visibilitychange', updatePageVisibility)
+  }, [])
+
 
   // Same endpoint ReorganizedDay (/cognitive) already uses to persist the
   // engine's suggested hours onto real Task records — reused here so a
@@ -193,61 +252,68 @@ export function NowHero() {
 
   useEffect(() => {
     let disposed = false
-    const loadWorkspaceContext = () => Promise.all([
-      fetch('/api/tasks?status=todo').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/checklist').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/cognitive/active-signal').then((r) => (r.ok ? r.json() : { signal: null })),
-      fetch('/api/cognitive/ambient').then((r) => (r.ok ? r.json() : { state: null })),
-    ])
-      .then(([tasks, checklist, activeSignalResponse, ambientResponse]: [TaskLite[], ChecklistLite[], { signal: PlatformSignalEntry | null }, { state: AmbientStateEntry | null }]) => {
-        if (disposed) return
-        const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
-        const now = Date.now()
-        const checklistTasks: TaskLite[] = (Array.isArray(checklist) ? checklist : [])
-          .filter((item) => !item.completed)
-          .map((item) => ({
-            id: `checklist:${item.id}`,
-            title: item.text,
-            priority: item.priority,
-            dueDate: item.dueDate,
-          }))
-        setHasAnyTask((Array.isArray(tasks) && tasks.length > 0) || (Array.isArray(checklist) && checklist.length > 0))
-        const sorted = [...(Array.isArray(tasks) ? tasks : []), ...checklistTasks].sort((a, b) => {
-          const overdueA = a.dueDate && new Date(a.dueDate).getTime() < now ? 0 : 1
-          const overdueB = b.dueDate && new Date(b.dueDate).getTime() < now ? 0 : 1
-          if (overdueA !== overdueB) return overdueA - overdueB
-          return (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)
-        })
-        const topTask = sorted[0] ?? null
-        setTask(topTask)
-        setAmbientState(ambientResponse.state)
+    let requestController: AbortController | null = null
+    const loadWorkspaceContext = (refreshChecklist = false) => {
+      if (disposed || document.visibilityState === 'hidden') return Promise.resolve()
+      requestController?.abort()
+      const controller = new AbortController()
+      requestController = controller
+      const { signal } = controller
+      if (refreshChecklist) void mutateChecklist().catch(() => undefined)
 
-        const isUrgentTask = !!topTask && (
-          (!!topTask.dueDate && new Date(topTask.dueDate).getTime() < now) || topTask.priority === 'high'
-        )
-        if (!isUrgentTask) {
+      const tasksRequest = fetch('/api/tasks?status=todo', { cache: 'no-store', signal })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((tasks: unknown) => {
+          if (!disposed) setTaskRows(Array.isArray(tasks) ? tasks : [])
+        })
+        .catch((error: unknown) => {
+          if (!disposed && (error as { name?: string })?.name !== 'AbortError') setTaskRows([])
+        })
+
+      const recommendationsRequest = Promise.all([
+        fetch('/api/cognitive/active-signal', { cache: 'no-store', signal }).then((r) => (r.ok ? r.json() : { signal: null })),
+        fetch('/api/cognitive/ambient', { cache: 'no-store', signal }).then((r) => (r.ok ? r.json() : { state: null })),
+      ])
+        .then(([activeSignalResponse, ambientResponse]: [{ signal: PlatformSignalEntry | null }, { state: AmbientStateEntry | null }]) => {
+          if (disposed) return
           setPlatformSignal(activeSignalResponse.signal)
-        }
-      })
-      .catch(() => {})
-      .finally(() => { if (!disposed) setLoading(false) })
+          setAmbientState(ambientResponse.state)
+        })
+        .catch((error: unknown) => {
+          if ((error as { name?: string })?.name !== 'AbortError') return
+        })
+
+      return Promise.all([tasksRequest, recommendationsRequest]).then(() => undefined)
+    }
     void loadWorkspaceContext()
-    const interval = window.setInterval(() => void loadWorkspaceContext(), 15 * 60 * 1000)
+    let interval: number | null = window.setInterval(() => void loadWorkspaceContext(true), 15 * 60 * 1000)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadWorkspaceContext(true)
+        if (interval === null) interval = window.setInterval(() => void loadWorkspaceContext(true), 15 * 60 * 1000)
+      } else if (interval !== null) {
+        window.clearInterval(interval)
+        interval = null
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       disposed = true
-      window.clearInterval(interval)
+      requestController?.abort()
+      if (interval !== null) window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [mutateChecklist])
 
   const phaseCopy = PHASE_COPY[phase] ?? PHASE_COPY.LINEAR_EXECUTION
   const now = Date.now()
-  const isUrgentTask = !!task && ((!!task.dueDate && new Date(task.dueDate).getTime() < now) || task.priority === 'high')
   const isOverdue = !!task?.dueDate && new Date(task.dueDate).getTime() < now
   const frictionTip = twin.bottlenecks.mainFrictionPoint
     ? FRICTION_TIP[twin.bottlenecks.mainFrictionPoint]
     : null
 
-  if (loading) {
+  const checklistResolved = checklistData !== undefined || !!checklistError
+  if (!isUrgentTask && (taskRows === null || !checklistResolved)) {
     return <div className="h-48 rounded-[28px] bg-foreground/[0.03] animate-pulse" />
   }
 
@@ -275,13 +341,26 @@ export function NowHero() {
     CALENDAR_DISRUPTION_TYPES.includes(platformSignal!.changeType) &&
     Array.isArray(engineReport?.reorganizedDay) && engineReport.reorganizedDay.length > 0
 
+  const [phaseA, phaseB, phaseC] = NOW_PHASE_PALETTE[phase] ?? NOW_PHASE_PALETTE.LINEAR_EXECUTION
+  const proceduralActive = motionMode === 'full' && nowVisible && pageVisible
   const cardInner = (
-    <div className="relative rounded-[28px] p-8 md:p-10 border border-primary/25 bg-gradient-to-br from-primary/[0.10] via-primary/[0.03] to-transparent overflow-hidden transition-all duration-300 hover:border-primary/40">
-      <div
-        className="absolute -top-10 -right-10 w-56 h-56 rounded-full opacity-20 blur-3xl pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
-        style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
-      />
-      <div className="relative flex items-center justify-between mb-3">
+    <div
+      ref={nowCardRef}
+      data-now-visible={nowVisible ? 'true' : 'false'}
+      data-novo-motion={motionMode}
+      data-now-phase={phase}
+      data-thinking-pill-state={NOW_THINKING_STATE[phase] ?? 'thinking'}
+      style={{ '--now-primary': phaseA, '--now-secondary': phaseB, '--now-tertiary': phaseC } as CSSProperties}
+      className="novo-now-panel group relative rounded-[28px] p-8 md:p-10 border border-primary/25 bg-background/20 overflow-hidden transition-[border-color,box-shadow] duration-300 hover:border-primary/40"
+    >
+      <div aria-hidden className="novo-thinking-pill__fields novo-now-procedural-fields" data-active={proceduralActive ? 'true' : 'false'}>
+        <span className="novo-thinking-pill__field novo-thinking-pill__field--one" />
+        <span className="novo-thinking-pill__field novo-thinking-pill__field--two" />
+        <span className="novo-thinking-pill__field novo-thinking-pill__field--three" />
+      </div>
+      <div aria-hidden className="novo-now-contrast-scrim" />
+      <div aria-hidden className="novo-now-noise" />
+      <div className="relative z-10 flex items-center justify-between mb-3">
         <p className="text-[11px] font-black tracking-[0.25em] uppercase text-primary/70">
           Ahora →
         </p>
@@ -292,6 +371,7 @@ export function NowHero() {
         </span>
       </div>
 
+      <div className="relative z-10">
       {showTask ? (
             <>
               <h2 className="relative text-2xl md:text-4xl font-semibold tracking-tight mb-2 max-w-2xl">{taskTitle}</h2>
@@ -333,8 +413,10 @@ export function NowHero() {
             </>
           )}
 
+      </div>
+
       {canReorganize ? (
-        <div className="relative mt-5 flex flex-wrap items-center gap-3">
+        <div className="relative z-10 mt-5 flex flex-wrap items-center gap-3">
           <Link
             href={linkHref}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/50 hover:text-foreground/80 transition-colors"
@@ -358,7 +440,7 @@ export function NowHero() {
           </button>
         </div>
       ) : (
-        <div className="relative mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
+        <div className="relative z-10 mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:gap-2.5 transition-all duration-300">
           {showTask ? 'Ir a la tarea' : showAmbient ? 'Ver por qué' : showPlatformSignal ? PLATFORM_ACTION_LABEL[platformSignal!.platform] : 'Agregar tarea'} <ArrowRight className="w-3.5 h-3.5" />
         </div>
       )}
@@ -367,6 +449,7 @@ export function NowHero() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={springConfig.smooth}>
+
       {canReorganize ? (
         cardInner
       ) : (

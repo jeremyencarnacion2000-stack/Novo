@@ -13,8 +13,30 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { appendActivityEvent, createActivityRun, finishActivityRun, isActivityCancelled, recordFirstVisibleActivityContent } from '@/lib/ai/activity';
+import { z } from 'zod';
 
 export const runtime = 'nodejs';
+
+const MAX_AI_STREAM_BODY_BYTES = 12_000_000;
+const MAX_ATTACHMENT_URL_CHARS = 2_500_000;
+
+const aiStreamRequestSchema = z.object({
+    message: z.string().trim().max(12_000).optional().default(''),
+    history: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(12_000),
+    })).max(40).optional().default([]),
+    attachments: z.array(z.object({
+        id: z.string().max(200).optional(),
+        name: z.string().max(255),
+        type: z.string().max(120),
+        url: z.string().max(MAX_ATTACHMENT_URL_CHARS),
+        size: z.number().finite().nonnegative().max(50_000_000).optional(),
+    })).max(10).optional().default([]),
+    webSearchEnabled: z.boolean().optional().default(false),
+    model: z.string().max(120).optional().default('auto'),
+    twinMode: z.boolean().optional().default(false),
+}).strict();
 
 // Normalize history and prevent token limit issues
 function normalizeHistory(history: any[]): any[] {
@@ -115,7 +137,30 @@ export async function POST(request: NextRequest) {
         if (!session?.user?.id) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
         }
+
+        const contentLength = Number(request.headers.get('content-length'));
+        if (Number.isFinite(contentLength) && contentLength > MAX_AI_STREAM_BODY_BYTES) {
+            return new Response(JSON.stringify({ error: 'Chat request is too large' }), { status: 413 });
+        }
+
+        const parsedRequest = aiStreamRequestSchema.safeParse(await request.json().catch(() => null));
+        if (!parsedRequest.success) {
+            return new Response(JSON.stringify({ error: 'Invalid chat request' }), { status: 400 });
+        }
+        const parsedBodySize = new TextEncoder().encode(JSON.stringify(parsedRequest.data)).byteLength;
+        if (parsedBodySize > MAX_AI_STREAM_BODY_BYTES) {
+            return new Response(JSON.stringify({ error: 'Chat request is too large' }), { status: 413 });
+        }
+
         const userId = session.user.id;
+        let { message, history, attachments, webSearchEnabled, model: requestedModel, twinMode: requestedTwinMode } = parsedRequest.data;
+
+        // Reject an empty request before persisting an activity run. Otherwise a
+        // validation error leaves a run permanently stuck in `running`.
+        if (!message && attachments.length === 0) {
+            return new Response(JSON.stringify({ error: 'Message or attachment is required' }), { status: 400 });
+        }
+
         const activityRun = await createActivityRun(userId, 'chat');
         const activityRunId = activityRun.id;
         activeRun = { userId, runId: activityRunId };
@@ -124,8 +169,6 @@ export async function POST(request: NextRequest) {
         // Twin Mode is Pro-only — re-verify server-side on every request,
         // never trust the client's requested value directly.
         let twinMode = false;
-
-        let { message, history, attachments, webSearchEnabled, model: requestedModel, twinMode: requestedTwinMode } = await request.json();
 
         if (requestedTwinMode) {
             const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
@@ -147,10 +190,6 @@ export async function POST(request: NextRequest) {
             } else if (requestedModel === 'meta-llama/llama-4-scout-17b-16e-instruct' || requestedModel === 'llama-3.2-11b-vision-preview') {
                 requestedModel = 'gemini-flash-latest';
             }
-        }
-
-        if (!message && (!attachments || attachments.length === 0)) {
-            return new Response(JSON.stringify({ error: 'Message or attachment is required' }), { status: 400 });
         }
 
         // Smart middle-truncation for current message if too long (max 8000 chars)
@@ -547,6 +586,10 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             async start(controller) {
                 const reader = groqResponse.body?.getReader();
                 if (!reader) {
+                    await finishActivityRun(userId, activityRunId, 'failed', {
+                        errorCode: 'chat_stream_unavailable',
+                        errorMessage: 'El proveedor no devolvió una transmisión legible.',
+                    });
                     controller.close();
                     return;
                 }
@@ -558,7 +601,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 let streamFailed = false;
                 let firstVisibleContentRecorded = false;
 
-                // Emit model metadata as first SSE event. thinking-steps.tsx already
+                // Emit model metadata as first SSE event. NovoThinkingPill already
                 // renders this (via the `meta` event's `label`/`fallback` fields) as a
                 // quiet "Conectado a X" line - a fallback happening isn't an error the
                 // user needs alarmed about, it's the resilience feature working as

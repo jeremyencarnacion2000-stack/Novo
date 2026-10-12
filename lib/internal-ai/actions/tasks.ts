@@ -15,8 +15,8 @@ export const registerTaskActions = (service: IInternalAIService) => {
 
             const data = await response.json();
             return { success: true, data };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'TASK_CREATE_FAILED' };
         }
     });
 
@@ -37,8 +37,8 @@ export const registerTaskActions = (service: IInternalAIService) => {
 
             const data = await response.json();
             return { success: true, data };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'TASK_UPDATE_FAILED' };
         }
     });
 
@@ -56,8 +56,8 @@ export const registerTaskActions = (service: IInternalAIService) => {
             }
 
             return { success: true, data: { id } };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'TASK_DELETE_FAILED' };
         }
     });
 };

@@ -19,10 +19,11 @@ export async function GET() {
     token_endpoint: `${issuer}${OAUTH_ROUTES.token}`,
     registration_endpoint: `${issuer}${OAUTH_ROUTES.registration}`,
     revocation_endpoint: `${issuer}${OAUTH_ROUTES.revocation}`,
+    device_authorization_endpoint: `${issuer}${OAUTH_ROUTES.device_authorization}`,
     jwks_uri: `${issuer}${OAUTH_ROUTES.jwks}`,
     scopes_supported: MCP_SCOPES,
     response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code', 'refresh_token'],
+    grant_types_supported: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_basic', 'client_secret_post'],
   })

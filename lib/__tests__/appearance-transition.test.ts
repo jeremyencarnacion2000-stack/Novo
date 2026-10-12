@@ -3,6 +3,7 @@ import { runAppearanceTransition } from '@/lib/appearance-transition'
 describe('runAppearanceTransition', () => {
   afterEach(() => {
     Reflect.deleteProperty(document, 'startViewTransition')
+    delete document.documentElement.dataset.novoMotion
   })
 
   it('uses the browser view transition so theme and wallpaper changes share one visual handoff', () => {
@@ -19,7 +20,7 @@ describe('runAppearanceTransition', () => {
   it('applies the setting immediately when motion is reduced', () => {
     const startViewTransition = jest.fn()
     Object.defineProperty(document, 'startViewTransition', { configurable: true, value: startViewTransition })
-    window.matchMedia = jest.fn().mockReturnValue({ matches: true })
+    document.documentElement.dataset.novoMotion = 'reduced'
     const update = jest.fn()
 
     runAppearanceTransition(update)

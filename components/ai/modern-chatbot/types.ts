@@ -9,7 +9,7 @@ export interface Message {
     model?: string;
     // Populated from the real `meta` SSE event /api/ai/stream emits (see
     // lib/ai/classifier.ts) — which intent/model actually handled this
-    // message, not a client-side guess. Drives thinking-steps.tsx.
+    // message, not a client-side guess. Drives NovoThinkingPill.
     intent?: string;
     fallback?: boolean;
     liked?: boolean;

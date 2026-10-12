@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 const AMBIENT_REFRESH_INTERVAL_MS = 15 * 60 * 1000
+const INITIAL_REFRESH_DELAY_MS = 2500
 
 /**
  * Keeps authorized context fresh while the user works outside the Dashboard.
@@ -15,9 +16,10 @@ export function AmbientContextHeartbeat() {
   const { status } = useSession()
   const pathname = usePathname()
   const inFlight = useRef(false)
+  const shouldRun = status === 'authenticated' && pathname !== '/'
 
   useEffect(() => {
-    if (status !== 'authenticated' || pathname === '/') return
+    if (!shouldRun) return
 
     const refresh = () => {
       if (document.visibilityState === 'hidden' || inFlight.current) return
@@ -26,18 +28,42 @@ export function AmbientContextHeartbeat() {
         .catch(() => undefined)
         .finally(() => { inFlight.current = false })
     }
+
+    let interval: number | null = null
+    let initialTimer: number | null = window.setTimeout(() => {
+      initialTimer = null
+      if (document.visibilityState === 'hidden') return
+      refresh()
+      interval = window.setInterval(refresh, AMBIENT_REFRESH_INTERVAL_MS)
+    }, INITIAL_REFRESH_DELAY_MS)
+
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refresh()
+      if (document.visibilityState === 'visible') {
+        if (initialTimer !== null) {
+          window.clearTimeout(initialTimer)
+          initialTimer = null
+        }
+        refresh()
+        if (interval === null) interval = window.setInterval(refresh, AMBIENT_REFRESH_INTERVAL_MS)
+      } else {
+        if (initialTimer !== null) {
+          window.clearTimeout(initialTimer)
+          initialTimer = null
+        }
+        if (interval !== null) {
+          window.clearInterval(interval)
+          interval = null
+        }
+      }
     }
 
-    refresh()
-    const interval = window.setInterval(refresh, AMBIENT_REFRESH_INTERVAL_MS)
     document.addEventListener('visibilitychange', handleVisibility)
     return () => {
-      window.clearInterval(interval)
+      if (initialTimer !== null) window.clearTimeout(initialTimer)
+      if (interval !== null) window.clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [pathname, status])
+  }, [shouldRun])
 
   return null
 }

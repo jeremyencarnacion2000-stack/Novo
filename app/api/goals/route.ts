@@ -12,6 +12,19 @@ const createGoalSchema = z.object({
   deadline: z.string().max(100).optional(),
 })
 
+const GOAL_CREATE_SCOPE = 'goal_create'
+const IDEMPOTENCY_KEY_MAX_LENGTH = 128
+
+function isUniqueConstraintError(error: unknown): error is { code: string } {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
+}
+
+function goalResponse(goal: { id: string }, replay: boolean) {
+  const response = NextResponse.json(goal, { status: replay ? 200 : 201 })
+  response.headers.set('X-Idempotent-Replay', String(replay))
+  return response
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -41,8 +54,8 @@ export async function GET(request: NextRequest) {
     response.headers.set('X-Total-Pages', String(Math.ceil(total / limit)))
     response.headers.set('X-Page', String(page))
     return response
-  } catch (error) {
-    console.error('Error fetching goals:', error)
+  } catch {
+    console.error('Error fetching goals.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -61,21 +74,100 @@ export async function POST(request: NextRequest) {
     }
 
     const { title, description, status, timeframe, deadline } = parsed.data
+    const normalized = {
+      title,
+      description: description ?? null,
+      status: status || 'active',
+      timeframe: timeframe || 'year',
+      deadline: deadline ?? null,
+    }
+    const rawIdempotencyKey = request.headers.get('Idempotency-Key')
+    const idempotencyKey = rawIdempotencyKey?.trim() || null
+    if (idempotencyKey && idempotencyKey.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+      return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+    }
+    const fingerprint = JSON.stringify(normalized)
 
-    const goal = await prisma.goal.create({
-      data: {
-        userId: session.user.id,
-        title,
-        description,
-        status: status || 'active',
-        timeframe: timeframe || 'year',
-        deadline
+    if (idempotencyKey) {
+      const existing = await prisma.mutationRequest.findUnique({
+        where: {
+          userId_scope_idempotencyKey: {
+            userId: session.user.id,
+            scope: GOAL_CREATE_SCOPE,
+            idempotencyKey,
+          },
+        },
+      })
+      if (existing) {
+        if (existing.fingerprint !== fingerprint) {
+          return NextResponse.json({ error: 'Idempotency key was already used for another request' }, { status: 409 })
+        }
+        const previousGoal = await prisma.goal.findFirst({
+          where: { id: existing.resourceId, userId: session.user.id },
+        })
+        if (previousGoal) return goalResponse(previousGoal, true)
+        return NextResponse.json({ error: 'Idempotent request result is unavailable' }, { status: 409 })
       }
+    }
+
+    const createGoal = (db: typeof prisma) => db.goal.create({
+      data: { userId: session.user.id, ...normalized },
     })
 
-    return NextResponse.json(goal)
-  } catch (error) {
-    console.error('Error creating goal:', error)
+    let goal
+    if (!idempotencyKey) {
+      goal = await createGoal(prisma)
+    } else {
+      try {
+        goal = await prisma.$transaction(async (tx) => {
+          await tx.mutationRequest.create({
+            data: {
+              userId: session.user.id,
+              scope: GOAL_CREATE_SCOPE,
+              idempotencyKey,
+              fingerprint,
+              resourceType: 'goal',
+              resourceId: 'pending',
+            },
+          })
+          const created = await createGoal(tx as typeof prisma)
+          await tx.mutationRequest.update({
+            where: {
+              userId_scope_idempotencyKey: {
+                userId: session.user.id,
+                scope: GOAL_CREATE_SCOPE,
+                idempotencyKey,
+              },
+            },
+            data: { resourceId: created.id },
+          })
+          return created
+        })
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          const winner = await prisma.mutationRequest.findUnique({
+            where: {
+              userId_scope_idempotencyKey: {
+                userId: session.user.id,
+                scope: GOAL_CREATE_SCOPE,
+                idempotencyKey,
+              },
+            },
+          })
+          if (winner?.fingerprint === fingerprint && winner.resourceId !== 'pending') {
+            const existingGoal = await prisma.goal.findFirst({
+              where: { id: winner.resourceId, userId: session.user.id },
+            })
+            if (existingGoal) return goalResponse(existingGoal, true)
+          }
+        }
+        throw error
+      }
+    }
+
+    return goalResponse(goal, false)
+  } catch {
+    console.error('Error creating goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -103,8 +195,8 @@ export async function PATCH(request: NextRequest) {
     })
 
     return NextResponse.json(goal)
-  } catch (error) {
-    console.error('Error updating goal:', error)
+  } catch {
+    console.error('Error updating goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -131,8 +223,8 @@ export async function DELETE(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting goal:', error)
+  } catch {
+    console.error('Error deleting goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

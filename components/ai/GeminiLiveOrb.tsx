@@ -23,7 +23,7 @@ import { Mic, X, Brain, CheckCircle2, AlertCircle, Clock, Timer } from 'lucide-r
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
-import { useFocus } from '@/lib/focus-context'
+import { useFocus, useFocusControls } from '@/lib/focus-context'
 import { eventBus } from '@/lib/events/event-bus'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 
@@ -38,6 +38,11 @@ const FOCUS_MODE_COLOR: Record<'work' | 'shortBreak' | 'longBreak', string> = {
   longBreak: 'bg-blue-500',
 }
 
+function FocusTimerReadout() {
+  const { time, formatTime } = useFocus()
+  return <span className="text-xs font-mono font-bold tabular-nums text-white/85">{formatTime(time)}</span>
+}
+
 export function GeminiLiveOrb() {
   const { suppressSecondary } = useMobileOverlay()
   const { bioState } = useCognitiveEngine()
@@ -47,7 +52,7 @@ export function GeminiLiveOrb() {
   // Activity pill (the reference that prompted this), scoped to the one
   // "live" state Novo already tracks in real time. Still the same
   // press-and-hold voice trigger underneath; this only changes what's shown.
-  const { isActive: focusActive, time: focusTime, mode: focusMode, formatTime } = useFocus()
+  const { isActive: focusActive, mode: focusMode } = useFocusControls()
 
   const [micState, setMicState] = useState<MicState>('idle')
   const [transcript, setTranscript] = useState('')
@@ -58,11 +63,24 @@ export function GeminiLiveOrb() {
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
 
-  // ── Audio-reactive aura scale — reads --mic-volume via rAF, GPU transform only
+  // ── Audio-reactive aura scale — reads --mic-volume via rAF, GPU transform only.
+  // The volume variable only changes while the microphone is recording. Keep
+  // the loop completely off while idle/result/error (and while the document
+  // is hidden) so the global utility does not spend a frame per tick parsing
+  // computed styles when there is no audio to visualize.
   const auraRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    let rafId: number
+    if (micState !== 'recording') {
+      if (auraRef.current) auraRef.current.style.transform = 'scale(1.35)'
+      return
+    }
+
+    let rafId = 0
     const tick = () => {
+      if (document.hidden) {
+        rafId = 0
+        return
+      }
       const vol = parseFloat(getComputedStyle(document.body).getPropertyValue('--mic-volume') || '0')
       if (auraRef.current) {
         const scale = 1.35 + vol * 0.85
@@ -70,9 +88,20 @@ export function GeminiLiveOrb() {
       }
       rafId = requestAnimationFrame(tick)
     }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [])
+    const handleVisibility = () => {
+      if (!document.hidden && rafId === 0) rafId = requestAnimationFrame(tick)
+      if (document.hidden && rafId) {
+        cancelAnimationFrame(rafId)
+        rafId = 0
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    handleVisibility()
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [micState])
 
   // ── Fade the orb out while scrolling & idle, so it stops crossing content
   const [isScrolling, setIsScrolling] = useState(false)
@@ -324,7 +353,7 @@ export function GeminiLiveOrb() {
                 <motion.div key="focus-pill" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
                   <span className={`w-1.5 h-1.5 rounded-full ${FOCUS_MODE_COLOR[focusMode]} animate-pulse`} />
                   <Timer className="w-3.5 h-3.5 text-white/50" />
-                  <span className="text-xs font-mono font-bold tabular-nums text-white/85">{formatTime(focusTime)}</span>
+                  <FocusTimerReadout />
                   <Mic className="w-4 h-4 text-indigo-400" />
                 </motion.div>
               ) : (

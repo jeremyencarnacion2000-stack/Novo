@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,9 +24,9 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { GoogleContacts } from '@/components/business/google-contacts'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 import { DealsPipeline } from '@/components/business/deals-pipeline'
 import { BusinessStats } from '@/components/business/business-stats'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 interface BusinessClient {
   id: string
@@ -50,23 +50,20 @@ export default function BusinessPage() {
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
   const [contentDialogOpen, setContentDialogOpen] = useState(false)
 
-  const closeClientFlip = useModalFlip('btn-add-client', clientDialogOpen)
-  const closeContentFlip = useModalFlip('btn-add-content', contentDialogOpen)
-
   const handleClientDialogChange = (o: boolean) => {
-    if (!o) closeClientFlip(() => setClientDialogOpen(false))
-    else setClientDialogOpen(true)
+    setClientDialogOpen(o)
   }
 
   const handleContentDialogChange = (o: boolean) => {
-    if (!o) closeContentFlip(() => setContentDialogOpen(false))
-    else setContentDialogOpen(true)
+    setContentDialogOpen(o)
   }
   const [newClientName, setNewClientName] = useState('')
   const [newClientStatus, setNewClientStatus] = useState<'active' | 'proposal' | 'inactive'>('proposal')
   const [newContentTitle, setNewContentTitle] = useState('')
   const [newContentPlatform, setNewContentPlatform] = useState('Blog')
   const [newContentStatus, setNewContentStatus] = useState<'draft' | 'scheduled' | 'published'>('draft')
+  const clientIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
+  const contentIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,20 +94,31 @@ export default function BusinessPage() {
   const handleAddClient = async () => {
     if (!newClientName.trim()) return
 
+    const payload = {
+      type: 'clients' as const,
+      name: newClientName.trim(),
+      status: newClientStatus,
+    }
+    const fingerprint = JSON.stringify(payload)
+    const previousIntent = clientIntentRef.current
+    const intent = previousIntent?.fingerprint === fingerprint
+      ? previousIntent
+      : { fingerprint, key: createClientIdempotencyKey() }
+    clientIntentRef.current = intent
     try {
       const response = await fetch('/api/business', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'clients',
-          name: newClientName,
-          status: newClientStatus
-        })
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
+        body: JSON.stringify(payload)
       })
       if (response.ok) {
         const newClient = await response.json()
-        setClients(prev => [newClient, ...prev])
+        // Two rapid submits can both receive the same idempotent replay. The
+        // database is already safe, but keep the optimistic list convergent
+        // as well so the UI never shows the same client twice.
+        setClients(prev => [newClient, ...prev.filter(client => client.id !== newClient.id)])
         setNewClientName('')
+        clientIntentRef.current = null
         handleClientDialogChange(false)
       }
     } catch (error) {
@@ -121,21 +129,29 @@ export default function BusinessPage() {
   const handleAddContent = async () => {
     if (!newContentTitle.trim()) return
 
+    const payload = {
+      type: 'content' as const,
+      title: newContentTitle.trim(),
+      platform: newContentPlatform,
+      status: newContentStatus,
+    }
+    const fingerprint = JSON.stringify(payload)
+    const previousIntent = contentIntentRef.current
+    const intent = previousIntent?.fingerprint === fingerprint
+      ? previousIntent
+      : { fingerprint, key: createClientIdempotencyKey() }
+    contentIntentRef.current = intent
     try {
       const response = await fetch('/api/business', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'content',
-          title: newContentTitle,
-          platform: newContentPlatform,
-          status: newContentStatus
-        })
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
+        body: JSON.stringify(payload)
       })
       if (response.ok) {
         const newContent = await response.json()
-        setContentIdeas(prev => [newContent, ...prev])
+        setContentIdeas(prev => [newContent, ...prev.filter(idea => idea.id !== newContent.id)])
         setNewContentTitle('')
+        contentIntentRef.current = null
         handleContentDialogChange(false)
       }
     } catch (error) {
@@ -311,7 +327,7 @@ export default function BusinessPage() {
       <GoogleContacts />
 
       <Dialog open={clientDialogOpen} onOpenChange={handleClientDialogChange}>
-        <DialogContent data-flip-to="btn-add-client">
+        <DialogContent motionId="btn-add-client">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users data-shared-item="icon" className="h-5 w-5" />
@@ -353,7 +369,7 @@ export default function BusinessPage() {
       </Dialog>
 
       <Dialog open={contentDialogOpen} onOpenChange={handleContentDialogChange}>
-        <DialogContent data-flip-to="btn-add-content">
+        <DialogContent motionId="btn-add-content">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText data-shared-item="icon" className="h-5 w-5" />

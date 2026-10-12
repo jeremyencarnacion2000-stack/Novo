@@ -11,7 +11,7 @@ export async function GET(
         const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
-            return new NextResponse('Unauthorized', { status: 401 })
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const note = await prisma.quickNote.findUnique({
@@ -22,13 +22,13 @@ export async function GET(
         })
 
         if (!note) {
-            return new NextResponse('Not Found', { status: 404 })
+            return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
         return NextResponse.json(note)
     } catch (error) {
-        console.error('[NOTE_GET]', error)
-        return new NextResponse('Internal Error', { status: 500 })
+        console.error('[NOTE_GET] Request failed.')
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
 
@@ -40,7 +40,7 @@ export async function PATCH(
         const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
-            return new NextResponse('Unauthorized', { status: 401 })
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const body = await req.json()
@@ -62,8 +62,8 @@ export async function PATCH(
 
         return NextResponse.json(note)
     } catch (error) {
-        console.error('[NOTE_PATCH]', error)
-        return new NextResponse('Internal Error', { status: 500 })
+        console.error('[NOTE_PATCH] Request failed.')
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
 
@@ -75,7 +75,7 @@ export async function DELETE(
         const { id } = await params
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
-            return new NextResponse('Unauthorized', { status: 401 })
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         await prisma.quickNote.delete({
@@ -87,7 +87,7 @@ export async function DELETE(
 
         return new NextResponse(null, { status: 204 })
     } catch (error) {
-        console.error('[NOTE_DELETE]', error)
-        return new NextResponse('Internal Error', { status: 500 })
+        console.error('[NOTE_DELETE] Request failed.')
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

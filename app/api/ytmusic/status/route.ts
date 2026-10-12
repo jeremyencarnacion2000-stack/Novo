@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
 
 // Simple in-memory cache for player state (for fast mirroring)
 // In production, this should be in Redis or Postgres for persistence across server restarts
 const playerStates = new Map<string, any>();
+const playerStateSchema = z.object({
+  currentTrack: z.unknown().nullable().optional(),
+  isPlaying: z.boolean(),
+  progress: z.number().finite().min(0).max(86_400_000),
+}).strict();
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || 'demo-user-id';
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     const state = playerStates.get(userId) || {
       currentTrack: null,
@@ -20,18 +28,26 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(state);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[ytmusic/status] read failed')
+    return NextResponse.json({ error: 'Music service temporarily unavailable' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || 'demo-user-id';
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     const body = await request.json();
-    const { currentTrack, isPlaying, progress } = body;
+    const parsed = playerStateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid player state' }, { status: 400 });
+    }
+    const { currentTrack, isPlaying, progress } = parsed.data;
 
     const newState = {
       currentTrack,
@@ -43,7 +59,8 @@ export async function POST(request: NextRequest) {
     playerStates.set(userId, newState);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[ytmusic/status] update failed')
+    return NextResponse.json({ error: 'Music service temporarily unavailable' }, { status: 500 });
   }
 }

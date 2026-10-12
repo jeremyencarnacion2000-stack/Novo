@@ -23,7 +23,19 @@ export type NovoLoopEvent = (typeof novoLoopEvents)[number]
 export async function trackNovoLoopEvent(userId: string, eventType: NovoLoopEvent, eventData: Record<string, unknown> = {}) {
   // Do not place sensitive task bodies, journal entries, OAuth data, or model
   // prompts in this generic analytics stream.
-  await prisma.analyticsEvent.create({
-    data: { userId, eventType, eventData: JSON.stringify(eventData) },
-  })
+  try {
+    await prisma.analyticsEvent.create({
+      data: { userId, eventType, eventData: JSON.stringify(eventData) },
+    })
+    return true
+  } catch (error) {
+    // Analytics is an observational side effect. A transient database or
+    // retention issue must never turn a durable Twin/activity operation into a
+    // failed user action that the client retries (and potentially duplicates).
+    console.error('[Novo analytics] event dropped', {
+      eventType,
+      error: error instanceof Error ? error.name : 'UnknownError',
+    })
+    return false
+  }
 }

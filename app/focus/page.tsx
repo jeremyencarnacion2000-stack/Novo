@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { GlassSurface } from '@/components/ui/GlassSurface';
 import { Play, Pause, Square, SkipForward, Plus, CheckCircle2, Circle, Target, Coffee, Trees, Flame } from 'lucide-react';
-import { useFocus } from '@/lib/focus-context';
+import { useFocus, useFocusControls } from '@/lib/focus-context';
 import { FocusSettings } from '@/components/focus/focus-settings';
 import { useAnalytics } from '@/hooks/use-swr';
 import { motion } from 'framer-motion';
@@ -16,24 +16,61 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TiltCard } from '@/components/ui/tilt-card';
 
+const FocusTaskList = React.memo(function FocusTaskList() {
+    const { tasks, selectedTaskId, setSelectedTaskId, toggleTaskCompletion } = useFocusControls();
+
+    return (
+        <ScrollArea className="flex-1 pr-4 -mr-4 h-[250px] lg:h-[350px]">
+            <div className="space-y-2">
+                {tasks.length === 0 && (
+                    <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+                        <div
+                            className="w-10 h-10 rounded-xl border border-primary/15 flex items-center justify-center"
+                            style={{ background: 'rgba(99,102,241,0.06)' }}
+                        >
+                            <CheckCircle2 className="h-4 w-4 text-primary/50" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-muted-foreground">
+                                No task selected for this session
+                            </p>
+                            <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">
+                                Linking a task lets Novo attribute this focus time to your
+                                completion rate and improve future scheduling.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                {tasks.map(task => (
+                    <TiltCard
+                        key={task.id}
+                        className={`group flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer hover:border-primary/50 ${selectedTaskId === task.id ? 'bg-primary/5 border-primary ring-1 ring-primary/20' : 'bg-card hover:bg-accent/50'}`}
+                        onClick={() => setSelectedTaskId(task.id)}
+                    >
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTaskCompletion(task.id);
+                            }}
+                            className={`shrink-0 ${task.completed ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
+                        >
+                            {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                        </button>
+                        <span className={`flex-1 text-xs font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+                            {task.text}
+                        </span>
+                        {selectedTaskId === task.id && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1">Active</Badge>
+                        )}
+                    </TiltCard>
+                ))}
+            </div>
+        </ScrollArea>
+    )
+});
+
 export default function FocusPage() {
-    const {
-        time,
-        isActive,
-        mode,
-        pomodoroCount,
-        progress,
-        toggleTimer,
-        resetTimer,
-        skipTimer,
-        formatTime,
-        tasks,
-        addTask,
-        selectedTaskId,
-        setSelectedTaskId,
-        toggleTaskCompletion,
-        deleteTask
-    } = useFocus();
+    const { mode, pomodoroCount, addTask } = useFocusControls();
 
     const [newTaskText, setNewTaskText] = useState('');
     
@@ -71,125 +108,7 @@ export default function FocusPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Timer Column */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div
-                        className="relative rounded-[28px] border border-foreground/[0.07] p-8"
-                        style={{
-                            background: 'rgba(255,255,255,0.015)',
-                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-                        }}
-                    >
-                        <GlassSurface
-                            radius={28}
-                            depth={12}
-                            blur={1}
-                            strength={50}
-                            chromaticAberration={14}
-                            refractive
-                            backgroundColor="transparent"
-                            elevation="low"
-                            aria-hidden
-                            className="pointer-events-none"
-                            style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
-                        />
-                        {/* Grain noise overlay */}
-                        <div 
-                            className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
-                            style={{
-                                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
-                            }}
-                        />
-
-                        <div className="relative z-10 flex flex-col items-center gap-6">
-                            {/* Session Type Badge */}
-                            <Badge
-                                variant={mode === 'work' ? 'default' : 'secondary'}
-                                className="text-base px-5 py-1.5 transition-colors duration-300 gap-1.5"
-                            >
-                                {mode === 'work' ? <Target className="w-4 h-4" /> : (mode === 'shortBreak' ? <Coffee className="w-4 h-4" /> : <Trees className="w-4 h-4" />)}
-                                {mode === 'work' ? 'Focus Session' : (mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
-                            </Badge>
-
-                            {/* Timer Display */}
-                            <motion.div
-                                className="relative"
-                                animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
-                                transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
-                            >
-                                <div className="text-6xl sm:text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">
-                                    {formatTime(time)}
-                                </div>
-                            </motion.div>
-
-                            {/* Progress Bar */}
-                            <div className="w-full max-w-md space-y-2">
-                                <Progress value={progress} className="h-2.5" />
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>{Math.round(progress)}%</span>
-                                    <span>{mode === 'work' ? 'Stay focused' : 'Relax'}</span>
-                                </div>
-                            </div>
-
-                            {/* Controls */}
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    size="lg"
-                                    onClick={toggleTimer}
-                                    className={`px-8 h-12 text-base rounded-full transition-all ${isActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105'}`}
-                                >
-                                    {isActive ? (
-                                        <>
-                                            <Pause className="h-5 w-5 mr-2" />
-                                            Pause
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Play className="h-5 w-5 mr-2" />
-                                            Start
-                                        </>
-                                    )}
-                                </Button>
-
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    onClick={resetTimer}
-                                    className="h-12 w-12 rounded-full"
-                                    title="Reset Timer"
-                                >
-                                    <Square className="h-4 w-4" />
-                                </Button>
-
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    onClick={skipTimer}
-                                    className="h-12 w-12 rounded-full"
-                                    title="Skip Session"
-                                >
-                                    <SkipForward className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            {/* Pomodoro Counter */}
-                            <div className="flex items-center gap-3 mt-2 bg-muted/30 px-4 py-1.5 rounded-full">
-                                <span className="text-xs font-medium text-muted-foreground">Session:</span>
-                                <div className="flex gap-1.5">
-                                    {[...Array(4)].map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i < pomodoroCount % 4
-                                                ? 'bg-primary scale-110'
-                                                : 'bg-muted-foreground/20'
-                                                }`}
-                                        />
-                                    ))}
-                                </div>
-                                <span className="text-xs font-medium ml-1 text-foreground">
-                                    {pomodoroCount % 4}/4
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                    <FocusTimerSection />
 
                     {/* Stats Cards Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -197,7 +116,8 @@ export default function FocusPage() {
                             className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
-                                backdropFilter: 'blur(12px)',
+                                backdropFilter: 'var(--novo-focus-backdrop-filter)',
+                                WebkitBackdropFilter: 'var(--novo-focus-backdrop-filter)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
@@ -211,7 +131,8 @@ export default function FocusPage() {
                             className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
-                                backdropFilter: 'blur(12px)',
+                                backdropFilter: 'var(--novo-focus-backdrop-filter)',
+                                WebkitBackdropFilter: 'var(--novo-focus-backdrop-filter)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
@@ -225,7 +146,8 @@ export default function FocusPage() {
                             className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-4 cursor-default group"
                             style={{
                                 background: 'rgba(255,255,255,0.015)',
-                                backdropFilter: 'blur(12px)',
+                                backdropFilter: 'var(--novo-focus-backdrop-filter)',
+                                WebkitBackdropFilter: 'var(--novo-focus-backdrop-filter)',
                                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                             }}
                         >
@@ -244,7 +166,8 @@ export default function FocusPage() {
                         className="h-full flex flex-col relative overflow-hidden rounded-[28px] border border-foreground/[0.07] p-4"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
-                            backdropFilter: 'blur(12px)',
+                            backdropFilter: 'var(--novo-focus-backdrop-filter)',
+                            WebkitBackdropFilter: 'var(--novo-focus-backdrop-filter)',
                             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}
                     >
@@ -268,56 +191,120 @@ export default function FocusPage() {
                                 </Button>
                             </form>
 
-                            <ScrollArea className="flex-1 pr-4 -mr-4 h-[250px] lg:h-[350px]">
-                                <div className="space-y-2">
-                                    {tasks.length === 0 && (
-                                        <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
-                                            <div
-                                                className="w-10 h-10 rounded-xl border border-primary/15 flex items-center justify-center"
-                                                style={{ background: 'rgba(99,102,241,0.06)' }}
-                                            >
-                                                <CheckCircle2 className="h-4 w-4 text-primary/50" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-muted-foreground">
-                                                    No task selected for this session
-                                                </p>
-                                                <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">
-                                                    Linking a task lets Novo attribute this focus time to your
-                                                    completion rate and improve future scheduling.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {tasks.map(task => (
-                                        <TiltCard
-                                            key={task.id}
-                                            className={`group flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer hover:border-primary/50 ${selectedTaskId === task.id ? 'bg-primary/5 border-primary ring-1 ring-primary/20' : 'bg-card hover:bg-accent/50'}`}
-                                            onClick={() => setSelectedTaskId(task.id)}
-                                        >
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleTaskCompletion(task.id);
-                                                }}
-                                                className={`shrink-0 ${task.completed ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
-                                            >
-                                                {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                                            </button>
-                                            <span className={`flex-1 text-xs font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                                {task.text}
-                                            </span>
-                                            {selectedTaskId === task.id && (
-                                                <Badge variant="secondary" className="text-[9px] h-4 px-1">Active</Badge>
-                                            )}
-                                        </TiltCard>
-                                    ))}
-                                </div>
-                            </ScrollArea>
+                            <FocusTaskList />
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    );
+}
+
+function FocusTimerSection() {
+    const { isActive, mode, pomodoroCount, toggleTimer, resetTimer } = useFocusControls();
+
+    return (
+        <div
+            className="relative rounded-[28px] border border-foreground/[0.07] p-8"
+            style={{
+                background: 'rgba(255,255,255,0.015)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+            }}
+        >
+            <GlassSurface
+                preset="panel"
+                refractive
+                radius={28}
+                depth={12}
+                strength={50}
+                chromaticAberration={4.5}
+                refractivePriority="ambient"
+                backgroundColor="transparent"
+                elevation="low"
+                aria-hidden
+                className="pointer-events-none"
+                style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
+            />
+            <div
+                className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                }}
+            />
+
+            <div className="relative z-10 flex flex-col items-center gap-6">
+                <Badge
+                    variant={mode === 'work' ? 'default' : 'secondary'}
+                    className="text-base px-5 py-1.5 transition-colors duration-300 gap-1.5"
+                >
+                    {mode === 'work' ? <Target className="w-4 h-4" /> : (mode === 'shortBreak' ? <Coffee className="w-4 h-4" /> : <Trees className="w-4 h-4" />)}
+                    {mode === 'work' ? 'Focus Session' : (mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
+                </Badge>
+
+                <motion.div
+                    className="relative"
+                    animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
+                    transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
+                >
+                    <FocusTimerReadout />
+                </motion.div>
+
+                <FocusProgressReadout mode={mode} />
+
+                <div className="flex items-center gap-4">
+                    <Button
+                        size="lg"
+                        onClick={toggleTimer}
+                        className={`px-8 h-12 text-base rounded-full transition-all ${isActive ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105'}`}
+                    >
+                        {isActive ? <><Pause className="h-5 w-5 mr-2" />Pause</> : <><Play className="h-5 w-5 mr-2" />Start</>}
+                    </Button>
+                    <Button size="icon" variant="outline" onClick={resetTimer} className="h-12 w-12 rounded-full" title="Reset Timer">
+                        <Square className="h-4 w-4" />
+                    </Button>
+                    <FocusSkipButton />
+                </div>
+
+                <div className="flex items-center gap-3 mt-2 bg-muted/30 px-4 py-1.5 rounded-full">
+                    <span className="text-xs font-medium text-muted-foreground">Session:</span>
+                    <div className="flex gap-1.5">
+                        {[...Array(4)].map((_, i) => (
+                            <div
+                                key={i}
+                                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i < pomodoroCount % 4 ? 'bg-primary scale-110' : 'bg-muted-foreground/20'}`}
+                            />
+                        ))}
+                    </div>
+                    <span className="text-xs font-medium ml-1 text-foreground">{pomodoroCount % 4}/4</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FocusTimerReadout() {
+    const { time, formatTime } = useFocus();
+    return <div className="text-6xl sm:text-7xl md:text-9xl font-bold tracking-tight text-center font-mono tabular-nums">{formatTime(time)}</div>;
+}
+
+function FocusProgressReadout({ mode }: { mode: 'work' | 'shortBreak' | 'longBreak' }) {
+    const { progress } = useFocus();
+    return (
+        <div className="w-full max-w-md space-y-2">
+            <Progress value={progress} className="h-2.5" />
+            <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{Math.round(progress)}%</span>
+                <span>{mode === 'work' ? 'Stay focused' : 'Relax'}</span>
+            </div>
+        </div>
+    );
+}
+
+function FocusSkipButton() {
+    const { skipTimer } = useFocus();
+    return (
+        <Button size="icon" variant="outline" onClick={skipTimer} className="h-12 w-12 rounded-full" title="Skip Session">
+            <SkipForward className="h-4 w-4" />
+        </Button>
     );
 }

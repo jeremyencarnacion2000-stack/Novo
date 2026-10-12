@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import { Copy, Check, Brain, X } from 'lucide-react'
 import { ConfidenceGauge, TrustBadge } from '@/components/cognitive/primitives'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 import { useTranslation } from '@/lib/i18n'
 
 const SHARE_COPY = {
@@ -47,8 +46,7 @@ export function ShareCognitiveCard({
       : language === 'de'
         ? 'Geschätzte operative Auslastung'
         : copy.load
-  const closeFlip = useModalFlip('cognitive-share', isOpen)
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
 
   const shareText = `Mi resumen de planificación en Novo:
 - Precisión Cognitiva: ${twinScore}%
@@ -71,7 +69,7 @@ Organiza tu siguiente paso con Novo -> https://productivitynovo.vercel.app`
   return (
     <Dialog open={isOpen} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
       <DialogContent
-        data-flip-to="cognitive-share"
+        motionId="cognitive-share"
         showCloseButton={false}
         className="max-w-[min(28rem,calc(100%-1.5rem))] overflow-hidden rounded-[28px] border-foreground/[0.1] bg-background/96 p-5 text-foreground shadow-[0_28px_90px_-36px_rgba(0,0,0,0.75)] sm:p-7"
       >

@@ -27,6 +27,14 @@ const DISCOVERY_QUERIES = [
 export async function GET() {
   const session = await getServerSession(authOptions);
 
+  // The home feed may include followed artists from the user's account. Keep
+  // the route behind the same session boundary as the rest of the music API;
+  // returning the curated fallback anonymously also made the protected app
+  // surface inconsistent with its API contract.
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const ytmusic = await getYTMusic();
 
@@ -49,8 +57,8 @@ export async function GET() {
           artists: [{ name: song.artist?.name ?? 'Unknown Artist', id: song.artist?.artistId ?? '' }],
         };
       });
-    } catch (err) {
-      console.warn('[home] searchSongs failed, topTracks will be empty:', err);
+    } catch {
+      console.warn('[ytmusic/home] searchSongs unavailable; topTracks will be empty.')
     }
 
     // ── 2. Playlists via ytmusic-api searchPlaylists ──
@@ -67,8 +75,8 @@ export async function GET() {
           trackCount: 0,
         };
       });
-    } catch (err) {
-      console.warn('[home] searchPlaylists failed:', err);
+    } catch {
+      console.warn('[ytmusic/home] searchPlaylists unavailable.')
     }
 
     // ── 3. Top Artists: DB-followed + curated fallback ──
@@ -87,8 +95,8 @@ export async function GET() {
             isFollowed: true,
           }));
         }
-      } catch (err) {
-        console.warn('[home] DB followedArtists fetch failed:', err);
+      } catch {
+        console.warn('[ytmusic/home] followed artists unavailable.')
       }
     }
 
@@ -114,8 +122,8 @@ export async function GET() {
       playlists,
       topArtists: mergedArtists.slice(0, 18),
     });
-  } catch (error: any) {
-    console.error('[home] Fatal error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[ytmusic/home] request failed')
+    return NextResponse.json({ error: 'Music home temporarily unavailable' }, { status: 500 });
   }
 }

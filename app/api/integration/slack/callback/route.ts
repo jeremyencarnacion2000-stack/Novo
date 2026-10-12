@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        console.log(`✅ [Slack] Connected for user ${session.user.id}, team: ${tokenData.team?.name}`);
+        console.log('[Slack] Connection persisted.');
     } catch (err) {
         console.error('[Slack Callback] Failed to upsert IntegrationAccount:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);

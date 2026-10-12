@@ -1,21 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Eye, EyeOff, ChevronsRight } from 'lucide-react'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
-import { InfinityOrbit } from '@/components/auth/infinity-orbit'
+import { AuthEditorialPanel } from '@/components/auth/auth-editorial-panel'
 import { reloadAuthenticatedApp } from '@/lib/auth-navigation'
 
 // Only follow a same-origin relative path (never a protocol-relative "//host"
 // or absolute URL) — this is read from a query param an attacker could craft,
 // so treat it as untrusted input, not a place to allow open redirects.
 function getSafeCallbackUrl(): string {
-  if (typeof window === 'undefined') return '/'
+  // Authentication is an app entry point, never an acquisition redirect.
+  // The `/app` resolver then chooses onboarding or the product for the user.
+  if (typeof window === 'undefined') return '/app'
   const raw = new URLSearchParams(window.location.search).get('callbackUrl')
   if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw
-  return '/'
+  return '/app'
 }
 
 export default function SignInPage() {
@@ -87,39 +90,7 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-dvh w-full flex bg-background text-foreground overflow-hidden">
-      {/* Left — decorative panel, own fixed-dark surface (Kreative-style) */}
-      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-10 overflow-hidden bg-[#0a0a0d]">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/30 via-teal-400/10 to-black" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(74,222,128,0.30),_transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_80%,_rgba(45,212,191,0.22),_transparent_50%)]" />
-
-        {/* Floating browser-chrome pill */}
-        <div className="relative z-10 flex justify-center">
-          <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-xl px-4 py-2 shadow-lg">
-            <span className="h-2 w-2 rounded-full bg-red-400/80" />
-            <span className="h-2 w-2 rounded-full bg-yellow-400/80" />
-            <span className="h-2 w-2 rounded-full bg-green-400/80" />
-            <span className="ml-2 text-[11px] font-medium text-white/50 tracking-wide">productivitynovo.app</span>
-          </div>
-        </div>
-
-        {/* Center content */}
-        <div className="relative z-10 flex flex-col items-center text-center gap-10 my-auto">
-          <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white/90 leading-tight italic max-w-sm">
-            Information isn&apos;t the problem.
-          </h1>
-
-          <InfinityOrbit />
-
-          <p className="text-sm text-white/40 leading-relaxed max-w-xs -mt-4">
-            Novo turns the noise into one clear answer: what to do right now.
-          </p>
-        </div>
-
-        <p className="relative z-10 text-center text-[11px] text-white/25 font-medium tracking-wide">
-          © {new Date().getFullYear()} Novo — All rights reserved
-        </p>
-      </div>
+      <AuthEditorialPanel mode="signin" />
 
       {/* Right — form panel, theme-adaptive */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative">
@@ -127,10 +98,10 @@ export default function SignInPage() {
         <div className="w-full max-w-sm space-y-8 relative z-10">
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 mb-6 lg:hidden">
-              <div className="h-9 w-9 rounded-full bg-foreground flex items-center justify-center">
-                <div className="h-3.5 w-3.5 bg-background rounded-full" />
-              </div>
-              <span className="text-sm font-bold tracking-tight text-foreground/40">NOVO</span>
+              <span className="grid size-9 place-items-center overflow-hidden rounded-full border border-foreground/10 bg-foreground/[0.04]">
+                <Image src="/icon.svg" alt="" width={24} height={24} className="size-6 object-contain" priority />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-foreground/55">Novo</span>
             </div>
             <h2 className="text-3xl font-black tracking-tight">Welcome back</h2>
             <p className="text-sm text-foreground/40 leading-relaxed">Sign in to continue to your workspace.</p>
@@ -178,7 +149,7 @@ export default function SignInPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label htmlFor="password" className="text-xs font-medium text-foreground/40 tracking-wide uppercase">Password</label>
-                <button type="button" className="text-[11px] text-foreground/30 hover:text-foreground/50 transition-colors">
+                <button type="button" onClick={() => router.push('/auth/reset-password')} className="text-[11px] text-foreground/30 hover:text-foreground/50 transition-colors">
                   Forgot?
                 </button>
               </div>
@@ -195,6 +166,9 @@ export default function SignInPage() {
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  title={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground/40 transition-colors"
                 >

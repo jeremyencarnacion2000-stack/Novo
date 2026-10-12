@@ -145,9 +145,9 @@ export const notionService = {
             try {
                 const tasks = await notionService.queryDatabase(accessToken, dbId);
                 all.push(...tasks);
-            } catch (err) {
+            } catch {
                 // One failing database should not block others
-                console.error(`[Notion] Failed to query database ${dbId}:`, err);
+                console.error('[Notion] Failed to query database.');
             }
         }
         return all;

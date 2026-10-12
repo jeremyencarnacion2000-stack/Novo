@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
@@ -51,15 +51,26 @@ export default function ProjectsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | undefined>()
+  const createIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   const handleCreate = async (project: Project | Omit<Project, "id">) => {
+    // Keep a key for the same payload when a response is lost, but never
+    // reuse it if the user edits the form before retrying. The server treats
+    // a changed payload under one key as a conflict by design.
+    const fingerprint = JSON.stringify(project)
+    const previousIntent = createIntentRef.current
+    const intent = previousIntent?.fingerprint === fingerprint
+      ? previousIntent
+      : { fingerprint, key: crypto.randomUUID() }
+    createIntentRef.current = intent
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify(project)
       })
       if (response.ok) {
+        createIntentRef.current = null
         mutate()
         setDialogOpen(false)
         toast({
@@ -208,7 +219,11 @@ export default function ProjectsPage() {
         <div className="rounded-[28px] p-8 border border-amber-500/20 relative overflow-hidden shadow-2xl"
           style={{
             background: 'linear-gradient(135deg, rgba(20, 10, 5, 0.8), rgba(9, 9, 11, 0.9))',
-            backdropFilter: 'blur(24px)',
+            // Keep this reduced-capacity shield on the same material contract
+            // as the rest of the app. A fixed blur here made the Settings
+            // controls appear broken on the projects surface.
+            backdropFilter: 'var(--novo-context-backdrop-filter)',
+            WebkitBackdropFilter: 'var(--novo-context-backdrop-filter)',
           }}
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />

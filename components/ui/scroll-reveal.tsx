@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 interface ScrollRevealProps {
   children: React.ReactNode
@@ -10,14 +11,14 @@ interface ScrollRevealProps {
 }
 
 export function ScrollReveal({ children, delay = 0, className, progressive = false }: ScrollRevealProps) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useNovoMotionPolicy() !== 'full'
 
   return (
     <motion.div
-      initial={reduceMotion || progressive ? false : { opacity: 0, transform: 'translate3d(0, 12px, 0)' }}
+      initial={reduceMotion || progressive ? false : { opacity: 0, y: 12 }}
       whileInView={reduceMotion ? undefined : progressive
-        ? { opacity: [0.92, 1], transform: ['translate3d(0, 6px, 0)', 'translate3d(0, 0, 0)'] }
-        : { opacity: 1, transform: 'translate3d(0, 0, 0)' }}
+        ? { opacity: [0.92, 1], y: [6, 0] }
+        : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-36px' }}
       transition={progressive
         ? { duration: 0.5, ease: [0.4, 0, 0.2, 1], delay: Math.min(delay, 0.12) }

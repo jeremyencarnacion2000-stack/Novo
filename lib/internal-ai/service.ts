@@ -87,7 +87,8 @@ export class InternalAIService implements IInternalAIService {
         } catch (error) {
             const errorResult: AIActionResult = {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                // Keep provider/implementation details out of action events and API responses.
+                error: 'INTERNAL_ACTION_FAILED',
                 metadata: {
                     executionTime: Date.now() - startTime
                 }
@@ -110,7 +111,7 @@ export class InternalAIService implements IInternalAIService {
     public async process(processorType: string, input: any, userId: string = 'system'): Promise<AIActionResult> {
         const processor = processors[processorType];
         if (!processor) {
-            return { success: false, error: `Processor not found: ${processorType}` };
+            return { success: false, error: 'PROCESSOR_NOT_FOUND' };
         }
         return processor(input);
     }

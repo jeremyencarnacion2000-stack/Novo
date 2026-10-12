@@ -1,21 +1,24 @@
 'use client'
 
-import React, { useRef, useState, useEffect } from 'react'
-import { AppSidebar } from '@/components/app-sidebar'
+import React, { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import { ResponsiveAppSidebar } from '@/components/responsive-app-sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { useSettings } from '@/lib/settings-context'
-import { DataIntegrator } from '@/lib/data-integrator'
+
 import { MobileNav } from '@/components/mobile-nav'
-import { useScrollContainer } from '@/lib/scroll-container-context'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PageWrapper } from '@/components/PageWrapper'
-import { VoiceCommandHub } from '@/components/ai/VoiceCommandHub'
-import { usePeakTaskOrchestrator } from '@/hooks/use-peak-task-orchestrator'
+const VoiceCommandHub = dynamic(
+  () => import("@/components/ai/VoiceCommandHub").then((module) => ({ default: module.VoiceCommandHub })),
+  { ssr: false, loading: () => null },
+)
 import { useDevicePresence } from '@/hooks/use-device-presence'
-import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
+import { useSession } from 'next-auth/react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -23,6 +26,7 @@ interface DashboardShellProps {
 
 function DashboardShellInner({ children }: DashboardShellProps) {
   const { settings } = useSettings()
+  const { data: session } = useSession()
   const pathname = usePathname()
   const { activeOverlay, closeOverlay, openOverlay } = useMobileOverlay()
   const isFullScreenPage =
@@ -37,16 +41,36 @@ function DashboardShellInner({ children }: DashboardShellProps) {
   const [desktopVoiceOpen, setDesktopVoiceOpen] = useState(false)
   const mobileVoiceOpen = activeOverlay === 'voice'
 
-  // Proactive cognitive orchestrator — single unified insight surface (see
-  // hooks/use-peak-task-orchestrator.ts for why the old separate DB-polled
-  // toast was folded into this same `insight` slot).
-  const { insight, dismissInsight } = usePeakTaskOrchestrator()
   useDevicePresence()
 
   useEffect(() => {
-    DataIntegrator.initialize()
-    return () => DataIntegrator.destroy()
-  }, [])
+    let active = true
+    let idleHandle: number | null = null
+    let timer: number | null = null
+    let integrator: { initialize: (userId?: string) => void; destroy: () => void } | null = null
+
+    const initialize = () => {
+      if (!active) return
+      void import("@/lib/data-integrator").then(({ DataIntegrator }) => {
+        if (!active) return
+        integrator = DataIntegrator
+        DataIntegrator.initialize(session?.user?.id)
+      })
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(initialize, { timeout: 2200 })
+    } else {
+      timer = window.setTimeout(initialize, 1200)
+    }
+
+    return () => {
+      active = false
+      if (idleHandle !== null) window.cancelIdleCallback(idleHandle)
+      if (timer !== null) window.clearTimeout(timer)
+      integrator?.destroy()
+    }
+  }, [session?.user?.id])
 
   // Close voice panel when navigating to full-screen routes
   useEffect(() => {
@@ -93,14 +117,15 @@ function DashboardShellInner({ children }: DashboardShellProps) {
           settings.compactMode && 'compact-mode',
           !settings.showAnimations && 'no-animations'
         )}
-        style={{ transformOrigin: 'top center', willChange: 'transform, border-radius' }}
+        // Keep the root in the normal compositor path. It is not animated
+        // continuously; a permanent will-change hint would reserve a GPU
+        // layer for the entire app and make backdrop surfaces more expensive.
+        style={{ transformOrigin: 'top center' }}
       >
         <div data-app-wallpaper aria-hidden />
 
         {/* Persistent sidebar */}
-        <div className="hidden md:flex h-full">
-          <AppSidebar />
-        </div>
+        <ResponsiveAppSidebar />
 
         <main
           className="flex-1 relative flex flex-col min-h-0 overflow-hidden transition-[background-color,opacity] duration-300 ease-out"
@@ -127,36 +152,16 @@ function DashboardShellInner({ children }: DashboardShellProps) {
           </div>
 
           {/* ── Floating Voice Button ──────────────────────────────────── */}
-          {!isFullScreenPage && mobileVoiceOpen && (
-            <div
-              data-mobile-overlay="voice"
-              aria-hidden="true"
-              className="fixed inset-0 z-[5000] bg-black/60 md:hidden"
-              onClick={handleCloseVoice}
-            />
-          )}
           {!isFullScreenPage && (
-            <AnimatePresence>
-              {(desktopVoiceOpen || mobileVoiceOpen) && (
-                <motion.div
-                  data-mobile-overlay="voice"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Hub de Comandos"
-                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 16, scale: 0.95 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  className="
-                    fixed right-4 z-[5001] w-[calc(100vw-2rem)] max-w-80 rounded-[28px] border border-foreground/10 p-5
-                    md:bottom-24 md:right-6 md:z-[160] md:w-80
-                    backdrop-blur-[28px] bg-background/95
-                    shadow-[0_20px_80px_rgba(0,0,0,0.6)]
-                  "
-                  style={mobileVoiceOpen ? { bottom: 'var(--mobile-navigation-bottom)' } : undefined}
-                >
+            <Dialog open={desktopVoiceOpen || mobileVoiceOpen} onOpenChange={(open) => !open && handleCloseVoice()}>
+              <DialogContent
+                motionPreset="anchored"
+                mobilePresentation="sheet"
+                showCloseButton={false}
+                className="w-[calc(100vw-2rem)] max-w-80 rounded-[28px] border-foreground/10 bg-background/95 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-[28px] md:fixed md:bottom-24 md:right-6 md:w-80"
+              >
                   <div className="flex justify-between items-center mb-3 pb-2 border-b border-foreground/5">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</span>
+                    <DialogTitle className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Hub de Comandos</DialogTitle>
                     <button
                       onClick={handleCloseVoice}
                       className="min-h-[44px] min-w-[44px] p-1 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
@@ -166,9 +171,16 @@ function DashboardShellInner({ children }: DashboardShellProps) {
                     </button>
                   </div>
                   <VoiceCommandHub className="w-full" />
-                </motion.div>
-              )}
-            </AnimatePresence>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Fullscreen chat routes hide the visible voice panel, but the
+              composer still exposes the voice action. Keep the same recorder
+              mounted in the authenticated shell so that action never falls
+              back to the retired GeminiLiveOrb event bridge. */}
+          {isFullScreenPage && (pathname?.startsWith('/ai') || pathname?.startsWith('/chat')) && (
+            <VoiceCommandHub headless />
           )}
         </main>
       </div>

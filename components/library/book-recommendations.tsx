@@ -64,6 +64,7 @@ export function BookRecommendations({ onAddBook }: BookRecommendationsProps) {
                 coverUrl: rec.coverUrl,
                 totalPages: rec.totalPages,
                 isbn: rec.isbn,
+                externalId: rec.key,
                 genre: rec.genre,
                 status: 'to-read',
             })

@@ -5,13 +5,11 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useTranslation } from "@/lib/i18n"
 import type { IntegratedTask } from "@/lib/data-integrator"
-import { useModalFlip } from "@/hooks/use-modal-flip"
 
 export function ChecklistTaskDetail({ task, onClose }: { task: IntegratedTask | null; onClose: () => void }) {
   const { t, language } = useTranslation()
   const flipKey = task ? `checklist-task-${task.id}` : ""
-  const closeFlip = useModalFlip(flipKey, Boolean(task))
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
 
   const dueDate = task?.metadata?.dueDate
   const formattedDate = dueDate
@@ -22,7 +20,7 @@ export function ChecklistTaskDetail({ task, onClose }: { task: IntegratedTask | 
 
   return (
     <Dialog open={Boolean(task)} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent data-flip-to={flipKey} className="max-w-md overflow-hidden rounded-[28px] border-foreground/[0.08] bg-background/95 p-0 backdrop-blur-2xl">
+      <DialogContent motionId={flipKey} className="max-w-md overflow-hidden rounded-[28px] border-foreground/[0.08] bg-background/95 p-0 backdrop-blur-2xl">
         <div data-modal-content className="p-6 sm:p-7">
           <DialogHeader className="gap-3 pr-8 text-left">
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

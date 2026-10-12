@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/select'
 import { Tracker } from '@/types/tracker'
 import { Plus } from 'lucide-react'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface TrackerDialogProps {
   open: boolean
@@ -37,8 +36,7 @@ export function TrackerDialog({ open, onClose, onSave, tracker }: TrackerDialogP
   const [goal, setGoal] = useState(1)
 
   const flipKey = tracker ? `tracker-${tracker.id}` : 'btn-new-tracker'
-  const closeFlip = useModalFlip(flipKey, open)
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
 
   useEffect(() => {
     if (tracker) {
@@ -73,7 +71,7 @@ export function TrackerDialog({ open, onClose, onSave, tracker }: TrackerDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent data-flip-to={flipKey} className="max-w-lg">
+      <DialogContent motionId={flipKey} className="max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

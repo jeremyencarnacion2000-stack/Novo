@@ -9,13 +9,15 @@ export interface OpenLibraryBook {
     subject?: string[]
 }
 
-export async function searchBooks(query: string): Promise<OpenLibraryBook[]> {
+export async function searchBooks(query: string, options?: { signal?: AbortSignal }): Promise<OpenLibraryBook[]> {
     if (!query) return []
 
     try {
         const response = await fetch(
-            `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=20&fields=key,title,author_name,cover_i,first_publish_year,isbn,number_of_pages_median,subject`
+            `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=20&fields=key,title,author_name,cover_i,first_publish_year,isbn,number_of_pages_median,subject`,
+            { signal: options?.signal }
         )
+        if (!response.ok) throw new Error(`Open Library responded with ${response.status}`)
         const data = await response.json()
         return data.docs || []
     } catch (error) {

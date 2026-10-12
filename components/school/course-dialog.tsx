@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 import { Course } from '@/types/school';
 import { Plus } from 'lucide-react';
-import { useModalFlip } from '@/hooks/use-modal-flip';
 
 interface CourseDialogProps {
     open: boolean;
@@ -68,8 +67,7 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
     }, [course, currentYear, open]);
 
     const flipKey = course ? `course-${course.id}` : 'btn-add-course';
-    const closeFlip = useModalFlip(flipKey, open);
-    const handleClose = () => closeFlip(onClose);
+    const handleClose = onClose;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,7 +77,7 @@ export function CourseDialog({ open, onClose, onSave, course }: CourseDialogProp
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent data-flip-to={flipKey} className="sm:max-w-[500px]">
+            <DialogContent motionId={flipKey} className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {!course && <Plus data-shared-item="icon" className="h-5 w-5" />}

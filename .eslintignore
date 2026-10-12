@@ -2,3 +2,5 @@ out/
 notebooklm-mcp/
 .kilo/
 .claude/
+android/app/build/
+/companion/

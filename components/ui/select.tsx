@@ -17,11 +17,23 @@ function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   const flipId = React.useId()
+  const openFrameRef = React.useRef<number | null>(null)
+  React.useEffect(() => () => {
+    if (openFrameRef.current !== null) cancelAnimationFrame(openFrameRef.current)
+  }, [])
   const handleOpenChange = React.useCallback(
     (open: boolean) => {
       if (open) {
-        requestAnimationFrame(() => selectFlip.open(flipId))
+        if (openFrameRef.current !== null) cancelAnimationFrame(openFrameRef.current)
+        openFrameRef.current = requestAnimationFrame(() => {
+          openFrameRef.current = null
+          selectFlip.open(flipId)
+        })
       } else {
+        if (openFrameRef.current !== null) {
+          cancelAnimationFrame(openFrameRef.current)
+          openFrameRef.current = null
+        }
         // The popover is already unmounted by now (Radix closes synchronously
         // from the item's pointerup) — close() plays a clone that open()
         // armed at pointerdown, while the item was still on screen.

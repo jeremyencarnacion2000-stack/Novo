@@ -3,7 +3,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js'
 import { prisma } from '@/lib/prisma'
-import { executeAIAction } from '@/lib/ai/executor'
 import { validateMcpBearerToken, wwwAuthenticateHeader } from '@/lib/mcp/auth'
 import { syncPlugin, syncAllPlugins, type PluginProvider } from '@/lib/plugins/plugin-orchestrator'
 import { isSameDay } from 'date-fns'
@@ -12,6 +11,9 @@ import { rateLimit } from '@/lib/rate-limit'
 import { canTransitionRecommendation, isTerminalRecommendationState } from '@/lib/cognitive/action-state-machine'
 import { prepareMcpRequest } from '@/lib/mcp/request-guard'
 import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime'
+import { syncTaskToCalendars } from '@/lib/task-calendar-sync'
+import { syncTaskChecklist } from '@/lib/task-checklist-sync'
+import { emitTwinSignal } from '@/lib/twin-signal'
 
 export const runtime = 'nodejs'
 
@@ -24,6 +26,13 @@ function insufficientScope(required: string): CallToolResult {
 
 function ok(text: string): CallToolResult {
   return { content: [{ type: 'text', text }] }
+}
+
+async function reconcileTaskMirrors(userId: string, task: { id: string; title: string; status: string; priority: string; dueDate: string | null }) {
+  await Promise.allSettled([
+    syncTaskToCalendars({ userId, taskId: task.id, title: task.title, dueDate: task.dueDate, priority: task.priority }),
+    syncTaskChecklist({ userId, taskId: task.id, title: task.title, status: task.status, priority: task.priority, dueDate: task.dueDate }),
+  ])
 }
 
 function buildServer(userId: string, scopes: string[], actor: McpActor) {
@@ -52,6 +61,8 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
         priority: args.priority === 3 ? 'high' : args.priority === 2 ? 'medium' : 'low',
         dueDate: args.dueDate, tags: '[]',
       } })
+      await reconcileTaskMirrors(userId, task)
+      void emitTwinSignal({ userId, signal: 'task_created' }).catch(() => undefined)
       await finishMcpAudit(claim.audit.id, { resourceId: task.id, summary: 'Task created' })
       return ok(JSON.stringify({ taskId: task.id, status: task.status }))
     } catch {
@@ -78,6 +89,9 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
       prisma.checklistItem.findMany({
         where: {
           userId,
+          // Tasks due today have a generated checklist mirror. Return the
+          // canonical Task only so MCP clients do not see one item twice.
+          taskId: null,
           ...(args.status === 'all' ? {} : { completed: args.status === 'done' }),
           ...(args.dueBefore ? { dueDate: { lte: new Date(args.dueBefore) } } : {}),
         },
@@ -112,7 +126,7 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
         orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }], take: args.limit,
       }),
       prisma.checklistItem.findMany({
-        where: { userId, completed: false },
+        where: { userId, taskId: null, completed: false },
         select: { id: true, text: true, priority: true, dueDate: true, source: true, updatedAt: true },
         orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }], take: args.limit,
       }),
@@ -209,12 +223,13 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
     if (!has('tasks:write')) return insufficientScope('tasks:write')
     const claim = await claimMcpMutation({ actor, tool: 'complete_task', action: 'complete', resourceType: 'task', idempotencyKey: args.idempotencyKey })
     if (claim.duplicate) return ok(JSON.stringify({ duplicate: true, taskId: claim.audit.resourceId, status: claim.audit.resultStatus }))
-    const task = await prisma.task.findFirst({ where: { id: args.id, userId }, select: { id: true, title: true } })
+    const task = await prisma.task.findFirst({ where: { id: args.id, userId }, select: { id: true, title: true, priority: true, dueDate: true, status: true } })
     if (!task) {
       await finishMcpAudit(claim.audit.id, { summary: 'Task not found', failed: true, safeErrorCode: 'task_not_found' })
       return { isError: true, content: [{ type: 'text', text: 'Task not found.' }] }
     }
-    await prisma.task.update({ where: { id: task.id }, data: { status: 'done' } })
+    const updated = await prisma.task.update({ where: { id: task.id }, data: { status: 'done' } })
+    await reconcileTaskMirrors(userId, updated)
     await finishMcpAudit(claim.audit.id, { resourceId: task.id, summary: 'Task completed' })
     void runAmbientTwinForUser(userId, { trigger: 'task_completed' }).catch(() => undefined)
     return ok(`Tarea "${task.title}" marcada como completada.`)
@@ -228,12 +243,13 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
     if (!has('tasks:write')) return insufficientScope('tasks:write')
     const claim = await claimMcpMutation({ actor, tool: 'start_task', action: 'start', resourceType: 'task', idempotencyKey: args.idempotencyKey })
     if (claim.duplicate) return ok(JSON.stringify({ duplicate: true, taskId: claim.audit.resourceId, status: claim.audit.resultStatus }))
-    const task = await prisma.task.findFirst({ where: { id: args.id, userId }, select: { id: true } })
+    const task = await prisma.task.findFirst({ where: { id: args.id, userId }, select: { id: true, title: true, priority: true, dueDate: true, status: true } })
     if (!task) {
       await finishMcpAudit(claim.audit.id, { summary: 'Task not found', failed: true, safeErrorCode: 'task_not_found' })
       return { isError: true, content: [{ type: 'text', text: 'Task not found.' }] }
     }
-    await prisma.task.update({ where: { id: task.id }, data: { status: 'in-progress' } })
+    const updated = await prisma.task.update({ where: { id: task.id }, data: { status: 'in-progress' } })
+    await reconcileTaskMirrors(userId, updated)
     await finishMcpAudit(claim.audit.id, { resourceId: task.id, summary: 'Task started' })
     void runAmbientTwinForUser(userId, { trigger: 'agent_outcome' }).catch(() => undefined)
     return ok(JSON.stringify({ taskId: task.id, status: 'in-progress' }))
@@ -268,6 +284,7 @@ function buildServer(userId: string, scopes: string[], actor: McpActor) {
       ...(updates.priority !== undefined ? { priority: updates.priority === 3 ? 'high' : updates.priority === 2 ? 'medium' : 'low' } : {}),
       ...(updates.dueDate !== undefined ? { dueDate: updates.dueDate } : {}),
     } })
+    await reconcileTaskMirrors(userId, updated)
     await finishMcpAudit(claim.audit.id, { resourceId: updated.id, summary: 'Task updated' })
     void runAmbientTwinForUser(userId, { trigger: 'agent_outcome' }).catch(() => undefined)
     return ok(JSON.stringify({ taskId: updated.id, status: updated.status }))

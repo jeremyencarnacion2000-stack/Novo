@@ -1,11 +1,12 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Brain, CalendarClock, ChevronDown, Clock3, Focus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { CognitiveReport, CognitiveSignals } from './types'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 type SupportedLanguage = 'en' | 'es' | 'fr' | 'de'
 
@@ -76,7 +77,7 @@ export function TwinCommandCenter({
   const { language } = useTranslation()
   const locale = (language in COPY ? language : 'en') as SupportedLanguage
   const copy = COPY[locale]
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useNovoMotionPolicy() !== 'full'
   const [showSources, setShowSources] = useState(false)
   // FocusScore is a planning estimate, not a diagnosis or fatigue measurement.
   const hasFocusWindow = report.focusScore >= 70

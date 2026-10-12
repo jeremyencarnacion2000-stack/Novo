@@ -61,4 +61,38 @@ describe('SettingsProvider material theme refresh', () => {
     )
     expect(document.documentElement.style.getPropertyValue('--novo-focus-refractive-opacity')).toBe('0.27')
   })
+
+  it('keeps the root animation flag in sync when animations are toggled', async () => {
+    function Controls() {
+      const { settings, updateSettings } = useSettings()
+
+      return (
+        <button
+          onClick={() => updateSettings({ showAnimations: !settings.showAnimations })}
+        >
+          Toggle animations
+        </button>
+      )
+    }
+
+    render(
+      <SettingsProvider>
+        <Controls />
+      </SettingsProvider>,
+    )
+
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute('data-animations')).toBe('true')
+    })
+
+    fireEvent.click(document.querySelector('button')!)
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute('data-animations')).toBe('false')
+    })
+
+    fireEvent.click(document.querySelector('button')!)
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute('data-animations')).toBe('true')
+    })
+  })
 })

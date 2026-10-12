@@ -1,50 +1,14 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import * as jose from "jose";
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
+// The legacy bridge placed a 30-day bearer token in a novoapp:// URL. There is
+// no released native consumer for that token and Novo's normal APIs use the
+// server session, so redirect to the supported PWA/web experience instead.
 export default async function MobileAuthBridge() {
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-        // If not authenticated, redirect to the normal sign-in page, 
-        // but tell it to come back here after.
-        redirect("/auth/signin?callbackUrl=/auth/mobile");
-    }
-
-    // User is authenticated! Generate the specific mobile token.
-    const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-    const token = await new jose.SignJWT({
-        id: (session.user as any).id,
-        email: session.user.email,
-        name: session.user.name,
-        role: (session.user as any).role || 'user'
-    })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('30d')
-        .sign(secret);
-
-    // Redirect to the Android URI Scheme
-    redirect(`novoapp://auth?token=${token}`);
-
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-white p-6">
-            <div className="max-w-md w-full text-center space-y-6">
-                <div className="animate-pulse text-4xl mb-8">✨</div>
-                <h1 className="text-2xl font-bold">Authenticating...</h1>
-                <p className="text-gray-400">Verifying session and returning to Novo Mobile app.</p>
-
-                <div className="mt-8 p-4 bg-foreground/5 border border-foreground/10 rounded-2xl">
-                    <p className="text-sm mb-4">Click below if the app doesn't open automatically</p>
-                    <a
-                        href={`novoapp://auth?token=${token}`}
-                        className="inline-block px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all"
-                    >
-                        Return to App
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
+  const session = await getServerSession(authOptions)
+  // Native shells use the app resolver only; it sends new users through
+  // login/onboarding and returning users to the product surface. Never bounce
+  // a mobile auth handoff through the public landing.
+  redirect(session?.user ? '/app' : '/auth/signin?callbackUrl=%2Fapp')
 }

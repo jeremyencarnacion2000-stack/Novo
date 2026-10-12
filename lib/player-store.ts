@@ -1,9 +1,33 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { MusicAlgorithm } from './music-algorithm'
+
+// Zustand persist receives every state update, including the one-second playback
+// progress tick. Avoid a synchronous localStorage write when only transient
+// playback state changed and the persisted preferences are identical.
+export function createPlayerPreferenceStorage(storage: Storage) {
+  const lastValues = new Map<string, string | null>()
+  return {
+    getItem(name: string) {
+      const value = storage.getItem(name)
+      lastValues.set(name, value)
+      return value
+    },
+    setItem(name: string, value: string) {
+      if (lastValues.get(name) === value) return
+      storage.setItem(name, value)
+      lastValues.set(name, value)
+    },
+    removeItem(name: string) {
+      storage.removeItem(name)
+      lastValues.delete(name)
+    },
+  }
+}
 
 // BroadcastChannel for cross-tab synchronization
-const playerChannel = typeof window !== 'undefined' ? new BroadcastChannel('player-state') : null
+const playerChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel('player-state')
+    : null
 
 export interface CurrentTrack {
   id: string; // YouTube Video ID
@@ -442,7 +466,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     },
     {
       name: 'novo-player-v2',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createPlayerPreferenceStorage(localStorage)),
       partialize: (state) => ({
         volume: state.volume,
         isShuffle: state.isShuffle,

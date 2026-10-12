@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { withProviderSyncLock } from './provider-sync-lock'
 
 /**
  * Server-side Analytics Functions
@@ -326,51 +327,57 @@ export async function updateDailyAnalytics(userId: string, module: string = '', 
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        const existing = await prisma.dailyAnalytics.findUnique({
-            where: {
-                userId_date: {
-                    userId,
-                    date: today,
+        // Two completion/session requests can arrive at the same time (double
+        // click, retry after a lost response, or two open devices). Serialize
+        // the read/merge/write window for this user's day so the unique
+        // userId+date row cannot race into a duplicate or lose an increment.
+        await withProviderSyncLock(prisma, `daily-analytics:${userId}:${today.toISOString().slice(0, 10)}`, async (db) => {
+            const existing = await db.dailyAnalytics.findUnique({
+                where: {
+                    userId_date: {
+                        userId,
+                        date: today,
+                    },
                 },
-            },
+            })
+
+            if (existing) {
+                const parsedModulesUsed = typeof existing.modulesUsed === 'string'
+                    ? JSON.parse(existing.modulesUsed) as string[]
+                    : (existing.modulesUsed as string[] || [])
+
+                const modulesUsed = module && !parsedModulesUsed.includes(module)
+                    ? [...parsedModulesUsed, module]
+                    : parsedModulesUsed
+
+                const newTotalTime = (existing.totalTime || 0) + duration
+                const newCompletions = isCompletion ? (existing.completions || 0) + 1 : (existing.completions || 0)
+                const newScore = calculateProductivityScore(newCompletions, newTotalTime)
+
+                await db.dailyAnalytics.update({
+                    where: { id: existing.id },
+                    data: {
+                        totalTime: newTotalTime,
+                        completions: newCompletions,
+                        modulesUsed: JSON.stringify(modulesUsed),
+                        productivityScore: newScore,
+                    },
+                })
+            } else {
+                const completions = isCompletion ? 1 : 0
+                const score = calculateProductivityScore(completions, duration)
+                await db.dailyAnalytics.create({
+                    data: {
+                        userId,
+                        date: today,
+                        totalTime: duration,
+                        completions,
+                        modulesUsed: JSON.stringify(module ? [module] : []),
+                        productivityScore: score,
+                    },
+                })
+            }
         })
-
-        if (existing) {
-            const parsedModulesUsed = typeof existing.modulesUsed === 'string'
-                ? JSON.parse(existing.modulesUsed) as string[]
-                : (existing.modulesUsed as string[] || [])
-
-            const modulesUsed = module && !parsedModulesUsed.includes(module)
-                ? [...parsedModulesUsed, module]
-                : parsedModulesUsed
-
-            const newTotalTime = (existing.totalTime || 0) + duration
-            const newCompletions = isCompletion ? (existing.completions || 0) + 1 : (existing.completions || 0)
-            const newScore = calculateProductivityScore(newCompletions, newTotalTime)
-
-            await prisma.dailyAnalytics.update({
-                where: { id: existing.id },
-                data: {
-                    totalTime: newTotalTime,
-                    completions: newCompletions,
-                    modulesUsed: JSON.stringify(modulesUsed),
-                    productivityScore: newScore,
-                },
-            })
-        } else {
-            const completions = isCompletion ? 1 : 0
-            const score = calculateProductivityScore(completions, duration)
-            await prisma.dailyAnalytics.create({
-                data: {
-                    userId,
-                    date: today,
-                    totalTime: duration,
-                    completions,
-                    modulesUsed: JSON.stringify(module ? [module] : []),
-                    productivityScore: score,
-                },
-            })
-        }
     } catch (error) {
         console.error('Failed to update daily analytics:', error)
     }

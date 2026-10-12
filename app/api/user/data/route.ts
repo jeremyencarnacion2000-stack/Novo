@@ -32,8 +32,8 @@ export async function DELETE() {
     ])
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting user data:', error)
+  } catch {
+    console.error('Error deleting user data.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

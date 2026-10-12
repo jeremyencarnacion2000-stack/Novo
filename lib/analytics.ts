@@ -3,6 +3,8 @@
  * Use these to track user events from client components
  */
 
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
+
 export async function trackEvent(
   userId: string | undefined,
   eventType: 'page_view' | 'task_complete' | 'routine_complete' | 'habit_complete' | 'reading_progress',
@@ -20,12 +22,12 @@ export async function trackEvent(
   }
 }
 
-export async function startSession(userId: string | undefined, module: string) {
+export async function startSession(userId: string | undefined, module: string, sessionId = createClientIdempotencyKey()) {
   try {
     const res = await fetch('/api/analytics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'startSession', userId, module })
+      body: JSON.stringify({ action: 'startSession', userId, module, sessionId })
     })
     const data = await res.json()
     return data.sessionId ? { id: data.sessionId } : null

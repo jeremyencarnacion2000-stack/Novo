@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
 import { RoutinesList } from '@/components/routines/routines-list'
@@ -12,10 +12,10 @@ import { useRoutines, ROUTINE_STATS_KEY } from '@/hooks/use-swr'
 import { useSWRConfig } from 'swr'
 import { useToast } from '@/hooks/use-toast'
 import { RoutineStatsCard } from '@/components/routines/routine-stats'
-import { safeViewTransition } from '@/hooks/use-view-transition'
 import { ScrollReveal } from '@/components/ui/scroll-reveal'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { useTranslation } from '@/lib/i18n'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 export default function RoutinesPage() {
   const { data: routines, error, isLoading, mutate } = useRoutines()
@@ -43,21 +43,28 @@ export default function RoutinesPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null)
+  const createIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
+  const importIntentKey = useRef<string | null>(null)
 
   const handleCreate = async (routine: Omit<Routine, 'id'>) => {
+    const fingerprint = JSON.stringify(routine)
+    const previousIntent = createIntentRef.current
+    const intent = previousIntent?.fingerprint === fingerprint
+      ? previousIntent
+      : { fingerprint, key: createClientIdempotencyKey() }
+    createIntentRef.current = intent
     try {
       const response = await fetch('/api/routines', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify(routine),
       })
       if (response.ok) {
+        createIntentRef.current = null
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
         globalMutate('/api/analytics')
-        safeViewTransition(() => {
-          setDialogOpen(false)
-        })
+        setDialogOpen(false)
         toast({
           title: 'Routine created',
           description: 'Your new routine has been created successfully.',
@@ -90,10 +97,8 @@ export default function RoutinesPage() {
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
         globalMutate('/api/analytics')
-        safeViewTransition(() => {
-          setDialogOpen(false)
-          setEditingRoutine(undefined)
-        })
+        setDialogOpen(false)
+        setEditingRoutine(undefined)
         toast({
           title: 'Routine updated',
           description: 'Your routine has been updated successfully.',
@@ -146,42 +151,42 @@ export default function RoutinesPage() {
   }
 
   const handleEdit = (routine: Routine) => {
-    safeViewTransition(() => {
-      setEditingRoutine(routine)
-      setDialogOpen(true)
-    })
+    setEditingRoutine(routine)
+    setDialogOpen(true)
   }
 
   const handleDialogClose = () => {
-    safeViewTransition(() => {
-      setDialogOpen(false)
-      setEditingRoutine(undefined)
-    })
+    setDialogOpen(false)
+    setEditingRoutine(undefined)
   }
 
   const handleImport = async (payload: any) => {
+    const intentKey = importIntentKey.current || createClientIdempotencyKey()
+    importIntentKey.current = intentKey
     try {
       const response = await fetch('/api/routines/import-batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intentKey },
         body: JSON.stringify(payload),
       })
       if (response.ok) {
         mutate()
         globalMutate(ROUTINE_STATS_KEY)
-        setImportDialogOpen(false)
+        if (importIntentKey.current === intentKey) importIntentKey.current = null
         toast({
           title: 'Import successful',
           description: 'Your routines and data have been imported successfully.',
         })
+        return true
       } else {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({}))
         console.error('Import error details:', errorData)
         toast({
           title: 'Error importing data',
           description: errorData.error || 'Could not import data. Please try again later.',
           variant: 'destructive',
         })
+        return false
       }
     } catch (error) {
       console.error('Error importing data:', error)
@@ -190,14 +195,13 @@ export default function RoutinesPage() {
         description: 'Could not import data. Please try again later.',
         variant: 'destructive',
       })
+      return false
     }
   }
 
   const handleView = (routine: Routine) => {
-    safeViewTransition(() => {
-      setViewingRoutine(routine)
-      setDetailDialogOpen(true)
-    })
+    setViewingRoutine(routine)
+    setDetailDialogOpen(true)
   }
 
   const handleUpdateProgress = async (routineId: string, taskId: string, completed: boolean) => {
@@ -291,7 +295,10 @@ export default function RoutinesPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           {!isReducedCapacity && <Button
-            onClick={() => setImportDialogOpen(true)}
+            onClick={() => {
+              importIntentKey.current = null
+              setImportDialogOpen(true)
+            }}
             data-flip-from="btn-import-routine"
             variant="outline"
             className="w-full sm:w-auto"

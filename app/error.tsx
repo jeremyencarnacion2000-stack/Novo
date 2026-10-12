@@ -10,7 +10,9 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[Novo Error Boundary]', error)
+    // Keep provider/database diagnostics out of browser logs. The digest is
+    // safe to correlate in the platform dashboard without exposing details.
+    console.error('[Novo Error Boundary]', error?.digest ? 'with_digest' : 'without_digest')
   }, [error])
 
   return (

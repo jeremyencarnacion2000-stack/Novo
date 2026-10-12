@@ -8,7 +8,7 @@ import { useSettings } from '@/lib/settings-context'
 import { useTranslation } from '@/lib/i18n'
 import { Card } from '@/components/ui/card'
 import React, { useEffect, useState, useCallback } from 'react'
-import { DashboardQuickView } from './dashboard/dashboard-quick-view'
+import dynamic from 'next/dynamic'
 import { motion, type Variants } from 'framer-motion'
 import { CognitiveEngineWidget } from '@/components/cognitive/cognitive-engine-widget'
 import { NowHero } from '@/components/dashboard/now-hero'
@@ -18,6 +18,13 @@ import { useCognitivePhase } from '@/lib/cognitive-context'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Shield } from 'lucide-react'
+
+// Routine details and workout controls are only needed after selecting an
+// activity. Keep their dependency tree outside the dashboard's initial load.
+const DashboardQuickView = dynamic(
+  () => import('./dashboard/dashboard-quick-view').then(module => module.DashboardQuickView),
+  { ssr: false },
+)
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -129,13 +136,13 @@ export default function DashboardClient() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-6 md:grid-cols-2">
             <ScrollReveal delay={0} className="space-y-6 cognitive-secondary-element">
-              <Card variant="liquid" className="p-0">
+              <Card variant="primary" className="p-0">
                 <QuickActions />
               </Card>
               <DashboardHabits />
             </ScrollReveal>
             <ScrollReveal delay={0.06} className="cognitive-secondary-element">
-              <Card variant="liquid" className="p-0 h-full">
+              <Card variant="primary" className="p-0 h-full">
                 <RecentActivity onActivityClick={handleActivityClick} />
               </Card>
             </ScrollReveal>
@@ -203,13 +210,13 @@ export default function DashboardClient() {
       )}
 
       {/* Quick View Side Panel */}
-      <DashboardQuickView
+      {quickViewType !== null && <DashboardQuickView
         open={quickViewOpen}
         onClose={() => setQuickViewOpen(false)}
         type={quickViewType}
         data={quickViewData}
         anchorRect={quickViewAnchor}
-      />
+      />}
     </motion.div>
   )
 }

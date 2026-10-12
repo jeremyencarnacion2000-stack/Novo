@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
+import { shouldReduceNovoMotion } from '@/hooks/use-novo-motion-policy'
 
 interface DragToDismissOptions<T extends HTMLElement> {
   /** Called after the surface has travelled off-screen. */
@@ -83,7 +84,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
     }
 
     const restore = () => {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const reducedMotion = shouldReduceNovoMotion()
       const overlay = getOverlay()
       gsap.to(surface, {
         y: 0,
@@ -195,7 +196,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       }
 
       const overlay = getOverlay()
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const reducedMotion = shouldReduceNovoMotion()
       const remaining = Math.max(window.innerHeight - distance + 24, 80)
       const duration = reducedMotion ? 0.14 : Math.min(0.28, Math.max(0.14, remaining / Math.max(700, velocityY * 1000)))
 

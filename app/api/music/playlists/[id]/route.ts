@@ -30,8 +30,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     })
 
     return NextResponse.json(playlist)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch {
+    console.error('[music/playlist] read failed')
+    return NextResponse.json({ error: 'Unable to load playlist right now' }, { status: 500 })
   }
 }
 
@@ -55,8 +56,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch {
+    console.error('[music/playlist] update failed')
+    return NextResponse.json({ error: 'Unable to update playlist right now' }, { status: 500 })
   }
 }
-

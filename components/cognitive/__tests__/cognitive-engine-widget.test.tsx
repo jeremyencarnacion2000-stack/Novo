@@ -11,7 +11,7 @@ jest.mock('@/hooks/use-swr', () => ({
         energyLevel: 'medium',
         burnoutRisk: 54,
         insights: [{ headline: 'Dos compromisos vencen hoy.' }],
-        recommendation: 'Empieza por el compromiso con fecha mÃ¡s cercana.',
+        recommendation: 'Empieza por el compromiso con fecha más cercana.',
       },
     },
   }),

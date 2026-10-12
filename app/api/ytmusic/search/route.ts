@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { getYTMusic } from '@/lib/ytmusic';
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get('q');
-  const limit = parseInt(searchParams.get('limit') || '20');
+  const q = searchParams.get('q')?.trim() || '';
+  const requestedLimit = Number.parseInt(searchParams.get('limit') || '20', 10)
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 50)
+    : 20
   
   if (!q) {
     return NextResponse.json({ error: 'Query parameter "q" is required' }, { status: 400 });
+  }
+  if (q.length > 200) {
+    return NextResponse.json({ error: 'Search query is too long' }, { status: 400 });
   }
 
   try {
@@ -35,7 +48,8 @@ export async function GET(request: Request) {
     });
     
     return NextResponse.json({ tracks });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[ytmusic/search] request failed')
+    return NextResponse.json({ error: 'Music search temporarily unavailable' }, { status: 500 });
   }
 }

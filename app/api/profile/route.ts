@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             habitsCount = results[3] as number;
             streakDays = results[4] as number;
         } catch (e) {
-            console.error('Error fetching stats:', e);
+            console.error('Error fetching stats.');
         }
 
         const memberSince = user.createdAt;
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
             })),
         });
     } catch (error) {
-        console.error('Error fetching profile:', error);
+        console.error('Error fetching profile.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -127,7 +127,7 @@ async function calculateStreak(userId: string): Promise<number> {
 
         return streak;
     } catch (error) {
-        console.error('Error calculating streak:', error);
+        console.error('Error calculating streak.');
         return 0;
     }
 }

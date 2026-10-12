@@ -175,8 +175,6 @@ export class GrokAPIClient {
         stream: false,
         ...(tools && tools.length > 0 && { tools })
       };
-      console.log('DEBUG: Request body model:', requestBody.model);
-
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -186,13 +184,8 @@ export class GrokAPIClient {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('DEBUG: API response status:', response.status);
-      console.log('DEBUG: API response statusText:', response.statusText);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('DEBUG: API error response body:', errorText);
-        throw new Error(`Grok API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error('grok_provider_unavailable');
       }
 
       const data: GrokAPIResponse = await response.json();
@@ -200,7 +193,6 @@ export class GrokAPIClient {
       console.log('Grok API: Respuesta recibida', {
         estado: response.status,
         cantidadOpciones: data.choices?.length || 0,
-        contenido: data.choices?.[0]?.message?.content?.slice(0, 100) || 'sin contenido'
       });
 
       if (!data.choices || data.choices.length === 0) {
@@ -221,20 +213,17 @@ export class GrokAPIClient {
                 name: toolCall.function.name,
                 args
               });
-            } catch (error) {
-              console.error('Error parsing tool call arguments:', error);
+            } catch {
+              console.warn('[Grok] Tool-call arguments rejected.');
             }
           }
         }
       }
 
       return { content, functionCalls };
-    } catch (error) {
-      console.error('Grok API error:', error);
-      console.error('DEBUG: Error type:', typeof error);
-      console.error('DEBUG: Error message:', error instanceof Error ? error.message : String(error));
-      console.error('DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack available');
-      throw new Error(`Grok API error: ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
+      console.error('[Grok] Provider request failed.');
+      throw new Error('grok_provider_unavailable');
     }
   }
 

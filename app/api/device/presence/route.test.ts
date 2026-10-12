@@ -66,12 +66,25 @@ describe('POST /api/device/presence', () => {
     const response = await POST(presenceRequest({
       startedAt: '2026-08-17T10:00:00.000Z',
       endedAt: '2026-08-17T10:05:00.000Z',
+      surface: 'pwa_mobile',
       userId: 'victim-2',
     }) as never)
 
     expect(response.status).toBe(200)
     expect(prisma.deviceActivityEvent.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ userId: 'owner-1' }),
+      data: expect.objectContaining({ userId: 'owner-1', surface: 'pwa_mobile' }),
     }))
+  })
+
+  it('rejects an unknown device surface instead of storing a raw client label', async () => {
+    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'owner-1' } })
+    const response = await POST(presenceRequest({
+      startedAt: '2026-08-17T10:00:00.000Z',
+      endedAt: '2026-08-17T10:05:00.000Z',
+      surface: 'fingerprint-me',
+    }) as never)
+
+    expect(response.status).toBe(400)
+    expect(prisma.deviceActivityEvent.create).not.toHaveBeenCalled()
   })
 })

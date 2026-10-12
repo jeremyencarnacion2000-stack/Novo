@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ settings: userSettings.settings })
     } catch (error) {
-        console.error('Error fetching user settings:', error)
+        console.error('Error fetching user settings.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true, settings: userSettings.settings })
     } catch (error) {
-        console.error('Error saving user settings:', error)
+        console.error('Error saving user settings.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

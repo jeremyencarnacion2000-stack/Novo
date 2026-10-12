@@ -365,6 +365,33 @@ function OnboardingContent() {
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const demoStartedRef = useRef(false)
+  const mountedRef = useRef(true)
+  const compileTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const answerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const demoAbortRef = useRef<AbortController | null>(null)
+  const analyzeAbortRef = useRef<AbortController | null>(null)
+  const dayPlanAbortRef = useRef<AbortController | null>(null)
+
+  // Onboarding deliberately uses a few staged timers for its editorial
+  // reveal. Keep them owned by this screen: navigating away, switching
+  // accounts, or restarting the flow must not let a late timer mutate an
+  // already-unmounted tree or start a second Day 1 plan.
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      compileTimersRef.current.forEach(clearTimeout)
+      compileTimersRef.current = []
+      if (answerTimerRef.current) clearTimeout(answerTimerRef.current)
+      answerTimerRef.current = null
+      demoAbortRef.current?.abort()
+      analyzeAbortRef.current?.abort()
+      dayPlanAbortRef.current?.abort()
+      demoAbortRef.current = null
+      analyzeAbortRef.current = null
+      dayPlanAbortRef.current = null
+    }
+  }, [])
 
   // /onboarding is intentionally public for acquisition and review, but an
   // authenticated user whose persisted Twin is already initialized must never
@@ -404,39 +431,58 @@ function OnboardingContent() {
   }, [isDemoMode])
 
   const triggerDemoSeeding = async () => {
+    if (!mountedRef.current) return
+    compileTimersRef.current.forEach(clearTimeout)
+    compileTimersRef.current = []
     setStage('compilation')
     setCompileStep(0)
 
     const compileTimings = [200, 400, 600, 800, 1000]
-    compileTimings.forEach((time, index) => {
-      setTimeout(() => setCompileStep(index + 1), time)
-    })
+    compileTimersRef.current = compileTimings.map((time, index) =>
+      setTimeout(() => {
+        if (mountedRef.current) setCompileStep(index + 1)
+      }, time),
+    )
 
     try {
+      demoAbortRef.current?.abort()
+      const controller = new AbortController()
+      demoAbortRef.current = controller
       const response = await fetch('/api/cognitive-twin/demo', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
       })
+      if (!mountedRef.current || controller.signal.aborted || demoAbortRef.current !== controller) return
       if (!response.ok) throw new Error(`Demo twin request failed: ${response.status}`)
       const data = await response.json()
+      if (!mountedRef.current || controller.signal.aborted || demoAbortRef.current !== controller) return
       if (data.success && data.twin) {
         setTwinData(data.twin)
       } else {
         setTwinData(DEFAULT_TWIN_DATA)
       }
     } catch (e) {
+      if (!mountedRef.current || (e as { name?: string })?.name === 'AbortError') return
       console.error('Failed to seed demo twin data:', e)
       setTwinData(DEFAULT_TWIN_DATA)
+    } finally {
+      if (demoAbortRef.current?.signal.aborted || !mountedRef.current) {
+        demoAbortRef.current = null
+      }
     }
   }
 
   // Dynamic next step trigger
   const handleAnswer = (answerText: string, value: string) => {
+    if (!mountedRef.current || answerTimerRef.current) return
     // Add User response
     const answerForAnalysis = value === answerText ? answerText : `${answerText} [selection:${value}]`
     setMessages(prev => [...prev, { role: 'user', content: answerForAnalysis }])
     
-    setTimeout(() => {
+    answerTimerRef.current = setTimeout(() => {
+      answerTimerRef.current = null
+      if (!mountedRef.current) return
       if (currentStep < STEPS.length - 1) {
         const next = currentStep + 1
         setCurrentStep(next)
@@ -464,65 +510,86 @@ function OnboardingContent() {
   // login. Fires in the background — the day1_plan stage shows a loading state
   // if it hasn't resolved yet by the time the user gets there.
   const triggerDayPlan = async (twin: any) => {
-    if (!session?.user?.id) return
+    if (!session?.user?.id || !mountedRef.current) return
+    dayPlanAbortRef.current?.abort()
+    const controller = new AbortController()
+    dayPlanAbortRef.current = controller
     try {
       const res = await fetch('/api/onboarding/day-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ twin }),
+        signal: controller.signal,
       })
+      if (!mountedRef.current || controller.signal.aborted || dayPlanAbortRef.current !== controller) return
       const data = await res.json()
       if (!data.error) setDayPlan(data)
     } catch (e) {
+      if (!mountedRef.current || (e as { name?: string })?.name === 'AbortError') return
       console.error('Failed to generate day 1 plan:', e)
+    } finally {
+      if (dayPlanAbortRef.current === controller) dayPlanAbortRef.current = null
     }
   }
 
   const triggerCompilation = async () => {
+    if (!mountedRef.current) return
+    compileTimersRef.current.forEach(clearTimeout)
+    compileTimersRef.current = []
     setStage('compilation')
     setCompileStep(0)
 
     const compileTimings = [800, 1600, 2400, 3200, 4200]
-    compileTimings.forEach((time, index) => {
-      setTimeout(() => setCompileStep(index + 1), time)
-    })
+    compileTimersRef.current = compileTimings.map((time, index) =>
+      setTimeout(() => {
+        if (mountedRef.current) setCompileStep(index + 1)
+      }, time),
+    )
 
-    // clearTimeout doesn't help once the timer has already fired: if
-    // /api/onboarding/analyze takes >=8s, the fallback branch below AND the
-    // success branch after `await fetch` both ran, each calling
-    // triggerDayPlan → POST /api/onboarding/day-plan, which unconditionally
-    // creates real tasks + a calendar event with no dedup guard server-side
-    // — a new user got their Day 1 plan created twice. One local flag shared
-    // by both closures (this function runs once per onboarding session)
-    // makes "first one wins" instead of "both can win".
+    // clearTimeout does not help once the timer has already fired: if
+    // /api/onboarding/analyze takes >=8s, the fallback branch below and the
+    // success branch after `await fetch` can both settle. One local flag shared
+    // by both closures makes the first result win, while the server's
+    // day-plan intent key remains the durable idempotency boundary for retries.
     let dayPlanStarted = false
     const settleTwin = (data: any) => {
-      if (dayPlanStarted) return
+      if (dayPlanStarted || !mountedRef.current) return
       dayPlanStarted = true
       setTwinData(data)
-      triggerDayPlan(data)
+      void triggerDayPlan(data)
     }
 
     // Call analysis endpoint with conversation history
     // 8-second timeout — fallback to default twin values to avoid infinite loading
     const analyzeTimeout = setTimeout(() => {
+      if (!mountedRef.current) return
       settleTwin(DEFAULT_TWIN_DATA)
     }, 8000)
 
     try {
+      analyzeAbortRef.current?.abort()
+      const controller = new AbortController()
+      analyzeAbortRef.current = controller
       const response = await fetch('/api/onboarding/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, language })
+        body: JSON.stringify({ messages, language }),
+        signal: controller.signal,
       })
+      if (!mountedRef.current || controller.signal.aborted || analyzeAbortRef.current !== controller) return
       if (!response.ok) throw new Error(`Onboarding analysis failed: ${response.status}`)
       const data = await response.json()
       clearTimeout(analyzeTimeout)
       settleTwin(data)
     } catch (e) {
-      console.error(e)
+      if (!mountedRef.current || (e as { name?: string })?.name === 'AbortError') return
+      console.error('Onboarding analysis failed.')
       clearTimeout(analyzeTimeout)
       settleTwin(DEFAULT_TWIN_DATA)
+    } finally {
+      if (analyzeAbortRef.current?.signal.aborted || !mountedRef.current) {
+        analyzeAbortRef.current = null
+      }
     }
   }
 
@@ -557,6 +624,7 @@ function OnboardingContent() {
       confidenceScore: data.confidenceScore ?? 0,
       trustLevel: data.trustLevel ?? 'initial'
     })
+    if (!mountedRef.current) return
     if (!persisted) {
       setFinalizeError(finalizationCopy[onboardingLanguage].error)
       setIsFinalizing(false)

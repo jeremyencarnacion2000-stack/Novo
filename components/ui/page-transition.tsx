@@ -9,10 +9,10 @@
  *   </PageTransition>
  */
 
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { pageTransitions, type PageTransitionVariant } from '@/lib/design-tokens'
 import { usePathname } from 'next/navigation'
-import { useSettings } from '@/lib/settings-context'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 interface PageTransitionProps {
   children: React.ReactNode
@@ -27,9 +27,7 @@ export function PageTransition({
 }: PageTransitionProps) {
   const pathname = usePathname()
   const preset = pageTransitions[variant]
-  const reducedMotion = useReducedMotion()
-  const { settings } = useSettings()
-  const shouldReduceMotion = reducedMotion || !settings.showAnimations
+  const shouldReduceMotion = useNovoMotionPolicy() !== 'full'
   const transition = shouldReduceMotion ? { duration: 0.01 } : preset.transition
 
   return (
@@ -41,8 +39,7 @@ export function PageTransition({
         exit={shouldReduceMotion ? { opacity: 1 } : preset.exit}
         transition={transition}
         className={className}
-        style={{ willChange: 'opacity, transform, filter' }}
-      >
+        >
         {children}
       </motion.div>
     </AnimatePresence>

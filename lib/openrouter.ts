@@ -56,12 +56,6 @@ export const openRouterAPI = {
             content: message
         });
 
-        console.log('OpenRouter API: Sending request', {
-            model,
-            messageCount: messages.length,
-            lastMessage: message.slice(0, 100)
-        });
-
         try {
             const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
                 method: 'POST',
@@ -80,17 +74,14 @@ export const openRouterAPI = {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('OpenRouter API error:', errorText);
-                throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+                // Provider bodies can contain prompt fragments or account
+                // diagnostics. Keep them out of logs and client-facing errors.
+                await response.arrayBuffer().catch(() => undefined);
+                console.error('OpenRouter API request failed', { status: response.status });
+                throw new Error('openrouter_provider_unavailable');
             }
 
             const data = await response.json();
-
-            console.log('OpenRouter API: Response received', {
-                model: data.model,
-                usage: data.usage
-            });
 
             const content = data.choices?.[0]?.message?.content || '';
 
@@ -99,7 +90,9 @@ export const openRouterAPI = {
                 functionCalls: []
             };
         } catch (error) {
-            console.error('Error calling OpenRouter API:', error);
+            console.error('OpenRouter API request failed', {
+                reason: error instanceof Error ? error.name : 'unknown',
+            });
             throw error;
         }
     }

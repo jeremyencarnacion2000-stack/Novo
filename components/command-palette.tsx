@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/command'
 import { useSettings } from '@/lib/settings-context'
 
-export function CommandPalette() {
-  const [open, setOpen] = React.useState(false)
+export function CommandPalette({ initialOpen = false }: { initialOpen?: boolean }) {
+  const [open, setOpen] = React.useState(initialOpen)
   const router = useRouter()
   const { settings } = useSettings()
 

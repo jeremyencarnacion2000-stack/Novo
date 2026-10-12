@@ -11,12 +11,8 @@ export async function POST(request: Request) {
   try {
     const channelToken = request.headers.get('x-goog-channel-token');
     const resourceState = request.headers.get('x-goog-resource-state');
-    const channelId = request.headers.get('x-goog-channel-id');
-    const resourceId = request.headers.get('x-goog-resource-id');
 
-    console.log('🔔 [Calendar Webhook] Received event notification:', {
-      channelId,
-      resourceId,
+    console.log('[Calendar Webhook] Notification received.', {
       resourceState,
       hasToken: !!channelToken,
     });
@@ -33,8 +29,17 @@ export async function POST(request: Request) {
       return new Response('Invalid token format', { status: 400 });
     }
 
+    const signingSecret = process.env.NEXTAUTH_SECRET;
+    if (!signingSecret) {
+      // Never fall back to a known development secret for a public webhook.
+      // A missing deployment secret must fail closed instead of accepting a
+      // forgeable channel token.
+      console.error('❌ [Calendar Webhook] NEXTAUTH_SECRET is not configured.');
+      return new Response('Webhook unavailable', { status: 503 });
+    }
+
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.NEXTAUTH_SECRET || 'secret-fallback')
+      .createHmac('sha256', signingSecret)
       .update(userId)
       .digest('hex');
 
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
     });
 
     if (!account || !account.access_token) {
-      console.error('❌ [Calendar Webhook] Connected Google Account not found for user ID:', userId);
+      console.error('[Calendar Webhook] Connected Google account not found.');
       return new Response('Linked Google account not found', { status: 404 });
     }
 
@@ -84,7 +89,7 @@ export async function POST(request: Request) {
     // Auto-update rotated tokens inside the DB
     oauth2Client.on('tokens', async (tokens) => {
       if (tokens.access_token) {
-        console.log('🔄 [Calendar Webhook] Automatic token refresh triggered during sync, updating DB Account...');
+        console.log('[Calendar Webhook] Rotated Google credentials persisted.');
         await prisma.account.update({
           where: { id: account.id },
           data: {
@@ -110,7 +115,7 @@ export async function POST(request: Request) {
     });
 
     const googleEvents = eventsResponse.data.items || [];
-    console.log(`📊 [Calendar Webhook] Fetched ${googleEvents.length} events from Google Calendar for synchronization.`);
+    console.log('[Calendar Webhook] Calendar events fetched.', { count: googleEvents.length });
 
     // Perform atomic database synchronizations to avoid race conditions
     for (const event of googleEvents) {
@@ -121,16 +126,19 @@ export async function POST(request: Request) {
       const isCancelled = event.status === 'cancelled';
 
       if (isCancelled) {
-        console.log(`🗑️ [Calendar Webhook] Event ${event.id} is deleted on Google, deleting locally...`);
-        try {
-          await prisma.timeBlock.delete({
-            where: { googleEventId: event.id },
-          });
-        } catch {
-          // Record might not exist locally, ignore deletion errors safely
-        }
+        // Delete only the current user's mirror. A provider event id must never
+        // be allowed to remove another user's time block.
+        await prisma.timeBlock.deleteMany({
+          where: { googleEventId: event.id, userId },
+        });
       } else {
-        console.log(`🔄 [Calendar Webhook] Upserting event locally: "${event.summary}"`);
+        // The unique provider id is global, but the resource is user-owned.
+        // Refuse to overwrite a row that belongs to a different account.
+        const existing = await prisma.timeBlock.findUnique({
+          where: { googleEventId: event.id },
+          select: { userId: true },
+        });
+        if (existing && existing.userId !== userId) continue;
         await prisma.timeBlock.upsert({
           where: { googleEventId: event.id },
           update: {
@@ -156,8 +164,8 @@ export async function POST(request: Request) {
     await runAmbientTwinForUser(userId, { trigger: 'calendar_changed' }).catch(() => undefined);
 
     return NextResponse.json({ success: true, synced: googleEvents.length });
-  } catch (error: any) {
-    console.error('💥 [Calendar Webhook] Fatal webhook synchronization failure:', error);
-    return NextResponse.json({ error: 'Internal sync error', details: error.message }, { status: 500 });
+  } catch {
+    console.error('💥 [Calendar Webhook] Fatal webhook synchronization failure.');
+    return NextResponse.json({ error: 'Internal sync error' }, { status: 500 });
   }
 }

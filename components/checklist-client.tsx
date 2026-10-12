@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 
 import { Button } from "@/components/ui/button"
@@ -26,9 +26,13 @@ export default function ChecklistClient() {
   const [items, setItems] = useState<IntegratedTask[]>([])
   const [newItemText, setNewItemText] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isAdding, setIsAdding] = useState(false)
+  const loadRequestIdRef = useRef(0)
+  const pendingToggleIdsRef = useRef(new Set<string>())
   const [selectedTask, setSelectedTask] = useState<IntegratedTask | null>(null)
   useEffect(() => {
     setIsClient(true)
+    return () => { loadRequestIdRef.current += 1 }
   }, [])
 
   // Load tasks on mount and listen to voice execution events
@@ -59,15 +63,18 @@ export default function ChecklistClient() {
   const loadTasks = async () => {
     if (!session?.user?.id) return
 
+    const requestId = ++loadRequestIdRef.current
     setIsLoading(true)
     try {
       const tasks = await DataIntegrator.getDailyTasks(session.user.id)
+      if (requestId !== loadRequestIdRef.current) return
       setItems(Array.isArray(tasks) ? tasks : [])
     } catch (error) {
+      if (requestId !== loadRequestIdRef.current) return
       console.error("Failed to load tasks", error)
       setItems([])
     } finally {
-      setIsLoading(false)
+      if (requestId === loadRequestIdRef.current) setIsLoading(false)
     }
   }
 
@@ -77,8 +84,9 @@ export default function ChecklistClient() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newItemText.trim() && session?.user?.id) {
-      const textToCreate = newItemText
+    if (isAdding || !newItemText.trim() || !session?.user?.id) return
+    setIsAdding(true)
+    const textToCreate = newItemText
       const tempId = `temp-${Date.now()}`
       const optimisticTask: IntegratedTask = {
         id: tempId,
@@ -94,7 +102,7 @@ export default function ChecklistClient() {
       setNewItemText("")
       sileo.success({ title: "Task Added", description: "Task successfully registered to your daily queue." })
 
-      try {
+    try {
         const createdTask = await DataIntegrator.createManualTask(session.user.id, {
           text: textToCreate,
           completed: false,
@@ -106,21 +114,25 @@ export default function ChecklistClient() {
         if (createdTask?.id) {
           setItems(prev => prev.map(item => item.id === tempId ? { ...item, id: createdTask.id } : item))
         }
-      } catch (error) {
-        console.error('Error adding task:', error)
-        setItems(previousItems)
-        sileo.warning({ title: "Error", description: "Failed to add task." })
-      }
+    } catch (error) {
+      console.error('Error adding task:', error)
+      setItems(previousItems)
+      sileo.warning({ title: "Error", description: "Failed to add task." })
+    } finally {
+      setIsAdding(false)
     }
   }
 
   const handleToggleComplete = async (task: IntegratedTask) => {
     if (!session?.user?.id) return
+    if (pendingToggleIdsRef.current.has(task.id)) return
+    pendingToggleIdsRef.current.add(task.id)
 
     const nextCompleted = !task.completed;
+    const previousItems = items
 
     // Optimistic update
-    setItems(items.map((i) => (i.id === task.id ? { ...i, completed: nextCompleted } : i)))
+    setItems(prev => prev.map((i) => (i.id === task.id ? { ...i, completed: nextCompleted } : i)))
 
     if (nextCompleted) {
       // Dispatch dopamine reward event to ContextHub
@@ -139,8 +151,10 @@ export default function ChecklistClient() {
       await DataIntegrator.toggleTaskCompletion(session.user.id, task)
     } catch (error) {
       // Revert optimistic update on error
-      setItems(items.map((i) => (i.id === task.id ? { ...i, completed: !i.completed } : i)))
+      setItems(previousItems)
       console.error("Failed to toggle task completion", error)
+    } finally {
+      pendingToggleIdsRef.current.delete(task.id)
     }
   }
 
@@ -298,7 +312,7 @@ export default function ChecklistClient() {
               placeholder="Add a new task..."
               className="flex-1"
             />
-            <Button type="submit">
+            <Button type="submit" disabled={isAdding || !newItemText.trim()} aria-busy={isAdding}>
               <Plus className="h-4 w-4 mr-2" />
               Add
             </Button>

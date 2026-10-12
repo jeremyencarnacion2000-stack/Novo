@@ -1,0 +1,51 @@
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#open-companion {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orb {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border: 1px solid rgba(198, 227, 184, .4);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 25%, rgba(212, 237, 191, .22), transparent 48%),
+    linear-gradient(145deg, rgba(42, 63, 51, .97), rgba(15, 28, 23, .98));
+  box-shadow: 0 9px 24px rgba(0, 0, 0, .34), inset 0 1px rgba(255, 255, 255, .09);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.orb svg { width: 49px; height: 49px; filter: drop-shadow(0 0 8px rgba(185, 224, 171, .22)); }
+#open-companion:hover .orb { transform: translateY(-2px) scale(1.035); box-shadow: 0 13px 28px rgba(0, 0, 0, .4), 0 0 22px rgba(178, 216, 163, .16); }
+#open-companion:focus-visible { outline: 2px solid #d8f0c1; outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb { transition: none; }
+}

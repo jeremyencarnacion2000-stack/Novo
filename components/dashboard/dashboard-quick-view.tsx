@@ -1,8 +1,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence } from 'framer-motion'
 import { Routine } from '@/types/routine'
 import { Project } from '@/types/project'
 import { RoutineDetailView } from '@/components/routines/routine-detail-view'
@@ -25,20 +23,6 @@ export function DashboardQuickView({ open, onClose, type, data, anchorRect }: Da
     const [isWorkoutActive, setIsWorkoutActive] = useState(false)
 
     if (!type || !data) return null
-
-    const workoutPortal = type === 'routine' && typeof document !== 'undefined' ? createPortal(
-        <AnimatePresence>
-            {isWorkoutActive && (
-                <ActiveWorkoutSession
-                    key="workout-session"
-                    routine={data as Routine}
-                    onComplete={() => { setIsWorkoutActive(false); onClose() }}
-                    onCancel={() => setIsWorkoutActive(false)}
-                />
-            )}
-        </AnimatePresence>,
-        document.body
-    ) : null
 
     const renderContent = () => {
         switch (type) {
@@ -106,7 +90,13 @@ export function DashboardQuickView({ open, onClose, type, data, anchorRect }: Da
 
     return (
         <>
-            {workoutPortal}
+        {isWorkoutActive && (
+            <ActiveWorkoutSession
+                routine={data as Routine}
+                onComplete={() => { setIsWorkoutActive(false); onClose() }}
+                onCancel={() => setIsWorkoutActive(false)}
+            />
+        )}
             <ContextualModal open={open} onClose={onClose} anchorRect={anchorRect ?? null} title="Quick View">
                 <div className="max-h-[min(70dvh,38rem)] overflow-y-auto pt-6">
                     {renderContent()}

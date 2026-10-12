@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
+import {
+    createMutationFingerprint,
+    IdempotencyConflictError,
+    readIdempotencyKey,
+    runIdempotentCreate,
+} from '@/lib/server-idempotency';
 
 const createGradeSchema = z.object({
     courseId: z.string().min(1).max(200),
@@ -54,22 +60,40 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Course not found' }, { status: 404 });
         }
 
-        const grade = await prisma.grade.create({
-            data: {
-                userId: user.id,
-                courseId,
-                name,
-                score,
-                maxScore,
-                weight,
-                category,
-                date: new Date(date),
-            },
+        const { key: idempotencyKey, invalid } = readIdempotencyKey(request);
+        if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 });
+
+        const gradeData = {
+            userId: user.id,
+            courseId,
+            name,
+            score,
+            maxScore,
+            weight,
+            category,
+            date: new Date(date),
+        };
+        const result = await runIdempotentCreate(prisma, {
+            userId: user.id,
+            scope: 'school_grade_create',
+            idempotencyKey,
+            fingerprint: createMutationFingerprint(parsed.data),
+            resourceType: 'grade',
+            create: (db) => db.grade.create({ data: gradeData }),
+            findResource: (resourceId, db) => db.grade.findFirst({
+                where: { id: resourceId, userId: user.id },
+            }),
         });
 
-        return NextResponse.json(grade, { status: 201 });
+        return NextResponse.json(result.resource, {
+            status: result.replay ? 200 : 201,
+            headers: { 'X-Idempotent-Replay': String(result.replay) },
+        });
     } catch (error) {
-        console.error('Error creating grade:', error);
+        if (error instanceof IdempotencyConflictError) {
+            return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        console.error('Error creating grade.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

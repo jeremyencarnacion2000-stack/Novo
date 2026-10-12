@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(friendships)
-    } catch (error) {
-        console.error('Error fetching friendships:', error)
+    } catch {
+        // Keep database/provider diagnostics out of logs and the response.
+        console.error('[friends] Fetch failed.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -53,6 +54,13 @@ export async function POST(request: NextRequest) {
         const { targetUserId, action } = parsed.data
 
         if (action === 'request') {
+            // A friendship must connect two distinct accounts. Reject this
+            // before the lookup so a malformed/self request cannot create a
+            // row that later appears twice in both sides of the social UI.
+            if (targetUserId === session.user.id) {
+                return NextResponse.json({ error: 'You cannot send a friend request to yourself' }, { status: 400 })
+            }
+
             const existing = await prisma.friendship.findFirst({
                 where: {
                     OR: [
@@ -63,16 +71,43 @@ export async function POST(request: NextRequest) {
             })
 
             if (existing) {
+                // A retry of the same client intent must be safe after a lost
+                // response. A reverse-direction request is a different user
+                // action (the current user should accept it), so keep that as
+                // an actionable conflict instead of claiming it succeeded.
+                if (existing.requesterId === session.user.id && existing.addresseeId === targetUserId) {
+                    return NextResponse.json({ success: true, replay: true, status: existing.status })
+                }
                 return NextResponse.json({ error: 'Friendship already exists or pending' }, { status: 400 })
             }
 
-            await prisma.friendship.create({
-                data: {
-                    requesterId: session.user.id,
-                    addresseeId: targetUserId,
-                    status: 'PENDING'
+            try {
+                await prisma.friendship.create({
+                    data: {
+                        requesterId: session.user.id,
+                        addresseeId: targetUserId,
+                        status: 'PENDING'
+                    }
+                })
+            } catch (error) {
+                // The preflight lookup and the unique pair constraint can race
+                // when two tabs send the same request. Treat the winner as an
+                // idempotent success instead of leaking a 500 to the client.
+                if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+                    const winner = await prisma.friendship.findFirst({
+                        where: {
+                            OR: [
+                                { requesterId: session.user.id, addresseeId: targetUserId },
+                                { requesterId: targetUserId, addresseeId: session.user.id }
+                            ]
+                        }
+                    })
+                    if (winner && winner.requesterId === session.user.id && winner.addresseeId === targetUserId) {
+                        return NextResponse.json({ success: true, replay: true, status: winner.status })
+                    }
                 }
-            })
+                throw error
+            }
         } else if (action === 'accept' || action === 'reject') {
             // Find the pending request where current user is addressee
             const friendship = await prisma.friendship.findFirst({
@@ -100,8 +135,9 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true })
-    } catch (error) {
-        console.error('Error managing friendship:', error)
+    } catch {
+        // Keep database/provider diagnostics out of logs and the response.
+        console.error('[friends] Mutation failed.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

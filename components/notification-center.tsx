@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import {
   X, CheckCheck, Trash2, Sparkles, Zap
 } from 'lucide-react'
@@ -16,23 +15,8 @@ import {
 import { sileo, subscribeSileoBell, type BellToast } from '@/lib/sileo-bell'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon'
-import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
-
-// ── Mobile drag handle for notifications panel ─────────────────────────────
-function MobileNotifDragHandle() {
-  return (
-    <div
-      aria-hidden="true"
-      className="flex sm:hidden justify-center pt-3 pb-1 pointer-events-none select-none shrink-0 -mx-1"
-    >
-      <motion.div
-        className="w-10 h-[5px] rounded-full bg-foreground/20"
-        whileHover={{ scaleX: 1.15, backgroundColor: 'rgba(var(--primary-rgb),0.5)' }}
-        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      />
-    </div>
-  )
-}
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { appleLiquidMotion } from '@/lib/design-tokens'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type NotificationType =
@@ -281,8 +265,9 @@ function NotificationRow({
             onClick={(e) => { e.stopPropagation(); onDelete(notification.id) }}
             aria-label="Delete notification"
             className="shrink-0 p-1 rounded-md text-foreground/0 group-hover:text-foreground/25 hover:!text-red-400 hover:bg-red-500/15 transition-colors"
-            whileHover={{ scale: 1.15 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: appleLiquidMotion.hoverScale }}
+            whileTap={{ scale: appleLiquidMotion.pressScale }}
+            transition={appleLiquidMotion.pressTransition}
             title="Eliminar"
           >
             <X className="w-3 h-3" />
@@ -305,23 +290,16 @@ function NotificationRow({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function NotificationCenter() {
-  const { status } = useSession()
+  const { data: session, status } = useSession()
+  const notificationStorageKey = session?.user?.id
+    ? `user:${session.user.id}`
+    : null
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(false)
   const [prevUnread, setPrevUnread] = useState(0)
-  const panelRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const bellControls = useAnimation()
-  const dismissPanel = useCallback(() => setIsOpen(false), [])
-  const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
-    onDismiss: dismissPanel,
-    enabled: isOpen,
-  })
-  const setPanelRef = useCallback((node: HTMLDivElement | null) => {
-    panelRef.current = node
-    dragSurfaceRef.current = node
-  }, [dragSurfaceRef])
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -373,11 +351,27 @@ export function NotificationCenter() {
   const lastFetchTimeRef = useRef<number>(0)
   const cachedNotificationsRef = useRef<AppNotification[]>([])
 
+  // Read/deleted markers are account-private. Clear the in-memory cache when
+  // the session changes so a second account never inherits the first account's
+  // notification list or unread count.
+  useEffect(() => {
+    setNotifications([])
+    setIsOpen(false)
+    setPrevUnread(0)
+    cachedNotificationsRef.current = []
+    lastFetchTimeRef.current = 0
+  }, [notificationStorageKey])
+
   const loadNotifications = useCallback(async (force = false) => {
+    if (!notificationStorageKey) return
     setLoading(true)
     try {
-      const readIds: string[]    = JSON.parse(localStorage.getItem('novo-read-notifications')    || '[]')
-      const deletedIds: string[] = JSON.parse(localStorage.getItem('novo-deleted-notifications') || '[]')
+      const readIds: string[] = JSON.parse(localStorage.getItem(
+        `novo-read-notifications:${notificationStorageKey}`
+      ) || '[]')
+      const deletedIds: string[] = JSON.parse(localStorage.getItem(
+        `novo-deleted-notifications:${notificationStorageKey}`
+      ) || '[]')
       
       let generated: AppNotification[] = []
       const now = Date.now()
@@ -421,40 +415,47 @@ export function NotificationCenter() {
       console.error('Failed to load notifications:', e)
     }
     setLoading(false)
-  }, [])
+  }, [notificationStorageKey])
 
   useEffect(() => {
     if (status !== 'authenticated') return
-    loadNotifications()
-    let interval: ReturnType<typeof setInterval> | null = setInterval(loadNotifications, 5 * 60 * 1000)
+
+    // Notifications enrich the shell but are not needed to paint or interact
+    // with the current route. Delay the first task scan so the bell does not
+    // compete with route data, glass setup and the first user gesture.
+    let interval: ReturnType<typeof setInterval> | null = null
+    let initialTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      initialTimer = null
+      void loadNotifications()
+      interval = setInterval(loadNotifications, 5 * 60 * 1000)
+    }, 1800)
+
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        loadNotifications()
+        if (initialTimer) {
+          clearTimeout(initialTimer)
+          initialTimer = null
+        }
+        void loadNotifications()
         if (!interval) interval = setInterval(loadNotifications, 5 * 60 * 1000)
-      } else if (interval) {
-        clearInterval(interval)
-        interval = null
+      } else {
+        if (initialTimer) {
+          clearTimeout(initialTimer)
+          initialTimer = null
+        }
+        if (interval) {
+          clearInterval(interval)
+          interval = null
+        }
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      if (initialTimer) clearTimeout(initialTimer)
       if (interval) clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [status, loadNotifications])
-
-  // Close on outside click
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e: MouseEvent) => {
-      if (
-        panelRef.current && !panelRef.current.contains(e.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as Node)
-      ) setIsOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [isOpen])
 
   // open-notifications custom event — fired by the mobile nav bell button
   useEffect(() => {
@@ -469,45 +470,60 @@ export function NotificationCenter() {
   // ── Actions ────────────────────────────────────────────────────────
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    const ids: string[] = JSON.parse(localStorage.getItem('novo-read-notifications') || '[]')
-    if (!ids.includes(id)) localStorage.setItem('novo-read-notifications', JSON.stringify([...ids, id]))
+    if (!notificationStorageKey) return
+    const key = `novo-read-notifications:${notificationStorageKey}`
+    const ids: string[] = JSON.parse(localStorage.getItem(key) || '[]')
+    if (!ids.includes(id)) localStorage.setItem(key, JSON.stringify([...ids, id]))
   }
 
   const markAllRead = () => {
     const ids = notifications.map(n => n.id)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    localStorage.setItem('novo-read-notifications', JSON.stringify(ids))
+    if (notificationStorageKey) {
+      localStorage.setItem(`novo-read-notifications:${notificationStorageKey}`, JSON.stringify(ids))
+    }
   }
 
   const deleteNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
-    const ids: string[] = JSON.parse(localStorage.getItem('novo-deleted-notifications') || '[]')
-    if (!ids.includes(id)) localStorage.setItem('novo-deleted-notifications', JSON.stringify([...ids, id]))
+    if (!notificationStorageKey) return
+    const key = `novo-deleted-notifications:${notificationStorageKey}`
+    const ids: string[] = JSON.parse(localStorage.getItem(key) || '[]')
+    if (!ids.includes(id)) localStorage.setItem(key, JSON.stringify([...ids, id]))
   }
 
   const clearAll = () => {
     const ids = notifications.map(n => n.id)
     setNotifications([])
-    localStorage.setItem('novo-deleted-notifications', JSON.stringify(ids))
+    if (notificationStorageKey) {
+      localStorage.setItem(`novo-deleted-notifications:${notificationStorageKey}`, JSON.stringify(ids))
+    }
   }
 
   if (status !== 'authenticated') return null
 
   return (
-    <>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        setIsOpen(nextOpen)
+        if (nextOpen) loadNotifications()
+      }}
+    >
       {/* ── Bell Button — two physical phases: idle pill ↔ Sileo HUD ──── */}
       <motion.button
         ref={buttonRef as any}
+        data-flip-from="notifications"
         layout
-        transition={{ layout: { type: 'spring', stiffness: 400, damping: 30 } }}
+        transition={{ ...appleLiquidMotion.pressTransition, layout: { type: 'spring', stiffness: 400, damping: 30 } }}
         onClick={() => {
           setIsOpen(prev => !prev)
           if (!isOpen) loadNotifications()
           if (sileoToast) sileo.dismiss(sileoToast.id)
         }}
         aria-label="Notifications"
-        whileHover={{ scale: sileoToast ? 1.02 : 1.1 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: appleLiquidMotion.hoverScale }}
+        whileTap={{ scale: appleLiquidMotion.pressScale }}
         className={
           sileoToast
             ? "fixed top-4 right-3 sm:right-6 z-[200] h-11 max-w-[min(360px,calc(100vw-1.5rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
@@ -517,11 +533,10 @@ export function NotificationCenter() {
       >
         {/* Liquid glass background overlay */}
         <GlassSurface
-          radius={9999}
-          depth={4}
-          blur={1}
-          strength={20}
-          chromaticAberration={sileoToast ? 10 : 8}
+          preset={sileoToast ? "status" : "control"}
+          refractive
+          refractivePriority={sileoToast ? "critical" : "interactive"}
+          refractiveActive={Boolean(sileoToast || isOpen)}
           backgroundColor="rgba(10, 10, 15, 0.35)"
           elevation="low"
           aria-hidden
@@ -593,45 +608,22 @@ export function NotificationCenter() {
         </AnimatePresence>
       </motion.button>
 
-      {/* ── Panel Portal ──────────────────────────────────────────────── */}
-      {typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              ref={setPanelRef}
-              key="notification-panel"
-              // Desktop: dropdown from top-right. Mobile: bottom sheet rising from bottom
-              initial={typeof window !== 'undefined' && window.innerWidth < 640
-                ? { opacity: 0, y: 32, scale: 0.97 }
-                : { opacity: 0, y: -16, scale: 0.94, transformOrigin: 'top right' }
-              }
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={typeof window !== 'undefined' && window.innerWidth < 640
-                ? { opacity: 0, y: 24, scale: 0.97, transition: { duration: 0.22 } }
-                : { opacity: 0, y: -10, scale: 0.96, transition: { duration: 0.18 } }
-              }
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              // top-[188px] (not 104px): clears the Pomodoro widget's compact
-              // pill (components/pomodoro-widget.tsx, `top-6 right-16`,
-              // ~24-176px tall) when a focus session is active at the same
-              // time notifications are opened — same fix, same reasoning as
-              // lib/cognitive-context.tsx's FatigueNavigationWarning.
-              className="fixed z-[201] flex flex-col overflow-hidden
-                bottom-[4.5rem] left-3 right-3 rounded-3xl
-                sm:bottom-auto sm:top-[188px] sm:left-auto sm:right-4 sm:w-[min(400px,calc(100vw-2rem))]
-                max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-9rem))]"
-              style={{
-                boxShadow: '0 -8px 40px rgba(0,0,0,0.25), 0 30px 80px rgba(0,0,0,0.55)',
-              }}
-            >
+          <DialogContent
+            motionPreset="anchored"
+            motionId="notifications"
+            mobilePresentation="sheet"
+        anchorRef={buttonRef}
+        showCloseButton={false}
+        aria-label="Notifications"
+        className="!z-[201] !w-[calc(100vw-1.5rem)] !max-w-[400px] !max-h-[min(70dvh,620px)] !overflow-hidden !rounded-3xl !border-0 !p-0 !shadow-[0_-8px_40px_rgba(0,0,0,0.25),0_30px_80px_rgba(0,0,0,0.55)] !mb-[4.5rem] sm:!mt-[164px] sm:!mb-0"
+      >
+        <DialogTitle className="sr-only">Notificaciones</DialogTitle>
               {/* Backdrop blur glass shell — theme-aware, no hardcoded dark bg */}
               <div className="relative w-full flex-1 flex flex-col bg-background/92 dark:bg-[rgba(10,10,18,0.92)] backdrop-blur-2xl border border-border/20 dark:border-white/[0.07] rounded-3xl overflow-hidden max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-5rem))]">
                 {/* Subtle top shimmer line */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-[1px] rounded-full pointer-events-none"
                   style={{ background: 'linear-gradient(90deg, transparent, rgba(var(--primary-rgb),0.4), transparent)' }}
                 />
-                {/* Mobile drag handle — above header */}
-                <MobileNotifDragHandle />
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07] shrink-0">
                   <div className="flex items-center gap-2.5">
@@ -671,8 +663,9 @@ export function NotificationCenter() {
                             onClick={markAllRead}
                             aria-label="Mark all as read"
                             className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
-                            whileHover={{ scale: 1.12 }}
-                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: appleLiquidMotion.hoverScale }}
+                            whileTap={{ scale: appleLiquidMotion.pressScale }}
+                            transition={appleLiquidMotion.pressTransition}
                             title="Marcar todo como leído"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
@@ -681,8 +674,9 @@ export function NotificationCenter() {
                             onClick={clearAll}
                             aria-label="Clear all notifications"
                             className="p-1.5 rounded-lg hover:bg-red-500/15 text-foreground/35 hover:text-red-400 transition-colors"
-                            whileHover={{ scale: 1.12 }}
-                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: appleLiquidMotion.hoverScale }}
+                            whileTap={{ scale: appleLiquidMotion.pressScale }}
+                            transition={appleLiquidMotion.pressTransition}
                             title="Limpiar todo"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -694,9 +688,9 @@ export function NotificationCenter() {
                       onClick={() => setIsOpen(false)}
                       aria-label="Close notifications"
                       className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
-                      whileHover={{ scale: 1.12, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                      whileHover={{ scale: appleLiquidMotion.hoverScale, rotate: 90 }}
+                      whileTap={{ scale: appleLiquidMotion.pressScale }}
+                      transition={appleLiquidMotion.pressTransition}
                     >
                       <X className="w-3.5 h-3.5" />
                     </motion.button>
@@ -779,8 +773,9 @@ export function NotificationCenter() {
                       <motion.button
                         onClick={() => loadNotifications(true)}
                         className="text-[10px] text-foreground/25 hover:text-primary transition-colors flex items-center gap-1"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        whileHover={{ scale: appleLiquidMotion.hoverScale }}
+                        whileTap={{ scale: appleLiquidMotion.pressScale }}
+                        transition={appleLiquidMotion.pressTransition}
                       >
                         <motion.span
                           animate={loading ? { rotate: 360 } : { rotate: 0 }}
@@ -795,11 +790,7 @@ export function NotificationCenter() {
                   )}
                 </AnimatePresence>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-    </>
+      </DialogContent>
+    </Dialog>
   )
 }

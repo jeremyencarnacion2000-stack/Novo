@@ -1,6 +1,7 @@
 'use client'
 
-import { useFocus } from '@/lib/focus-context'
+import { memo } from 'react'
+import { useFocus, useFocusControls } from '@/lib/focus-context'
 import { Timer, Play, Pause, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,9 +10,10 @@ import { GlassSurface } from '@/components/ui/GlassSurface'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { appleLiquidMotion } from '@/lib/design-tokens'
 
 export function PomodoroWidget() {
-    const { mode, time, isActive, toggleTimer, resetTimer, formatTime } = useFocus()
+    const { mode, time, isActive } = useFocus()
     const pathname = usePathname()
     const isFocusPage = pathname === '/focus'
 
@@ -21,6 +23,12 @@ export function PomodoroWidget() {
     if (!isActive && !isModified) {
         return null
     }
+
+    return <PomodoroWidgetContent isFocusPage={isFocusPage} />
+}
+
+const PomodoroWidgetContent = memo(function PomodoroWidgetContent({ isFocusPage }: { isFocusPage: boolean }) {
+    const { mode, isActive, toggleTimer, resetTimer } = useFocusControls()
 
     const getModeLabel = () => {
         switch (mode) {
@@ -42,10 +50,12 @@ export function PomodoroWidget() {
         <AnimatePresence mode="wait">
             <motion.div
                 layout
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                // Keep typography on its own layer: the lab materializes the surface with
+                // spatial drift rather than scaling the timer glyphs and labels.
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={appleLiquidMotion.morphTransition}
                 className={cn(
                     // z-[55]: above other floating z-50 surfaces — an active
                     // countdown stays visible instead of getting covered.
@@ -65,12 +75,14 @@ export function PomodoroWidget() {
                 )}
             >
                 <GlassSurface
+                    preset={isFocusPage ? "control" : "panel"}
+                    refractive
                     radius={isFocusPage ? 9999 : 24}
                     depth={4}
-                    blur={1}
                     strength={35}
-                    chromaticAberration={5}
-                    refractive
+                    chromaticAberration={isFocusPage ? 2.5 : 4.5}
+                    refractivePriority="interactive"
+                    webComponent
                     backgroundColor="transparent"
                     elevation="low"
                     aria-hidden
@@ -105,7 +117,7 @@ export function PomodoroWidget() {
                         isFocusPage ? "text-2xl" : "text-3xl"
                     )}
                 >
-                    {formatTime(time)}
+                    <PomodoroTimerText />
                 </motion.div>
 
                 {/* Right Section: Controls */}
@@ -141,4 +153,9 @@ export function PomodoroWidget() {
             </motion.div>
         </AnimatePresence>
     )
+})
+
+function PomodoroTimerText() {
+    const { time, formatTime } = useFocus()
+    return <>{formatTime(time)}</>
 }

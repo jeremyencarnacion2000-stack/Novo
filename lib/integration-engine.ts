@@ -32,6 +32,15 @@ export interface UrgentItem {
     weight?: number; // For GPA-weighted priority
 }
 
+export interface CompletionSyncResult {
+    persisted: boolean;
+    /** The local record is authoritative, but an external provider may fail
+     * after it has been updated. Keeping that distinction lets the UI remain
+     * truthful without rolling back a change that Novo did save. */
+    externalSync?: 'synced' | 'failed' | 'not_applicable';
+    source?: 'notion' | 'todoist';
+}
+
 export class IntegrationEngine {
     /**
      * Get all tasks for today from all sources
@@ -77,7 +86,16 @@ export class IntegrationEngine {
             }),
             // 3. Manual, Notion, and Todoist checklist items
             prisma.checklistItem.findMany({
-                where: { userId, source: { in: ['manual', 'notion', 'todoist'] } }
+                where: { userId, source: { in: ['manual', 'notion', 'todoist'] } },
+                // Today is a bounded working surface. Keep it responsive for
+                // long-lived workspaces while retaining the most actionable
+                // rows first (open items, due items, then recently touched).
+                orderBy: [
+                    { completed: 'asc' },
+                    { dueDate: 'asc' },
+                    { updatedAt: 'desc' },
+                ],
+                take: 200,
             }),
             // 3b. Task-model tasks (created via /api/tasks or the AI assistant's
             // CREATE_TASK / CREATE_TASKS actions) — due today, or already
@@ -116,7 +134,20 @@ export class IntegrationEngine {
             ? await prisma.task.findFirst({ where: { id: canonicalTaskId, userId, status: { not: 'done' } } })
             : null;
 
+        const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][today.getDay()]
         for (const routine of routines) {
+            // A blank schedule means every day. When the user selected days
+            // in the routine editor, only surface that routine on its selected
+            // weekday so Today does not repeat every routine every day.
+            if (routine.daysOfWeek) {
+                try {
+                    const selectedDays = JSON.parse(routine.daysOfWeek)
+                    if (Array.isArray(selectedDays) && selectedDays.length > 0 && !selectedDays.includes(weekday)) continue
+                } catch {
+                    // Preserve legacy rows with malformed schedule data rather
+                    // than hiding their tasks completely.
+                }
+            }
             for (const task of routine.tasks) {
                 tasks.push({
                     id: `routine:${routine.id}:task:${task.id}`,
@@ -126,6 +157,8 @@ export class IntegrationEngine {
                     source: 'routine',
                     sourceId: routine.id,
                     timeOfDay: routine.timeOfDay,
+                    scheduledHour: routine.scheduledTime ? Number(routine.scheduledTime.slice(0, 2)) : null,
+                    scheduledReason: routine.scheduledTime ? 'Rutina programada' : null,
                     metadata: {
                         routineName: routine.name,
                         category: routine.timeOfDay
@@ -154,8 +187,12 @@ export class IntegrationEngine {
             }
         }
 
-        // 3. Manual, Notion, and Todoist checklist items
+        // 3. Manual, Notion, and Todoist checklist items. A Task created with
+        // a due date also gets a linked checklist row for legacy surfaces;
+        // Today must render the canonical Task exactly once rather than
+        // showing both records as two separate pieces of work.
         for (const item of checklistItems) {
+            if (item.taskId) continue;
             tasks.push({
                 id: `checklist:${item.id}`,
                 text: item.text,
@@ -286,36 +323,53 @@ export class IntegrationEngine {
      * to reject the request instead of reporting success for a checkbox that
      * silently reverts on the next load.
      */
-    static async syncCompletion(taskId: string, completed: boolean): Promise<boolean> {
+    static async syncCompletion(userId: string, taskId: string, completed: boolean): Promise<boolean> {
+        const result = await this.syncCompletionDetailed(userId, taskId, completed);
+        return result.persisted;
+    }
+
+    static async syncCompletionDetailed(userId: string, taskId: string, completed: boolean): Promise<CompletionSyncResult> {
         const [source, ...idParts] = taskId.split(':');
 
         switch (source) {
             case 'routine': {
                 const [routineId, , taskIdPart] = idParts;
-                await prisma.routineTask.update({
-                    where: { id: taskIdPart },
+                if (!routineId || !taskIdPart) return { persisted: false };
+                const updated = await prisma.routineTask.updateMany({
+                    where: { id: taskIdPart, routine: { id: routineId, userId } },
                     data: { completed }
                 });
-                return true;
+                return { persisted: updated.count > 0 };
             }
 
             case 'project': {
                 const [projectId, , subtaskId] = idParts;
-                await prisma.subtask.update({
-                    where: { id: subtaskId },
+                if (!projectId || !subtaskId) return { persisted: false };
+                const updated = await prisma.subtask.updateMany({
+                    where: { id: subtaskId, project: { id: projectId, userId } },
                     data: { completed }
                 });
-                return true;
+                return { persisted: updated.count > 0 };
             }
 
             case 'checklist': {
                 const checklistId = idParts[0];
-                const item = await prisma.checklistItem.update({
-                    where: { id: checklistId },
+                if (!checklistId) return { persisted: false };
+                const item = await prisma.checklistItem.findFirst({
+                    where: { id: checklistId, userId },
+                });
+                if (!item) return { persisted: false };
+                const updated = await prisma.checklistItem.updateMany({
+                    where: { id: checklistId, userId },
                     data: { completed }
                 });
+                if (!updated.count) return { persisted: false };
+
+                let externalSync: CompletionSyncResult['externalSync'] = 'not_applicable';
+                let externalSource: CompletionSyncResult['source'];
 
                 if (item.source === 'notion' && item.sourceId) {
+                    externalSource = 'notion';
                     try {
                         const integrationAccount = await prisma.integrationAccount.findUnique({
                             where: {
@@ -332,11 +386,15 @@ export class IntegrationEngine {
                                 item.sourceId,
                                 completed
                             );
-                        }
-                    } catch (notionError) {
-                        console.error('Failed to sync completion to Notion:', notionError);
+                            externalSync = 'synced';
+                        } else externalSync = 'failed';
+                    } catch {
+                        console.error('Failed to sync completion to Notion.');
+                        externalSync = 'failed';
+                        externalSource = 'notion';
                     }
                 } else if (item.source === 'todoist' && item.sourceId) {
+                    externalSource = 'todoist';
                     try {
                         const integrationAccount = await prisma.integrationAccount.findUnique({
                             where: {
@@ -353,31 +411,35 @@ export class IntegrationEngine {
                             } else {
                                 await todoistService.reopenTask(integrationAccount.accessToken, item.sourceId);
                             }
-                        }
-                    } catch (todoistError) {
-                        console.error('Failed to sync completion to Todoist:', todoistError);
+                            externalSync = 'synced';
+                        } else externalSync = 'failed';
+                    } catch {
+                        console.error('Failed to sync completion to Todoist.');
+                        externalSync = 'failed';
+                        externalSource = 'todoist';
                     }
                 }
-                return true;
+                return { persisted: true, externalSync, source: externalSource };
             }
 
             case 'school':
                 // School grades don't have a "completed" status — nothing to
                 // persist. Report failure so the UI doesn't show a checkbox
                 // that silently un-checks itself on next load.
-                return false;
+                return { persisted: false };
 
             case 'task': {
                 const aiTaskId = idParts[0];
-                await prisma.task.update({
-                    where: { id: aiTaskId },
+                if (!aiTaskId) return { persisted: false };
+                const updated = await prisma.task.updateMany({
+                    where: { id: aiTaskId, userId },
                     data: { status: completed ? 'done' : 'todo' }
                 });
-                return true;
+                return { persisted: updated.count > 0 };
             }
 
             default:
-                return false;
+                return { persisted: false };
         }
     }
 

@@ -15,7 +15,7 @@ import React, { startTransition, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { usePlayerStore } from '@/lib/player-store';
 import { useSettings } from '@/lib/settings-context';
-import { useFocus } from '@/lib/focus-context';
+import { useFocus, useFocusControls } from '@/lib/focus-context';
 import { useScrollContainer } from '@/lib/scroll-container-context';
 import { useCognitiveState, useCognitiveDispatch } from '@/lib/cognitive-context';
 import type { CognitivePhase } from '@/lib/cognitive-engine';
@@ -30,9 +30,12 @@ import {
 import { FaSlack } from 'react-icons/fa6';
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
-import { AnimatePresence, motion, useMotionValue, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useQuickCapture } from '@/lib/quick-capture-context';
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy';
+import { GlassSurface } from '@/components/ui/GlassSurface';
+import { SHARED_SURFACE_SHAPES, useSharedSurfaceMorph } from '@/hooks/use-shared-surface-morph';
 
 // ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
 const PHASE_COLOR: Record<CognitivePhase, string> = {
@@ -54,24 +57,6 @@ type HubTab = 'focus' | 'audio' | 'settings';
 type WeatherIcon = 'sun' | 'cloud-sun' | 'cloud' | 'cloud-rain' | 'zap';
 
 const HUB_TABS: readonly HubTab[] = ['focus', 'audio', 'settings'];
-
-const HUB_SHAPE: Record<HubState, { width: number; height: number; radius: number }> = {
-  idle: { width: 8, height: 80, radius: 20 },
-  capsule: { width: 46, height: 190, radius: 9999 },
-  notification: { width: 352, height: 118, radius: 30 },
-  expanded: { width: 360, height: 420, radius: 28 },
-};
-
-const HUB_SPRING = {
-  type: 'spring' as const,
-  // Near-critical damping gives the shell its soft, liquid morph without a
-  // visible bounce or a long microscopic tail at the end of a transition.
-  stiffness: 430,
-  damping: 40,
-  mass: 0.92,
-  restDelta: 0.25,
-  restSpeed: 0.25,
-};
 
 const HUB_CONTENT_SPRING = {
   type: 'spring' as const,
@@ -315,7 +300,11 @@ function PlaylistPanel() {
   const [data, setData] = useState<YTData>({});
   const [loading, setLoading] = useState(true);
   const [activeList, setActiveList] = useState<'playlists' | 'liked'>('playlists');
-  const { currentTrack, isPlaying, togglePlayPause, nextTrack, previousTrack } = usePlayerStore();
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const togglePlayPause = usePlayerStore((state) => state.togglePlayPause);
+  const nextTrack = usePlayerStore((state) => state.nextTrack);
+  const previousTrack = usePlayerStore((state) => state.previousTrack);
 
   useEffect(() => {
     fetch('/api/youtube/account')
@@ -571,20 +560,33 @@ function ClockSection({
   const [time, setTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    setTime(new Date());
-    let t: ReturnType<typeof setInterval> | null = setInterval(() => setTime(new Date()), 1000);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        setTime(new Date());
-        if (!t) t = setInterval(() => setTime(new Date()), 1000);
-      } else if (t) {
-        clearInterval(t);
-        t = null;
-      }
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearTimer = () => {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
     };
+
+    const schedule = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      setTime(new Date());
+      // Align updates to the second boundary and avoid background wakeups.
+      const delay = Math.max(120, 1000 - (Date.now() % 1000));
+      timer = setTimeout(schedule, delay);
+    };
+
+    const onVisibility = () => {
+      clearTimer();
+      if (document.visibilityState === 'visible') schedule();
+    };
+
+    onVisibility();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      if (t) clearInterval(t);
+      disposed = true;
+      clearTimer();
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
@@ -632,9 +634,9 @@ function ClockSection({
 // ─── Capsule Content Sub-component ──────────────────────────────────────────
 function CapsuleContent({ cognitiveAlert, ambientAudioActive }: { cognitiveAlert: boolean; ambientAudioActive: boolean }) {
   const { bioState } = useCognitiveState();
-  const { isActive: focusTimerActive, time, formatTime } = useFocus();
-  const { isPlaying } = usePlayerStore();
-  const reduceMotion = useReducedMotion();
+  const { isActive: focusTimerActive } = useFocusControls();
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const reduceMotion = useNovoMotionPolicy() !== 'full';
   return (
     <div className="flex flex-col items-center justify-between py-4 px-2 w-full h-full">
       <ClockSection attentionScore={bioState.attentionScore} showDetails={false} />
@@ -651,7 +653,7 @@ function CapsuleContent({ cognitiveAlert, ambientAudioActive }: { cognitiveAlert
       ) : focusTimerActive ? (
         <div className="flex flex-col items-center gap-1 text-emerald-200">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.9)]" />
-          <span className="text-[8px] font-mono font-bold tabular-nums tracking-tight">{formatTime(time)}</span>
+          <FocusTimeText className="text-[8px] font-mono font-bold tabular-nums tracking-tight" />
         </div>
       ) : isPlaying || ambientAudioActive ? (
         <div className="h-6 flex items-center gap-[2px]" aria-label="Audio activo">
@@ -683,6 +685,24 @@ function CapsuleContent({ cognitiveAlert, ambientAudioActive }: { cognitiveAlert
 }
 
 // ─── Expanded Content Sub-component ─────────────────────────────────────────
+function FocusTimeText({ className }: { className?: string }) {
+  const { time, formatTime } = useFocus();
+  return <span className={className}>{formatTime(time)}</span>;
+}
+
+function FocusSessionControl() {
+  const { isActive, toggleTimer } = useFocusControls();
+
+  return (
+    <>
+      <p className="mt-0.5 text-[10px] text-white/70">{isActive ? <><FocusTimeText /> restantes</> : 'Elige una tarea y comienza cuando estés listo'}</p>
+      <button onClick={toggleTimer} className={cn('shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold transition-[background,transform] duration-150 active:scale-[0.97]', isActive ? 'bg-emerald-400/20 text-emerald-100 border border-emerald-300/25' : 'bg-white/10 text-white border border-white/10')}>
+        {isActive ? 'Pausar' : 'Iniciar'}
+      </button>
+    </>
+  );
+}
+
 function ExpandedContent({
   setHubState,
   activeTab,
@@ -696,7 +716,7 @@ function ExpandedContent({
 }) {
   // ── Real settings connections ──────────────────────────────────────────────
   const { settings, updateSettings } = useSettings();
-  const { isActive: focusTimerActive, toggleTimer, time, formatTime, tasks, selectedTaskId, addTask } = useFocus();
+  const { tasks, selectedTaskId, addTask } = useFocusControls();
   const { bioState } = useCognitiveState();
   const { onOpen: openQuickNote } = useQuickCapture();
   const [quickCapture, setQuickCapture] = useState('');
@@ -796,11 +816,8 @@ function ExpandedContent({
                   <div className="min-w-0">
                     <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200/85 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> Temporizador de foco</p>
                     <p className="mt-1 text-sm font-semibold text-white truncate">{activeTask?.text ?? 'Sin tarea seleccionada'}</p>
-                    <p className="mt-0.5 text-[10px] text-white/70">{focusTimerActive ? `${formatTime(time)} restantes` : 'Elige una tarea y comienza cuando estés listo'}</p>
+                    <FocusSessionControl />
                   </div>
-                  <button onClick={toggleTimer} className={cn('shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold transition-[background,transform] duration-150 active:scale-[0.97]', focusTimerActive ? 'bg-emerald-400/20 text-emerald-100 border border-emerald-300/25' : 'bg-white/10 text-white border border-white/10')}>
-                    {focusTimerActive ? 'Pausar' : 'Iniciar'}
-                  </button>
                 </div>
               </div>
               <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-2.5">
@@ -926,6 +943,8 @@ const ContextHubComponent = () => {
   const [dopaminePulse, setDopaminePulse] = useState(false);
   const [activeNotification, setActiveNotification] = useState<TwinNotificationPayload | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dopamineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const routineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryPhaseRef = useRef<CognitivePhase | null>(null);
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1057,6 +1076,11 @@ const ContextHubComponent = () => {
   // mouse-leave, and also a nice desktop shortcut (click away to dismiss
   // instead of waiting on the hover-out timeout).
   const hubRef = useRef<HTMLDivElement>(null);
+  const hubSurfaceRef = useRef<HTMLDivElement>(null);
+  const hubMorph = useSharedSurfaceMorph({
+    surfaceRef: hubSurfaceRef,
+    state: hubState,
+  });
   useEffect(() => {
     if (hubState !== 'expanded') return;
     const handleOutside = (e: PointerEvent) => {
@@ -1084,21 +1108,32 @@ const ContextHubComponent = () => {
   // Event handlers
   // Event handlers — pulse hub on actions, let sileo handle the notification toast
   useEffect(() => {
+    const pulse = () => {
+      setDopaminePulse(true);
+      if (dopamineTimerRef.current) clearTimeout(dopamineTimerRef.current);
+      dopamineTimerRef.current = setTimeout(() => {
+        setDopaminePulse(false);
+        dopamineTimerRef.current = null;
+      }, 1200);
+    };
+
     const onHabit = (e: Event) => {
       const cost = (e as CustomEvent).detail?.energyCost ?? 0.5;
       logHabit(cost);
       setHubState('capsule');
-      setDopaminePulse(true);
-      setTimeout(() => setDopaminePulse(false), 1200);
+      pulse();
     };
     const onTask = () => {
       setHubState('capsule');
-      setDopaminePulse(true);
-      setTimeout(() => setDopaminePulse(false), 1200);
+      pulse();
     };
     const onRoutine = () => {
       setHubState('capsule');
-      setTimeout(() => setHubState('idle'), 1800);
+      if (routineTimerRef.current) clearTimeout(routineTimerRef.current);
+      routineTimerRef.current = setTimeout(() => {
+        setHubState('idle');
+        routineTimerRef.current = null;
+      }, 1800);
     };
     const handleNotification = (e: Event) => {
       const detail = (e as CustomEvent).detail as TwinNotificationPayload;
@@ -1138,6 +1173,10 @@ const ContextHubComponent = () => {
       window.removeEventListener('cognitive:notification', handleNotification);
       window.removeEventListener('cognitive:navigation-warning', onNavWarn);
       if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+      if (dopamineTimerRef.current) clearTimeout(dopamineTimerRef.current);
+      if (routineTimerRef.current) clearTimeout(routineTimerRef.current);
+      dopamineTimerRef.current = null;
+      routineTimerRef.current = null;
     };
   }, [logHabit]);
 
@@ -1171,33 +1210,36 @@ const ContextHubComponent = () => {
     return null;
   }
 
-  // ─── Single morphing hub — no FLIP, no element switching, pure shape animation ───
+  // ─── Single physical surface. The shell is always the final-size chrome;
+  // the prototype morphs only its clip-path, so glass/refraction never stretch. ───
   return (
     <div className="fixed right-0 top-0 h-full w-screen z-[60] flex flex-col items-end justify-start pointer-events-none overflow-visible">
       <motion.div
-        ref={hubRef}
+        ref={(node) => {
+          hubRef.current = node;
+          hubSurfaceRef.current = node;
+        }}
+        data-hub-state={hubState}
         className={cn(
           "context-hub-layer pointer-events-auto select-none relative overflow-visible border transition-colors duration-300",
           hubState === 'idle'
-            ? 'bg-white/20 border-white/5 cursor-pointer hover:bg-white/40'
+            ? 'bg-transparent border-white/5 cursor-pointer'
             : hubState === 'capsule' && cognitiveAlert
-              ? 'bg-gradient-to-b from-indigo-950/70 to-zinc-950/70 border-indigo-500/40 backdrop-blur-2xl cursor-pointer'
+              ? 'bg-transparent border-indigo-500/40 cursor-pointer'
               : hubState === 'capsule'
-                ? 'bg-black/90 border-white/10 hover:border-white/20 backdrop-blur-2xl cursor-pointer'
-                : 'border-white/10 bg-black/95 backdrop-blur-3xl cursor-default',
+                ? 'bg-transparent border-white/10 hover:border-white/20 cursor-pointer'
+                : 'border-white/10 bg-transparent cursor-default',
           (hubState === 'capsule' || hubState === 'expanded') && dopaminePulse && 'animate-dopamine-pulse',
         )}
-        style={{ y }}
-        initial={{
-          width: HUB_SHAPE.idle.width, height: HUB_SHAPE.idle.height, borderRadius: HUB_SHAPE.idle.radius, opacity: 0.55,
-          boxShadow: '0 0 0 rgba(0,0,0,0)',
-          transformOrigin: '100% 50%',
-        }}
-        animate={{
-          width: HUB_SHAPE[hubState].width,
-          height: HUB_SHAPE[hubState].height,
-          borderRadius: HUB_SHAPE[hubState].radius,
+        // Keep the optical host in normal flow so Chromium can sample the
+        // wallpaper behind the delivered displacement lens.
+        style={{
+          top: y,
+          width: hubMorph.stageSize.width,
+          height: hubMorph.stageSize.height,
+          borderRadius: hubMorph.surfaceRadius,
           opacity: hubState === 'idle' ? 0.55 : 1,
+          willChange: hubState === 'idle' ? 'auto' : 'clip-path, opacity',
           boxShadow: hubState === 'idle'
             ? '0 0 0 rgba(0,0,0,0)'
             : hubState === 'expanded'
@@ -1206,7 +1248,6 @@ const ContextHubComponent = () => {
                 ? '-18px 18px 48px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.10)'
                 : '-10px 16px 48px rgba(0,0,0,0.62)',
         }}
-        transition={HUB_SPRING}
         onMouseEnter={() => {
           setIsHovered(true);
           if (hubState === 'idle') setHubState('capsule');
@@ -1219,15 +1260,37 @@ const ContextHubComponent = () => {
         }
         title={hubState === 'idle' ? 'Novo Context Hub' : undefined}
       >
+        <GlassSurface
+          aria-hidden
+          preset="panel"
+          refractive
+          radius={hubMorph.surfaceRadius}
+          refractivePriority="critical"
+          webComponent
+          refractiveActive={hubState !== 'idle'}
+          backgroundColor="transparent"
+          elevation={hubState === 'expanded' ? 'high' : 'medium'}
+          className="pointer-events-none"
+          style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+        />
+        <div aria-hidden className="context-hub-chrome pointer-events-none absolute inset-0 z-[1]">
+          <div data-hub-skin="compact" className="absolute inset-0" />
+          <div data-hub-skin="expanded" className="absolute inset-0" />
+        </div>
+        <div
+          data-hub-content-frame
+          className="absolute right-0 top-0 overflow-hidden z-[2]"
+          style={hubMorph.contentStyle}
+        >
         <AnimatePresence initial={false} mode="sync">
           {hubState === 'idle' && (
             <motion.div
               key="idle"
               data-hub-motion-panel
               className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={HUB_CONTENT_SPRING}
             >
               <GripVertical className="w-3 h-3 text-white/50" strokeWidth={1.5} />
@@ -1238,9 +1301,9 @@ const ContextHubComponent = () => {
               key="capsule"
               data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0, y: 7, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -5, scale: 0.97 }}
+              initial={{ opacity: 0, y: 7 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
               transition={HUB_CONTENT_SPRING}
             >
               <CapsuleContent cognitiveAlert={cognitiveAlert} ambientAudioActive={ambientAudioActive} />
@@ -1251,9 +1314,9 @@ const ContextHubComponent = () => {
               key="notification"
               data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0, x: 18, scale: 0.976 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 10, scale: 0.988 }}
+              initial={{ opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
               transition={HUB_CONTENT_SPRING}
             >
               <NotificationContent
@@ -1270,9 +1333,9 @@ const ContextHubComponent = () => {
               key="expanded"
               data-hub-motion-panel
               className="absolute inset-0"
-              initial={{ opacity: 0, x: 18, scale: 0.976 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 12, scale: 0.988 }}
+              initial={{ opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
               transition={HUB_CONTENT_SPRING}
             >
               <ExpandedContent
@@ -1284,6 +1347,7 @@ const ContextHubComponent = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </motion.div>
     </div>
   );

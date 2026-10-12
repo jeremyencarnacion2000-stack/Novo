@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,18 +9,24 @@ import { defaultTemplates } from '@/lib/templates'
 import { Copy, Loader2, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 export default function TemplatesPage() {
     const [usingId, setUsingId] = useState<string | null>(null)
     const { toast } = useToast()
     const router = useRouter()
+    // Keep the same key across a retry of one click, while a later deliberate
+    // use of the template receives a fresh intent.
+    const pendingIntentKeys = useRef(new Map<string, string>())
 
     const handleUseTemplate = async (template: any) => {
         setUsingId(template.id)
+        const intentKey = pendingIntentKeys.current.get(template.id) || createClientIdempotencyKey()
+        pendingIntentKeys.current.set(template.id, intentKey)
         try {
             const response = await fetch('/api/templates/use', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intentKey },
                 body: JSON.stringify({ templateId: template.id })
             })
 
@@ -35,6 +41,7 @@ export default function TemplatesPage() {
                 if (data.type === 'routine') router.push('/routines')
                 if (data.type === 'project') router.push('/projects')
                 if (data.type === 'tracker') router.push('/trackers')
+                pendingIntentKeys.current.delete(template.id)
             } else {
                 throw new Error('Failed to use template')
             }

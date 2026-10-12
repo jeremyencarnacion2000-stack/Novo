@@ -42,16 +42,13 @@ export async function POST(request: NextRequest) {
             text: transcription,
             success: true
         });
-    } catch (error) {
-        console.error('Transcription API: Error occurred', error);
-
-        const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    } catch {
+        console.error('Transcription API: Error occurred.');
 
         return NextResponse.json(
             {
-                error: errorMessage,
+                error: 'Transcription is temporarily unavailable',
                 success: false,
-                hint: 'Verifica que WHISPER_API_KEY esté configurada en Vercel'
             },
             { status: 500 }
         );

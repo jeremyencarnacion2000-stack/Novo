@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating project:', error)
+    console.error('Error updating project.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -63,7 +63,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting project:', error)
+    console.error('Error deleting project.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,5 +1,9 @@
 jest.mock('@/lib/prisma', () => ({
-  prisma: { userSettings: { findUnique: jest.fn() }, novoSignalLedger: { upsert: jest.fn() } },
+  prisma: {
+    userSettings: { findUnique: jest.fn() },
+    novoSignalSourcePreference: { findMany: jest.fn() },
+    novoSignalLedger: { upsert: jest.fn() },
+  },
 }))
 
 import { prisma } from '@/lib/prisma'
@@ -20,6 +24,13 @@ describe('signal ledger fingerprints', () => {
   it('does not append new ledger signals while learning is paused', async () => {
     ;(prisma.userSettings.findUnique as jest.Mock).mockResolvedValue({ settings: { cognitiveLearningPaused: true } })
     await upsertNovoSignals('user-1', [{ ...base, label: 'Task', observedAt: new Date(), reliability: 'direct' }])
+    expect(prisma.novoSignalLedger.upsert).not.toHaveBeenCalled()
+  })
+
+  it('does not append signals from a source the user has excluded', async () => {
+    ;(prisma.userSettings.findUnique as jest.Mock).mockResolvedValue({ settings: {} })
+    ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{ source: 'device', excludedAt: new Date() }])
+    await upsertNovoSignals('user-1', [{ ...base, source: 'device', label: 'Editor active for 5 minutes', observedAt: new Date(), reliability: 'direct' }])
     expect(prisma.novoSignalLedger.upsert).not.toHaveBeenCalled()
   })
 })

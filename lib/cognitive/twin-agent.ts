@@ -136,8 +136,8 @@ async function logAction(
         metadata: metadata ?? {},
       },
     });
-  } catch (err) {
-    console.error('[TwinAgent] Failed to log action:', err);
+  } catch {
+    console.error('[TwinAgent] Failed to log action.');
   }
 }
 
@@ -234,9 +234,9 @@ async function runCreateCatchupTask(ctx: AgentContext): Promise<CapabilityResult
 
     await logAction(ctx, cap, 'success', 'Existing task queue adapted', { friction, deferCount, ...adaptation });
     return { capability: cap, result: 'success', description: 'Existing task queue adapted', metadata: { friction, deferCount, ...adaptation } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -289,9 +289,9 @@ async function runTriageOverdueTasks(ctx: AgentContext): Promise<CapabilityResul
 
     await logAction(ctx, cap, 'success', `Adapted ${total} overdue tasks`, { total, ...adaptation });
     return { capability: cap, result: 'success', description: `Adapted ${total} overdue tasks`, metadata: { total, ...adaptation } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -319,9 +319,9 @@ async function runNotifyBurnoutRisk(ctx: AgentContext): Promise<CapabilityResult
 
     await logAction(ctx, cap, 'success', `Burnout alert sent`, { burnoutIndex });
     return { capability: cap, result: 'success', description: 'Burnout alert sent', metadata: { burnoutIndex } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -375,9 +375,9 @@ async function runSuggestFocusBlock(ctx: AgentContext): Promise<CapabilityResult
 
     await logAction(ctx, cap, 'success', 'Focus block suggested', { minutesUntilPeak, calendarBlocked });
     return { capability: cap, result: 'success', description: 'Focus block suggested', metadata: { minutesUntilPeak, calendarBlocked } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -425,9 +425,9 @@ async function runRescheduleOverload(ctx: AgentContext): Promise<CapabilityResul
 
     await logAction(ctx, cap, 'success', `Rescheduled ${lowPriorityToday.length} tasks`, { cogLoad, count: lowPriorityToday.length });
     return { capability: cap, result: 'success', description: `Rescheduled ${lowPriorityToday.length} tasks`, metadata: { cogLoad } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -468,9 +468,9 @@ async function runSuggestRecoveryRoutine(ctx: AgentContext): Promise<CapabilityR
 
     await logAction(ctx, cap, 'success', 'Recovery routine created', { skippedCount });
     return { capability: cap, result: 'success', description: 'Recovery routine created', metadata: { skippedCount } };
-  } catch (err) {
-    await logAction(ctx, cap, 'failed', String(err));
-    return { capability: cap, result: 'failed', description: String(err) };
+  } catch {
+    await logAction(ctx, cap, 'failed', 'Capability failed');
+    return { capability: cap, result: 'failed', description: 'Capability failed' };
   }
 }
 
@@ -541,8 +541,8 @@ export async function runTwinAgent(userId: string): Promise<CapabilityResult[]> 
     }
 
     return results;
-  } catch (err) {
-    console.error('[TwinAgent] Fatal error:', err);
+  } catch {
+    console.error('[TwinAgent] Fatal request failure.');
     return [];
   }
 }

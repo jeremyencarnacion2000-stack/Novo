@@ -12,6 +12,13 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
  * Get your key at: https://resend.com/api-keys
  */
 export const emailService = {
+    sendPasswordReset: async (to: string, resetUrl: string) => {
+        return emailService.sendReminder(
+            to,
+            'Reset your Novo password',
+            `<p>We received a request to reset your Novo password.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#b7f7c5;color:#0b1a12;text-decoration:none;border-radius:10px;font-weight:600">Reset password</a></p><p>This link expires in one hour and works only once. If you did not request this, you can safely ignore this email.</p>`,
+        )
+    },
     /**
      * Send a reminder email
      * @param to - Recipient email address

@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
             pipelineByStage,
         });
     } catch (error) {
-        console.error('Error fetching business analytics:', error);
+        console.error('Error fetching business analytics.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

@@ -32,22 +32,11 @@ export async function GET() {
       )
     }
 
-    // Check provider — if not Google, compute real-world metrics from the database instead of falling back to mock 50!
-    if (session.provider && session.provider !== 'google') {
-      console.info('[Biometrics] Google Fit is not connected; returning the operational fallback.')
-      const payload = await fetchDbBiometricPayload(session.user.id)
-      return NextResponse.json(payload, {
-        status: 200,
-        headers: {
-          'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
-        },
-      })
-    }
-
-    const accessToken = await getGoogleAccessToken(
-      session.user.id,
-      (session as any)?.accessToken
-    )
+    const accessToken = await getGoogleAccessToken(session.user.id, [
+      'fitness.activity.read',
+      'fitness.heart_rate.read',
+      'fitness.sleep.read',
+    ])
 
     if (!accessToken) {
       console.warn('[Biometrics] Google Fit token is unavailable; returning the operational fallback.')
@@ -120,10 +109,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Default POST behavior: same as GET
-    const accessToken = await getGoogleAccessToken(
-      session.user.id,
-      (session as any)?.accessToken
-    )
+    const accessToken = await getGoogleAccessToken(session.user.id, [
+      'fitness.activity.read',
+      'fitness.heart_rate.read',
+      'fitness.sleep.read',
+    ])
 
     if (!accessToken) {
       const payload = await fetchDbBiometricPayload(session.user.id)

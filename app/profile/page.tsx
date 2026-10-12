@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { GoalsManager } from '@/components/profile/goals-manager'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useSession, signOut } from 'next-auth/react'
-import { User, Target, Sparkles, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy, XCircle } from 'lucide-react'
+import { User, Target, Edit2, Save, X, CalendarDays, CheckCircle2, Flame, Trophy, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSettings } from '@/lib/settings-context'
 import { clearApiCache } from '@/lib/register-sw'
@@ -199,27 +199,6 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Vision Board Placeholder */}
-          <Card className="liquid-glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-yellow-500" />
-                Vision Board
-              </CardTitle>
-              <CardDescription>
-                Visualize your dreams and aspirations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg text-muted-foreground bg-muted/50">
-                <div className="text-center">
-                  <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Coming Soon</p>
-                  <p className="text-xs mt-1">Upload images that inspire you</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Goals Manager */}

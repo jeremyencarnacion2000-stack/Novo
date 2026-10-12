@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma';
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin';
 import { upsertNovoSignals } from '@/lib/cognitive/signal-ledger';
+import { withProviderSyncLock } from '@/lib/provider-sync-lock';
 
 const API_BASE = 'https://api.todoist.com/api/v1';
 const PAGE_LIMIT = 200;
@@ -206,32 +207,51 @@ export async function syncTodoistPlugin(
     }
 
     const overdueToSync = overdueTasks.slice(0, 15);
-    const existingItems = await prisma.checklistItem.findMany({
-      where: {
-        userId,
-        source: 'todoist',
-        sourceId: { in: overdueToSync.map((task) => task.id) },
-      },
-      select: { sourceId: true },
-    });
-    const existingSourceIds = new Set(existingItems.map((item) => item.sourceId));
-    const newItems = overdueToSync.filter((task) => !existingSourceIds.has(task.id));
-
-    if (newItems.length > 0) {
-      await prisma.checklistItem.createMany({
-        data: newItems.map((task) => ({
+    await withProviderSyncLock(prisma, `novo:checklist-sync:${userId}:todoist`, async (db) => {
+      const existingItems = await db.checklistItem.findMany({
+        where: {
           userId,
-          text: task.content,
-          completed: false,
-          priority: task.priority >= 3 ? 'high' : task.priority === 2 ? 'medium' : 'low',
           source: 'todoist',
-          sourceId: task.id,
-          dueDate: task.due?.datetime
-            ? new Date(task.due.datetime)
-            : task.due?.date ? new Date(task.due.date) : null,
-        })),
+          sourceId: { in: overdueToSync.map((task) => task.id) },
+        },
+        select: { id: true, sourceId: true },
       });
-    }
+      const existingSourceIds = new Set(existingItems.map((item) => item.sourceId));
+      const newItems = overdueToSync.filter((task) => !existingSourceIds.has(task.id));
+
+      // Provider data is the source of truth for imported rows. Updating an
+      // existing item prevents stale titles, priorities, and due dates from
+      // becoming permanent Twin context after a task changes in Todoist.
+      for (const task of overdueToSync.filter((candidate) => existingSourceIds.has(candidate.id))) {
+        await db.checklistItem.updateMany({
+          where: { userId, source: 'todoist', sourceId: task.id },
+          data: {
+            text: task.content,
+            completed: false,
+            priority: task.priority >= 3 ? 'high' : task.priority === 2 ? 'medium' : 'low',
+            dueDate: task.due?.datetime
+              ? new Date(task.due.datetime)
+              : task.due?.date ? new Date(task.due.date) : null,
+          },
+        });
+      }
+
+      if (newItems.length > 0) {
+        await db.checklistItem.createMany({
+          data: newItems.map((task) => ({
+            userId,
+            text: task.content,
+            completed: false,
+            priority: task.priority >= 3 ? 'high' : task.priority === 2 ? 'medium' : 'low',
+            source: 'todoist',
+            sourceId: task.id,
+            dueDate: task.due?.datetime
+              ? new Date(task.due.datetime)
+              : task.due?.date ? new Date(task.due.date) : null,
+          })),
+        });
+      }
+    });
 
     return {
       tasksRead: activeTasks.length,

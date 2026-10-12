@@ -59,6 +59,10 @@ model User {
   sessions      Session[]
   checklistItems ChecklistItem[]
   deviceActivityEvents DeviceActivityEvent[]
+  companionActivityDailySummaries CompanionActivityDailySummary[]
+  companionWorkContext CompanionWorkContext?
+  companionChatTurns CompanionChatTurn[]
+  userChatLease UserChatLease?
   routines      Routine[]
   projects      Project[]
   tasks         Task[]
@@ -104,6 +108,8 @@ model User {
   externalActionExecutions ExternalActionExecution[]
   mcpPersonalAccessTokens McpPersonalAccessToken[]
   mcpAuditLogs McpAuditLog[]
+  companionDevices CompanionDevice[]
+  mutationRequests MutationRequest[]
   cognitiveReplanRequests CognitiveReplanRequest[]
 
   // Social
@@ -288,6 +294,7 @@ model RoutineDay {
   order     Int    @default(0)
   weekday   String? // 'monday', 'tuesday', etc.
 
+  @@index([routineId, order])
   @@map("routine_days")
 }
 
@@ -303,6 +310,7 @@ model RoutineExercise {
   day          RoutineDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
   order        Int    @default(0)
 
+  @@index([dayId, order])
   @@map("routine_exercises")
 }
 
@@ -315,6 +323,7 @@ model WorkoutLog {
   completed Boolean  @default(false)
   exercises WorkoutExerciseLog[]
 
+  @@index([routineId, date])
   @@map("workout_logs")
 }
 
@@ -329,6 +338,7 @@ model WorkoutExerciseLog {
   weight        Float?  // Optional, for progression
   notes         String?
 
+  @@index([workoutLogId])
   @@map("workout_exercise_logs")
 }
 
@@ -342,6 +352,7 @@ model RoutineTask {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([routineId, updatedAt])
   @@map("routine_tasks")
 }
 
@@ -354,6 +365,7 @@ model RoutineCompletion {
   tasksTotal  Int
   tasksCompleted Int
 
+  @@index([routineId, completedAt])
   @@map("routine_completions")
 }
 
@@ -373,6 +385,7 @@ model Project {
   subtasks  Subtask[]
   tasks     Task[]
   timeBlocks TimeBlock[]
+  quickNotes QuickNote[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
@@ -444,6 +457,7 @@ model TrackerEntry {
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
+  @@index([trackerId, date])
   @@map("tracker_entries")
 }
 
@@ -543,6 +557,8 @@ model AIConversation {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   messages  Json
+  revision  Int      @default(0)
+  companionTurns CompanionChatTurn[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -635,6 +651,7 @@ model Book {
   notes       String?  // General notes
   pageNotes   Json?    // Array of { page: Int, note: String, date: DateTime }
   isbn        String?
+  identityKey String?
   genre       String?  // Primary genre/subject
   categories  String?  // Comma-separated categories
   description String?  // Book description/synopsis
@@ -647,7 +664,27 @@ model Book {
   version     Int      @default(1)
 
   @@index([userId])
+  @@unique([userId, identityKey])
   @@map("books")
+}
+
+// Generic durable idempotency boundary for user-initiated creations. Unlike
+// content fingerprints, a client-generated key preserves intentional duplicate
+// items while making a retry of the *same* intent converge on one resource.
+model MutationRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope          String
+  idempotencyKey String
+  fingerprint    String
+  resourceType   String
+  resourceId     String
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, scope, idempotencyKey])
+  @@index([userId, createdAt])
+  @@map("mutation_requests")
 }
 
 model Gratitude {
@@ -1191,6 +1228,9 @@ model QuickNote {
   isArchived  Boolean  @default(false)
   color       String?  // Optional color for the note
   convertedTo String?  // If converted to task/project, store the ID
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  dueDate     String?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
@@ -1198,6 +1238,7 @@ model QuickNote {
 
   @@index([userId])
   @@index([userId, isPinned])
+  @@index([userId, projectId])
   @@map("quick_notes")
 }
 
@@ -1522,11 +1563,113 @@ model DeviceActivityEvent {
   userId    String
   startedAt DateTime
   endedAt   DateTime
+  surface   String   @default("web_desktop") // web_desktop|web_mobile|pwa_desktop|pwa_mobile
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startedAt])
+  @@index([userId, surface, startedAt])
+}
+
+// Only app/day duration snapshots are synced. Detailed event intervals stay
+// in the device's seven-day local history and are never persisted by Novo.
+model CompanionActivityDailySummary {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceId        String
+  day             DateTime @db.Date
+  applicationId   String
+  state           String   // active|idle|locked
+  durationSeconds Int
+  expiresAt       DateTime
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, day, applicationId, state])
+  @@index([userId, day])
+  @@index([expiresAt])
+  @@map("companion_activity_daily_summaries")
+}
+
+// A durable, owner-scoped device link. The desktop's UUID is the public
+// identifier; the internal row id and bearer credential are never returned.
+model CompanionDevice {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId        String    @db.Uuid
+  name            String
+  platform        String
+  clientId        String
+  grantId         String
+  scopes          String[]
+  connectedAt     DateTime  @default(now())
+  lastVerifiedAt  DateTime  @default(now())
+  revokedAt       DateTime?
+  chatTurns       CompanionChatTurn[]
+
+  @@unique([userId, deviceId])
+  @@index([userId, revokedAt, connectedAt])
+  @@map("companion_devices")
+}
+
+// Only short-lived, user-selected work focus is stored. It contains no
+// window titles, file paths, URLs, code contents, or passive capture.
+model CompanionWorkContext {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  projectLabel    String?
+  focusSummary    String
+  source          String   @default("web")
+  sourceDeviceId  String?  @db.Uuid
+  status          String   @default("active")
+  observedAt      DateTime @default(now())
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("companion_work_contexts")
+}
+
+model CompanionChatTurn {
+  id                 String   @id @default(cuid())
+  userId             String
+  requestId          String   @db.Uuid
+  conversationId     String?
+  deviceId           String
+  clientId           String
+  grantId            String
+  fingerprint        String
+  status             String
+  leaseExpiresAt     DateTime
+  expiresAt          DateTime
+  userMessageId      String   @db.Uuid
+  assistantMessageId String?  @db.Uuid
+  initialRevision    Int
+  resultRevision     Int?
+  modelId            String?
+  errorCode          String?
+  createdAt          DateTime @default(now())
+  finishedAt         DateTime?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device             CompanionDevice @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  conversation       AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
+  @@index([userId, status])
+  @@index([expiresAt])
+  @@map("companion_chat_turns")
+}
+
+model UserChatLease {
+  userId    String   @id
+  requestId String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_chat_leases")
 }
 
 model TwinSnapshot {

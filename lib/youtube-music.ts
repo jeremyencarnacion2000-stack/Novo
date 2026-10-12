@@ -6,6 +6,12 @@ const YT_API_BASE = 'https://www.googleapis.com/youtube/v3';
 // In-memory cache with TTL (5 min)
 const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
+const MAX_PAGE_SIZE = 50;
+
+function boundedPageSize(value: number, fallback: number): number {
+  const normalized = Number.isFinite(value) ? Math.trunc(value) : fallback;
+  return Math.min(Math.max(normalized, 1), MAX_PAGE_SIZE);
+}
 
 function getCached(key: string) {
   const entry = cache.get(key);
@@ -54,14 +60,15 @@ export async function getMyChannel(token: string) {
 
 // Get user's playlists
 export async function getMyPlaylists(token: string, maxResults = 25) {
-  const ck = `playlists:${token.slice(-8)}`;
+  const boundedMaxResults = boundedPageSize(maxResults, 25);
+  const ck = `playlists:${token.slice(-8)}:${boundedMaxResults}`;
   const cached = getCached(ck);
   if (cached) return cached;
 
   const data = await ytFetch('playlists', token, {
     part: 'snippet,contentDetails',
     mine: 'true',
-    maxResults: String(maxResults),
+    maxResults: String(boundedMaxResults),
   });
   const result = (data.items || []).map((p: any) => ({
     id: p.id,
@@ -77,14 +84,15 @@ export async function getMyPlaylists(token: string, maxResults = 25) {
 
 // Get tracks from a playlist
 export async function getPlaylistTracks(token: string, playlistId: string, maxResults = 50) {
-  const ck = `pltracks:${playlistId}`;
+  const boundedMaxResults = boundedPageSize(maxResults, 50);
+  const ck = `pltracks:${playlistId}:${boundedMaxResults}`;
   const cached = getCached(ck);
   if (cached) return cached;
 
   const data = await ytFetch('playlistItems', token, {
     part: 'snippet,contentDetails',
     playlistId,
-    maxResults: String(maxResults),
+    maxResults: String(boundedMaxResults),
   });
   const videoIds = (data.items || [])
     .map((i: any) => i.contentDetails?.videoId)
@@ -125,19 +133,20 @@ export async function getPlaylistTracks(token: string, playlistId: string, maxRe
 export async function getLikedVideos(token: string, maxResults = 50) {
   const channel = await getMyChannel(token);
   if (!channel?.likedPlaylistId) return [];
-  return getPlaylistTracks(token, channel.likedPlaylistId, maxResults);
+  return getPlaylistTracks(token, channel.likedPlaylistId, boundedPageSize(maxResults, 50));
 }
 
 // Get subscriptions (channels the user follows)
 export async function getSubscriptions(token: string, maxResults = 20) {
-  const ck = `subs:${token.slice(-8)}`;
+  const boundedMaxResults = boundedPageSize(maxResults, 20);
+  const ck = `subs:${token.slice(-8)}:${boundedMaxResults}`;
   const cached = getCached(ck);
   if (cached) return cached;
 
   const data = await ytFetch('subscriptions', token, {
     part: 'snippet',
     mine: 'true',
-    maxResults: String(maxResults),
+    maxResults: String(boundedMaxResults),
     order: 'relevance',
   });
   const result = (data.items || []).map((s: any) => ({
@@ -152,12 +161,13 @@ export async function getSubscriptions(token: string, maxResults = 20) {
 
 // Search YouTube (music category)
 export async function searchYouTube(token: string, query: string, maxResults = 20) {
+  const boundedMaxResults = boundedPageSize(maxResults, 20);
   const data = await ytFetch('search', token, {
     part: 'snippet',
     q: query,
     type: 'video',
     videoCategoryId: '10', // Music category
-    maxResults: String(maxResults),
+    maxResults: String(boundedMaxResults),
   });
   const videoIds = (data.items || []).map((i: any) => i.id.videoId).filter(Boolean);
 

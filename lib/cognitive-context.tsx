@@ -89,12 +89,16 @@ export type CognitiveContextValue = CognitiveStateValue & CognitiveDispatchValue
 // ─── Contexts ─────────────────────────────────────────────────────────────────
 const CognitiveStateContext    = createContext<CognitiveStateValue | null>(null)
 const CognitiveDispatchContext = createContext<CognitiveDispatchValue | null>(null)
+// Page and dashboard surfaces only need the phase. A separate primitive value
+// prevents metric refreshes from invalidating their entire render tree.
+const CognitivePhaseContext = createContext<CognitivePhase | null>(null)
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { status: authStatus } = useSession()
-  const { playPlaylist, currentTrack } = usePlayerStore()
+  const { data: session, status: authStatus } = useSession()
+  const playPlaylist = usePlayerStore((state) => state.playPlaylist)
+  const currentTrack = usePlayerStore((state) => state.currentTrack)
 
   const [chronotype, setChronotype]     = useState<Chronotype>('intermediate')
   const [phaseOverride, setPhaseOverride] = useState<CognitivePhase | null>(null)
@@ -112,48 +116,86 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   )
   const [navigationWarning, setNavigationWarning] = useState<string | null>(null)
 
+  const cognitiveStorageKey = useMemo(
+    () => session?.user?.id ? `user:${session.user.id}` : null,
+    [session?.user?.id]
+  )
+
   const prevPhaseRef    = useRef<CognitivePhase>(bioState.phase)
   const audioLoadedRef  = useRef<string | null>(null)
 
   // Restore settings from localStorage on client mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedChronotype = localStorage.getItem('cognitive:chronotype') as Chronotype | null
-      if (savedChronotype) {
-        setChronotype(savedChronotype)
-      }
-      // Phase Override was a temporary development control. The control was
-      // removed from the UI, but old installations could still restore its
-      // localStorage value here and remain in SYNAPTIC_FATIGUE forever. The
-      // current phase must always be calculated by the Twin's live model.
-      localStorage.removeItem('cognitive:phase-override')
+    if (typeof window === 'undefined') return
+
+    // Chronotype is an account preference, not a browser-global preference.
+    // Do not hydrate while auth is unresolved: otherwise the default first
+    // render can overwrite or expose the previous account's value.
+    setChronotype('intermediate')
+    if (cognitiveStorageKey) {
+      const savedChronotype = localStorage.getItem(
+        `cognitive:chronotype:${cognitiveStorageKey}`
+      ) as Chronotype | null
+      if (savedChronotype) setChronotype(savedChronotype)
     }
-  }, [])
+
+    // Phase Override was a temporary development control. Remove both the
+    // legacy global key and any account-scoped residue; the live Twin phase is
+    // always the source of truth.
+    localStorage.removeItem('cognitive:phase-override')
+    if (cognitiveStorageKey) {
+      localStorage.removeItem(`cognitive:phase-override:${cognitiveStorageKey}`)
+    }
+  }, [cognitiveStorageKey])
 
   // ── Biometrics polling (every 3 min) ───────────────────────────────────────
-  const fetchBiometrics = useCallback(() => {
-    fetch('/api/cognitive/biometrics')
+  const fetchBiometrics = useCallback((signal?: AbortSignal) => {
+    fetch('/api/cognitive/biometrics', { signal })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.hasGoogleFitData && typeof data.userStressScore === 'number') {
           setUserStressScore(data.userStressScore)
         }
       })
-      .catch(() => {})
+      .catch((error: unknown) => {
+        if ((error as { name?: string })?.name !== 'AbortError') return
+      })
   }, [])
 
   // CognitiveProvider mounts app-wide (public /landing, /auth/* included), so
   // this polling loop waits for a real session — otherwise every logged-out
   // page load hits /api/cognitive/biometrics and gets a 401.
   useEffect(() => {
-    if (authStatus !== 'authenticated') return
+    if (authStatus !== 'authenticated' || !session?.user?.id) {
+      setUserStressScore(null)
+      return
+    }
 
-    fetchBiometrics()
-    let id: ReturnType<typeof setInterval> | null = setInterval(fetchBiometrics, 180_000)
+    const controller = new AbortController()
+    const refreshBiometrics = () => {
+      if (document.visibilityState === 'hidden') return
+      fetchBiometrics(controller.signal)
+    }
+    setUserStressScore(null)
+    let id: ReturnType<typeof setInterval> | null = null
+    const startBiometricsPolling = () => {
+      if (id || document.visibilityState === 'hidden') return
+      refreshBiometrics()
+      id = setInterval(refreshBiometrics, 180_000)
+    }
+    // Biometrics enrich the ambient state but are not needed to paint the
+    // first route. Let the shell become interactive before the first request.
+    let initialTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      initialTimer = null
+      startBiometricsPolling()
+    }, 900)
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        fetchBiometrics()
-        if (!id) id = setInterval(fetchBiometrics, 180_000)
+        if (initialTimer) {
+          clearTimeout(initialTimer)
+          initialTimer = null
+        }
+        startBiometricsPolling()
       } else if (id) {
         clearInterval(id)
         id = null
@@ -161,10 +203,12 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      if (initialTimer) clearTimeout(initialTimer)
       if (id) clearInterval(id)
+      controller.abort()
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [fetchBiometrics, authStatus])
+  }, [fetchBiometrics, authStatus, session?.user?.id])
 
   // ── Event Bus → Engine bridge — ref handles (declared early so refresh/logHabit can populate them) ──
   const logHabitRef = useRef<(cost: number) => void>(() => {})
@@ -293,6 +337,14 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
 
   // ── Auto-load binaural playlist on fatigue ────────────────────────────────
   useEffect(() => {
+    // This provider is also used by public review/auth surfaces. Never let an
+    // anonymous page bootstrap a provider-backed YouTube search (or its 401)
+    // before the session exists; audio recommendations belong to the live Twin
+    // inside the authenticated app.
+    if (authStatus !== 'authenticated') {
+      audioLoadedRef.current = null
+      return
+    }
     const category = bioState.recommendedAudioCategory
     if (category === 'none') { audioLoadedRef.current = null; return }
     if (audioLoadedRef.current === category) return
@@ -302,27 +354,44 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
     if (!query) return
 
     audioLoadedRef.current = category
+    const controller = new AbortController()
+    let cancelled = false
+    // Recommendations are ambient enhancement, not part of the first route.
+    // Give navigation and the shell time to settle before hitting the YouTube
+    // search endpoint, and cancel the work if the user leaves the route.
+    const timer = window.setTimeout(() => {
+      if (cancelled || document.visibilityState === 'hidden') return
+      fetch(`/api/youtube/search?q=${encodeURIComponent(query)}&type=video&maxResults=10`, { signal: controller.signal })
+        .then(r => {
+          if (r.status === 401 || r.status === 403) { audioLoadedRef.current = null; return null }
+          return r.ok ? r.json() : null
+        })
+        .then((data: any) => {
+          if (cancelled) return
+          const items: any[] = data?.tracks ?? []
+          if (!items.length) return
+          const tracks = items.map((t: any) => ({
+            id: t.id ?? t.uri,
+            uri: t.id ?? t.uri,
+            name: t.name ?? t.title ?? 'Focus Track',
+            artist: t.artist ?? t.channelTitle ?? 'Ambient',
+            image: t.image ?? t.thumbnailUrl,
+            duration_ms: 0,
+          }))
+          playPlaylist({ id: `cognitive-${category}`, name: query, tracks }, 0)
+        })
+        .catch((error: unknown) => {
+          if ((error as { name?: string })?.name !== 'AbortError') audioLoadedRef.current = null
+        })
+    }, 2200)
 
-    fetch(`/api/youtube/search?q=${encodeURIComponent(query)}&type=video&maxResults=10`)
-      .then(r => {
-        if (r.status === 401 || r.status === 403) { audioLoadedRef.current = null; return null }
-        return r.ok ? r.json() : null
-      })
-      .then((data: any) => {
-        const items: any[] = data?.tracks ?? []
-        if (!items.length) return
-        const tracks = items.map((t: any) => ({
-          id: t.id ?? t.uri,
-          uri: t.id ?? t.uri,
-          name: t.name ?? t.title ?? 'Focus Track',
-          artist: t.artist ?? t.channelTitle ?? 'Ambient',
-          image: t.image ?? t.thumbnailUrl,
-          duration_ms: 0,
-        }))
-        playPlaylist({ id: `cognitive-${category}`, name: query, tracks }, 0)
-      })
-      .catch(() => { audioLoadedRef.current = null })
-  }, [bioState.recommendedAudioCategory, currentTrack, playPlaylist])
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      controller.abort()
+      audioLoadedRef.current = null
+    }
+  }, [authStatus, bioState.recommendedAudioCategory, currentTrack, playPlaylist])
 
   // ── Navigation guard ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -345,10 +414,10 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   // ── Stable dispatch callbacks (identity never changes) ────────────────────
   const setChronotypeWithSave = useCallback((c: Chronotype) => {
     setChronotype(c)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cognitive:chronotype', c)
+    if (typeof window !== 'undefined' && cognitiveStorageKey) {
+      localStorage.setItem(`cognitive:chronotype:${cognitiveStorageKey}`, c)
     }
-  }, [])
+  }, [cognitiveStorageKey])
 
   const setPhaseOverrideWithSave = useCallback((p: CognitivePhase | null) => {
     startMorphTransition(() => {
@@ -358,8 +427,11 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
       // Do not persist a development override. A stale value must never
       // supersede the cognitive algorithm on a subsequent app launch.
       localStorage.removeItem('cognitive:phase-override')
+      if (cognitiveStorageKey) {
+        localStorage.removeItem(`cognitive:phase-override:${cognitiveStorageKey}`)
+      }
     }
-  }, [])
+  }, [cognitiveStorageKey])
 
   const logHabit = useCallback((energyCost: number) => {
     setHabits(prev => [
@@ -421,6 +493,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
   return (
     <CognitiveDispatchContext.Provider value={dispatchValue}>
       <CognitiveStateContext.Provider value={stateValue}>
+        <CognitivePhaseContext.Provider value={bioState.phase}>
         {children}
         {navigationWarning && (
           <FatigueNavigationWarning
@@ -430,6 +503,7 @@ export function CognitiveProvider({ children }: { children: React.ReactNode }) {
             minutesToRecover={bioState.minutesToNextPhase}
           />
         )}
+        </CognitivePhaseContext.Provider>
       </CognitiveStateContext.Provider>
     </CognitiveDispatchContext.Provider>
   )
@@ -545,12 +619,12 @@ export function useCognitiveEngine(): CognitiveContextValue {
 
 /** true only while in PEAK_FOCUS phase */
 export function usePeakFocus(): boolean {
-  return useCognitiveState().bioState.phase === 'PEAK_FOCUS'
+  return useCognitivePhase() === 'PEAK_FOCUS'
 }
 
 /** true when the system recommends recovery */
 export function useSynapticFatigue(): boolean {
-  return useCognitiveState().bioState.phase === 'SYNAPTIC_FATIGUE'
+  return useCognitivePhase() === 'SYNAPTIC_FATIGUE'
 }
 
 /** Current attention score (0–100) — subscribe without pulling full bioState */
@@ -560,5 +634,7 @@ export function useAttentionScore(): number {
 
 /** Current cognitive phase string */
 export function useCognitivePhase(): CognitivePhase {
-  return useCognitiveState().bioState.phase
+  const phase = useContext(CognitivePhaseContext)
+  if (!phase) throw new Error('useCognitivePhase must be used within <CognitiveProvider>')
+  return phase
 }

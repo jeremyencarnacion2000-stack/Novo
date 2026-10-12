@@ -45,7 +45,6 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { springConfig } from '@/lib/design-tokens'
-import { FocusMode } from '@/components/focus-mode'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { GlassSurface } from '@/components/ui/GlassSurface'
@@ -57,8 +56,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 import { useRef } from 'react'
 
-
-import { safeViewTransition } from '@/hooks/use-view-transition'
 
 import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 
@@ -139,6 +136,7 @@ export function AppSidebar() {
         { title: t('sidebar.cognitive_engine'), href: '/cognitive', icon: Brain },
         { title: t('sidebar.chat'), href: '/chat', icon: Bot },
         { title: t('sidebar.activity'), href: '/activity', icon: Timer },
+        { title: t('sidebar.companion') || 'Companion', href: '/companion', icon: Sparkles },
     ],
     },
     {
@@ -176,7 +174,7 @@ export function AppSidebar() {
     const filteredGroups = rawNavigation.map((group) => {
       const items = group.items.filter((item) => {
         // Core dashboard items always visible
-        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/calendar', '/projects', '/checklist', '/connectors']
+        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/companion', '/calendar', '/projects', '/checklist', '/connectors']
         if (coreHrefs.includes(item.href)) return true
         
         const moduleKey = item.href.replace('/', '')
@@ -185,7 +183,7 @@ export function AppSidebar() {
 
       // Sort items based on their order in enabledModules
       const sortedItems = [...items].sort((a, b) => {
-        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/calendar', '/projects', '/checklist', '/connectors']
+        const coreHrefs = ['/', '/today', '/cognitive', '/chat', '/activity', '/companion', '/calendar', '/projects', '/checklist', '/connectors']
         const aIsCore = coreHrefs.includes(a.href)
         const bIsCore = coreHrefs.includes(b.href)
         
@@ -293,12 +291,9 @@ export function AppSidebar() {
                               <SidebarMenuItem key={item.title} className="relative">
                                 {isActive && (
                                   <GlassSurface
-                                    radius={9999}
-                                    depth={4}
-                                    blur={1}
-                                    strength={20}
-                                    chromaticAberration={2.75}
+                                    preset="navigation"
                                     refractive
+                                    refractivePriority="interactive"
                                     backgroundColor="transparent"
                                     elevation="low"
                                     aria-hidden
@@ -371,11 +366,9 @@ export function AppSidebar() {
                       <GlassSurface
                         as={Link}
                         href="/profile"
-                        radius={9999}
-                        depth={4}
-                        blur={1}
-                        strength={20}
-                        chromaticAberration={3}
+                        preset="navigation"
+                        refractive
+                        refractivePriority="interactive"
                         backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.06)"
                         elevation="low"
                         contrastObserver
@@ -428,12 +421,7 @@ export function AppSidebar() {
                 >
                 <SidebarMenuButton
                   asChild={isSettingsOpen}
-                  onClick={!isSettingsOpen ? () => {
-                    safeViewTransition(() => {
-                      setSettingsOpen(true)
-                    })
-                  } : undefined}
-                  style={!isSettingsOpen ? { viewTransitionName: 'settings-window' } as React.CSSProperties : undefined}
+                  onClick={!isSettingsOpen ? () => setSettingsOpen(true) : undefined}
                   tooltip={t('sidebar.settings')}
                   aria-label="Settings"
                   className={cn("rounded-full h-10 transition-all duration-300 btn-press flex items-center justify-between relative novo-sidebar-nav-button",
@@ -443,11 +431,9 @@ export function AppSidebar() {
                 >
                   {isSettingsOpen ? (
                     <GlassSurface
-                      radius={9999}
-                      depth={4}
-                      blur={1}
-                      strength={20}
-                      chromaticAberration={3}
+                      preset="navigation"
+                      refractive
+                      refractivePriority="interactive"
                       backgroundColor="rgba(var(--md-sys-color-neutral-background), 0.06)"
                       elevation="low"
                       contrastObserver

@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(goal)
   } catch (error) {
-    console.error('Error fetching goal:', error)
+    console.error('Error fetching goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -56,6 +56,15 @@ export async function PUT(
 
     const { title, description, status, deadline } = parsedBody.data
 
+    const currentGoal = await prisma.goal.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true, status: true },
+    })
+    if (!currentGoal) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
+    }
+    const transitionedToCompleted = status === 'completed' && currentGoal.status !== 'completed'
+
     const updatedGoal = await prisma.goal.update({
       where: {
         id,
@@ -69,7 +78,9 @@ export async function PUT(
       }
     })
 
-    if (status === 'completed') {
+    // A retry of the same completed state must not create a second analytics
+    // completion or teach the Twin that the goal was completed twice.
+    if (transitionedToCompleted) {
       const { trackServerCompletion } = await import('@/lib/analytics-server')
       await trackServerCompletion(session.user.id, 'task', 'goals', {
         goalId: id,
@@ -82,7 +93,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating goal:', error)
+    console.error('Error updating goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -112,7 +123,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting goal:', error)
+    console.error('Error deleting goal.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

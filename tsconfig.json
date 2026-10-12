@@ -42,6 +42,7 @@
   "exclude": [
     "node_modules",
     "tests",
-    "notebooklm-mcp"
+    "notebooklm-mcp",
+    "companion"
   ]
 }

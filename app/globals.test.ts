@@ -6,11 +6,13 @@ const stylesheet = (): Root => postcss.parse(
   fs.readFileSync(path.join(process.cwd(), 'app', 'globals.css'), 'utf8'),
 )
 
+const normalizeSelector = (selector: string) => selector.replace(/\r\n/g, '\n')
+
 const backdropFilterFor = (root: Root, selector: string) => {
   let value: string | undefined
 
   root.walkRules((rule) => {
-    if (rule.selector === selector) {
+    if (normalizeSelector(rule.selector) === normalizeSelector(selector)) {
       rule.walkDecls('backdrop-filter', (declaration) => {
         value = declaration.value
       })
@@ -24,7 +26,7 @@ const declarationFor = (root: Root, selector: string, property: string) => {
   let value: string | undefined
 
   root.walkRules((rule) => {
-    if (rule.selector === selector) {
+    if (normalizeSelector(rule.selector) === normalizeSelector(selector)) {
       rule.walkDecls(property, (declaration) => {
         value = declaration.value
       })
@@ -38,7 +40,7 @@ const layerFor = (root: Root, selector: string) => {
   let layer: string | undefined
 
   root.walkRules((rule) => {
-    if (rule.selector === selector && rule.parent?.type === 'atrule' && rule.parent.name === 'layer') {
+    if (normalizeSelector(rule.selector) === normalizeSelector(selector) && rule.parent?.type === 'atrule' && rule.parent.name === 'layer') {
       layer = rule.parent.params
     }
   })
@@ -61,6 +63,17 @@ const utilityDeclarationFor = (root: Root, name: string, property: string) => {
 }
 
 describe('liquid glass card tiers', () => {
+  it('keeps the shared primary Card on the live Focus material contract', () => {
+    const root = stylesheet()
+    const selector = ".novo-card-surface[data-variant='primary']"
+
+    expect(declarationFor(root, selector, 'background')).toBe('var(--novo-focus-background)')
+    expect(backdropFilterFor(root, selector)).toBe('var(--novo-focus-backdrop-filter)')
+    expect(declarationFor(root, selector, '-webkit-backdrop-filter')).toBe('var(--novo-focus-backdrop-filter)')
+    expect(declarationFor(root, selector, 'border')).toBe('var(--novo-focus-border)')
+    expect(declarationFor(root, selector, 'box-shadow')).toBe('var(--novo-focus-box-shadow)')
+  })
+
   it('feeds everyday liquid cards from the card Settings controls (Focus)', () => {
     const root = stylesheet()
 
@@ -164,5 +177,60 @@ describe('custom wallpaper backdrop', () => {
     expect(declarationFor(root, 'body.has-bg-image [data-app-wallpaper]', 'background')).toBe('var(--novo-canvas-background)')
     expect(declarationFor(root, 'body.has-bg-image [data-app-wallpaper]', 'filter')).toBe('var(--novo-canvas-backdrop-filter)')
     expect(declarationFor(root, '[data-app-viewport] > [data-app-wallpaper]', 'z-index')).toBe('0')
+  })
+})
+
+describe('mobile navigation panel glass controls', () => {
+  it('keeps the selected destination visibly distinct on the shared nav-control material', () => {
+    const root = stylesheet()
+    expect(
+      declarationFor(root, ".novo-mobile-nav-panel .novo-nav-glass-control[data-active='true']", 'background'),
+    ).toBe('color-mix(in srgb, var(--novo-context-background) 32%, transparent)')
+    expect(
+      declarationFor(root, ".novo-mobile-nav-panel .novo-nav-glass-control[data-active='true']", 'isolation'),
+    ).toBe('auto')
+  })
+})
+
+describe('interaction motion contract', () => {
+  it('does not let the global interaction rule animate layout metrics', () => {
+    const root = stylesheet()
+    const transition = declarationFor(root, `a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  [data-slot="tabs-trigger"],
+  [data-slot="sidebar-menu-button"]`, 'transition')
+
+    expect(transition).toContain('transform')
+    expect(transition).toContain('background-color')
+    expect(transition).not.toContain('all ')
+  })
+
+  it('honors the in-app animation preference independently of the OS setting', () => {
+    const root = stylesheet()
+    const rule = root.nodes.find((node) => node.type === 'rule' && node.selector.includes("[data-animations='false']"))
+
+    expect(rule?.toString()).toContain('animation: none !important')
+    expect(rule?.toString()).toContain('transition: none !important')
+    expect(rule?.toString()).toContain('scroll-behavior: auto !important')
+  })
+
+  it('uses a static cognitive field with only a short opacity crossfade in reduced mode', () => {
+    const root = stylesheet()
+    const selector = ":root[data-novo-motion='reduced'] [data-app-viewport] .novo-motion-context-node"
+
+    expect(declarationFor(root, selector, 'transition-property')).toBe('opacity')
+    expect(declarationFor(root, selector, 'transition-duration')).toBe('160ms')
+  })
+})
+
+describe('bounded ambient motion', () => {
+  it('plays the chat confirmation glow once instead of repainting its shadow forever', () => {
+    const root = stylesheet()
+
+    expect(declarationFor(root, '.animate-glow-pulse', 'animation')).toBe('glow-pulse 3s ease-in-out 1')
   })
 })

@@ -44,8 +44,10 @@ export async function runTodoistAmbientSync(input: { connectionId: string; trigg
     await ports.advanceCursor(connectionId, cursor, discovered.nextCursor)
     await ports.completeClaim(claim.claimId, { reconciled, trigger: input.trigger })
     return { processed: true as const, reconciled }
-  } catch (error) {
-    await ports.failClaim(claim.claimId, error instanceof Error ? error.message : 'todoist_ambient_failed')
+  } catch {
+    // Keep provider diagnostics out of durable reconciliation records. The
+    // claim only needs a stable code for retries/operations dashboards.
+    await ports.failClaim(claim.claimId, 'todoist_ambient_failed')
     return { processed: true as const, failed: true as const }
   }
 }

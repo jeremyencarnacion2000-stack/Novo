@@ -1,0 +1,26 @@
+{
+  "purpose": "Route the right local skill to each animation phase",
+  "core": [
+    "design-consultation",
+    "taste-skill:high-end-visual-design",
+    "motion-design",
+    "improve-animations",
+    "impeccable:impeccable",
+    "review-animations",
+    "apple-design",
+    "superpowers:verification-before-completion"
+  ],
+  "optional": [
+    "watch:watch",
+    "imagegen",
+    "taste-skill:imagegen-frontend-web",
+    "ponytail:ponytail",
+    "superpowers:systematic-debugging"
+  ],
+  "policy": {
+    "improve-animations": "read-only audit and plan; never modify source directly",
+    "verification-before-completion": "run fresh evidence before claiming completion",
+    "reducedMotion": "required for every scene",
+    "scope": "one scene or one motion problem per pass"
+  }
+}

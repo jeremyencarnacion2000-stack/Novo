@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useChatbot } from './context';
 import { Message as ChatMessage } from './message';
-import { ThinkingSteps } from './thinking-steps';
-import { NovoActivitySurface } from '@/components/ai/novo-activity-surface';
+import { NovoThinkingPill } from '@/components/ai/novo-thinking-pill';
 
 // Pure message list — index.tsx decides whether to show this or a hero, and
 // owns the single persistent composer + voice overlay (one input surface,
 // not a different one per view). This component only ever mounts once a
 // chat is active, so it has no empty-state branch of its own to keep in sync.
 export function ChatArea() {
-    const { messages, isLoading, streamingMessage, currentConversationId, twinMode } = useChatbot();
+    const { messages, isLoading, streamingMessage, currentConversationId } = useChatbot();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const prevLengthRef = useRef(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -97,18 +97,20 @@ export function ChatArea() {
                     {streamingMessage && streamingMessage.content && (
                         <ChatMessage message={streamingMessage} />
                     )}
-                    {/* Real pipeline stages (classifier/model from the `meta`
-                        SSE event), not a canned spinner — hidden the moment
-                        actual tokens start rendering as the message above. */}
-                    {((isLoading && !streamingMessage) || (streamingMessage && !streamingMessage.content)) && (
-                        <div className="space-y-2"><NovoActivitySurface runId={streamingMessage?.activityRunId ?? null} /><ThinkingSteps
-                            modelLabel={streamingMessage && streamingMessage.model !== 'auto' ? streamingMessage.model ?? null : null}
-                            intent={streamingMessage?.intent ?? null}
-                            fallback={!!streamingMessage?.fallback}
-                            agentMode={twinMode}
-                            showCompanion={!streamingMessage?.activityRunId}
-                        /></div>
-                    )}
+                    {/* One physical surface follows the real activity stream.
+                        AnimatePresence lets it resolve into the first response
+                        token instead of disappearing between two paint frames. */}
+                    <AnimatePresence initial={false}>
+                        {((isLoading && !streamingMessage) || (streamingMessage && !streamingMessage.content)) ? (
+                            <NovoThinkingPill
+                                key="novo-thinking-pill"
+                                runId={streamingMessage?.activityRunId ?? null}
+                                modelLabel={streamingMessage && streamingMessage.model !== 'auto' ? streamingMessage.model ?? null : null}
+                                intent={streamingMessage?.intent ?? null}
+                                fallback={!!streamingMessage?.fallback}
+                            />
+                        ) : null}
+                    </AnimatePresence>
                     <div ref={messagesEndRef} />
                 </div>
             </div>

@@ -6,11 +6,77 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+import { useNativeDialogMotion, type NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
+import { useSharedDialogMotion } from '@/hooks/use-shared-dialog-motion'
+import {
+  resolveModalMotionPreset,
+  type ModalMobilePresentation,
+  type ModalMotionPreset,
+} from '@/lib/modal-motion'
+
+type DialogMotionContextValue = {
+  registerController: (controller: NativeDialogMotionController | null) => void
+}
+
+const DialogMotionContext = React.createContext<DialogMotionContextValue | null>(null)
 
 function Dialog({
+  open,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const [present, setPresent] = React.useState(open ?? defaultOpen ?? false)
+  const controllerRef = React.useRef<NativeDialogMotionController | null>(null)
+  const previousOpenRef = React.useRef(open)
+
+  const registerController = React.useCallback((controller: NativeDialogMotionController | null) => {
+    controllerRef.current = controller
+  }, [])
+
+  const finishClose = React.useCallback((notify: boolean) => {
+    const complete = () => {
+      setPresent(false)
+      if (notify) onOpenChange?.(false)
+    }
+    const controller = controllerRef.current
+    if (controller) controller.close(complete)
+    else complete()
+  }, [onOpenChange])
+
+  React.useLayoutEffect(() => {
+    if (open === undefined) return
+    const wasOpen = previousOpenRef.current
+    previousOpenRef.current = open
+    if (open) {
+      if (!present) setPresent(true)
+      else if (wasOpen === false) controllerRef.current?.open()
+      return
+    }
+    if (wasOpen === true && present) finishClose(false)
+  }, [finishClose, open, present])
+
+  const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    if (nextOpen) {
+      setPresent(true)
+      onOpenChange?.(true)
+      return
+    }
+    finishClose(true)
+  }, [finishClose, onOpenChange])
+
+  const context = React.useMemo(() => ({ registerController }), [registerController])
+
+  return (
+    <DialogMotionContext.Provider value={context}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        {...props}
+        open={present}
+        onOpenChange={handleOpenChange}
+      />
+    </DialogMotionContext.Provider>
+  )
 }
 
 function DialogTrigger({
@@ -41,14 +107,11 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-[5000]',
+        'novo-dialog-overlay fixed inset-0 z-[5000]',
         isMaterialOverlay ? 'novo-material-overlay' : 'bg-black/60',
         isFlipModal
           ? 'modal-flip-overlay'
-          : cn(
-              !isMaterialOverlay && 'backdrop-blur-sm',
-              'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-            ),
+          : !isMaterialOverlay && 'backdrop-blur-sm',
         className,
       )}
       {...props}
@@ -102,12 +165,13 @@ function FlipAnchoredPositioner({
     }
 
     place()
-    const resizeObserver = surface && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null
-    if (resizeObserver && surface) resizeObserver.observe(surface)
+    // Freeze the trigger-relative placement for the dialog lifetime. Observing
+    // the surface itself made async fields, validation messages, and font
+    // settling visibly move the whole modal after its entrance had completed.
+    // Viewport changes still re-clamp it so rotation/resizing remains safe.
     window.addEventListener('resize', place)
     window.visualViewport?.addEventListener('resize', place)
     return () => {
-      resizeObserver?.disconnect()
       window.removeEventListener('resize', place)
       window.visualViewport?.removeEventListener('resize', place)
     }
@@ -148,25 +212,75 @@ function DialogContent({
   showCloseButton = true,
   flipAnchored,
   contextualRect,
+  motionPreset,
+  motionId,
+  mobilePresentation = 'inherit',
+  anchorRef,
+  overlayClassName,
+  overlayProps,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Anchor near the trigger instead of centering — for small, single-purpose dialogs. */
   flipAnchored?: boolean
   contextualRect?: DOMRect | null
+  motionPreset?: ModalMotionPreset
+  motionId?: string
+  mobilePresentation?: ModalMobilePresentation
+  anchorRef?: React.RefObject<HTMLElement | null>
+  /** Extra styling/attributes for the shared backdrop. */
+  overlayClassName?: string
+  overlayProps?: React.ComponentProps<typeof DialogPrimitive.Overlay> & Record<string, unknown>
 }) {
-  const flipId = (props as any)['data-flip-to'] as string | undefined
-  const isFlipModal = Boolean(flipId)
-  const isContextualModal = Boolean(contextualRect)
+  const legacyMotionId = (props as any)['data-flip-to'] as string | undefined
+  const flipId = motionId ?? legacyMotionId
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const resolvedPreset = resolveModalMotionPreset({
+    preset: motionPreset,
+    legacyMotionId: flipId,
+    flipAnchored,
+    mobilePresentation,
+    isMobile,
+  })
+  const isFlipModal = Boolean(flipId) && (resolvedPreset === 'shared' || resolvedPreset === 'anchored')
+  const isIntegratedFlipModal = Boolean(motionId) && isFlipModal
+  const resolvedAnchorRect = anchorRef?.current?.getBoundingClientRect() ?? contextualRect
+  const isContextualModal = resolvedPreset === 'anchored' && Boolean(resolvedAnchorRect)
   const isMaterialOverlay = Boolean((props as any)['data-overlay-material'])
+  const motionContext = React.useContext(DialogMotionContext)
+  const surfaceRef = React.useRef<HTMLDivElement | null>(null)
+  const overlayRef = React.useRef<HTMLDivElement | null>(null)
   const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    enabled: resolvedPreset === 'sheet',
     onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="dialog-close"]')?.click(),
+  })
+
+  React.useImperativeHandle(forwardedRef, () => surfaceRef.current as HTMLDivElement)
+  const setSurfaceRef = React.useCallback((node: HTMLDivElement | null) => {
+    surfaceRef.current = node
+    dragSurfaceRef.current = node
+  }, [dragSurfaceRef])
+
+  useNativeDialogMotion({
+    surfaceRef,
+    overlayRef,
+    preset: resolvedPreset,
+    enabled: !isFlipModal,
+    registerController: motionContext?.registerController,
+  })
+  useSharedDialogMotion({
+    motionId: flipId ?? '',
+    enabled: isIntegratedFlipModal,
+    registerController: motionContext?.registerController,
   })
 
   const content = (
     <DialogPrimitive.Content
-      ref={dragSurfaceRef}
+      ref={setSurfaceRef}
       data-slot="dialog-content"
+      data-modal-motion={resolvedPreset}
+      {...(flipId ? { 'data-flip-to': flipId } : {})}
       aria-describedby={undefined}
       className={cn(
         // max-h uses dvh, not vh: on mobile, vh is computed against the
@@ -175,12 +289,14 @@ function DialogContent({
         // in a non-scrolling wrapper, gets cropped equally from top and
         // bottom with no way to scroll to the cropped part. dvh tracks the
         // real visual viewport instead.
-        'bg-background pointer-events-auto relative box-border w-full max-w-[calc(100vw-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
+        'novo-modal-surface bg-background pointer-events-auto relative box-border w-full max-w-[calc(100vw-2rem)] max-h-[90dvh] overflow-y-auto gap-4 rounded-3xl border p-6 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg',
         isFlipModal
           ? 'modal-flip-target'
           : isContextualModal
             ? 'contextual-modal-target'
-          : 'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:duration-[180ms] data-[state=open]:duration-[320ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
+            : '',
+        resolvedPreset === 'sheet' && 'max-w-none rounded-b-none rounded-t-[30px] border-b-0 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:max-w-lg',
+        resolvedPreset === 'fullscreen' && 'h-[100dvh] max-h-[100dvh] max-w-none rounded-none border-0 sm:h-auto sm:max-h-[90dvh] sm:max-w-4xl sm:rounded-[34px] sm:border',
         className,
       )}
       {...props}
@@ -190,7 +306,7 @@ function DialogContent({
       {showCloseButton && (
         <DialogPrimitive.Close
           data-slot="dialog-close"
-          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-[background-color,color,opacity,transform] hover:opacity-100 hover:bg-foreground/10 active:scale-95 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
         >
           <XIcon />
           <span className="sr-only">Close</span>
@@ -202,21 +318,49 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay
+        ref={overlayRef}
+        className={cn(
+          resolvedPreset === 'anchored' ? 'bg-transparent backdrop-blur-none' : undefined,
+          overlayClassName,
+        )}
         {...(isFlipModal ? { 'data-flip-overlay': flipId } as any : {})}
         {...(isMaterialOverlay ? { 'data-overlay-material': true } as any : {})}
+        {...overlayProps}
       />
-      {isFlipModal && flipAnchored !== false ? (
+      {isFlipModal && flipAnchored === true ? (
         <FlipAnchoredPositioner flipId={flipId!}>{content}</FlipAnchoredPositioner>
       ) : (
         <div
           className={cn(
             "fixed inset-0 z-[5001] pointer-events-none",
-            isContextualModal ? "flex items-start justify-start" : "flex items-center justify-center",
+            isContextualModal
+              ? "flex items-start justify-start"
+              : resolvedPreset === 'sheet'
+                ? 'flex items-end justify-center'
+                : "flex items-center justify-center",
           )}
-          style={isContextualModal && contextualRect ? {
-            paddingLeft: Math.max(12, Math.min(contextualRect.left, (typeof window !== 'undefined' ? window.innerWidth : 640) - 432)),
-            paddingTop: Math.max(12, Math.min(contextualRect.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 180)),
-          } : undefined}
+          style={isContextualModal && resolvedAnchorRect ? (() => {
+            // Clamp against the dialog's actual CSS bounds rather than a
+            // magic width/height. The old constants allowed a 28rem panel to
+            // hang 16px off the right edge on desktop and tall content to be
+            // cropped below the visual viewport on mobile.
+            const viewportWidth = typeof window !== 'undefined'
+              ? (window.visualViewport?.width ?? window.innerWidth)
+              : 640
+            const viewportHeight = typeof window !== 'undefined'
+              ? (window.visualViewport?.height ?? window.innerHeight)
+              : 800
+            const margin = 12
+            const maxPanelWidth = Math.min(448, Math.max(0, viewportWidth - margin * 2))
+            const maxPanelHeight = Math.max(0, viewportHeight * 0.9)
+            const maxLeft = Math.max(margin, viewportWidth - maxPanelWidth - margin)
+            const maxTop = Math.max(margin, viewportHeight - maxPanelHeight - margin)
+
+            return {
+              paddingLeft: Math.max(margin, Math.min(resolvedAnchorRect.left, maxLeft)),
+              paddingTop: Math.max(margin, Math.min(resolvedAnchorRect.top, maxTop)),
+            }
+          })() : undefined}
         >
           {content}
         </div>

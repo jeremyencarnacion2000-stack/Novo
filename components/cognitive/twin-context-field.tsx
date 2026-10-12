@@ -56,7 +56,7 @@ function ContextNode({ context, selected, muted, onSelect }: { context: TwinGrap
       onClick={onSelect}
       style={{ left: `${context.position.x}%`, top: `${context.position.y}%` }}
       className={cn(
-        'absolute z-10 w-[min(42vw,12.5rem)] text-left motion-reduce:transition-none',
+        'novo-motion-context-node absolute z-10 w-[min(42vw,12.5rem)] text-left',
         placement(context.position),
         'transition-[left,top,opacity,transform] duration-500 ease-[cubic-bezier(0.2,0,0,1)]',
         muted ? 'scale-[.94] opacity-45' : 'opacity-100',

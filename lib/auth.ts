@@ -429,9 +429,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Send properties to the client, like an access_token and user id from a JWT.
-      session.accessToken = token.accessToken as string;
-      session.provider = token.provider as string; // Provider (google, spotify, etc.)
+      // OAuth credentials stay server-side. Provider access/refresh tokens are
+      // deliberately kept in the JWT/database layer and must never be copied
+      // into the session JSON returned to browser clients. Server routes resolve
+      // the durable provider grant by user id instead.
       session.error = token.error; // For refresh token errors
       if (token.id) {
         session.user.id = token.id as string;
@@ -460,7 +461,7 @@ export const authOptions: NextAuthOptions = {
       // Redirect Spotify users to /music, others to dashboard
       const redirectUrl = url.includes('spotify') || url.includes('/music')
         ? baseUrl + '/music'
-        : baseUrl + '/';
+        : baseUrl + '/app';
       return redirectUrl;
     },
   },

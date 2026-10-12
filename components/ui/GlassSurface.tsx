@@ -10,7 +10,8 @@
  *  • ResizeObserver auto-updates the filter whenever dimensions change.
  *  • Filter results are cached; identical params never regenerate.
  *  • Only transform, opacity, filter, backdrop-filter are animated — never layout.
- *  • GPU acceleration via will-change on mount.
+ *  • Keeps compositor hints scoped to active motion instead of reserving a
+ *    permanent GPU layer for every card.
  *  • Graceful fallback for browsers without SVG-filter backdrop-filter support.
  *
  * Usage:
@@ -22,10 +23,39 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { useLiquidGlass } from '@/lib/liquid-glass/useLiquidGlass'
+import type { RefractivePriority } from '@/lib/liquid-glass/liquid-glass-budget'
+
+export type GlassPreset = 'navigation' | 'status' | 'control' | 'panel'
+export type { RefractivePriority }
+
+const glassPresets: Record<GlassPreset, {
+  radius: number
+  depth: number
+  blur: number
+  strength: number
+  chromaticAberration: number
+}> = {
+  // These are the calibrated values from the supplied GlassElement variant:
+  // a light 5px RGB split for compact controls and a 15px split for focal
+  // lenses. The distinction keeps navigation calm while making the Twin pill
+  // and Context Hub visibly refractive instead of merely translucent.
+  navigation: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
+  status: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
+  control: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
+  panel: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'> {
+  /** Semantic shape/material calibration; pass `refractive` to mount an SVG lens. */
+  preset?: GlassPreset
+
+  /** Priority within Novo's five-filter high-fidelity rendering budget. */
+  refractivePriority?: RefractivePriority
+
+  /** Releases high-fidelity resources while preserving the mounted fallback. */
+  refractiveActive?: boolean
   /**
    * Border radius in pixels — fed into the displacement map to match geometry.
    * @default 128
@@ -108,6 +138,8 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
   /** Enable the heavier SVG displacement/refraction layer for focal surfaces. */
   refractive?: boolean
 
+  /** Use the supplied vanilla <glass-element> renderer for this focal lens. */
+  webComponent?: boolean
   /** Static/fixed width overrides */
   width?: number
   /** Static/fixed height overrides */
@@ -128,11 +160,12 @@ type GlassBackdropStyle = React.CSSProperties & {
 const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
   function GlassSurface(
     {
-      radius = 128,
-      depth = 6,
-      blur = 1,
-      strength = 40,
-      chromaticAberration = 6,
+      preset,
+      radius: radiusProp,
+      depth: depthProp,
+      blur: blurProp,
+      strength: strengthProp,
+      chromaticAberration: chromaticAberrationProp,
       adaptive = true,
       debug = false,
       backgroundColor,
@@ -141,7 +174,10 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       as,
       contrastObserver = false,
       autoSize = true,
-      refractive = false,
+      refractive: refractiveProp,
+      refractivePriority = 'ambient',
+      refractiveActive = true,
+      webComponent = false,
       width: staticWidth,
       height: staticHeight,
       className,
@@ -151,11 +187,45 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     },
     forwardedRef,
   ) {
+    const resolvedPreset = preset as GlassPreset | undefined
+    const presetValues = resolvedPreset ? glassPresets[resolvedPreset] : undefined
+    const radius = radiusProp ?? presetValues?.radius ?? 128
+    const depth = depthProp ?? presetValues?.depth ?? 6
+    const blur = blurProp ?? presetValues?.blur ?? 1
+    const strength = strengthProp ?? presetValues?.strength ?? 40
+    const chromaticAberration = chromaticAberrationProp ?? presetValues?.chromaticAberration ?? 6
+
+    // The supplied <glass-element> is loaded lazily by the app shell. Keep
+    // the React lens alive until the custom element is actually upgraded so
+    // Chromium never paints an unupgraded placeholder over the glass.
+    const [webComponentReady, setWebComponentReady] = React.useState(() =>
+      typeof window !== 'undefined' &&
+      typeof customElements !== 'undefined' &&
+      Boolean(customElements.get('glass-element')),
+    )
+    React.useEffect(() => {
+      if (!webComponent || typeof window === 'undefined' || typeof customElements === 'undefined') return
+      let cancelled = false
+      const markReady = () => { if (!cancelled) setWebComponentReady(true) }
+      if (customElements.get('glass-element')) markReady()
+      else customElements.whenDefined('glass-element').then(markReady).catch(() => {})
+      window.addEventListener('novo:liquid-glass-ready', markReady)
+      return () => {
+        cancelled = true
+        window.removeEventListener('novo:liquid-glass-ready', markReady)
+      }
+    }, [webComponent])
+
+    const webComponentPreferred = webComponent && webComponentReady
+    // A preset selects geometry and material tokens; it must not implicitly
+    // allocate an SVG displacement lens. Refraction is intentionally opt-in.
+    const refractive = refractiveProp ?? false
     const {
       ref: internalRef,
       mapUrl,
       filterUrl,
       useSVGFilter,
+      buildBackdropFilter,
     } = useLiquidGlass({
       radius,
       depth,
@@ -167,7 +237,22 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       height: staticHeight,
       autoSize,
       enabled: refractive,
+      leaseOnly: webComponentPreferred,
+      priority: refractivePriority,
+      active: refractiveActive,
+      includeMap: debug,
     })
+    const webComponentActive = webComponentPreferred && refractive && refractiveActive && useSVGFilter
+
+    // Keep the optical chain identical to the reference Liquid Glass
+    // renderer: a light pre-blur, the geometry-aware SVG displacement lens,
+    // then a restrained post-blur/brightness/saturation pass.  The hook also
+    // returns the CSS-only fallback for Safari/Firefox or when the five-lens
+    // budget is occupied, so the material never flashes flat.
+    const refractiveFilter = React.useMemo(
+      () => buildBackdropFilter(),
+      [buildBackdropFilter],
+    )
 
     const [resolvedContrast, setResolvedContrast] = React.useState<'light' | 'dark' | null>(null)
 
@@ -183,6 +268,57 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       },
       [internalRef, forwardedRef],
     )
+
+    const webComponentRef = React.useRef<HTMLElement | null>(null)
+
+    // Keep the supplied web component's SVG map aligned with the actual host
+    // geometry. Layout effect + custom-element readiness prevents a first-paint
+    // 200x200 lens and keeps the exact delivered displacement renderer visible.
+    React.useLayoutEffect(() => {
+      if (!webComponentActive) return
+      const host = internalRef.current
+      const lens = webComponentRef.current
+      if (!host || !lens) return
+
+      const setIfChanged = (name: string, value: string) => {
+        if (lens.getAttribute(name) !== value) lens.setAttribute(name, value)
+      }
+      let lastGeometry = ''
+      const syncGeometry = () => {
+        const rect = host.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return
+        const width = String(Math.max(1, Math.ceil(rect.width)))
+        const height = String(Math.max(1, Math.ceil(rect.height)))
+        const radiusValue = String(Math.min(radius, rect.width / 2, rect.height / 2))
+        const background = backgroundColor && backgroundColor !== 'transparent'
+          ? backgroundColor
+          : 'rgba(255,255,255,0.10)'
+        const geometry = `${width}|${height}|${radiusValue}|${depth}|${blur}|${strength}|${chromaticAberration}|${background}`
+        if (geometry === lastGeometry) return
+        lastGeometry = geometry
+        setIfChanged('width', width)
+        setIfChanged('height', height)
+        setIfChanged('radius', radiusValue)
+        setIfChanged('depth', String(depth))
+        setIfChanged('blur', String(blur))
+        setIfChanged('strength', String(strength))
+        setIfChanged('chromatic-aberration', String(chromaticAberration))
+        setIfChanged('background-color', background)
+      }
+
+      // Set the first geometry synchronously so the lens never flashes at its
+      // default 200×200 size, then ignore duplicate ResizeObserver callbacks.
+      syncGeometry()
+      const observer = typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(syncGeometry)
+      observer?.observe(host)
+      window.addEventListener('resize', syncGeometry, { passive: true })
+      return () => {
+        observer?.disconnect()
+        window.removeEventListener('resize', syncGeometry)
+      }
+    }, [webComponentActive, internalRef, radius, depth, blur, strength, chromaticAberration, backgroundColor])
 
     // ── Contrast Observer logic ──────────────────────────────────────────────
 
@@ -259,13 +395,21 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       return {
         borderRadius: radius,
         position: 'relative',
-        isolation: 'isolate',
+        // Do not isolate this host: the Settings-controlled backdrop lives in
+        // a child layer and must be able to sample the wallpaper outside the
+        // card. `isolation: isolate` turns the transparent host into the
+        // child's backdrop root in Chromium, making a valid blur token look
+        // visually flat on desktop.
         background: 'transparent',
         border: 'none',
         boxShadow: 'none',
+        // The delivered Web Component is the sole optical compositor when
+        // active. Leaving the host backdrop-filter enabled would blur the
+        // backdrop once, then refract that already-composited result again.
+        backdropFilter: webComponentActive ? 'none' : undefined,
+        WebkitBackdropFilter: webComponentActive ? 'none' : undefined,
       }
-    }, [radius])
-
+    }, [radius, webComponentActive])
     const bgStyles = React.useMemo<GlassBackdropStyle>(() => {
       const materialVariable = `--novo-${material}`
       let activeBg = backgroundColor ?? `var(${materialVariable}-background)`
@@ -336,6 +480,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       <Component
         ref={ref}
         data-novo-glass
+        data-glass-preset={resolvedPreset}
+        data-refractive-priority={refractivePriority}
         data-liquid-refractive={refractive ? (useSVGFilter ? 'svg' : 'fallback') : 'off'}
         data-elevation={elevation}
         data-contrast={resolvedContrast}
@@ -347,14 +493,37 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         style={{ ...computedStyle, ...style }}
         {...rest}
       >
-        {/* Liquid Glass Background Layer */}
-        <div aria-hidden data-glass-backdrop className="novo-glass-backdrop" style={bgStyles} />
+        {/* Liquid Glass Background Layer. The supplied web component owns
+            the complete optical stack when active; keeping this backdrop
+            mounted would create the visible double-plate effect on mobile. */}
+        {!webComponentActive && (
+          <div aria-hidden data-glass-backdrop className="novo-glass-backdrop" style={bgStyles} />
+        )}
 
+        {webComponentActive && React.createElement('glass-element', {
+          // The supplied element exposes optical values through read-only
+          // getters. Passing width/radius/etc. as React props makes React
+          // assign properties and throws before the custom element can paint.
+          // Geometry and optical attributes are synchronously applied through
+          // setAttribute in the layout effect above instead.
+          ref: webComponentRef,
+          'aria-hidden': 'true',
+          style: {
+            position: 'absolute',
+            inset: 0,
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            borderRadius: 'inherit',
+            pointerEvents: 'none',
+            zIndex: 0,
+          },
+        })}
         {/* Optional refractive lens. It is deliberately separate from the
             Settings-controlled backdrop layer: Chromium can reject a mixed
             `url(#filter) blur(...)` declaration as a whole, which would make
             a transparent card lose its blur. */}
-        {refractive && (
+        {refractive && !webComponentActive && (
           <div
             aria-hidden
             data-glass-refractive
@@ -377,7 +546,19 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
               // this layer contributes only depth, an inner highlight and a
               // gentle spectral edge instead of pretending that no material
               // exists at all.
-              '--novo-glass-refractive-filter': filterUrl || 'none',
+              '--novo-glass-refractive-filter': refractiveFilter || 'none',
+              // Keep the critical compositor declaration inline as well as in
+              // the CSS token. Chromium can otherwise drop a `url(#...)`
+              // value during a stylesheet cascade when the lens is mounted
+              // inside a transformed portal. The token remains the fallback
+              // contract; the inline declaration makes the SVG resource
+              // resolvable on the first paint.
+              ...(refractiveFilter
+                ? {
+                    backdropFilter: refractiveFilter,
+                    WebkitBackdropFilter: refractiveFilter,
+                  }
+                : {}),
             } as React.CSSProperties & {
               '--novo-glass-refractive-opacity': string
               '--novo-glass-refractive-filter': string
@@ -388,6 +569,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         {/* The specular edge belongs to the same material contract as the
             lens. This prevents a fixed white rim from surviving after the
             user turns the card's opacity or liquid intensity down to zero. */}
+        {!webComponentActive && (
         <div
           aria-hidden
           data-glass-sheen
@@ -403,6 +585,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
               : '0',
           } as React.CSSProperties & { '--novo-glass-sheen-opacity': string }}
         />
+        )}
 
         {/* Content — z-2 lifts above bg (z-0) and highlight (z-1) layers */}
         <div className="relative z-[2] flex flex-col flex-1 min-h-0 min-w-0">

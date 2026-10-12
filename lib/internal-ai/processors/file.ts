@@ -31,8 +31,8 @@ export const registerFileProcessor = (service: IInternalAIService) => {
                     preview: content.substring(0, 100)
                 }
             };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'FILE_PROCESSING_FAILED' };
         }
     });
 };

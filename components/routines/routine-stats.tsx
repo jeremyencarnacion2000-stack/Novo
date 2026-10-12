@@ -77,7 +77,8 @@ export function RoutineStatsCard() {
                         className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] hover:border-foreground/[0.11] transition-all duration-400 p-5 cursor-default group"
                         style={{
                             background: 'rgba(255,255,255,0.015)',
-                            backdropFilter: 'blur(12px)',
+                            backdropFilter: 'var(--novo-context-backdrop-filter)',
+                            WebkitBackdropFilter: 'var(--novo-context-backdrop-filter)',
                             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}
                     >
@@ -101,7 +102,8 @@ export function RoutineStatsCard() {
                 className="relative overflow-hidden rounded-2xl border border-foreground/[0.07] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3"
                 style={{
                     background: 'rgba(255,255,255,0.01)',
-                    backdropFilter: 'blur(12px)',
+                    backdropFilter: 'var(--novo-context-backdrop-filter)',
+                    WebkitBackdropFilter: 'var(--novo-context-backdrop-filter)',
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                 }}
             >

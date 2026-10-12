@@ -1,8 +1,9 @@
 "use client";
 
-import { motion, useReducedMotion, type Variants } from "motion/react";
+import { motion, type Variants } from "motion/react";
 import { type ComponentProps, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { useNovoMotionPolicy } from "@/hooks/use-novo-motion-policy";
 
 export type ShimmeringTextProps = Omit<
   ComponentProps<typeof motion.span>,
@@ -35,8 +36,8 @@ export function ShimmeringText({
   className,
   ...props
 }: ShimmeringTextProps) {
-  const reducedMotion = useReducedMotion();
-  const stopped = isStopped || paused || reducedMotion === true;
+  const reducedMotion = useNovoMotionPolicy() !== 'full';
+  const stopped = isStopped || paused || reducedMotion;
 
   const createCharVariants = useCallback(
     (charIndex: number): Variants => ({

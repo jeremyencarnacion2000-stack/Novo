@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { Section } from './settings-shared'
 
 export function SettingsAiModels() {
   const { toast } = useToast()
+  const { data: session } = useSession()
 
   // AI Models state
   const [models, setModels] = useState<AIModel[]>([])
@@ -24,11 +26,14 @@ export function SettingsAiModels() {
   const [newModelType, setNewModelType] = useState<'lora' | 'base'>('base')
   const [newModelBase, setNewModelBase] = useState('')
 
-  // Load AI models on mount
+  // Custom model metadata is private account state. Re-scope the singleton
+  // before reading it so switching accounts cannot expose another user's
+  // uploaded model list.
   useEffect(() => {
+    aiModelManager.setStorageScope(session?.user?.id ? `user:${session.user.id}` : null)
     const loadedModels = aiModelManager.getModels()
     setModels(loadedModels)
-  }, [])
+  }, [session?.user?.id])
 
   const handleModelFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]

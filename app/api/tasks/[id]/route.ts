@@ -6,6 +6,7 @@ import { updateTaskSchema } from '@/lib/schemas/task'
 import { z } from 'zod'
 import { emitTwinSignal } from '@/lib/twin-signal'
 import { syncTaskToCalendars } from '@/lib/task-calendar-sync'
+import { syncTaskChecklist } from '@/lib/task-checklist-sync'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -56,10 +57,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           title: updatedTask.title,
           dueDate: updatedTask.dueDate,
           priority: updatedTask.priority,
-          accessToken: session.accessToken,
         })
       } catch (calendarError) {
-        console.warn('[tasks] Calendar sync skipped:', calendarError)
+        console.warn('[tasks] Calendar sync skipped.')
+      }
+    }
+
+    if (dueDate !== undefined || title !== undefined || priority !== undefined || status !== undefined) {
+      try {
+        await syncTaskChecklist({
+          userId: session.user.id,
+          taskId: updatedTask.id,
+          title: updatedTask.title,
+          priority: updatedTask.priority,
+          status: updatedTask.status,
+          dueDate: updatedTask.dueDate,
+        })
+      } catch {
+        console.warn('[tasks] Checklist sync skipped.')
       }
     }
 
@@ -76,7 +91,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating task:', error)
+    console.error('Error updating task.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -108,7 +123,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     return NextResponse.json({ message: 'Task deleted successfully' })
   } catch (error) {
-    console.error('Error deleting task:', error)
+    console.error('Error deleting task.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

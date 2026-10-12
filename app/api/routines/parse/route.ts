@@ -5,16 +5,28 @@ import { chutesAPI } from '@/lib/chutes';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 
+// Routine parsing is provider-backed and can be CPU/memory intensive. Keep
+// the request bounded before duplicating the content across provider prompts.
+const MAX_ROUTINE_TEXT_LENGTH = 40_000;
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text } = await req.json();
-    if (!text) {
+    const body = await req.json();
+    const text = body && typeof body === 'object' && typeof body.text === 'string'
+      ? body.text
+      : '';
+    if (!text.trim()) {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 });
+    }
+    if (text.length > MAX_ROUTINE_TEXT_LENGTH) {
+      return NextResponse.json({
+        error: `Routine text is too large. Maximum size is ${MAX_ROUTINE_TEXT_LENGTH.toLocaleString()} characters.`,
+      }, { status: 413 });
     }
 
     const systemPrompt = `
@@ -72,7 +84,6 @@ export async function POST(req: NextRequest) {
     `;
 
     let result;
-    let usedProvider = 'groq';
 
     try {
       console.log('Attempting parsing with Groq...');
@@ -83,9 +94,8 @@ export async function POST(req: NextRequest) {
         systemPrompt,
         'openai/gpt-oss-120b'
       );
-    } catch (groqError) {
-      console.error('Groq API failed, trying OpenRouter:', groqError);
-      usedProvider = 'openrouter';
+    } catch {
+      console.error('Routine parsing provider failed; trying fallback', { provider: 'groq' });
       try {
         result = await openRouterAPI.generateResponse(
           `Parse this document:\n\n${text}`,
@@ -94,9 +104,8 @@ export async function POST(req: NextRequest) {
           systemPrompt,
           'openai/gpt-oss-20b:free'
         );
-      } catch (orError) {
-        console.error('OpenRouter API failed, trying Chutes:', orError);
-        usedProvider = 'chutes';
+      } catch {
+        console.error('Routine parsing provider failed; trying fallback', { provider: 'openrouter' });
         result = await chutesAPI.generateResponse(
           `Parse this document:\n\n${text}`,
           '',
@@ -114,14 +123,15 @@ export async function POST(req: NextRequest) {
     try {
       const parsedData = JSON.parse(cleanedResult);
       return NextResponse.json(parsedData);
-    } catch (parseError) {
-      console.error('Failed to parse LLM response as JSON:', cleanedResult);
+    } catch {
+      // The parsed content is user-provided/private; never write it to logs.
+      console.error('Routine parsing returned invalid JSON; using fallback parser');
       // Fallback to a basic regex parser if LLM fails
       return NextResponse.json(parseWithRegex(text));
     }
 
-  } catch (error) {
-    console.error('Error in routine parse route:', error);
+  } catch {
+    console.error('Error in routine parse route');
     return NextResponse.json({ error: 'Failed to parse routine' }, { status: 500 });
   }
 }

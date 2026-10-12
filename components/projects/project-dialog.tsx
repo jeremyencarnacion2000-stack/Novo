@@ -20,7 +20,6 @@ import type { Project, ProjectStatus, Subtask } from "@/types/project"
 import { Badge } from "@/components/ui/badge"
 import { X, Plus, Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useModalFlip } from "@/hooks/use-modal-flip"
 
 interface ProjectDialogProps {
   open: boolean
@@ -36,8 +35,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
 
   const flipKey = project ? `project-${project.id}` : 'btn-new-project'
-  const closeFlip = useModalFlip(flipKey, open)
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
 
   const [startDate, setStartDate] = useState("")
   const [dueDate, setDueDate] = useState("")
@@ -124,7 +122,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent data-flip-to={flipKey} className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent motionId={flipKey} className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -308,7 +306,7 @@ export function ProjectDialog({ open, onClose, onSave, project }: ProjectDialogP
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">{project ? "Update" : "Create"} Project</Button>
+            <Button ripple type="submit">{project ? "Update" : "Create"} Project</Button>
           </DialogFooter>
         </form>
       </DialogContent>

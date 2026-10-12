@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { DollarSign, Plus, Trash2, ArrowRight } from 'lucide-react'
-import { useModalFlip } from '@/hooks/use-modal-flip'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 interface Deal {
     id: string
@@ -64,17 +64,15 @@ export function DealsPipeline() {
         probability: 50,
         clientId: '',
     })
+    const createIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
     useEffect(() => {
         fetchDeals()
         fetchClients()
     }, [])
 
-    const closeDealFlip = useModalFlip('btn-new-deal', dialogOpen)
-
     const handleDialogChange = (o: boolean) => {
-        if (!o) closeDealFlip(() => setDialogOpen(false))
-        else setDialogOpen(true)
+        setDialogOpen(o)
     }
 
     const fetchDeals = async () => {
@@ -104,13 +102,21 @@ export function DealsPipeline() {
     const handleAddDeal = async () => {
         if (!newDeal.title.trim() || !newDeal.clientId) return
 
+        const payload = { ...newDeal, title: newDeal.title.trim() }
+        const fingerprint = JSON.stringify(payload)
+        const previousIntent = createIntentRef.current
+        const intent = previousIntent?.fingerprint === fingerprint
+            ? previousIntent
+            : { fingerprint, key: createClientIdempotencyKey() }
+        createIntentRef.current = intent
         try {
             const response = await fetch('/api/business/deals', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newDeal),
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
+                body: JSON.stringify(payload),
             })
             if (response.ok) {
+                createIntentRef.current = null
                 fetchDeals()
                 setNewDeal({ title: '', value: '', stage: 'lead', probability: 50, clientId: '' })
                 handleDialogChange(false)
@@ -222,7 +228,7 @@ export function DealsPipeline() {
             </CardContent>
 
             <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-                <DialogContent data-flip-to="btn-new-deal" flipAnchored className="sm:max-w-[400px]">
+                <DialogContent motionId="btn-new-deal" flipAnchored className="sm:max-w-[400px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Plus data-shared-item="icon" className="h-5 w-5" />

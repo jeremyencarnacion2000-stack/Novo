@@ -1,9 +1,6 @@
 import { AIActionResult, IInternalAIService } from '../types';
 import { groqAPI } from '@/lib/groq';
 
-// Helper for ID generation
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
 const CATEGORIZE_SYSTEM_PROMPT = `Categorize the note below. Return ONLY valid JSON, no markdown:
 { "tags": string[] (pick 1-3 from: urgent, work, personal, shopping, idea, general), "color": string (a Tailwind bg class, e.g. "bg-red-100 dark:bg-red-900/20") }
 Pick "urgent" only if the note genuinely conveys time pressure, not just because a deadline word appears in passing.`;
@@ -39,22 +36,6 @@ function categorizeWithKeywords(content: string) {
 }
 
 export const registerNoteActions = (service: IInternalAIService) => {
-    // Assuming we might have note creation in the future, 
-    // currently mapping to a generic placeholder or existing API if available.
-    // For now, we'll just log it as a success for the demo of "Internal AI" capabilities.
-
-    service.registerAction('create_note', async (payload: any): Promise<AIActionResult> => {
-        // Mock implementation until /api/notes is fully standardized
-        return {
-            success: true,
-            data: {
-                id: generateId(),
-                ...payload,
-                createdAt: new Date().toISOString()
-            }
-        };
-    });
-
     service.registerAction('categorize_note', async (payload: any): Promise<AIActionResult> => {
         try {
             const { content } = payload;
@@ -69,15 +50,15 @@ export const registerNoteActions = (service: IInternalAIService) => {
                 if (Array.isArray(data.tags) && typeof data.color === 'string') {
                     return { success: true, data };
                 }
-            } catch (llmError) {
-                console.error('[categorize_note] LLM categorization failed, falling back to keywords:', llmError);
+            } catch {
+                console.error('[categorize_note] LLM categorization failed; falling back to keywords.');
             }
 
             return { success: true, data: categorizeWithKeywords(content) };
-        } catch (error) {
+        } catch {
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Failed to categorize note'
+                error: 'NOTE_CATEGORIZATION_FAILED'
             };
         }
     });

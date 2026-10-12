@@ -1,19 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { GlassSurface } from '@/components/ui/GlassSurface';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
     PenLine, X, Lightbulb, CheckSquare, Bell, FileText,
     Send, Archive, Trash2, ChevronRight, Calendar, Layers, Plus, Check,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useQuickCapture } from '@/lib/quick-capture-context';
 import { cn } from '@/lib/utils';
-import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss';
+import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 
 type NoteType = 'note' | 'idea' | 'task' | 'reminder';
 type TabView = 'capture' | 'saved' | 'attributes';
@@ -51,20 +51,14 @@ export function QuickCapture() {
     const [projects, setProjects] = useState<any[]>([]);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const createIntentKey = useRef<string | null>(null);
+    const notesRequestRef = useRef<AbortController | null>(null);
     const { toast } = useToast();
-    const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
-        onDismiss: onClose,
-        enabled: isOpen,
-    });
 
-    // Keyboard shortcut: CMD/CTRL + Shift + N
+    // Escape closes the on-demand surface; the shell owns the global open
+    // shortcut so this heavier module does not need to be loaded for it.
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'n') {
-                e.preventDefault();
-                if (isOpen) onClose();
-                else onOpen();
-            }
             if (e.key === 'Escape' && isOpen) {
                 onClose();
             }
@@ -83,24 +77,45 @@ export function QuickCapture() {
     // Load projects for attribution
     useEffect(() => {
         if (isOpen && type === 'task') {
-            fetch('/api/projects').then(res => res.json()).then(data => {
-                setProjects(Array.isArray(data) ? data : []);
-            });
+            const controller = new AbortController();
+            fetch('/api/projects', { signal: controller.signal, cache: 'no-store' })
+                .then(res => res.ok ? res.json() : [])
+                .then(data => {
+                    if (!controller.signal.aborted) setProjects(Array.isArray(data) ? data : []);
+                })
+                .catch((error: unknown) => {
+                    if ((error as { name?: string })?.name !== 'AbortError') setProjects([]);
+                });
+            return () => controller.abort();
         }
+        setProjects([]);
     }, [isOpen, type]);
 
     const loadNotes = useCallback(async () => {
+        notesRequestRef.current?.abort();
+        const controller = new AbortController();
+        notesRequestRef.current = controller;
         setLoadingNotes(true);
         try {
-            const res = await fetch('/api/notes');
-            if (res.ok) {
+            const res = await fetch('/api/notes', { signal: controller.signal, cache: 'no-store' });
+            if (res.ok && !controller.signal.aborted) {
                 const data = await res.json();
-                setSavedNotes(Array.isArray(data) ? data : []);
+                if (!controller.signal.aborted) setSavedNotes(Array.isArray(data) ? data : []);
             }
-        } catch (e) {
-            console.error('Failed to load notes:', e);
+        } catch (error: unknown) {
+            if ((error as { name?: string })?.name !== 'AbortError') console.error('Failed to load notes');
+        } finally {
+            if (notesRequestRef.current === controller) {
+                notesRequestRef.current = null;
+                setLoadingNotes(false);
+            }
         }
-        setLoadingNotes(false);
+    }, []);
+
+    useEffect(() => () => {
+        const controller = notesRequestRef.current;
+        notesRequestRef.current = null;
+        controller?.abort();
     }, []);
 
     useEffect(() => {
@@ -110,20 +125,23 @@ export function QuickCapture() {
     }, [isOpen, activeTab, loadNotes]);
 
     const handleSave = async () => {
-        if (!content.trim()) return;
+        if (!content.trim() || saving) return;
+        const intentKey = createIntentKey.current || createClientIdempotencyKey();
+        createIntentKey.current = intentKey;
         setSaving(true);
         try {
             const response = await fetch('/api/notes', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intentKey },
                 body: JSON.stringify({
                     content,
                     type,
                     projectId: selectedProject,
-                    dueDate: selectedDate
+                    dueDate: selectedDate,
                 }),
             });
             if (response.ok) {
+                createIntentKey.current = null;
                 toast({
                     title: 'Saved!',
                     description: `${typeConfig[type].label} captured successfully.`,
@@ -189,57 +207,23 @@ export function QuickCapture() {
         }
     };
 
-    if (typeof document === 'undefined') return null;
-
-    return createPortal((
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        data-modal-drag-overlay
-                        className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        onClick={onClose}
-                    />
-
-                    {/* Modal (Floating like Raycast/Spotlight) */}
-                    <div className="fixed inset-0 z-[5001] flex items-center justify-center p-4 pointer-events-none">
-                    <motion.div
-                        ref={dragSurfaceRef}
-                        className="relative pointer-events-auto w-full max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-popover/90 border border-transparent rounded-[32px] shadow-[0_30px_100px_-20px_rgba(0,0,0,0.32)]"
-                        initial={{ opacity: 0, y: -20, scale: 0.94, filter: 'blur(4px)' }}
-                        animate={{
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                            filter: 'blur(0px)',
-                            transition: {
-                                type: 'spring',
-                                stiffness: 380,
-                                damping: 30,
-                            }
-                        }}
-                        exit={{
-                            opacity: 0,
-                            y: -12,
-                            scale: 0.96,
-                            filter: 'blur(3px)',
-                            transition: {
-                                duration: 0.2,
-                                ease: 'easeOut'
-                            }
-                        }}
-                    >
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent
+                motionPreset="command"
+                mobilePresentation="sheet"
+                showCloseButton={false}
+                className="relative max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-[32px] border-transparent bg-popover/90 p-0 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.32)]"
+            >
+                        <DialogTitle className="sr-only">Quick Capture</DialogTitle>
                         <GlassSurface
-                            radius={32}
+                            preset="panel"
+                            refractive
                             depth={12}
-                            blur={1}
                             strength={50}
-                            chromaticAberration={8}
+                            chromaticAberration={5}
+                            refractivePriority="interactive"
+                            webComponent
                             backgroundColor="transparent"
                             elevation="medium"
                             aria-hidden
@@ -315,6 +299,7 @@ export function QuickCapture() {
                                     </div>
 
                                     <Button
+                                        ripple
                                         onClick={handleNext}
                                         disabled={!content.trim() || saving}
                                         className="rounded-2xl px-6 h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-black tracking-tighter italic btn-press"
@@ -382,6 +367,7 @@ export function QuickCapture() {
                                         BACK
                                     </Button>
                                     <Button
+                                        ripple
                                         onClick={handleSave}
                                         className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground font-black tracking-tighter italic"
                                     >
@@ -408,12 +394,9 @@ export function QuickCapture() {
                                 ))}
                             </div>
                         )}
-                    </motion.div>
-                    </div>
-                </>
-            )}
-        </AnimatePresence>
-    ), document.body);
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 /**

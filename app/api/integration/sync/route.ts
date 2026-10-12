@@ -30,15 +30,19 @@ export async function POST(request: NextRequest) {
 
         const { taskId, completed } = parsed.data;
 
-        const persisted = await IntegrationEngine.syncCompletion(taskId, completed);
-        if (!persisted) {
+        const result = await IntegrationEngine.syncCompletionDetailed(session.user.id, taskId, completed);
+        if (!result.persisted) {
             return NextResponse.json(
                 { error: 'This item cannot be marked complete' },
                 { status: 422 }
             );
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({
+            success: true,
+            externalSync: result.externalSync,
+            source: result.source,
+        });
     } catch (error) {
         console.error('Error syncing completion:', { name: error instanceof Error ? error.name : 'UnknownError' });
         return NextResponse.json(

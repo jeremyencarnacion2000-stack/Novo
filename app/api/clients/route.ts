@@ -4,6 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { clientSchema } from '@/lib/schemas/client'
 import { z } from 'zod'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(clients)
   } catch (error) {
-    console.error('Error fetching clients:', error)
+    console.error('Error fetching clients.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -40,22 +46,34 @@ export async function POST(request: NextRequest) {
 
     const { name, email, phone, status } = parsedBody.data
 
-    const client = await prisma.client.create({
-      data: {
-        name,
-        email,
-        phone,
-        status,
-        userId: session.user.id
-      }
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(request)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+
+    const result = await runIdempotentCreate(prisma, {
+      userId: session.user.id,
+      scope: 'client_create',
+      idempotencyKey,
+      fingerprint: createMutationFingerprint(parsedBody.data),
+      resourceType: 'client',
+      create: (db) => db.client.create({
+        data: { name, email, phone, status, userId: session.user.id },
+      }),
+      findResource: (resourceId, db) => db.client.findFirst({
+        where: { id: resourceId, userId: session.user.id },
+      }),
     })
 
-    return NextResponse.json(client, { status: 201 })
+    const response = NextResponse.json(result.resource, { status: result.replay ? 200 : 201 })
+    response.headers.set('X-Idempotent-Replay', String(result.replay))
+    return response
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error creating client:', error)
+    console.error('Error creating client.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

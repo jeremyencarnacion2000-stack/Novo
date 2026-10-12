@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { driveService } from '@/lib/google';
+import { findGoogleAccountForScopes } from '@/lib/google-account';
+import { readIdempotencyKey } from '@/lib/server-idempotency';
 
 // ── GET — Check Connection / Scope Status ────────────────────────────────────
 
@@ -20,13 +22,9 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find the Google Account for this user
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    // A user can have a basic Google login row alongside an incremental
+    // connector grant. Select the account that actually owns Drive scope.
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['drive.file']);
 
     if (!googleAccount) {
         return NextResponse.json({
@@ -36,15 +34,9 @@ export async function GET() {
         });
     }
 
-    // Check if scope list contains drive.file
-    const scopes = googleAccount.scope || '';
-    const hasDriveScope = scopes.includes('https://www.googleapis.com/auth/drive.file') || scopes.includes('drive.file');
-
     return NextResponse.json({
         connected: true,
-        hasScope: hasDriveScope,
-        scopes,
-        updatedAt: (googleAccount as any).updatedAt || new Date(),
+        hasScope: true,
     });
 }
 
@@ -56,26 +48,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Double-check if the google account exists and has Drive scope
-    const googleAccount = await prisma.account.findFirst({
-        where: {
-            userId: session.user.id,
-            provider: 'google',
-        },
-    });
+    const idempotency = readIdempotencyKey(req);
+    if (idempotency.invalid) {
+        return NextResponse.json({ error: 'InvalidIdempotencyKey' }, { status: 400 });
+    }
+
+    // Select the specific incremental grant rather than whichever Google
+    // account row happens to sort first.
+    const googleAccount = await findGoogleAccountForScopes(session.user.id, ['drive.file']);
 
     if (!googleAccount) {
         return NextResponse.json({ error: 'Google account not connected' }, { status: 400 });
-    }
-
-    const scopes = googleAccount.scope || '';
-    const hasDriveScope = scopes.includes('https://www.googleapis.com/auth/drive.file') || scopes.includes('drive.file');
-
-    if (!hasDriveScope) {
-        return NextResponse.json({
-            error: 'Insufficient permission. Google Drive access not granted.',
-            code: 'MISSING_DRIVE_SCOPE',
-        }, { status: 403 });
     }
 
     try {
@@ -105,7 +88,7 @@ export async function POST(req: NextRequest) {
         };
 
         // Export to Google Drive
-        const uploadResult = await driveService.exportWorkspaceBackup(backupPayload);
+        const uploadResult = await driveService.exportWorkspaceBackup(backupPayload, idempotency.key ?? undefined);
 
         // Record activity history
         try {
@@ -120,18 +103,22 @@ export async function POST(req: NextRequest) {
             // Non-critical — the backup itself already succeeded
         }
 
-        return NextResponse.json({
+        const response = NextResponse.json({
             success: true,
             fileName: uploadResult.name,
             fileId: uploadResult.id,
             webViewLink: uploadResult.webViewLink,
         });
+        if (uploadResult.replayed) response.headers.set('X-Idempotent-Replay', 'true');
+        return response;
 
-    } catch (err: any) {
-        console.error('[Google Drive Backup] Export failed:', err);
+    } catch {
+        // Provider diagnostics stay server-side; the UI only needs a stable,
+        // retryable code and must never receive Google SDK/auth details.
+        console.error('[Google Drive Backup] Export failed.');
         return NextResponse.json({
             error: 'Google Drive backup failed',
-            detail: err.message || err,
+            code: 'DRIVE_EXPORT_FAILED',
         }, { status: 502 });
     }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Shirt, ShieldAlert, Cpu, Heart, CheckCircle } from 'lucide-react';
@@ -19,54 +19,85 @@ interface CognitiveState {
 export function CognitiveOutfitSuggestions() {
   const [cognitive, setCognitive] = useState<CognitiveState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
-  const fetchCognitiveState = () => {
-    fetch('/api/ai/cognitive-engine')
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success) {
-          // Check if there are active insights or recommendations
-          const reports = json.report;
-          
-          // Fallback based on fatigue level if AI recommendation is missing
-          let outfit = "Traje casual relajado: Suéter de punto suave, pantalones de lino sueltos y zapatillas deportivas.";
-          let psychology = "Colores cálidos y texturas suaves para calmar el sistema nervioso central y reducir el estrés.";
+  const fetchCognitiveState = useCallback(() => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    setLoading(true);
+    setError(false);
 
-          if (reports.focusScore >= 75) {
-            outfit = "Minimalista estructurado: Camisa Oxford blanca de corte limpio, pantalones chinos marinos y zapatos Derby de cuero.";
-            psychology = "Líneas definidas y contrastes nítidos para maximizar el enfoque mental y proyectar autoridad.";
-          } else if (reports.energyLevel === 'medium') {
-            outfit = "Smart casual cómodo: Polo de punto de seda de manga larga, vaqueros oscuros de corte clásico y mocasines de ante.";
-            psychology = "Un equilibrio perfecto entre profesionalismo y comodidad que facilita las transiciones cognitivas.";
-          }
-
-          setCognitive({
-            fatigueEstimate: reports.energyLevel === 'low' ? 'high' : reports.energyLevel === 'high' ? 'low' : 'medium',
-            focusScore: reports.focusScore,
-            burnoutRisk: reports.burnoutRisk,
-            recommendation: {
-              outfit,
-              psychology
-            }
-          });
+    fetch('/api/ai/cognitive-engine', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('cognitive_state_unavailable');
+        const json = await response.json();
+        const reports = json?.success ? json.report : null;
+        const focusScore = Number(reports?.focusScore);
+        const burnoutRisk = Number(reports?.burnoutRisk);
+        const energyLevel = reports?.energyLevel;
+        if (!Number.isFinite(focusScore) || !Number.isFinite(burnoutRisk) || !['low', 'medium', 'high'].includes(energyLevel)) {
+          throw new Error('cognitive_state_invalid');
         }
+
+        let outfit = "Traje casual relajado: Suéter de punto suave, pantalones de lino sueltos y zapatillas deportivas.";
+        let psychology = "Colores cálidos y texturas suaves para calmar el sistema nervioso central y reducir el estrés.";
+
+        if (focusScore >= 75) {
+          outfit = "Minimalista estructurado: Camisa Oxford blanca de corte limpio, pantalones chinos marinos y zapatos Derby de cuero.";
+          psychology = "Líneas definidas y contrastes nítidos para maximizar el enfoque mental y proyectar autoridad.";
+        } else if (energyLevel === 'medium') {
+          outfit = "Smart casual cómodo: Polo de punto de seda de manga larga, vaqueros oscuros de corte clásico y mocasines de ante.";
+          psychology = "Un equilibrio perfecto entre profesionalismo y comodidad que facilita las transiciones cognitivas.";
+        }
+
+        setCognitive({
+          fatigueEstimate: energyLevel === 'low' ? 'high' : energyLevel === 'high' ? 'low' : 'medium',
+          focusScore: Math.max(0, Math.min(100, focusScore)),
+          burnoutRisk: Math.max(0, Math.min(100, burnoutRisk)),
+          recommendation: { outfit, psychology },
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
+      .catch((requestError: unknown) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     fetchCognitiveState();
     
     // Listen to voice state updates to sync automatically!
     window.addEventListener('cognitive-state-updated', fetchCognitiveState);
-    return () => window.removeEventListener('cognitive-state-updated', fetchCognitiveState);
-  }, []);
+    return () => {
+      window.removeEventListener('cognitive-state-updated', fetchCognitiveState);
+      requestControllerRef.current?.abort();
+    };
+  }, [fetchCognitiveState]);
 
   if (loading) {
     return (
       <Card className="border-foreground/[0.08] bg-foreground/[0.01] backdrop-blur-xl animate-pulse">
         <div className="h-48 rounded-3xl" />
+      </Card>
+    );
+  }
+
+  if (error && !cognitive) {
+    return (
+      <Card className="border-foreground/[0.08] bg-foreground/[0.01]">
+        <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
+          <ShieldAlert className="h-5 w-5 text-amber-400" aria-hidden="true" />
+          <p className="text-sm font-semibold">Cognitive state unavailable</p>
+          <p className="max-w-sm text-xs text-foreground/50">We could not refresh your focus context. Try again when your session is active.</p>
+          <button type="button" onClick={fetchCognitiveState} className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10">
+            Retry
+          </button>
+        </CardContent>
       </Card>
     );
   }

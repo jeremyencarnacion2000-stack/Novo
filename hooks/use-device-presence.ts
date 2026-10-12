@@ -9,11 +9,21 @@ function isActiveNow(): boolean {
   return document.visibilityState === 'visible' && document.hasFocus()
 }
 
-function sendSession(startedAt: number, endedAt: number) {
+function getSurface(): 'web_desktop' | 'web_mobile' | 'pwa_desktop' | 'pwa_mobile' {
+  const isMobile = window.matchMedia('(max-width: 767px)').matches
+  const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  if (standalone) return isMobile ? 'pwa_mobile' : 'pwa_desktop'
+  return isMobile ? 'web_mobile' : 'web_desktop'
+}
+
+function sendSession(startedAt: number, endedAt: number, sessionId: string | null) {
   if (endedAt - startedAt < MIN_SESSION_MS) return
   const payload = JSON.stringify({
     startedAt: new Date(startedAt).toISOString(),
     endedAt: new Date(endedAt).toISOString(),
+    surface: getSurface(),
+    ...(sessionId ? { sessionId } : {}),
   })
   navigator.sendBeacon('/api/device/presence', new Blob([payload], { type: 'application/json' }))
 }
@@ -26,6 +36,7 @@ function sendSession(startedAt: number, endedAt: number) {
  */
 export function useDevicePresence() {
   const sessionStartRef = useRef<number | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -41,13 +52,17 @@ export function useDevicePresence() {
     const endSession = () => {
       clearGraceTimer()
       if (sessionStartRef.current === null) return
-      sendSession(sessionStartRef.current, Date.now())
+      sendSession(sessionStartRef.current, Date.now(), sessionIdRef.current)
       sessionStartRef.current = null
+      sessionIdRef.current = null
     }
 
     const startSessionIfNeeded = () => {
       if (sessionStartRef.current === null) {
         sessionStartRef.current = Date.now()
+        sessionIdRef.current = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
       }
       clearGraceTimer()
     }
@@ -69,8 +84,9 @@ export function useDevicePresence() {
       // beforeunload/pagehide fire on real tab close — end immediately,
       // don't wait out the grace period which would never fire in time.
       if (sessionStartRef.current !== null) {
-        sendSession(sessionStartRef.current, Date.now())
+        sendSession(sessionStartRef.current, Date.now(), sessionIdRef.current)
         sessionStartRef.current = null
+        sessionIdRef.current = null
       }
     }
 

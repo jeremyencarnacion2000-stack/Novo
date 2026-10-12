@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useGratitudes, useSWRWithConfig } from '@/hooks/use-swr'
 import { useToast } from '@/hooks/use-toast'
 import { Goal } from '@/types/goal'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 // Since there is no useGoals hook, we create a local one.
 const useGoals = () => {
@@ -22,6 +23,8 @@ export default function SpiritualPage() {
 
   const [newGratitude, setNewGratitude] = useState('')
   const [newGoal, setNewGoal] = useState('')
+  const gratitudeIntentKeyRef = useRef<string | null>(null)
+  const goalIntentKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (gratitudesError || goalsError) {
@@ -39,12 +42,16 @@ export default function SpiritualPage() {
     try {
       const response = await fetch('/api/gratitudes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': gratitudeIntentKeyRef.current ??= createClientIdempotencyKey(),
+        },
         body: JSON.stringify({ content: newGratitude }),
       })
       if (response.ok) {
         mutateGratitudes()
         setNewGratitude('')
+        gratitudeIntentKeyRef.current = null
         toast({
           title: 'Gratitude added',
           description: 'Your gratitude has been added successfully.',
@@ -100,12 +107,16 @@ export default function SpiritualPage() {
     try {
       const response = await fetch('/api/goals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': goalIntentKeyRef.current ??= createClientIdempotencyKey(),
+        },
         body: JSON.stringify({ title: newGoal, completed: false }),
       })
       if (response.ok) {
         mutateGoals()
         setNewGoal('')
+        goalIntentKeyRef.current = null
         toast({
           title: 'Goal added',
           description: 'Your goal has been added successfully.',
@@ -231,7 +242,10 @@ export default function SpiritualPage() {
               <Input
                 placeholder="e.g., Meditate for 10 minutes"
                 value={newGoal}
-                onChange={(e) => setNewGoal(e.target.value)}
+                onChange={(e) => {
+                  goalIntentKeyRef.current = null
+                  setNewGoal(e.target.value)
+                }}
               />
               <Button onClick={handleAddGoal}>Add Goal</Button>
             </div>

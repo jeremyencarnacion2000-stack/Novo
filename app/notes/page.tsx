@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QuickCapture } from '@/components/quick-notes/quick-capture'
 import { NoteCard } from '@/components/quick-notes/note-card'
@@ -25,13 +25,14 @@ export default function NotesPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const { toast } = useToast()
 
-    const fetchNotes = async () => {
+    const fetchNotes = useCallback(async (signal?: AbortSignal) => {
         try {
-            const response = await fetch('/api/notes')
+            const response = await fetch('/api/notes', { cache: 'no-store', signal })
             if (!response.ok) throw new Error('Failed to fetch notes')
             const data = await response.json()
-            setNotes(data)
-        } catch (error) {
+            if (!signal?.aborted) setNotes(Array.isArray(data) ? data : [])
+        } catch (error: unknown) {
+            if ((error as { name?: string })?.name === 'AbortError' || signal?.aborted) return
             console.error('Error fetching notes:', error)
             toast({
                 title: 'Error',
@@ -39,13 +40,15 @@ export default function NotesPage() {
                 variant: 'destructive'
             })
         } finally {
-            setLoading(false)
+            if (!signal?.aborted) setLoading(false)
         }
-    }
+    }, [toast])
 
     useEffect(() => {
-        fetchNotes()
-    }, [])
+        const controller = new AbortController()
+        void fetchNotes(controller.signal)
+        return () => controller.abort()
+    }, [fetchNotes])
 
     const filteredNotes = notes.filter(note =>
         note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||

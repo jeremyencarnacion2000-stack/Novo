@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import {
   Search, UserPlus, Check, X, ArrowLeft, Send, Users, MessageCircle,
@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 type ActiveTab = 'friends' | 'requests' | 'search'
 
@@ -22,7 +23,16 @@ export default function SocialPage() {
   const [messages, setMessages]           = useState<any[]>([])
   const [newMessage, setNewMessage]       = useState('')
   const [sending, setSending]             = useState(false)
+  // Keep a request in one client-side flight. The API is replay-safe too, but
+  // the UI should immediately communicate that a friend invitation is being
+  // processed instead of allowing a double-click to create competing calls.
+  const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set())
+  const pendingRequestIdsRef = useRef(new Set<string>())
+  const [pendingFriendActions, setPendingFriendActions] = useState<Set<string>>(new Set())
+  const pendingFriendActionsRef = useRef(new Set<string>())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesRequestRef = useRef<AbortController | null>(null)
+  const messageIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -30,35 +40,56 @@ export default function SocialPage() {
   }, [messages])
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchFriends = async () => {
+  const fetchFriends = useCallback(async (signal?: AbortSignal) => {
+    const userId = session?.user?.id
+    if (!userId) {
+      setFriends([])
+      setRequests([])
+      return
+    }
     try {
-      const res = await fetch('/api/friends')
+      const res = await fetch('/api/friends', { cache: 'no-store', signal })
       if (!res.ok) return
       const data = await res.json()
+      if (signal?.aborted) return
       const confirmed = data.filter((f: any) => f.status === 'ACCEPTED')
-      const pending   = data.filter((f: any) => f.status === 'PENDING' && f.addresseeId === session?.user?.id)
+      const pending   = data.filter((f: any) => f.status === 'PENDING' && f.addresseeId === userId)
       setFriends(confirmed.map((f: any) =>
-        f.requesterId === session?.user?.id ? f.addressee : f.requester
+        f.requesterId === userId ? f.addressee : f.requester
       ))
       setRequests(pending)
-    } catch {}
-  }
+    } catch (error: unknown) {
+      if ((error as { name?: string })?.name !== 'AbortError' && !signal?.aborted) {
+        // A background refresh should keep the last known social state.
+      }
+    }
+  }, [session?.user?.id])
 
-  useEffect(() => { if (session) fetchFriends() }, [session])
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchFriends(controller.signal)
+    return () => controller.abort()
+  }, [fetchFriends])
 
   // Debounced search
   useEffect(() => {
     if (searchQuery.length < 2) { setSearchResults([]); return }
+    const controller = new AbortController()
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`)
-        if (res.ok) setSearchResults(await res.json())
-      } catch {}
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`, { signal: controller.signal, cache: 'no-store' })
+        if (res.ok && !controller.signal.aborted) setSearchResults(await res.json())
+      } catch (error: unknown) {
+        if ((error as { name?: string })?.name !== 'AbortError') return
+      }
     }, 400)
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); controller.abort() }
   }, [searchQuery])
 
   const sendRequest = async (userId: string) => {
+    if (pendingRequestIdsRef.current.has(userId)) return
+    pendingRequestIdsRef.current.add(userId)
+    setPendingRequestIds(prev => new Set(prev).add(userId))
     try {
       const res = await fetch('/api/friends', {
         method: 'POST',
@@ -67,9 +98,21 @@ export default function SocialPage() {
       })
       if (res.ok) setSearchResults(prev => prev.filter(u => u.id !== userId))
     } catch {}
+    finally {
+      pendingRequestIdsRef.current.delete(userId)
+      setPendingRequestIds(prev => {
+        const next = new Set(prev)
+        next.delete(userId)
+        return next
+      })
+    }
   }
 
   const handleRequest = async (userId: string, action: 'accept' | 'reject') => {
+    const actionKey = `${action}:${userId}`
+    if (pendingFriendActionsRef.current.has(actionKey)) return
+    pendingFriendActionsRef.current.add(actionKey)
+    setPendingFriendActions(prev => new Set(prev).add(actionKey))
     try {
       const res = await fetch('/api/friends', {
         method: 'POST',
@@ -78,32 +121,81 @@ export default function SocialPage() {
       })
       if (res.ok) fetchFriends()
     } catch {}
+    finally {
+      pendingFriendActionsRef.current.delete(actionKey)
+      setPendingFriendActions(prev => {
+        const next = new Set(prev)
+        next.delete(actionKey)
+        return next
+      })
+    }
   }
 
   const fetchMessages = async (friendId: string) => {
+    messagesRequestRef.current?.abort()
+    const controller = new AbortController()
+    messagesRequestRef.current = controller
     try {
-      const res = await fetch(`/api/messages?userId=${friendId}`)
-      if (res.ok) setMessages(await res.json())
-    } catch {}
+      const res = await fetch(`/api/messages?userId=${friendId}`, { signal: controller.signal })
+      if (res.ok && !controller.signal.aborted) setMessages(await res.json())
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') return
+    } finally {
+      if (messagesRequestRef.current === controller) messagesRequestRef.current = null
+    }
   }
 
   useEffect(() => {
     if (!selectedFriend) return
-    fetchMessages(selectedFriend.id)
-    const interval = setInterval(() => fetchMessages(selectedFriend.id), 30000)
-    return () => clearInterval(interval)
+    let active = true
+    const refresh = () => {
+      if (active && document.visibilityState === 'visible') void fetchMessages(selectedFriend.id)
+    }
+    refresh()
+    let interval: ReturnType<typeof setInterval> | null = setInterval(refresh, 30000)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh()
+        if (interval === null) interval = setInterval(refresh, 30000)
+      } else if (interval !== null) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      active = false
+      if (interval !== null) clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      messagesRequestRef.current?.abort()
+      messagesRequestRef.current = null
+    }
   }, [selectedFriend])
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedFriend || sending) return
+    const content = newMessage.trim()
+    const fingerprint = `${selectedFriend.id}:${content}`
+    const previous = messageIntentRef.current
+    const intent = previous?.fingerprint === fingerprint
+      ? previous
+      : { fingerprint, key: createClientIdempotencyKey() }
+    messageIntentRef.current = intent
     setSending(true)
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiverId: selectedFriend.id, content: newMessage }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': intent.key,
+        },
+        body: JSON.stringify({ receiverId: selectedFriend.id, content }),
       })
-      if (res.ok) { setNewMessage(''); fetchMessages(selectedFriend.id) }
+      if (res.ok) {
+        messageIntentRef.current = null
+        setNewMessage('')
+        void fetchMessages(selectedFriend.id)
+      }
     } catch {}
     setSending(false)
   }
@@ -281,15 +373,19 @@ export default function SocialPage() {
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleRequest(req.requester.id, 'accept')}
-                          className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center hover:bg-emerald-500/25 transition-colors"
+                          onClick={() => void handleRequest(req.requester.id, 'accept')}
+                          disabled={pendingFriendActions.has(`accept:${req.requester.id}`) || pendingFriendActions.has(`reject:${req.requester.id}`)}
+                          aria-busy={pendingFriendActions.has(`accept:${req.requester.id}`)}
+                          className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center hover:bg-emerald-500/25 transition-colors disabled:cursor-wait disabled:opacity-50"
                           title="Accept"
                         >
                           <Check className="h-3.5 w-3.5 text-emerald-400" />
                         </button>
                         <button
-                          onClick={() => handleRequest(req.requester.id, 'reject')}
-                          className="w-7 h-7 rounded-xl bg-red-500/10 border border-red-500/15 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                          onClick={() => void handleRequest(req.requester.id, 'reject')}
+                          disabled={pendingFriendActions.has(`accept:${req.requester.id}`) || pendingFriendActions.has(`reject:${req.requester.id}`)}
+                          aria-busy={pendingFriendActions.has(`reject:${req.requester.id}`)}
+                          className="w-7 h-7 rounded-xl bg-red-500/10 border border-red-500/15 flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:cursor-wait disabled:opacity-50"
                           title="Decline"
                         >
                           <X className="h-3.5 w-3.5 text-red-400" />
@@ -335,11 +431,13 @@ export default function SocialPage() {
                         <p className="text-[10px] text-muted-foreground truncate">{user.bio || 'Novo user'}</p>
                       </div>
                       <button
-                        onClick={() => sendRequest(user.id)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/15 border border-primary/20 text-primary text-[11px] font-bold hover:bg-primary/25 transition-colors shrink-0"
+                        onClick={() => void sendRequest(user.id)}
+                        disabled={pendingRequestIds.has(user.id)}
+                        aria-busy={pendingRequestIds.has(user.id)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/15 border border-primary/20 text-primary text-[11px] font-bold hover:bg-primary/25 transition-colors shrink-0 disabled:cursor-wait disabled:opacity-60"
                       >
                         <UserPlus className="h-3 w-3" />
-                        Add
+                        {pendingRequestIds.has(user.id) ? 'Adding…' : 'Add'}
                       </button>
                     </div>
                   ))}

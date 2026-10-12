@@ -14,7 +14,7 @@ describe('GET /api/cognitive/biometrics', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('does not return a fabricated stress value when the fallback fails', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' }, provider: 'credentials' })
+    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
     ;(fetchDbBiometricPayload as jest.Mock).mockRejectedValue(new Error('private database detail'))
 
     const response = await GET()
@@ -23,6 +23,10 @@ describe('GET /api/cognitive/biometrics', () => {
     expect(response.status).toBe(500)
     expect(body).toEqual({ error: 'InternalError', message: 'Biometric data is temporarily unavailable.', hasGoogleFitData: false })
     expect(JSON.stringify(body)).not.toContain('private database detail')
-    expect(getGoogleAccessToken).not.toHaveBeenCalled()
+    expect(getGoogleAccessToken).toHaveBeenCalledWith('user-1', [
+      'fitness.activity.read',
+      'fitness.heart_rate.read',
+      'fitness.sleep.read',
+    ])
   })
 })

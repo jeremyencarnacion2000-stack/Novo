@@ -2,523 +2,816 @@
 
 import { gsap } from 'gsap'
 import { CustomEase } from 'gsap/CustomEase'
-import { createFlyingClone, flyTo } from './flying-clone'
+import {
+  createFlyingClone,
+  createTextCrossfadeFlight,
+  flyTo,
+  isTextFlightElement,
+} from './flying-clone'
+import {
+  createModalChromeBridge,
+  getSharedSurfaceMorphEase,
+  isElementVisibleForSharedMotion,
+  MODAL_CUSTOM_EASE,
+  MODAL_MOTION,
+} from './modal-motion'
+import { getNovoMotionModeFromDOM } from '@/hooks/use-novo-motion-policy'
 
-// Shared-element ("Container Transform") modal animation.
-//
-// Configuration matches the reference HTML exactly:
-//   - CustomEase "appleFluid"  (M0,0 C0.16,1 0.3,1 1,1)  — box morph
-//   - CustomEase "contentEntrance" (M0,0 C0.18,1 0.26,1 1,1) — content in
-//   - CustomEase "contentExit"  (M0,0 C0.35,0 0.15,1 1,1)  — content out
-//   - Open  : 0.52s total | content reveals at 0.12s for 0.44s | stagger 0.05
-//   - Close : 0.48s total | content hides first for 0.18s
-//   - Viewport depth effect: parent app-root scales 0.94/0.97 with 28px radius
-//   - Inner content: y:28 scale:0.91 → y:0 scale:1 (kept crisp during the handoff)
-//   - Backdrop: rgba(9,13,22,0.65), no blur, 0.38s open / 0.35s close
-
-// ─── Register plugins once ─────────────────────────────────────────────────
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(CustomEase)
-  CustomEase.create('appleFluid',      'M0,0 C0.16,1 0.3,1 1,1')
-  CustomEase.create('contentEntrance', 'M0,0 C0.18,1 0.26,1 1,1')
-  CustomEase.create('contentExit',     'M0,0 C0.35,0 0.15,1 1,1')
+  CustomEase.create('novoModalFluid', MODAL_CUSTOM_EASE.fluid)
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return
+    document.querySelectorAll<HTMLElement>('[data-modal-motion-bridge]').forEach((bridge) => {
+      gsap.set(bridge, { filter: 'blur(0px)' })
+    })
+  })
 }
 
-const EASE_FLUID    = 'appleFluid'
-const EASE_ENTRANCE = 'contentEntrance'
-const EASE_EXIT     = 'contentExit'
+const EASE_FLUID = 'novoModalFluid'
+type SharedItemPair = { originEl: HTMLElement; targetEl: HTMLElement }
+type SharedMotionEase = string | ((progress: number) => number)
+type RuntimeFlight = { nodes: HTMLElement[]; addTo: (timeline: gsap.core.Timeline, duration: number, ease: SharedMotionEase) => void }
 
-// Open timing — matches reference exactly
-const OPEN_DURATION          = 0.52
-// Fraction of OPEN_DURATION spent on the box's scaleX/scaleY geometry morph.
-// Content reveal (OPEN_CONTENT_AT) is timed to start right as this finishes,
-// so text is never visible while the container's non-uniform scale is still
-// changing — see the tl.to(target, ...) comment below for why that matters.
-const BOX_MORPH_FRACTION     = 0.6
-const OPEN_CONTENT_AT        = BOX_MORPH_FRACTION   // starts once the box has settled
-const OPEN_CONTENT_DURATION  = 0.44
-const OPEN_CONTENT_STAGGER   = 0.05
-const OPEN_BACKDROP_DURATION = 0.38
-
-// Close timing — matches reference exactly
-const CLOSE_DURATION          = 0.48
-const CLOSE_CONTENT_DURATION  = 0.18
-const CLOSE_BACKDROP_DURATION = 0.35
-
-// Viewport depth effect — matches reference exactly
-const VIEWPORT_SCALE_MOBILE  = 0.94
-const VIEWPORT_SCALE_DESKTOP = 0.97
-const VIEWPORT_RADIUS        = '28px'
-const VIEWPORT_Y_MOBILE      = -8
-
-function isMobile() {
-  return typeof window !== 'undefined' && window.innerWidth < 640
+type ActiveTransition = {
+  naturalDirection: 'open' | 'close'
+  timeline: gsap.core.Timeline
+  finishOpen: () => void
+  finishClosed: (onDone?: () => void) => void
 }
 
-function prefersReducedMotion() {
-  if (typeof window === 'undefined') return false
-  const prefers = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  // Keep the authored container-transform visible on desktop. Desktop Novo
-  // uses the animation as spatial feedback; honour the OS preference on
-  // touch/mobile where motion sensitivity is more likely to be intentional.
-  const desktopPointer = window.innerWidth >= 1024 && window.matchMedia('(pointer: fine)').matches
-  return prefers && !desktopPointer
-}
-
-/** The single page-root element that shrinks to create depth on modal open. */
-function getAppViewport(): HTMLElement | null {
-  // Prefer an explicit marker so any wrapper can opt-in without selector magic.
-  return (
-    document.querySelector<HTMLElement>('[data-app-viewport]') ??
-    document.querySelector<HTMLElement>('#appViewport') ??
-    null
-  )
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
+const activeTransitions = new Map<string, ActiveTransition>()
 
 function findPair(id: string) {
-  const origin  = document.querySelector<HTMLElement>(`[data-flip-from="${id}"]`)
-  const target  = document.querySelector<HTMLElement>(`[data-flip-to="${id}"]`)
-  const overlay = document.querySelector<HTMLElement>(`[data-flip-overlay="${id}"]`)
-  return { origin, target, overlay }
-}
-
-interface SharedItemPair {
-  originEl: HTMLElement
-  targetEl: HTMLElement
-}
-
-function findSharedItemPairs(origin: HTMLElement, target: HTMLElement): SharedItemPair[] {
-  const originItems = origin.querySelectorAll<HTMLElement>('[data-shared-item]')
-  const targetItems = Array.from(target.querySelectorAll<HTMLElement>('[data-shared-item]'))
-  const pairs: SharedItemPair[] = []
-  originItems.forEach((originEl) => {
-    const key = originEl.dataset.sharedItem
-    const targetEl = targetItems.find((t) => t.dataset.sharedItem === key)
-    if (targetEl) pairs.push({ originEl, targetEl })
-  })
-  return pairs
-}
-
-interface FlyingItem {
-  el: HTMLElement
-  originEl: HTMLElement
-  targetEl: HTMLElement
-}
-
-// Timelines that can be killed on a rapid double-toggle.
-const activeTimelines = new Map<string, gsap.core.Timeline>()
-const completionTimers = new Map<string, ReturnType<typeof setTimeout>>()
-// Flying clones persist from open through close — they are hidden (opacity 0)
-// while the modal is open and reactivate for the return trip on close.
-const flyingRegistry  = new Map<string, FlyingItem[]>()
-
-function cleanupFlying(id: string) {
-  flyingRegistry.get(id)?.forEach((f) => f.el.remove())
-  flyingRegistry.delete(id)
-}
-
-function killActive(id: string) {
-  activeTimelines.get(id)?.kill()
-  activeTimelines.delete(id)
-  const timer = completionTimers.get(id)
-  if (timer) {
-    clearTimeout(timer)
-    completionTimers.delete(id)
+  return {
+    origin: document.querySelector<HTMLElement>(`[data-flip-from="${id}"]`),
+    target: document.querySelector<HTMLElement>(`[data-flip-to="${id}"]`),
+    overlay: document.querySelector<HTMLElement>(`[data-flip-overlay="${id}"]`),
   }
 }
 
-// A trigger this much smaller than its destination panel (in either
-// dimension) doesn't read as "the same object transforming" — it reads as
-// the trigger exploding into an unrelated big box. Small calendar-event
-// chips (~24px tall, 10px text) growing into a ~450px modal are the extreme
-// case, but any small pill/icon-button-to-modal pairing hits the same
-// problem. Below this ratio, use the plain fade/scale entrance instead of
-// the full container-transform.
-const MIN_ORIGIN_RATIO = 0.15
+function findSharedItemPairs(origin: HTMLElement, target: HTMLElement): SharedItemPair[] {
+  const targetItems = Array.from(target.querySelectorAll<HTMLElement>('[data-shared-item]'))
+  return Array.from(origin.querySelectorAll<HTMLElement>('[data-shared-item]')).flatMap((originEl) => {
+    const targetEl = targetItems.find((candidate) => candidate.dataset.sharedItem === originEl.dataset.sharedItem)
+    return targetEl ? [{ originEl, targetEl }] : []
+  })
+}
 
-/** Smooth modal scale/fade entrance — used when there's no sensible shared-element travel. */
-function runFadeEntrance(id: string, target: HTMLElement, overlay: HTMLElement | null, reducedMotion: boolean, onDone?: () => void) {
-  gsap.set(target, { opacity: 0, x: 0, y: 8, scaleX: 0.96, scaleY: 0.96, transformOrigin: '50% 50%' })
+function getRevealElements(target: HTMLElement) {
+  const contentRoot = target.querySelector<HTMLElement>(
+    '[data-modal-content],#filterInnerContent,#txModalContent,.py-5',
+  )
+  const candidates = Array.from((contentRoot ?? target).children) as HTMLElement[]
+  const closeButton = target.querySelector<HTMLElement>('[data-slot="dialog-close"]')
+  return {
+    content: candidates.filter((element) => element !== closeButton),
+    closeButton,
+  }
+}
+
+function restoreSharedItems(pairs: SharedItemPair[]) {
+  gsap.set(pairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), {
+    clearProps: 'opacity,visibility',
+  })
+}
+
+function clearTarget(target: HTMLElement, content: HTMLElement[], closeButton: HTMLElement | null) {
+  gsap.set(target, { clearProps: 'opacity,visibility,transition,transform,transformOrigin,willChange' })
+  // The CSS baseline is fail-open. Keep an explicit visible settle frame so
+  // cleanup cannot re-expose the old global opacity:0 regression.
+  target.dataset.modalMotionState = 'open'
+  target.style.opacity = '1'
+  target.style.visibility = 'visible'
+  if (content.length > 0) {
+    gsap.set(content, { clearProps: 'opacity,transform,transition,willChange' })
+  }
+  if (closeButton) gsap.set(closeButton, { clearProps: 'opacity,transform,transition,willChange' })
+}
+
+function isLowPowerDevice() {
+  const navigatorWithMemory = navigator as Navigator & { deviceMemory?: number }
+  const coarsePointer = matchMedia('(pointer: coarse)').matches
+  const memory = Number(navigatorWithMemory.deviceMemory ?? 8)
+  const cores = Number(navigator.hardwareConcurrency ?? 8)
+  return coarsePointer && (memory <= 4 || cores <= 4)
+}
+
+function addBridgeVelocityBlur(timeline: gsap.core.Timeline, bridge: HTMLElement, duration: number) {
+  if (getNovoMotionModeFromDOM() !== 'full') return
+  const peak = isLowPowerDevice() ? 0.34 : 0.52
+  const shoulder = peak * 0.42
+
+  gsap.set(bridge, { filter: 'blur(0px)' })
+  timeline.to(bridge, {
+    filter: `blur(${peak}px)`,
+    duration: duration * 0.09,
+    ease: 'power1.out',
+  }, duration * 0.075)
+  timeline.to(bridge, {
+    filter: `blur(${shoulder}px)`,
+    duration: duration * 0.085,
+    ease: 'none',
+  }, duration * 0.165)
+  timeline.to(bridge, {
+    filter: 'blur(0px)',
+    duration: duration * 0.17,
+    ease: 'power2.out',
+  }, duration * 0.245)
+}
+
+function animateBridge(
+  timeline: gsap.core.Timeline,
+  bridge: ReturnType<typeof createModalChromeBridge>,
+  direction: 'open' | 'close',
+  duration: number,
+  bounce = false,
+): SharedMotionEase {
+  const opening = direction === 'open'
+  gsap.set(bridge.root, { clipPath: opening ? bridge.startClip : bridge.endClip, opacity: 1 })
+  gsap.set(bridge.compactSkin, { opacity: opening ? 1 : 0 })
+  gsap.set(bridge.expandedSkin, { opacity: opening ? 0 : 1 })
+
+  const bridgeEase = bounce ? getSharedSurfaceMorphEase(direction) : EASE_FLUID
+
+  timeline.to(bridge.root, {
+    clipPath: opening ? bridge.endClip : bridge.startClip,
+    duration,
+    ease: bridgeEase,
+    force3D: true,
+  }, 0)
+
+  timeline.to(bridge.compactSkin, {
+    opacity: opening ? 0 : 1,
+    duration: duration * (opening ? 0.38 : 0.47),
+    ease: 'power2.out',
+  }, duration * (opening ? 0.11 : 0.08))
+  timeline.to(bridge.expandedSkin, {
+    opacity: opening ? 1 : 0,
+    duration: duration * (opening ? 0.48 : 0.44),
+    ease: 'power2.inOut',
+  }, duration * (opening ? 0.08 : 0.1))
+
+  addBridgeVelocityBlur(timeline, bridge.root, duration)
+  return bridgeEase
+}
+
+function getMobileNavSurfaceClips(origin: HTMLElement, target: HTMLElement) {
+  const sourceRect = origin.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+  if (
+    sourceRect.width <= 0 || sourceRect.height <= 0 ||
+    targetRect.width <= 0 || targetRect.height <= 0
+  ) {
+    throw new Error('Mobile navigation surface has no measurable geometry')
+  }
+
+  const containsSource =
+    sourceRect.left >= targetRect.left - 1 &&
+    sourceRect.top >= targetRect.top - 1 &&
+    sourceRect.right <= targetRect.right + 1 &&
+    sourceRect.bottom <= targetRect.bottom + 1
+  if (!containsSource) throw new Error('Mobile navigation source is outside the panel bounds')
+
+  const sourceStyle = getComputedStyle(origin)
+  const targetStyle = getComputedStyle(target)
+  const sourceRadius = Math.min(
+    parseFloat(sourceStyle.borderTopLeftRadius) || sourceRect.height / 2,
+    sourceRect.width / 2,
+    sourceRect.height / 2,
+  )
+  const targetRadius = Math.min(
+    parseFloat(targetStyle.borderTopLeftRadius) || 32,
+    targetRect.width / 2,
+    targetRect.height / 2,
+  )
+  const start = `inset(${sourceRect.top - targetRect.top}px ${targetRect.right - sourceRect.right}px ${targetRect.bottom - sourceRect.bottom}px ${sourceRect.left - targetRect.left}px round ${sourceRadius}px)`
+  const end = `inset(0px 0px 0px 0px round ${targetRadius}px)`
+  return { start, end }
+}
+
+function runMobileNavSurfaceEntrance(
+  id: string,
+  origin: HTMLElement,
+  target: HTMLElement,
+  overlay: HTMLElement | null,
+  onDone?: () => void,
+) {
+  const clips = getMobileNavSurfaceClips(origin, target)
+  const sharedPairs = findSharedItemPairs(origin, target)
+  const reveal = getRevealElements(target)
+  const flights = createSharedFlights(sharedPairs, 'open')
+  const runtimeNodes = flights.flatMap(({ nodes }) => nodes)
+  const duration = MODAL_MOTION.shared.enter
+  const ease = getSharedSurfaceMorphEase('open')
+
+  origin.classList.add('modal-flip-source-active')
+  target.classList.add('modal-flip-active')
+  overlay?.classList.add('modal-flip-active')
+  target.classList.remove('modal-flip-preparing')
+  gsap.set(origin, { opacity: 0 })
+  // Keep the Radix surface at its final dimensions. The live surface itself
+  // starts clipped to the rail bounds; there is no copied glass bridge.
+  gsap.set(target, {
+    clipPath: clips.start,
+    opacity: 1,
+    visibility: 'visible',
+    transition: 'none',
+    willChange: 'clip-path',
+  })
+  target.dataset.modalMotionState = 'opening'
+  gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
+  gsap.set(reveal.content, { opacity: 0, y: 6, transition: 'none', willChange: 'transform,opacity' })
+  if (reveal.closeButton) {
+    gsap.set(reveal.closeButton, { opacity: 0, transition: 'none', willChange: 'opacity' })
+  }
+  if (overlay) {
+    overlay.dataset.modalMotionState = 'opening'
+    gsap.set(overlay, { opacity: 0 })
+  }
+
+  const cleanupFlights = () => runtimeNodes.forEach((node) => node.remove())
+  const finishOpen = () => {
+    cleanupFlights()
+    restoreSharedItems(sharedPairs)
+    gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
+    target.style.opacity = '1'
+    target.dataset.modalMotionState = 'open'
+    if (overlay) {
+      gsap.set(overlay, { clearProps: 'opacity' })
+      overlay.dataset.modalMotionState = 'open'
+    }
+    activeTransitions.delete(id)
+    onDone?.()
+  }
+  const finishClosed = (onCloseDone?: () => void) => {
+    cleanupFlights()
+    restoreSharedItems(sharedPairs)
+    target.classList.remove('modal-flip-active')
+    overlay?.classList.remove('modal-flip-active')
+    origin.classList.remove('modal-flip-source-active')
+    gsap.set(origin, { clearProps: 'opacity' })
+    gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
+    target.style.opacity = '0'
+    target.dataset.modalMotionState = 'closing'
+    if (overlay) {
+      gsap.set(overlay, { clearProps: 'opacity' })
+      overlay.dataset.modalMotionState = 'closing'
+    }
+    activeTransitions.delete(id)
+    onCloseDone?.()
+  }
+
+  const timeline = gsap.timeline({
+    defaults: { overwrite: 'auto' },
+    onComplete: finishOpen,
+  })
+  timeline.to(target, {
+    clipPath: clips.end,
+    duration,
+    ease,
+    force3D: true,
+  }, 0)
+  flights.forEach((flight) => flight.addTo(timeline, duration, ease))
+  timeline.to(reveal.content, {
+    opacity: 1,
+    y: 0,
+    duration: 0.22,
+    stagger: MODAL_MOTION.shared.stagger,
+    ease: 'power3.out',
+  }, 0.21)
+  if (reveal.closeButton) {
+    timeline.to(reveal.closeButton, {
+      opacity: 1,
+      duration: 0.16,
+      ease: 'power2.out',
+    }, duration * 0.62)
+  }
+  if (overlay) {
+    timeline.to(overlay, {
+      opacity: 1,
+      duration: duration * 0.64,
+      ease: 'power2.out',
+    }, 0.012)
+  }
+  activeTransitions.set(id, {
+    naturalDirection: 'open',
+    timeline,
+    finishOpen,
+    finishClosed,
+  })
+}
+
+function runMobileNavSurfaceExit(
+  id: string,
+  origin: HTMLElement,
+  target: HTMLElement,
+  overlay: HTMLElement | null,
+  onDone?: () => void,
+) {
+  const clips = getMobileNavSurfaceClips(origin, target)
+  const sharedPairs = findSharedItemPairs(origin, target)
+  const reveal = getRevealElements(target)
+  const flights = createSharedFlights(sharedPairs, 'close')
+  const runtimeNodes = flights.flatMap(({ nodes }) => nodes)
+  const duration = MODAL_MOTION.shared.exit
+  const ease = getSharedSurfaceMorphEase('close')
+
+  gsap.set(origin, { opacity: 0 })
+  gsap.set(target, {
+    clipPath: clips.end,
+    opacity: 1,
+    transition: 'none',
+    willChange: 'clip-path',
+  })
+  target.dataset.modalMotionState = 'closing'
+  gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
+  gsap.set(reveal.content, { opacity: 1, y: 0, transition: 'none', willChange: 'transform,opacity' })
+  if (reveal.closeButton) gsap.set(reveal.closeButton, { opacity: 1, transition: 'none', willChange: 'opacity' })
+
+  const cleanupFlights = () => runtimeNodes.forEach((node) => node.remove())
+  const finishOpen = () => {
+    cleanupFlights()
+    restoreSharedItems(sharedPairs)
+    gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
+    target.style.opacity = '1'
+    target.dataset.modalMotionState = 'open'
+    if (overlay) gsap.set(overlay, { opacity: 1 })
+    activeTransitions.delete(id)
+  }
+  const finishClosed = (onCloseDone?: () => void) => {
+    cleanupFlights()
+    restoreSharedItems(sharedPairs)
+    target.classList.remove('modal-flip-active')
+    overlay?.classList.remove('modal-flip-active')
+    origin.classList.remove('modal-flip-source-active')
+    gsap.set(origin, { clearProps: 'opacity' })
+    gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
+    target.style.opacity = '0'
+    target.dataset.modalMotionState = 'closing'
+    if (overlay) {
+      overlay.classList.remove('modal-flip-active')
+      gsap.set(overlay, { opacity: 0 })
+      overlay.dataset.modalMotionState = 'closing'
+    }
+    activeTransitions.delete(id)
+    onCloseDone?.()
+  }
+
+  const timeline = gsap.timeline({
+    defaults: { overwrite: 'auto' },
+    onComplete: () => finishClosed(onDone),
+  })
+  timeline.to(target, {
+    clipPath: clips.start,
+    duration,
+    ease,
+    force3D: true,
+  }, 0)
+  flights.forEach((flight) => flight.addTo(timeline, duration, ease))
+  timeline.to(reveal.content, {
+    opacity: 0,
+    y: 4,
+    duration: 0.16,
+    stagger: MODAL_MOTION.shared.stagger,
+    ease: 'power2.out',
+  }, 0)
+  if (reveal.closeButton) {
+    timeline.to(reveal.closeButton, {
+      opacity: 0,
+      duration: 0.14,
+      ease: 'power2.out',
+    }, 0)
+  }
+  if (overlay) {
+    timeline.to(overlay, {
+      opacity: 0,
+      duration: duration * 0.72,
+      ease: 'power2.out',
+    }, duration * 0.08)
+  }
+  activeTransitions.set(id, {
+    naturalDirection: 'close',
+    timeline,
+    finishOpen,
+    finishClosed,
+  })
+}
+
+function createSharedFlights(
+  pairs: SharedItemPair[],
+  direction: 'open' | 'close',
+): RuntimeFlight[] {
+  return pairs.map(({ originEl, targetEl }) => {
+    const fromEl = direction === 'open' ? originEl : targetEl
+    const toEl = direction === 'open' ? targetEl : originEl
+
+    if (isTextFlightElement(fromEl) && isTextFlightElement(toEl)) {
+      const flight = createTextCrossfadeFlight(fromEl, toEl)
+      const deltaX = flight.targetRect.left - flight.originRect.left
+      const deltaY = flight.targetRect.top - flight.originRect.top
+      gsap.set(flight.expanded, {
+        x: flight.originRect.left - flight.targetRect.left,
+        y: flight.originRect.top - flight.targetRect.top,
+      })
+
+      return {
+        nodes: flight.nodes,
+        addTo(timeline, duration, ease) {
+          timeline.to(flight.compact, {
+            x: deltaX,
+            y: deltaY,
+            duration: duration * 0.89,
+            ease,
+            force3D: true,
+          }, 0.012)
+          timeline.to(flight.expanded, {
+            x: 0,
+            y: 0,
+            duration: duration * 0.89,
+            ease,
+            force3D: true,
+          }, 0.012)
+          timeline.to(flight.compact, {
+            opacity: 0,
+            duration: duration * 0.23,
+            ease: 'power2.in',
+          }, duration * 0.1)
+          timeline.to(flight.expanded, {
+            opacity: 1,
+            duration: duration * 0.3,
+            ease: 'power2.out',
+          }, duration * 0.17)
+        },
+      }
+    }
+
+    const clone = createFlyingClone(fromEl)
+    return {
+      nodes: [clone],
+      addTo(timeline, duration, ease) {
+        flyTo(timeline, clone, toEl, duration * 0.91, 0.006, {
+          blur: 0,
+          ease,
+        })
+        if (fromEl.dataset.sharedItem === 'mobile-nav-close') {
+          timeline.to(clone, {
+            rotation: direction === 'open' ? 45 : -45,
+            duration: duration * 0.91,
+            ease,
+            force3D: true,
+          }, 0.006)
+        }
+      },
+    }
+  })
+}
+
+function runFadeEntrance(id: string, target: HTMLElement, overlay: HTMLElement | null, onDone?: () => void) {
+  const mode = getNovoMotionModeFromDOM()
+  if (mode === 'off') {
+    // Motion off is an immediate, visible state—not a zero-duration hidden
+    // tween that waits for a GSAP tick to settle.
+    gsap.set(target, { clearProps: 'opacity,transform,transformOrigin,willChange' })
+    target.dataset.modalMotionState = 'open'
+    target.style.opacity = '1'
+    if (overlay) {
+      gsap.set(overlay, { clearProps: 'opacity' })
+      overlay.dataset.modalMotionState = 'open'
+      overlay.style.opacity = '1'
+    }
+    onDone?.()
+    return
+  }
+  const duration = mode === 'reduced' ? 0.16 : MODAL_MOTION.center.enter
+  gsap.set(target, {
+    opacity: 0,
+    y: mode === 'full' ? 10 : 0,
+    scale: mode === 'full' ? 0.94 : 1,
+    transformOrigin: '50% 50%',
+    willChange: 'transform,opacity',
+  })
+  target.dataset.modalMotionState = 'opening'
   if (overlay) gsap.set(overlay, { opacity: 0 })
 
-  const tlFallback = gsap.timeline({
-    onComplete: () => {
-      gsap.set(target, { clearProps: 'transform,transformOrigin,opacity' })
-      activeTimelines.delete(id)
-      onDone?.()
-    },
-  })
-  tlFallback.to(target, { opacity: 1, x: 0, y: 0, scaleX: 1, scaleY: 1, duration: reducedMotion ? 0.01 : 0.32, ease: EASE_ENTRANCE }, 0)
-  if (overlay) tlFallback.to(overlay, { opacity: 1, duration: reducedMotion ? 0.01 : 0.25 }, 0)
-
-  activeTimelines.set(id, tlFallback)
+  const finishOpen = () => {
+    clearTarget(target, [], null)
+    target.style.opacity = '1'
+    if (overlay) {
+      overlay.dataset.modalMotionState = 'open'
+      overlay.style.opacity = '1'
+    }
+    activeTransitions.delete(id)
+    onDone?.()
+  }
+  const finishClosed = (done?: () => void) => {
+    clearTarget(target, [], null)
+    target.dataset.modalMotionState = 'closing'
+    target.style.opacity = '0'
+    activeTransitions.delete(id)
+    done?.()
+  }
+  const timeline = gsap.timeline({ onComplete: finishOpen })
+  timeline.to(target, { opacity: 1, y: 0, scale: 1, duration, ease: EASE_FLUID }, 0)
+  if (overlay) timeline.to(overlay, { opacity: 1, duration: Math.min(duration, 0.22), ease: EASE_FLUID }, 0)
+  activeTransitions.set(id, { naturalDirection: 'open', timeline, finishOpen, finishClosed })
 }
 
-/** Matching close for runFadeEntrance — plain fade/scale exit, no origin travel. */
-function runFadeExit(id: string, target: HTMLElement, overlay: HTMLElement | null, reducedMotion: boolean, onDone?: () => void) {
-  const tlFallback = gsap.timeline({
-    onComplete: () => {
-      target.classList.remove('modal-flip-active')
-      if (overlay) overlay.classList.remove('modal-flip-active')
-      gsap.set(target, { clearProps: 'transform,transformOrigin,opacity' })
-      activeTimelines.delete(id)
-      onDone?.()
-    },
-  })
-  tlFallback.to(target, { opacity: 0, y: 8, scaleX: 0.96, scaleY: 0.96, transformOrigin: '50% 50%', duration: reducedMotion ? 0.01 : 0.24, ease: EASE_EXIT }, 0)
-  if (overlay) tlFallback.to(overlay, { opacity: 0, duration: reducedMotion ? 0.01 : 0.2 }, 0)
-
-  activeTimelines.set(id, tlFallback)
+function runFadeExit(id: string, target: HTMLElement, overlay: HTMLElement | null, onDone?: () => void) {
+  const mode = getNovoMotionModeFromDOM()
+  const duration = mode === 'off' ? 0 : mode === 'reduced' ? 0.16 : MODAL_MOTION.center.exit
+  const finishOpen = () => {
+    clearTarget(target, [], null)
+    activeTransitions.delete(id)
+  }
+  const finishClosed = (done?: () => void) => {
+    clearTarget(target, [], null)
+    activeTransitions.delete(id)
+    done?.()
+  }
+  const timeline = gsap.timeline({ onComplete: () => finishClosed(onDone) })
+  timeline.to(target, {
+    opacity: 0,
+    y: mode === 'full' ? 6 : 0,
+    scale: mode === 'full' ? 0.97 : 1,
+    duration,
+    ease: EASE_FLUID,
+  }, 0)
+  if (overlay) timeline.to(overlay, { opacity: 0, duration: Math.min(duration, 0.18), ease: EASE_FLUID }, 0)
+  activeTransitions.set(id, { naturalDirection: 'close', timeline, finishOpen, finishClosed })
 }
 
-// ─── Public API ────────────────────────────────────────────────────────────
+function reverseClosingTransition(active: ActiveTransition) {
+  active.timeline.eventCallback('onComplete', null)
+  active.timeline.eventCallback('onReverseComplete', active.finishOpen)
+  active.timeline.timeScale(MODAL_MOTION.shared.exit / MODAL_MOTION.shared.enter).reverse()
+}
+
+function reverseOpeningTransition(active: ActiveTransition, onDone?: () => void) {
+  active.timeline.eventCallback('onComplete', null)
+  active.timeline.eventCallback('onReverseComplete', () => active.finishClosed(onDone))
+  active.timeline.timeScale(MODAL_MOTION.shared.enter / MODAL_MOTION.shared.exit).reverse()
+}
 
 export const modalFlip = {
-  /** Animates the dialog content growing out of the origin element. */
+  cancel(id: string) {
+    const running = activeTransitions.get(id)
+    if (running) {
+      running.timeline.eventCallback('onComplete', null)
+      running.timeline.eventCallback('onReverseComplete', null)
+      running.timeline.kill()
+      running.finishClosed()
+      return
+    }
+
+    // A settled shared modal no longer has an active timeline, but its trigger
+    // intentionally stays hidden until the modal closes. Route changes and
+    // conditional unmounts can skip that close animation, so hook cleanup must
+    // still restore every persistent visual state.
+    const { origin, target, overlay } = findPair(id)
+    origin?.classList.remove('modal-flip-source-active')
+    target?.classList.remove('modal-flip-active')
+    overlay?.classList.remove('modal-flip-active')
+    if (origin) gsap.set(origin, { clearProps: 'opacity' })
+    if (target) gsap.set(target, { clearProps: 'opacity,clipPath,visibility,transition,transform,transformOrigin,willChange' })
+  },
+
   toggle(id: string, onDone?: () => void, retries = 3) {
     if (typeof window === 'undefined') { onDone?.(); return }
 
+    const running = activeTransitions.get(id)
+    if (running) {
+      if (running.naturalDirection === 'close') reverseClosingTransition(running)
+      else running.timeline.timeScale(1).play()
+      return
+    }
+
     const { origin, target, overlay } = findPair(id)
-
-    // If target (Radix Portal content) hasn't mounted into DOM yet, retry next frame
     if (!target && retries > 0) {
-      requestAnimationFrame(() => {
-        modalFlip.toggle(id, onDone, retries - 1)
-      })
+      // Portals can finish their commit just after the controller effect. A
+      // microtask handles that same-turn commit; later retries use a macrotask
+      // instead of requestAnimationFrame so opening never depends on a frame
+      // that may be skipped or already consumed by a route transition.
+      const retry = () => modalFlip.toggle(id, onDone, retries - 1)
+      if (retries === 3 && typeof queueMicrotask === 'function') queueMicrotask(retry)
+      else setTimeout(retry, 0)
       return
     }
+    if (!target) { onDone?.(); return }
 
-    if (!target) {
-      onDone?.()
-      return
-    }
-
-    killActive(id)
-    cleanupFlying(id)
-
-    // Keep the shared-element geometry and focus order intact for people who
-    // request less motion, but collapse the visual travel to an immediate,
-    // readable state change. This also prevents blur/scale from becoming a
-    // disorienting flash on reduced-motion devices.
-    const reducedMotion = prefersReducedMotion()
-    const openDuration = reducedMotion ? 0.01 : OPEN_DURATION
-    const openContentAt = reducedMotion ? 0 : OPEN_CONTENT_AT
-    const openContentDuration = reducedMotion ? 0.01 : OPEN_CONTENT_DURATION
-    const openBackdropDuration = reducedMotion ? 0.01 : OPEN_BACKDROP_DURATION
-
-    // Mark target and overlay active so CSS keeps them visible
     target.classList.add('modal-flip-active')
-    if (overlay) overlay.classList.add('modal-flip-active')
+    target.classList.add('modal-flip-preparing')
+    overlay?.classList.add('modal-flip-active')
+    target.dataset.modalMotionState = 'preparing'
+    if (overlay) overlay.dataset.modalMotionState = 'preparing'
 
-    // If origin is missing, perform a smooth modal scale/fade entrance fallback
-    if (!origin) {
-      runFadeEntrance(id, target, overlay, reducedMotion, onDone)
+    const mode = getNovoMotionModeFromDOM()
+    if (mode !== 'full' || !isElementVisibleForSharedMotion(origin)) {
+      runFadeEntrance(id, target, overlay, onDone)
       return
     }
 
-    // An origin far smaller than the target (in either dimension) can't
-    // "grow" into it without an explosive, non-uniform stretch — the trigger
-    // never gets hidden/touched in this branch, so it's left exactly as-is.
-    const originRect  = origin.getBoundingClientRect()
-    const naturalRect = target.getBoundingClientRect()
-    const widthRatio  = naturalRect.width  ? originRect.width  / naturalRect.width  : 1
-    const heightRatio = naturalRect.height ? originRect.height / naturalRect.height : 1
-    if (widthRatio < MIN_ORIGIN_RATIO || heightRatio < MIN_ORIGIN_RATIO) {
-      runFadeEntrance(id, target, overlay, reducedMotion, onDone)
-      return
+    try {
+      if (id === 'mobile-nav-panel') {
+        runMobileNavSurfaceEntrance(id, origin!, target, overlay, onDone)
+        return
+      }
+      const sharedPairs = findSharedItemPairs(origin!, target)
+      const reveal = getRevealElements(target)
+      const bridge = createModalChromeBridge(origin!, target)
+    const flights = createSharedFlights(sharedPairs, 'open')
+    const runtimeNodes = [bridge.root, ...flights.flatMap(({ nodes }) => nodes)]
+    origin!.classList.add('modal-flip-source-active')
+    gsap.set(origin!, { opacity: 0 })
+    gsap.set(target, { opacity: 0, visibility: 'visible', transition: 'none', transform: 'translateZ(0)' })
+    target.dataset.modalMotionState = 'opening'
+    target.classList.remove('modal-flip-preparing')
+    gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
+    gsap.set(reveal.content, { opacity: 0, y: 9, scale: 0.994, transition: 'none', willChange: 'transform,opacity' })
+    if (reveal.closeButton) gsap.set(reveal.closeButton, { opacity: 0, scale: 0.82, willChange: 'transform,opacity' })
+    if (overlay) gsap.set(overlay, { opacity: 0 })
+
+    const cleanupRuntime = () => runtimeNodes.forEach((node) => node.remove())
+    const finishOpen = () => {
+      cleanupRuntime()
+      restoreSharedItems(sharedPairs)
+      clearTarget(target, reveal.content, reveal.closeButton)
+      target.style.opacity = '1'
+      target.dataset.modalMotionState = 'open'
+      if (overlay) gsap.set(overlay, { opacity: 1 })
+      if (overlay) overlay.dataset.modalMotionState = 'open'
+      activeTransitions.delete(id)
+      onDone?.()
+    }
+    const finishClosed = (done?: () => void) => {
+      cleanupRuntime()
+      restoreSharedItems(sharedPairs)
+      target.classList.remove('modal-flip-active')
+      overlay?.classList.remove('modal-flip-active')
+      origin!.classList.remove('modal-flip-source-active')
+      gsap.set(origin!, { clearProps: 'opacity' })
+      gsap.set(target, { opacity: 0 })
+      target.dataset.modalMotionState = 'closing'
+      activeTransitions.delete(id)
+      done?.()
     }
 
-    // Hide origin instantly so it doesn't remain visible under flying clones
-    origin.classList.add('modal-flip-source-active')
-    // Let the source disappear cleanly. Blurring the live trigger while a
-    // second blurred clone is flying over it creates a visible muddy cut on
-    // low-power GPUs and makes the handoff feel like a teleport.
-    gsap.set(origin, { opacity: 0 })
-
-    const originRadius = getComputedStyle(origin).borderRadius
-    const naturalRadius = getComputedStyle(target).borderRadius
-    const sharedPairs  = findSharedItemPairs(origin, target)
-
-    const flyingItems: FlyingItem[] = sharedPairs.map(({ originEl, targetEl }) => ({
-      el: createFlyingClone(originEl),
-      originEl,
-      targetEl,
-    }))
-    flyingRegistry.set(id, flyingItems)
-
-    // Hide real icon/label copies — flying clones bridge them visually
-    gsap.set([
-      ...sharedPairs.map((p) => p.originEl),
-      ...sharedPairs.map((p) => p.targetEl),
-    ], { opacity: 0 })
-
-    // Inner content children — cascade-reveal with a restrained translate/scale.
-    const innerContent = target.querySelector<HTMLElement>(
-      '[data-modal-content],' +
-      '#filterInnerContent,' +
-      '#txModalContent,' +
-      '.py-5'
-    )
-    const innerChildren = innerContent
-      ? (Array.from(innerContent.children) as HTMLElement[])
-      : (Array.from(target.children) as HTMLElement[])
-
-    gsap.set(innerChildren, {
-      opacity: 0,
-      y: reducedMotion ? 0 : 28,
-      scale: reducedMotion ? 1 : 0.91,
-      filter: 'none',
-    })
-
-    const tl = gsap.timeline({
-      defaults: { ease: EASE_FLUID, duration: openDuration },
-      onComplete: () => {
-        // Keep the settled viewport geometry in place for the remainder of
-        // the dialog's lifetime. Clearing position/left/top/width/height
-        // here sends the panel back into its portal wrapper's normal flow
-        // after the flight has finished, which creates a second visible
-        // reposition/resize (especially for anchored dialogs). The close
-        // timeline owns cleanup once the panel is no longer visible.
-        gsap.set(target, {
-          clearProps: 'borderRadius,overflow,zIndex,transition,transform,transformOrigin,opacity',
-        })
-        gsap.set(innerChildren, { clearProps: 'opacity,transform,filter,willChange' })
-        if (overlay) gsap.set(overlay, { opacity: 1 })
-        gsap.set(sharedPairs.map((p) => p.targetEl), { opacity: 1 })
-        flyingItems.forEach((f) => { f.el.style.opacity = '0' })
-        activeTimelines.delete(id)
-        onDone?.()
-      },
-    })
-
-    // Measure shared-item destinations BEFORE squashing target to origin size
-    flyingItems.forEach(({ el, targetEl }) => flyTo(tl, el, targetEl, openDuration, 0, { blur: 0 }))
-
-    // Keep the surface at its natural layout size and animate only compositor
-    // properties. Animating left/top/width/height reflows the portal every
-    // frame, which is what made the previous transition feel cut on slower
-    // GPUs and when the user reopened it quickly.
-    gsap.set(target, {
-      position: 'fixed',
-      left:         naturalRect.left,
-      top:          naturalRect.top,
-      width:        naturalRect.width,
-      height:       naturalRect.height,
-      borderRadius: naturalRadius,
-      opacity:      1,
-      overflow:     'hidden',
-      zIndex:       5002,
-      transition:   'none',
-      transformOrigin: 'top left',
-    })
-    gsap.set(target, {
-      x: originRect.left - naturalRect.left,
-      y: originRect.top - naturalRect.top,
-      scaleX: naturalRect.width ? originRect.width / naturalRect.width : 1,
-      scaleY: naturalRect.height ? originRect.height / naturalRect.height : 1,
-    })
-    gsap.set(innerChildren, { transition: 'none' })
-
-    // Animate the container from the trigger's presentation rect to its
-    // resting rect. This is the web equivalent of a native container
-    // transform: the user can see where the modal came from and where it will
-    // return, without a layout-property jump.
-    //
-    // Duration is intentionally shorter than the full open timeline (and ends
-    // before OPEN_CONTENT_AT below) rather than inheriting `openDuration`.
-    // scaleX/scaleY here are independent (origin and target rarely share an
-    // aspect ratio), and innerChildren are DOM descendants of `target` — they
-    // inherit whatever non-uniform stretch the container is mid-animating.
-    // With the old shared full-duration tween, content became visible at 12%
-    // while the box was still actively distorting for another ~88% of the
-    // timeline, so every word visibly stretched/skewed as it faded in. Boxing
-    // the geometry morph into its own shorter window lets it settle before
-    // any content is visible enough to show the distortion.
-    tl.to(target, {
-      x: 0,
+    const timeline = gsap.timeline({ defaults: { overwrite: 'auto' }, onComplete: finishOpen })
+    const isMobileNavigation = id === 'mobile-nav-panel'
+    const navigationHandoffAt = MODAL_MOTION.shared.enter * 0.82
+    const bridgeEase = animateBridge(timeline, bridge, 'open', MODAL_MOTION.shared.enter, id === 'mobile-nav-panel')
+    flights.forEach((flight) => flight.addTo(timeline, MODAL_MOTION.shared.enter, bridgeEase))
+    timeline.to(target, {
+      opacity: 1,
+      duration: isMobileNavigation ? 0.12 : 0.16,
+      ease: EASE_FLUID,
+    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.subtitleAt)
+    timeline.to(reveal.content, {
+      opacity: 1,
       y: 0,
-      scaleX: 1,
-      scaleY: 1,
-      borderRadius: naturalRadius,
-      duration: openDuration * BOX_MORPH_FRACTION,
-    }, 0)
-
-    // Viewport depth effect — matches reference's appViewport scale
-    const appViewport = getAppViewport()
-    if (appViewport) {
-      tl.to(appViewport, {
-        scale:        isMobile() ? VIEWPORT_SCALE_MOBILE : VIEWPORT_SCALE_DESKTOP,
-        y:            isMobile() ? VIEWPORT_Y_MOBILE : 0,
-        borderRadius: VIEWPORT_RADIUS,
-        duration:     reducedMotion ? 0.01 : 0.5,
-        ease:         EASE_FLUID,
-      }, 0)
+      scale: 1,
+      duration: isMobileNavigation ? 0.12 : MODAL_MOTION.shared.contentDuration,
+      stagger: isMobileNavigation ? 0.02 : MODAL_MOTION.shared.stagger,
+      ease: 'power3.out',
+    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.contentAt)
+    const closeButtonHasSharedFlight = Boolean(
+      reveal.closeButton && sharedPairs.some(({ targetEl }) => reveal.closeButton?.contains(targetEl)),
+    )
+    if (reveal.closeButton && !closeButtonHasSharedFlight) {
+      timeline.to(reveal.closeButton, {
+        opacity: 1,
+        scale: 1,
+        duration: MODAL_MOTION.shared.closeDuration,
+        ease: 'power3.out',
+      }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.closeAt)
     }
-
-    // Backdrop fade-in — same timeline, one shared clock
-    if (overlay) tl.to(overlay, { opacity: 1, duration: openBackdropDuration }, 0)
-
-    // Cascade-reveal inner content without a filter handoff that can smear text.
-    tl.to(innerChildren, {
-      opacity:  1,
-      y:        0,
-      scale:    1,
-      filter:   'none',
-      duration: openContentDuration,
-      stagger:  reducedMotion ? 0 : OPEN_CONTENT_STAGGER,
-      ease:     EASE_ENTRANCE,
-    }, openContentAt)
-
-    activeTimelines.set(id, tl)
+    timeline.to(bridge.root, {
+      opacity: 0,
+      duration: 0.12,
+      ease: 'power2.out',
+    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * 0.814)
+    if (overlay) {
+      timeline.to(overlay, {
+        opacity: 1,
+        duration: MODAL_MOTION.shared.enter * 0.64,
+        ease: 'power2.out',
+      }, 0.012)
+    }
+    activeTransitions.set(id, { naturalDirection: 'open', timeline, finishOpen, finishClosed })
+    } catch {
+      // A malformed origin, a missing SVG resource, or a browser compositor
+      // failure must never leave the Radix surface hidden. Fall back to the
+      // native fade entrance and keep the dialog usable.
+      origin?.classList.remove('modal-flip-source-active')
+      if (origin) gsap.set(origin, { clearProps: 'opacity' })
+      target.classList.remove('modal-flip-preparing')
+      gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
+      target.dataset.modalMotionState = 'open'
+      target.style.opacity = '1'
+      if (overlay) {
+        overlay.classList.remove('modal-flip-active')
+        overlay.dataset.modalMotionState = 'open'
+        overlay.style.opacity = '1'
+      }
+      runFadeEntrance(id, target, overlay, onDone)
+    }
   },
 
-  /** Animates the dialog content shrinking back into the origin element. */
   untoggle(id: string, onDone?: () => void) {
     if (typeof window === 'undefined') { onDone?.(); return }
 
+    const running = activeTransitions.get(id)
+    if (running) {
+      if (running.naturalDirection === 'open') reverseOpeningTransition(running, onDone)
+      else running.timeline.timeScale(1).play()
+      return
+    }
+
     const { origin, target, overlay } = findPair(id)
-    if (!origin || !target) {
-      // Radix can remove a portal during a rapid route change. Always restore
-      // the viewport depth state before handing control back to React.
-      const appViewport = getAppViewport()
-      if (appViewport) {
-        gsap.to(appViewport, {
-          scale: 1,
-          y: 0,
-          borderRadius: '0px',
-          duration: prefersReducedMotion() ? 0.01 : 0.24,
-          ease: EASE_FLUID,
-          overwrite: 'auto',
-          onComplete: () => gsap.set(appViewport, { clearProps: 'transform,transformOrigin' }),
-        })
+    if (!target) { onDone?.(); return }
+    const mode = getNovoMotionModeFromDOM()
+    if (mode !== 'full' || !isElementVisibleForSharedMotion(origin)) {
+      origin?.classList.remove('modal-flip-source-active')
+      if (origin) gsap.set(origin, { clearProps: 'opacity' })
+      runFadeExit(id, target, overlay, onDone)
+      return
+    }
+
+    try {
+      if (id === 'mobile-nav-panel') {
+        runMobileNavSurfaceExit(id, origin!, target, overlay, onDone)
+        return
       }
+      const sharedPairs = findSharedItemPairs(origin!, target)
+      const reveal = getRevealElements(target)
+      const bridge = createModalChromeBridge(origin!, target)
+    const flights = createSharedFlights(sharedPairs, 'close')
+    const runtimeNodes = [bridge.root, ...flights.flatMap(({ nodes }) => nodes)]
+    gsap.set(origin!, { opacity: 0 })
+    gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
+    gsap.set(target, { transition: 'none', willChange: 'opacity' })
+    target.dataset.modalMotionState = 'closing'
+
+    const cleanupRuntime = () => runtimeNodes.forEach((node) => node.remove())
+    const finishOpen = () => {
+      cleanupRuntime()
+      restoreSharedItems(sharedPairs)
+      clearTarget(target, reveal.content, reveal.closeButton)
+      target.style.opacity = '1'
+      target.dataset.modalMotionState = 'open'
+      if (overlay) gsap.set(overlay, { opacity: 1 })
+      gsap.set(origin!, { opacity: 0 })
+      activeTransitions.delete(id)
+    }
+    const finishClosed = (done?: () => void) => {
+      cleanupRuntime()
+      restoreSharedItems(sharedPairs)
+      target.classList.remove('modal-flip-active')
+      overlay?.classList.remove('modal-flip-active')
+      origin!.classList.remove('modal-flip-source-active')
+      gsap.set(origin!, { clearProps: 'opacity' })
+      clearTarget(target, reveal.content, reveal.closeButton)
+      target.dataset.modalMotionState = 'closing'
+      target.style.opacity = '0'
+      activeTransitions.delete(id)
+      done?.()
+    }
+
+    const timeline = gsap.timeline({ defaults: { overwrite: 'auto' }, onComplete: () => finishClosed(onDone) })
+    const isMobileNavigation = id === 'mobile-nav-panel'
+    const bridgeEase = animateBridge(timeline, bridge, 'close', MODAL_MOTION.shared.exit, id === 'mobile-nav-panel')
+    flights.forEach((flight) => flight.addTo(timeline, MODAL_MOTION.shared.exit, bridgeEase))
+    timeline.to(reveal.content, { opacity: 0, y: 4, duration: 0.16, ease: 'power2.out' }, 0)
+    if (reveal.closeButton) {
+      timeline.to(reveal.closeButton, { opacity: 0, scale: 0.84, duration: 0.14, ease: 'power2.out' }, 0)
+    }
+    timeline.to(target, {
+      opacity: 0,
+      duration: isMobileNavigation ? 0.12 : 0.14,
+      ease: EASE_FLUID,
+    }, isMobileNavigation ? 0 : 0.06)
+    timeline.to(origin!, { opacity: 1, duration: 0.1, ease: EASE_FLUID }, MODAL_MOTION.shared.exit * 0.78)
+    timeline.to(bridge.root, { opacity: 0, duration: 0.1, ease: 'power2.out' }, MODAL_MOTION.shared.exit * 0.82)
+    if (overlay) {
+      timeline.to(overlay, {
+        opacity: 0,
+        duration: MODAL_MOTION.shared.exit * 0.72,
+        ease: 'power2.out',
+      }, MODAL_MOTION.shared.exit * 0.08)
+    }
+    activeTransitions.set(id, { naturalDirection: 'close', timeline, finishOpen, finishClosed })
+    } catch {
+      // Closing must also be fail-safe: release the portal instead of leaving
+      // a half-built bridge or a stale focus trap behind.
+      origin?.classList.remove('modal-flip-source-active')
+      if (origin) gsap.set(origin, { clearProps: 'opacity' })
+      target.classList.remove('modal-flip-active')
+      overlay?.classList.remove('modal-flip-active')
+      target.dataset.modalMotionState = 'closing'
+      target.style.opacity = '0'
+      overlay?.style.setProperty('opacity', '0')
       onDone?.()
-      return
     }
-
-    killActive(id)
-    const reducedMotion = prefersReducedMotion()
-    const closeDuration = reducedMotion ? 0.01 : CLOSE_DURATION
-    const closeContentDuration = reducedMotion ? 0.01 : CLOSE_CONTENT_DURATION
-    const closeBackdropDuration = reducedMotion ? 0.01 : CLOSE_BACKDROP_DURATION
-
-    let called = false
-    const safeDone = () => {
-      if (called) return
-      called = true
-      completionTimers.delete(id)
-      origin.classList.remove('modal-flip-source-active')
-      onDone?.()
-    }
-
-    const originRect   = origin.getBoundingClientRect()
-    const originRadius = getComputedStyle(origin).borderRadius
-    const currentRect  = target.getBoundingClientRect()
-
-    // Mirror of the toggle()-side ratio guard: an origin this much smaller
-    // than the panel can't "shrink" back into it convincingly either.
-    const widthRatio  = currentRect.width  ? originRect.width  / currentRect.width  : 1
-    const heightRatio = currentRect.height ? originRect.height / currentRect.height : 1
-    if (widthRatio < MIN_ORIGIN_RATIO || heightRatio < MIN_ORIGIN_RATIO) {
-      origin.classList.remove('modal-flip-source-active')
-      runFadeExit(id, target, overlay, reducedMotion, onDone)
-      return
-    }
-
-    const sharedPairs  = findSharedItemPairs(origin, target)
-    const flyingItems  = flyingRegistry.get(id) || []
-
-    // Reactivate flying clones for the return trip
-    gsap.set(flyingItems.map((f) => f.el), { opacity: 1 })
-    gsap.set(sharedPairs.map((p) => p.targetEl), { opacity: 0 })
-
-    const innerContent = target.querySelector<HTMLElement>(
-      '[data-modal-content],' +
-      '#filterInnerContent,' +
-      '#txModalContent,' +
-      '.py-5'
-    )
-    const innerChildren = innerContent
-      ? (Array.from(innerContent.children) as HTMLElement[])
-      : (Array.from(target.children) as HTMLElement[])
-
-    gsap.set(target, {
-      position:  'fixed',
-      left:      currentRect.left,
-      top:       currentRect.top,
-      width:     currentRect.width,
-      height:    currentRect.height,
-      overflow:  'hidden',
-      zIndex:    5002,
-      transition:'none',
-      transformOrigin: 'top left',
-    })
-    gsap.set(target, { x: 0, y: 0, scaleX: 1, scaleY: 1 })
-    gsap.set(innerChildren, { transition: 'none' })
-
-    const appViewport = getAppViewport()
-
-    const tl = gsap.timeline({
-      defaults: { ease: EASE_FLUID, duration: closeDuration },
-      onComplete: () => {
-        target.classList.remove('modal-flip-active')
-        if (overlay) overlay.classList.remove('modal-flip-active')
-        cleanupFlying(id)
-        gsap.set([origin, ...sharedPairs.map((p) => p.originEl)], { opacity: 1, clearProps: 'filter' })
-        gsap.set(target, { clearProps: 'position,left,top,width,height,borderRadius,overflow,zIndex,transition,transform,transformOrigin,opacity' })
-        gsap.set(innerChildren, { clearProps: 'opacity,transform,filter,willChange' })
-        if (appViewport) gsap.set(appViewport, { clearProps: 'transform,transformOrigin' })
-        activeTimelines.delete(id)
-        safeDone()
-      },
-    })
-
-    // Content disappears first — quick exit before the container contracts
-    tl.to(innerChildren, {
-      opacity:  0,
-      y:        reducedMotion ? 0 : 12,
-      filter:   'none',
-      duration: closeContentDuration,
-      ease:     EASE_EXIT,
-    }, 0)
-
-    // Contract back to the trigger using only compositor transforms. The
-    // current visual rect is the starting point, so an interrupted close can
-    // be reversed without a jump.
-    tl.to(target, {
-      x: currentRect.width ? originRect.left - currentRect.left : 0,
-      y: currentRect.height ? originRect.top - currentRect.top : 0,
-      scaleX: currentRect.width ? originRect.width / currentRect.width : 1,
-      scaleY: currentRect.height ? originRect.height / currentRect.height : 1,
-      borderRadius: originRadius,
-    }, 0)
-
-    // Viewport depth — restore to normal
-    if (appViewport) {
-      tl.to(appViewport, {
-        scale:        1,
-        y:            0,
-        borderRadius: '0px',
-        duration:     reducedMotion ? 0.01 : 0.46,
-        ease:         EASE_FLUID,
-      }, 0)
-    }
-
-    // Backdrop fade-out
-    if (overlay) tl.to(overlay, { opacity: 0, duration: closeBackdropDuration }, 0)
-
-    // Flying clones return to origin
-    // Let the source button materialize beneath the returning clone with a
-    // brief blur settle, so the trigger never pops in as a sharp duplicate.
-    tl.to(origin, { opacity: 1, duration: reducedMotion ? 0.01 : 0.14, ease: EASE_ENTRANCE }, Math.max(0, closeDuration - (reducedMotion ? 0.01 : 0.14)))
-    flyingItems.forEach(({ el, originEl }) => flyTo(tl, el, originEl, closeDuration, 0, { blur: 0 }))
-
-    activeTimelines.set(id, tl)
-
-    // Fallback guarantee — dialog closes even if tween is interrupted
-    const timer = setTimeout(safeDone, closeDuration * 1000 + 150)
-    completionTimers.set(id, timer)
   },
 }

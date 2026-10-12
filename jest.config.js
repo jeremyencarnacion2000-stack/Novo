@@ -51,7 +51,7 @@ const customJestConfig = {
     '^uuid$': '<rootDir>/tests/mocks/uuid.ts',
   },
   transformIgnorePatterns: ['node_modules/(?!(msw|@mswjs|uuid)/)'],
-  testPathIgnorePatterns: ['/node_modules/', nestedWorktreePattern, '/\\.kilo\\/worktrees\\/'],
+  testPathIgnorePatterns: ['/node_modules/', `^${rootDirPattern}[\\\\/]companion[\\\\/]`, nestedWorktreePattern, '/\\.kilo\\/worktrees\\/'],
   modulePathIgnorePatterns: [nestedWorktreePattern, '\\.kilo\\worktrees'],
 }
 

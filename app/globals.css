@@ -1,6 +1,20 @@
+@import './tailwind-source.css';
 @import 'tailwindcss';
 @import '@heroui/styles';
 @import 'tw-animate-css';
+@import './tailwind-legacy.css';
+
+/* Keep Tailwind's v4 source graph explicit for production builds. Vercel's
+   isolated build worker can otherwise omit utility classes from route files
+   that are rendered through the native `/app` shell, leaving plain HTML while
+   the global stylesheet itself still loads. */
+@source "../app";
+@source "../components";
+@source "../hooks";
+@source "../lib";
+/* Keep a tiny baseline safelist for WebView/CDN builds while the full source
+   graph is resolved. These are also used by the native app's first paint. */
+@source inline("flex inline-flex grid block hidden");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -142,7 +156,11 @@ body.has-bg-image [data-app-wallpaper] {
      the occasional dark seam that can show when a displaced RGB channel
      reaches the rounded edge of a card. */
   overflow: hidden;
-  isolation: isolate;
+  /* Match the reference GlassElement: keep this lens in the page backdrop
+     root so Chromium samples the wallpaper behind the surface. Isolating the
+     child makes the same data-URI filter resolve against a transparent local
+     plane, which reads as a static tint instead of refraction. */
+  isolation: auto;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform: translateZ(0);
@@ -206,10 +224,11 @@ html[data-appearance-transition] body.has-bg-image::before {
 @keyframes novo-appearance-out { to { opacity: 0; } }
 @keyframes novo-appearance-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-appearance-transition] body.has-bg-image::before,
-  ::view-transition-old(root),
-  ::view-transition-new(root) { animation: none; transition: none; }
+:root[data-novo-motion='reduced'] html[data-appearance-transition] body.has-bg-image::before,
+:root[data-novo-motion='reduced'] ::view-transition-old(root),
+:root[data-novo-motion='reduced'] ::view-transition-new(root) {
+  animation: none;
+  transition: none;
 }
 
 /* Premium Novo surface: a calm editorial field for high-value moments such as
@@ -275,9 +294,11 @@ html[data-appearance-transition] body.has-bg-image::before {
   background-size: 180px 180px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .novo-premium-field::after,
-  .novo-premium-field:hover::after { transform: none; transition: none; animation: none; }
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-premium-field::after,
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-premium-field:hover::after {
+  transform: none;
+  transition: none;
+  animation: none;
 }
 
 /* ── Novo Panel Animation System (Sileo-derived spring physics) ────────── */
@@ -336,21 +357,60 @@ html[data-appearance-transition] body.has-bg-image::before {
   --chart-scale-pattern-color: oklch(0.96 0.005 106);
 }
 
+:root {
+  --novo-modal-ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
+  --novo-modal-ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --novo-modal-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Modal surfaces are visible by default. Motion controllers may apply a
+   synchronous preparing state before the first paint, but a missing/failed
+   controller must never leave Settings or Notifications permanently hidden. */
+.novo-modal-surface,
+.novo-dialog-overlay {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-flip-from],
+  [data-slot="dialog-trigger"],
+  [data-slot="sheet-trigger"],
+  [data-slot="alert-dialog-trigger"] {
+    transition: transform 120ms var(--novo-modal-ease-enter);
+  }
+
+  [data-flip-from]:active,
+  [data-slot="dialog-trigger"]:active,
+  [data-slot="sheet-trigger"]:active,
+  [data-slot="alert-dialog-trigger"]:active {
+    transform: scale(0.97);
+  }
+}
+
+html[data-novo-motion="off"] [data-flip-from],
+html[data-novo-motion="off"] [data-slot="dialog-trigger"],
+html[data-novo-motion="off"] [data-slot="sheet-trigger"],
+html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
+  transition: none;
+}
+
 /* ── Modal shared-element ("Container Transform") dialog target ───────────
-   lib/modal-flip.ts drives the entire animation via inline GSAP tweens on
-   the real box model (left/top/width/height/border-radius) — no CSS
-   keyframes or toggled classes are involved anymore. This rule only hides
-   the target until the layout-effect flip driver snaps it to the origin's
-   rect; without it the dialog can flash at its centered resting position
-   before the container transform starts.
-   modalFlip.toggle() sets opacity back to 1 as its very first inline style
-   write, and the fallback path (missing flip pair) also forces it to 1 so a
-   misconfigured pair never leaves a dialog stuck invisible. ────────────── */
+   Standard shared dialogs keep the Radix surface in its final layout and use
+   a clipped chrome bridge. Mobile navigation is the exception: its live
+   surface itself is clipped from the rail bounds, so no second glass shell
+   flashes before the layout-effect controller writes its first frame. ─── */
 .modal-flip-target {
-  opacity: 0;
+  opacity: 1;
 }
 
 .modal-flip-overlay {
+  opacity: 1;
+}
+
+.novo-modal-surface[data-modal-motion-state="preparing"],
+.novo-dialog-overlay[data-modal-motion-state="preparing"],
+.modal-flip-target.modal-flip-preparing,
+.modal-flip-overlay.modal-flip-preparing {
   opacity: 0;
 }
 
@@ -400,16 +460,14 @@ html[data-appearance-transition] body.has-bg-image::before {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  [data-task-submenu][data-state],
-  [data-task-date-picker][data-state] {
-    animation: none;
-    transition: opacity 120ms ease;
-  }
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-task-submenu][data-state],
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-task-date-picker][data-state] {
+  animation: none;
+  transition: opacity 120ms ease;
+}
 
-  [data-task-submenu] [data-task-submenu-item] {
-    transition: background-color 120ms ease, color 120ms ease;
-  }
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-task-submenu] [data-task-submenu-item] {
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .cognitive-engine-summary {
@@ -427,10 +485,8 @@ html[data-appearance-transition] body.has-bg-image::before {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cognitive-engine-summary {
-    transition: none;
-  }
+:root[data-novo-motion='reduced'] [data-app-viewport] .cognitive-engine-summary {
+  transition: none;
 }
 
 @keyframes novo-panel-in {
@@ -1026,7 +1082,7 @@ html[data-appearance-transition] body.has-bg-image::before {
 
 /* 2.5 Column Headers */
 @utility glass-header {
-  @apply rounded-xl border p-4 transition-all duration-300;
+  @apply rounded-xl border p-4 transition-[background-color,border-color,box-shadow,opacity,transform] duration-300;
   background: var(--novo-context-background);
   backdrop-filter: var(--novo-context-backdrop-filter);
   border-color: var(--novo-context-border);
@@ -1075,7 +1131,7 @@ html[data-appearance-transition] body.has-bg-image::before {
 
 /* 3. BUTTONS (Soft Capsule) */
 @utility btn-glass {
-  @apply relative overflow-hidden transition-all duration-300 flex items-center justify-center;
+  @apply relative overflow-hidden transition-[background-color,border-color,box-shadow,opacity,transform,color] duration-300 flex items-center justify-center;
   background: var(--secondary);
   border-radius: 999px;
   border: 1px solid transparent;
@@ -1097,6 +1153,13 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 /* Override for elements that define their own focus ring via Tailwind focus-visible: utilities */
+.novo-message-input:focus,
+.novo-message-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+}
+
 .focus-visible\:ring-2:focus-visible,
 .focus-visible\:outline-none:focus-visible {
   outline: none;
@@ -1136,7 +1199,17 @@ html[data-appearance-transition] body.has-bg-image::before {
   textarea,
   [data-slot="tabs-trigger"],
   [data-slot="sidebar-menu-button"] {
-    transition: all 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
+    /* Keep interaction feedback on paint/compositor properties. A global
+       `transition: all` also interpolates width, padding and layout metrics,
+       which makes dialogs and navigation visibly reflow while opening. */
+    transition:
+      color 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      background-color 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      border-color 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      box-shadow 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      opacity 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+      filter 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
   /* Smooth card interactions */
@@ -1196,6 +1269,290 @@ html[data-appearance-transition] body.has-bg-image::before {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
+}
+
+/* ── Novo surface finish ────────────────────────────────────────────────────
+   The reference interfaces use one calm focal plane with a barely visible
+   grain and spectral edge, not a mosaic of equally loud cards. This finish is
+   attached to the shared Card primitive so existing routes inherit the same
+   material without adding another component or another blur pass. The color
+   field is intentionally quiet and the noise is static, keeping the effect
+   readable while scrolling. */
+.novo-card-surface[data-variant='primary'] {
+  --novo-card-edge: color-mix(in srgb, var(--foreground) 9%, transparent);
+  border-color: var(--novo-card-edge);
+  isolation: auto;
+  /* Keep the shared Card primitive on the same material contract as the
+     settings panel.  `glass-surface` is a Tailwind utility, so a caller's
+     `bg-transparent`/`bg-*` utility can otherwise win the cascade and leave
+     desktop Chromium with a transparent card but no visible frosted plane.
+     The explicit selector is intentionally limited to the default primary
+     card; secondary/tertiary cards retain their semantic surface roles. */
+  background: var(--novo-focus-background);
+  backdrop-filter: var(--novo-focus-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-focus-backdrop-filter);
+  border: var(--novo-focus-border);
+  box-shadow: var(--novo-focus-box-shadow);
+  transition:
+    transform 420ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 320ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 420ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.novo-card-surface::before,
+.novo-card-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Fine grain gives the translucent plane a physical surface. */
+.novo-card-surface::before {
+  z-index: 0;
+  opacity: 0.045;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+  mix-blend-mode: soft-light;
+}
+
+/* A static micro-grain keeps the lens physical without adding another blur or
+   animated paint layer. It inherits the surface geometry and stays quieter in
+   dark mode, where spectral noise becomes visible sooner. */
+.novo-glass-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.075;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+  mix-blend-mode: soft-light;
+}
+
+.dark .novo-glass-sheen::after { opacity: 0.045; }
+
+/* ── Twin activity lens ────────────────────────────────────────────────────
+   The optical shell remains stable. Only these oversized internal color
+   fields translate/scale, so state changes feel alive without animating blur,
+   filter parameters, width or height every frame. */
+.novo-thinking-pill {
+  min-width: min(20rem, calc(100vw - 2rem));
+  /* The pill is a compact lens, not a status badge: keep the surface clear
+     enough for the moving colour fields to remain visible through the glass. */
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015) 48%, rgba(127, 211, 255, 0.045));
+  box-shadow:
+    0 16px 52px color-mix(in srgb, var(--primary) 13%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.novo-thinking-pill__dots {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-left: 3px;
+  vertical-align: baseline;
+}
+
+.novo-thinking-pill__dots i {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.34;
+  animation: novo-thinking-dot 1.15s ease-in-out infinite;
+}
+
+.novo-thinking-pill__dots i:nth-child(2) { animation-delay: 0.16s; }
+.novo-thinking-pill__dots i:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes novo-thinking-dot {
+  0%, 56%, 100% { opacity: 0.28; transform: translateY(0) scale(0.8); }
+  28% { opacity: 0.95; transform: translateY(-1px) scale(1); }
+}
+
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-thinking-pill__dots i,
+:root[data-novo-motion='off'] [data-app-viewport] .novo-thinking-pill__dots i {
+  animation: none;
+  opacity: 0.6;
+  transform: none;
+}
+
+.novo-thinking-pill__fields {
+  position: absolute;
+  inset: -65%;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.88;
+  contain: paint;
+}
+
+.novo-thinking-pill__field {
+  position: absolute;
+  width: 58%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  opacity: 0.56;
+  filter: blur(24px) saturate(135%);
+  will-change: transform;
+}
+
+.novo-thinking-pill__field--one {
+  top: 11%;
+  left: 4%;
+  background: color-mix(in srgb, var(--primary) 78%, #59f0d0 22%);
+  animation: novo-thinking-orbit-one 7.4s ease-in-out infinite alternate;
+}
+
+.novo-thinking-pill__field--two {
+  right: 3%;
+  top: 3%;
+  background: color-mix(in srgb, #7c3aed 64%, #ff4fa3 36%);
+  animation: novo-thinking-orbit-two 9.2s ease-in-out infinite alternate;
+}
+
+.novo-thinking-pill__field--three {
+  left: 31%;
+  bottom: 1%;
+  background: color-mix(in srgb, #f6d365 48%, #fda085 52%);
+  animation: novo-thinking-orbit-three 11.2s ease-in-out infinite alternate;
+}
+
+.novo-thinking-pill__fields[data-active='false'] .novo-thinking-pill__field {
+  animation-play-state: paused;
+  will-change: auto;
+}
+
+[data-thinking-pill-state='searching'] .novo-thinking-pill__field--one { opacity: 0.72; }
+[data-thinking-pill-state='planning'] .novo-thinking-pill__field--two { opacity: 0.7; }
+[data-thinking-pill-state='acting'] .novo-thinking-pill__field--three { opacity: 0.74; }
+[data-thinking-pill-state='reconnecting'] .novo-thinking-pill__fields { filter: saturate(0.65); }
+[data-thinking-pill-state='error'] .novo-thinking-pill__fields { filter: hue-rotate(118deg) saturate(0.8); }
+
+@keyframes novo-thinking-orbit-one {
+  from { transform: translate3d(-8%, 4%, 0) scale(0.92); }
+  to { transform: translate3d(66%, 14%, 0) scale(1.18); }
+}
+
+@keyframes novo-thinking-orbit-two {
+  from { transform: translate3d(7%, -6%, 0) scale(1.08); }
+  to { transform: translate3d(-64%, 28%, 0) scale(0.9); }
+}
+
+@keyframes novo-thinking-orbit-three {
+  from { transform: translate3d(-12%, 24%, 0) scale(0.84); }
+  to { transform: translate3d(34%, -28%, 0) scale(1.12); }
+}
+
+/* One restrained ambient wash makes the focal surface feel intentional. */
+.novo-card-surface::after {
+  z-index: 0;
+  opacity: 0.055;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 34%, rgba(255, 255, 255, 0.035));
+  mix-blend-mode: screen;
+}
+
+.novo-card-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+.novo-card-surface:hover {
+  --novo-card-edge: color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+/* Buttons borrow the same optical edge, but never add backdrop-filter. A
+   button should remain crisp and cheap even when many appear in a list. */
+[data-slot='button'] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+/* Chromium applies the SVG displacement correctly, but on a desktop
+   wallpaper with broad, low-frequency colour fields the displaced channels
+   can look like ordinary blur. Keep a restrained spectral rim on the lens so
+   the refraction reads at a glance without turning every surface into a
+   rainbow card. It is a border-only treatment: the configured blur, opacity
+   and SVG filter still do the actual material work underneath. */
+.novo-glass-refractive[data-glass-refractive-mode='svg']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    118deg,
+    rgba(255, 166, 211, 0.34),
+    rgba(255, 255, 255, 0.08) 22%,
+    transparent 46%,
+    rgba(134, 220, 255, 0.28) 78%,
+    rgba(255, 255, 255, 0.12)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.78;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* Keep the optical cue visible when Chromium accepts the SVG URL but declines
+   to composite a particular feImage displacement chain. The real wallpaper
+   blur still comes from .novo-glass-backdrop; this is only the low-cost light
+   bend that makes the lens legible in that browser path. */
+.novo-glass-refractive[data-glass-refractive-mode='svg'] {
+  background:
+    radial-gradient(125% 100% at 8% -20%, rgba(255, 255, 255, 0.16), transparent 48%),
+    linear-gradient(118deg, rgba(255, 188, 220, 0.045), transparent 36%, rgba(145, 224, 255, 0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 1px 0 0 rgba(255, 170, 215, 0.085),
+    inset -1px 0 0 rgba(130, 215, 255, 0.075);
+}
+
+.dark .novo-glass-refractive[data-glass-refractive-mode='svg']::before {
+  opacity: 0.62;
+}
+
+[data-slot='button']::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.18), transparent 46%, rgba(255, 255, 255, 0.06));
+  transition: opacity 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-slot='button'] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-slot='button']:hover::before,
+[data-slot='button']:focus-visible::before {
+  opacity: 0.85;
+}
+
+[data-slot='button']:active {
+  transform: translateZ(0) scale(0.975);
+}
+
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-card-surface,
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-slot='button'],
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-slot='button']::before {
+  transition: opacity 160ms ease !important;
 }
 
 /* ── Novo Liquid Glass Tier System ──────────────────────────────────────────
@@ -1298,8 +1655,10 @@ html[data-appearance-transition] body.has-bg-image::before {
     backdrop-filter: var(--novo-focus-backdrop-filter);
     border: var(--novo-focus-border);
     box-shadow: var(--novo-focus-box-shadow);
-    will-change: transform;
-    transform: translateZ(0);
+    /* Keep static premium surfaces out of a permanent compositor layer. The
+       modal/route motion owners add their own transient GPU hint while an
+       animation is actually running; reserving one here for every premium
+       card caused extra memory pressure and intermittent shadow seams. */
     isolation: isolate;
   }
   .liquid-glass-premium::before {
@@ -1463,6 +1822,14 @@ html[data-appearance-transition] body.has-bg-image::before {
     opacity: 0;
   }
 
+  /* In the expanded mobile menu, keep the selected destination legible while
+     the small optical marker remains the only refractive child lens. */
+  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
+    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    isolation: auto;
+  }
+
   .novo-mobile-nav-shell {
     box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
   }
@@ -1471,14 +1838,45 @@ html[data-appearance-transition] body.has-bg-image::before {
     box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .novo-nav-glass-control,
-    .novo-sidebar-nav-button {
-      transition: none;
-    }
+  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-nav-glass-control,
+  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-sidebar-nav-button {
+    transition: opacity 160ms ease;
   }
 }
 
+/* Sidebar depth balance -----------------------------------------------------
+   The floating shell, its active navigation lens and the footer card were
+   each painting an elevation shadow. On warm wallpapers those shadows merged
+   into a dark halo. Keep one quiet outer lift and use inset highlights for the
+   nested controls instead. */
+[data-slot='sidebar-inner'] {
+  box-shadow: 0 14px 34px rgba(4, 10, 18, .14) !important;
+}
+[data-slot='sidebar-inner'] [data-glass-preset='navigation'] {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(0,0,0,.06) !important;
+}
+[data-slot='sidebar-inner'] [data-glass-preset='navigation'] .novo-glass-refractive {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 1px 0 0 rgba(255,188,220,.035),
+    inset -1px 0 0 rgba(145,224,255,.03) !important;
+}
+[data-slot='sidebar-inner'] .glass-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 4px 14px rgba(4,10,18,.08) !important;
+}
+.dark [data-slot='sidebar-inner'] {
+  box-shadow: 0 16px 38px rgba(0,0,0,.22) !important;
+}
+.novo-mobile-nav-shell {
+  box-shadow: 0 8px 22px rgba(0,0,0,.12) !important;
+}
+.novo-mobile-nav-fab {
+  box-shadow: 0 8px 22px rgba(0,0,0,.14) !important;
+}
 /* The Context Hub uses a morphing outer shell. Its elevation and inner
    highlight already define the edge, so a utility `border` must not reappear
    as a dark hairline when the shell changes state or receives hover. */
@@ -1598,7 +1996,7 @@ html:not(.dark) .cognitive-chart {
 
   /* App Background - Silent Dark */
   .app-background {
-    @apply fixed inset-0 z-[-1] pointer-events-none transition-all duration-500;
+    @apply fixed inset-0 z-[-1] pointer-events-none transition-[background-color,opacity,filter] duration-500;
     background: #050505;
   }
 
@@ -1711,7 +2109,7 @@ html:not(.dark) .cognitive-chart {
 
   /* Sidebar - Frosted Glass (brand-protected — uses sidebar namespace exclusively) */
   .glass-sidebar {
-    @apply transition-all duration-300 ease-out relative overflow-hidden;
+    @apply transition-[background-color,border-color,box-shadow,opacity,transform,filter] duration-300 ease-out relative overflow-hidden;
     background: var(--novo-context-background);
     backdrop-filter: var(--novo-context-backdrop-filter);
     border-right: var(--novo-context-border);
@@ -1836,7 +2234,7 @@ html:not(.dark) .cognitive-chart {
     background: var(--primary);
     border-radius: 20px;
     box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2);
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
     filter: blur(2px) contrast(15);
     mix-blend-mode: lighten;
     overflow: hidden;
@@ -2074,14 +2472,16 @@ html:not(.dark) .cognitive-chart {
 
 /* Ambient glow pulse for active/focused elements */
 .animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
+  animation: glow-pulse 3s ease-in-out 1;
 }
 
 /* --- Button micro-interactions --- */
 
 /* Premium button press effect */
 .btn-press {
-  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter 0.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+    box-shadow 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 .btn-press:active {
   transform: scale(0.97);
@@ -2112,7 +2512,7 @@ html:not(.dark) .cognitive-chart {
 
 /* --- Interactive tooltip glow --- */
 .tooltip-glow {
-  transition: all 0.25s ease;
+  transition: filter 0.25s ease, opacity 0.25s ease, box-shadow 0.25s ease;
 }
 .tooltip-glow:hover {
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
@@ -2129,70 +2529,173 @@ html:not(.dark) .cognitive-chart {
   will-change: transform;
 }
 
-/* --- View Transition Elastic Morphing Overrides --- */
-::view-transition-group(settings-window),
-::view-transition-group(routine-modal),
-::view-transition-group(routine-detail-modal),
-::view-transition-group(routine-form-modal),
-::view-transition-group(import-routine-modal) {
-  animation-duration: 0.58s;
-  /* ease-out-expo — same curve already used elsewhere in this file (lines
-     ~337/517/538/558) for the "premium" feel. Was an elastic/overshoot curve
-     (1.56 > 1) — real objects (and premium UI chrome like modals) decelerate
-     smoothly rather than springing past the target and settling back. */
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-::view-transition-old(settings-window),
-::view-transition-old(routine-modal),
-::view-transition-old(routine-detail-modal),
-::view-transition-old(routine-form-modal),
-::view-transition-old(import-routine-modal) {
-  animation: vt-fade-out 0.18s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-::view-transition-new(settings-window),
-::view-transition-new(routine-modal),
-::view-transition-new(routine-detail-modal),
-::view-transition-new(routine-form-modal),
-::view-transition-new(import-routine-modal) {
-  /* Same ease-out-expo swap as the group rule above — was elastic overshoot. */
-  animation: vt-scale-up 0.58s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes vt-scale-up {
-  from {
-    transform: scale(0.93) translateY(4px);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes vt-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
 /* --- Context Hub GPU Acceleration Layer --- */
 .context-hub-layer {
-  will-change: width, height, transform, border-radius, box-shadow;
-  contain: layout style;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
+  /* Keep the optical host in the page backdrop. A permanent transform or
+     containment boundary makes Chromium sample the wrong backdrop for the
+     delivered SVG displacement lens. */
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
 }
 
 .context-hub-layer [data-hub-motion-panel] {
   will-change: transform, opacity;
   transform: translateZ(0);
 }
+
+/* Ahora / Liquid Intelligence ------------------------------------------------
+   The Now card is a solid focal plane. Three independent colour fields drift
+   inside that plane so the Twin feels alive without letting the wallpaper leak
+   through the surface or animating blur/filter geometry. */
+.novo-now-panel {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  color: #f7fbff;
+  background: linear-gradient(145deg, #121a2c 0%, #10232e 52%, #0b1721 100%);
+  border-color: color-mix(in srgb, var(--primary) 28%, rgba(255,255,255,.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -1px 0 rgba(0,0,0,.18),
+    0 18px 44px rgba(4,10,18,.22);
+}
+.novo-now-panel[data-now-phase='PEAK_FOCUS'] {
+  background: linear-gradient(145deg, #141a3b 0%, #123c59 54%, #0b1d32 100%);
+}
+.novo-now-panel[data-now-phase='LINEAR_EXECUTION'] {
+  background: linear-gradient(145deg, #102d2c 0%, #114039 52%, #0c2030 100%);
+}
+.novo-now-panel[data-now-phase='SYNAPTIC_FATIGUE'] {
+  background: linear-gradient(145deg, #3a211f 0%, #3d2434 52%, #181b31 100%);
+}
+.novo-now-panel[data-now-phase='REDUCED_CAPACITY_MODE'] {
+  background: linear-gradient(145deg, #20332f 0%, #19344b 52%, #242b31 100%);
+}
+.novo-now-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255,255,255,.11), transparent 34%, transparent 72%, rgba(255,255,255,.035));
+  opacity: .72;
+}
+.novo-now-panel:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.19),
+    inset 0 -1px 0 rgba(0,0,0,.2),
+    0 20px 50px rgba(4,10,18,.26);
+}
+.novo-now-procedural-fields {
+  inset: -34%;
+  z-index: 0;
+  opacity: 1;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+.novo-now-procedural-fields .novo-thinking-pill__field {
+  width: 62%;
+  opacity: .72;
+  filter: blur(38px) saturate(155%);
+  mix-blend-mode: screen;
+}
+.novo-now-procedural-fields .novo-thinking-pill__field--one {
+  background: color-mix(in srgb, var(--now-primary) 82%, #ffffff 18%);
+}
+.novo-now-procedural-fields .novo-thinking-pill__field--two {
+  background: color-mix(in srgb, var(--now-secondary) 78%, #f0abff 22%);
+}
+.novo-now-procedural-fields .novo-thinking-pill__field--three {
+  background: color-mix(in srgb, var(--now-tertiary) 78%, #ffd6a5 22%);
+}
+.novo-now-panel[data-now-visible="false"] .novo-now-procedural-fields,
+.novo-now-panel[data-novo-motion="reduced"] .novo-now-procedural-fields,
+.novo-now-panel[data-novo-motion="off"] .novo-now-procedural-fields,
+html[data-novo-motion="reduced"] .novo-now-procedural-fields,
+html[data-novo-motion="off"] .novo-now-procedural-fields {
+  animation-play-state: paused;
+}
+.novo-now-gradient-field,
+.novo-now-contrast-scrim,
+.novo-now-noise {
+  position: absolute;
+  pointer-events: none;
+}
+.novo-now-gradient-field {
+  inset: -26%;
+  z-index: 0;
+  opacity: .72;
+  filter: blur(30px) saturate(1.24);
+  mix-blend-mode: screen;
+  transform: translate3d(0,0,0) scale(1.08);
+  background:
+    radial-gradient(ellipse at 18% 26%, color-mix(in srgb, var(--now-a) 88%, transparent), transparent 54%),
+    radial-gradient(ellipse at 82% 72%, color-mix(in srgb, var(--now-b) 78%, transparent), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--now-a) 48%, transparent), transparent 62%);
+  will-change: transform, opacity;
+}
+.novo-now-gradient-field-a { animation: novo-now-field-a 14s ease-in-out infinite alternate; }
+.novo-now-gradient-field-b { animation: novo-now-field-b 17s ease-in-out infinite alternate; opacity: .54; }
+.novo-now-gradient-field-c { animation: novo-now-field-c 11s ease-in-out infinite alternate; opacity: .42; }
+.novo-now-contrast-scrim {
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(112deg, rgba(4,9,18,.22), transparent 42%, rgba(4,9,18,.15)),
+    radial-gradient(ellipse at 50% 120%, rgba(0,0,0,.18), transparent 64%);
+}
+.novo-now-noise {
+  inset: 0;
+  z-index: 2;
+  opacity: .045;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+@keyframes novo-now-field-a {
+  from { transform: translate3d(-3%, -2%, 0) scale(1.08) rotate(-1deg); opacity: .58; }
+  to { transform: translate3d(4%, 3%, 0) scale(1.18) rotate(2deg); opacity: .86; }
+}
+@keyframes novo-now-field-b {
+  from { transform: translate3d(4%, 3%, 0) scale(1.14) rotate(1deg); opacity: .38; }
+  to { transform: translate3d(-4%, -3%, 0) scale(1.05) rotate(-2deg); opacity: .68; }
+}
+@keyframes novo-now-field-c {
+  from { transform: translate3d(-2%, 4%, 0) scale(1.18); opacity: .28; }
+  to { transform: translate3d(4%, -3%, 0) scale(1.07); opacity: .54; }
+}
+.novo-now-panel[data-now-visible="false"] .novo-now-gradient-field,
+.novo-now-panel[data-novo-motion="reduced"] .novo-now-gradient-field,
+.novo-now-panel[data-novo-motion="off"] .novo-now-gradient-field,
+html[data-novo-motion="reduced"] .novo-now-gradient-field,
+html[data-novo-motion="off"] .novo-now-gradient-field {
+  animation-play-state: paused;
+  transform: translate3d(0,0,0) scale(1.08);
+}
+.novo-now-panel[data-novo-motion="reduced"]::before,
+.novo-now-panel[data-novo-motion="off"]::before {
+  opacity: .56;
+}
+/* The Hub keeps one optical surface. These two lightweight skins only tune
+   the chrome tint while clip-path performs the physical morph; they never
+   introduce a second refractive lens. */
+.context-hub-chrome,
+.context-hub-chrome [data-hub-skin] {
+  border-radius: inherit;
+}
+.context-hub-chrome [data-hub-skin="compact"] {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255,255,255,.12), transparent 42%),
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.12));
+}
+.context-hub-chrome [data-hub-skin="expanded"] {
+  opacity: .72;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.08), transparent 40%),
+    linear-gradient(180deg, rgba(4,10,18,.18), rgba(0,0,0,.28));
+}
+
 
 /* --- Soundwave Equalizer Bar Animation --- */
 @keyframes soundbar-1 {
@@ -2225,17 +2728,29 @@ html, body, * {
 }
 
 /* ─── Reduced Motion ─────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .liquid-glass,
-  .liquid-glass-subtle,
-  .liquid-glass-elevated,
-  .liquid-glass-premium,
-  .glass-card,
-  .glass-panel,
-  [data-novo-glass] {
-    transition: none !important;
-    animation: none !important;
-  }
+:root[data-animations='false'] *,
+:root[data-animations='false'] *::before,
+:root[data-animations='false'] *::after {
+  /* The preference is app-owned, not only an OS preference. Keep the
+     interface usable while removing decorative transitions, looping effects,
+     and smooth scrolling that would otherwise continue after the user turns
+     animations off in Settings. PageWrapper also disables its Framer Motion
+     route handoff at the source. */
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+  will-change: auto !important;
+}
+
+:root[data-novo-motion='reduced'] [data-app-viewport] .liquid-glass,
+:root[data-novo-motion='reduced'] [data-app-viewport] .liquid-glass-subtle,
+:root[data-novo-motion='reduced'] [data-app-viewport] .liquid-glass-elevated,
+:root[data-novo-motion='reduced'] [data-app-viewport] .liquid-glass-premium,
+:root[data-novo-motion='reduced'] [data-app-viewport] .glass-card,
+:root[data-novo-motion='reduced'] [data-app-viewport] .glass-panel,
+:root[data-novo-motion='reduced'] [data-app-viewport] [data-novo-glass] {
+  transition: opacity 160ms ease !important;
+  animation: none !important;
 }
 
 /* ─── Cognitive Circadian Theming ──────────────────────────────────────────── */
@@ -2486,7 +3001,12 @@ html.cognitive-peak * { transition-duration: var(--cognitive-transition-speed, 1
 html.cognitive-peak .liquid-glass,
 html.cognitive-peak .liquid-glass-elevated,
 html.cognitive-peak .liquid-glass-premium {
-  transition: all 200ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: transform 200ms cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 200ms cubic-bezier(0.25, 0.8, 0.25, 1),
+    background-color 200ms cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-color 200ms cubic-bezier(0.25, 0.8, 0.25, 1),
+    box-shadow 200ms cubic-bezier(0.25, 0.8, 0.25, 1),
+    filter 200ms cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Fatigue: clean baseline layout */
@@ -2497,10 +3017,10 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 
 /* Linear: balanced baseline — no overrides needed, CSS defaults apply */
 
-/* ─── Modal Flip origin fade (GSAP) ──────────────────────────────────────
-   The origin element (card/button) dims slightly while its dialog is open,
-   since GSAP Flip animates the dialog content directly rather than a
-   cloned element — no clone-specific styling needed. ─────────────────── */
+/* ─── Modal shared-transition origin state (GSAP) ────────────────────────
+   Keep the trigger in layout for focus restoration and the return flight.
+   For mobile navigation, the live panel surface replaces the hidden rail
+   during the clipped morph; matched control glyphs may still fly separately. */
 [data-flip-from].modal-flip-source-active {
   opacity: 0 !important;
   pointer-events: none;
@@ -2615,14 +3135,25 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
   50% { opacity: 0.62; transform: scale(1); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .novo-sprite-sheet {
-    animation: none;
-    transform: translate3d(-75%, -50%, 0);
-  }
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-sprite-sheet {
+  animation: none;
+  transform: translate3d(-75%, -50%, 0);
+}
 
-  .novo-loader-orbit {
-    animation: none;
-    opacity: 0.42;
-  }
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-loader-orbit {
+  animation: none;
+  opacity: 0.42;
+}
+
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-thinking-pill__field {
+  animation: none;
+  will-change: auto;
+}
+
+/* The app-owned policy, rather than the host OS media query, decides whether
+   cognitive-field nodes may travel. This keeps full Novo motion available on
+   desktop even when Windows has a global reduced-motion preference. */
+:root[data-novo-motion='reduced'] [data-app-viewport] .novo-motion-context-node {
+  transition-property: opacity;
+  transition-duration: 160ms;
 }

@@ -8,24 +8,42 @@
  *  • Listens to window resize for adaptive updates
  *  • Caches generated filter URLs so identical params don't regenerate SVGs
  *  • Detects whether the current browser supports SVG filters in backdrop-filter
- *  • Wires `will-change: transform, filter` for GPU acceleration
+ *  • Leaves compositor hints to the active animation owner so static glass
+ *    surfaces do not consume a permanent GPU layer
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react'
 import {
   getDisplacementMap,
-  type DisplacementFilterParams,
+type DisplacementFilterParams,
 } from './displacement-utils'
+import {
+  liquidGlassBudget,
+  type RefractivePriority,
+} from './liquid-glass-budget'
 
 // ─── Filter Cache ─────────────────────────────────────────────────────────────
 
 /** Module-level cache: cacheKey → DOM filter id */
 const domFilterIds = new Map<string, string>()
+/** Active GlassSurface instances pin their map so cache eviction can never
+ * remove a filter URL still painted by the browser. */
+const domFilterPins = new Map<string, number>()
 
 const MAX_CACHE_SIZE = 64
 
 function cacheKey(p: Required<DisplacementFilterParams>): string {
   return `${p.width}x${p.height}x${p.radius}x${p.depth}x${p.strength}x${p.chromaticAberration}`
+}
+
+function pinDOMFilter(key: string) {
+  domFilterPins.set(key, (domFilterPins.get(key) ?? 0) + 1)
+}
+
+function unpinDOMFilter(key: string) {
+  const remaining = (domFilterPins.get(key) ?? 1) - 1
+  if (remaining > 0) domFilterPins.set(key, remaining)
+  else domFilterPins.delete(key)
 }
 
 /**
@@ -56,7 +74,11 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
     svgContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement
     svgContainer.id = '_ng_svg'
     svgContainer.setAttribute('aria-hidden', 'true')
-    svgContainer.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:-9999'
+    // Keep a non-zero SVG viewport. Chromium resolves filter resources from
+    // zero-sized SVG roots inconsistently, which can silently turn a valid
+    // `backdrop-filter: url(#...)` into a no-op. The host remains invisible
+    // and non-interactive, but the resource tree has a paintable viewport.
+    svgContainer.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;overflow:hidden;pointer-events:none;z-index:-9999;opacity:0'
     document.body.appendChild(svgContainer)
   }
 
@@ -73,32 +95,40 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
   const half = Math.floor(Math.min(width, height) / 2)
   const safeRadius = Math.min(radius, half)
   const safeDepth = Math.max(1, Math.min(depth, half - 1))
-  // The RGB displacement shifts pixels beyond the source rectangle. Leaving
-  // the SVG filter region flush with the card edge clips that shift into a
-  // hard dark contour, especially over wallpapers. A small capped overscan
-  // keeps the lens continuous without turning each surface into a large
-  // compositor allocation.
-  const filterBleed = Math.min(48, Math.max(8, Math.ceil(Math.max(scR / 2, safeDepth * 2))))
-
   // Displacement texture as a data-URI image — the only feImage source Chromium
   // honours inside a backdrop-filter pipeline.
   const mapUrl = getDisplacementMap({ width, height, radius: safeRadius, depth: safeDepth })
 
+  // Keep filters in a real <defs> registry. Chromium is permissive when a
+  // filter is appended directly to the hidden SVG, but backdrop-filter URL
+  // resolution is more reliable when the resource lives in the same
+  // definition tree as the native SVG examples this renderer follows.
+  let defs = svgContainer.querySelector('defs')
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+    defs.id = '_ng_defs'
+    svgContainer.appendChild(defs)
+  }
+
   const filterEl = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
   filterEl.id = id
   filterEl.setAttribute('color-interpolation-filters', 'sRGB')
-  filterEl.setAttribute('x', String(-filterBleed))
-  filterEl.setAttribute('y', String(-filterBleed))
-  filterEl.setAttribute('width', String(width + filterBleed * 2))
-  filterEl.setAttribute('height', String(height + filterBleed * 2))
-  filterEl.setAttribute('filterUnits', 'userSpaceOnUse')
+  // Keep the filter region in the element's objectBoundingBox coordinate
+  // system, as the reference component does. A pixel-sized userSpaceOnUse
+  // region is technically valid but produces hard rectangular seams when a
+  // displaced RGB channel reaches a rounded edge on a backdrop surface.
+  // Percent padding gives every geometry the same optical breathing room.
+  filterEl.setAttribute('x', '-12%')
+  filterEl.setAttribute('y', '-12%')
+  filterEl.setAttribute('width', '124%')
+  filterEl.setAttribute('height', '124%')
   filterEl.setAttribute('primitiveUnits', 'userSpaceOnUse')
 
   // feImage loads the displacement map; three feDisplacementMap passes (one per
   // RGB channel at slightly different scales) recombine via screen blend to
   // produce chromatic aberration — exactly the srdavo/ekino pipeline.
   filterEl.innerHTML = [
-    `<feImage x="0" y="0" width="${width}" height="${height}" href="${mapUrl}" result="dm" preserveAspectRatio="none"/>`,
+    `<feImage x="0" y="0" width="${width}" height="${height}" href="${mapUrl}" xlink:href="${mapUrl}" result="dm" preserveAspectRatio="none"/>`,
     `<feDisplacementMap in="SourceGraphic" in2="dm" scale="${scR}" xChannelSelector="R" yChannelSelector="G"/>`,
     `<feColorMatrix type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="dR"/>`,
     `<feDisplacementMap in="SourceGraphic" in2="dm" scale="${scG}" xChannelSelector="R" yChannelSelector="G"/>`,
@@ -108,15 +138,21 @@ function getOrCreateDOMFilter(params: Required<DisplacementFilterParams>): strin
     `<feBlend in="dR" in2="dG" mode="screen" result="rg"/>`,
     `<feBlend in="rg" in2="dB" mode="screen"/>`,
   ].join('')
-  svgContainer.appendChild(filterEl)
+  defs.appendChild(filterEl)
 
   if (domFilterIds.size >= MAX_CACHE_SIZE) {
-    const oldestKey = domFilterIds.keys().next().value!
-    const oldestId = domFilterIds.get(oldestKey)
-    domFilterIds.delete(oldestKey)
-    // Evict the stale DOM node too, otherwise the cache map shrinks but the
-    // document keeps accumulating orphaned <filter> elements.
-    if (oldestId) document.getElementById(oldestId)?.remove()
+    // A cache entry can be older than the current layout and still be actively
+    // painted by one of the five leased lenses. Only evict an unpinned filter;
+    // otherwise allowing a short-lived cache overflow is cheaper than a
+    // visible lens flashing flat until its next ResizeObserver update.
+    const evictable = [...domFilterIds.keys()].find((key) => !domFilterPins.has(key))
+    if (evictable) {
+      const oldestId = domFilterIds.get(evictable)
+      domFilterIds.delete(evictable)
+      // Evict the stale DOM node too, otherwise the cache map shrinks but the
+      // document keeps accumulating orphaned <filter> elements.
+      if (oldestId) document.getElementById(oldestId)?.remove()
+    }
   }
   domFilterIds.set(k, id)
   return `url(#${id})`
@@ -159,25 +195,6 @@ function detectSVGFilterSupport(): boolean {
   return _svgFilterSupport
 }
 
-// ─── Reactive Liquid Glass Registry ───────────────────────────────────────────
-const listeners = new Set<() => void>()
-let activeSVGFiltersCount = 0
-const MAX_SIMULTANEOUS_SVG_FILTERS = 5
-
-function registerSVGFilter(): boolean {
-  if (activeSVGFiltersCount < MAX_SIMULTANEOUS_SVG_FILTERS) {
-    activeSVGFiltersCount++
-    listeners.forEach(l => l())
-    return true
-  }
-  return false
-}
-
-function unregisterSVGFilter() {
-  activeSVGFiltersCount = Math.max(0, activeSVGFiltersCount - 1)
-  listeners.forEach(l => l())
-}
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export interface UseLiquidGlassOptions {
@@ -192,12 +209,20 @@ export interface UseLiquidGlassOptions {
   autoSize?: boolean
   /** Enable the SVG displacement pipeline for this surface. */
   enabled?: boolean
+  /** Retain a budget lease without constructing an unused React SVG filter. */
+  leaseOnly?: boolean
+  /** Controls which visible surfaces keep one of the five SVG leases. */
+  priority?: RefractivePriority
+  /** Releases the SVG lease without unmounting the CSS fallback. */
+  active?: boolean
+  /** Generate the raw displacement map only for explicit debug surfaces. */
+  includeMap?: boolean
 }
 
 export interface UseLiquidGlassResult {
   /** Attach this to the glass container element */
   ref: React.RefObject<HTMLDivElement | null>
-  /** The full `data:image/svg+xml...#displace` filter URL */
+  /** A same-document SVG filter URL (or an empty string while measuring). */
   filterUrl: string
   /** The raw displacement map URL (for debug mode) */
   mapUrl: string
@@ -226,14 +251,43 @@ export function useLiquidGlass({
   height: staticHeight,
   autoSize = true,
   enabled = true,
+  leaseOnly = false,
+  priority = 'ambient',
+  active = true,
+  includeMap = false,
 }: UseLiquidGlassOptions): UseLiquidGlassResult {
   const ref = useRef<HTMLDivElement>(null)
+  const generatedLeaseId = useId()
+  const leaseId = useRef(`novo-glass-${generatedLeaseId}`)
   const [dimensions, setDimensions] = useState({
     width: staticWidth || 0,
     height: staticHeight || 0,
   })
   const hasSVGFilterSupport = detectSVGFilterSupport()
   const [useSVGFilter, setUseSVGFilter] = useState(false)
+  const [isIntersecting, setIsIntersecting] = useState(true)
+  const [pageVisible, setPageVisible] = useState(
+    () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+  )
+
+  useEffect(() => {
+    if (!enabled) return
+    const element = ref.current
+    if (!element || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsIntersecting(entry?.isIntersecting ?? true),
+      { rootMargin: '96px' },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [enabled])
+
+  useEffect(() => {
+    if (!enabled) return
+    const update = () => setPageVisible(document.visibilityState !== 'hidden')
+    document.addEventListener('visibilitychange', update)
+    return () => document.removeEventListener('visibilitychange', update)
+  }, [enabled])
 
   // Sync static dimensions if they change when autoSize is disabled
   useEffect(() => {
@@ -244,7 +298,7 @@ export function useLiquidGlass({
 
   // ResizeObserver: track element dimensions
   useEffect(() => {
-    if (!autoSize) return
+    if (!enabled || !autoSize) return
 
     const el = ref.current
     if (!el) return
@@ -262,13 +316,13 @@ export function useLiquidGlass({
     ro.observe(el)
 
     return () => ro.disconnect()
-  }, [autoSize])
+  }, [enabled, autoSize])
 
   const { width, height } = dimensions
 
   // Evaluate eligibility based on browser support, element dimensions, and performance settings
   const isEligible = useMemo(() => {
-    if (!enabled) return false
+    if (!enabled || !active || !isIntersecting || !pageVisible) return false
     if (!hasSVGFilterSupport) return false
     // A liquid lens needs enough *surface*, but does not need to be a square.
     // The old 120×120 gate excluded every intentional pill in Novo: the mobile
@@ -287,58 +341,65 @@ export function useLiquidGlass({
     if (reduceEffects) return false
 
     return true
-  }, [enabled, hasSVGFilterSupport, width, height])
+  }, [enabled, active, isIntersecting, pageVisible, hasSVGFilterSupport, width, height])
 
   // Orchestrate active SVG filters to keep browser rasterization lightweight
   useEffect(() => {
-    let registered = false
-
-    const checkRegistration = () => {
-      if (!isEligible) {
-        if (registered) {
-          unregisterSVGFilter()
-          registered = false
-          setUseSVGFilter(false)
-        }
-        return
-      }
-
-      if (registered) return
-
-      // Claim the local lease *before* the registry broadcasts. The registry
-      // intentionally notifies waiting surfaces synchronously; previously the
-      // same listener re-entered while `registered` was still false and could
-      // consume all five global slots by itself. On a dashboard this made later
-      // liquid surfaces look randomly flat even though Settings were correct.
-      registered = true
-      const success = registerSVGFilter()
-      if (success) {
-        setUseSVGFilter(true)
-      } else {
-        registered = false
-        setUseSVGFilter(false)
-      }
-    }
-
-    checkRegistration()
-    listeners.add(checkRegistration)
+    const id = leaseId.current
+    const sync = () => setUseSVGFilter(isEligible && liquidGlassBudget.isGranted(id))
+    const unsubscribe = liquidGlassBudget.subscribe(sync)
+    if (isEligible) liquidGlassBudget.request(id, priority)
+    else liquidGlassBudget.release(id)
+    sync()
 
     return () => {
-      listeners.delete(checkRegistration)
-      if (registered) {
-        unregisterSVGFilter()
-      }
+      unsubscribe()
+      liquidGlassBudget.release(id)
     }
-  }, [isEligible])
+  }, [isEligible, priority])
 
-  const filterUrl = useMemo(() =>
-    width > 0 && height > 0 && useSVGFilter
-      ? getOrCreateDOMFilter({ width, height, radius, depth, strength, chromaticAberration })
-      : '',
-    [width, height, radius, depth, strength, chromaticAberration, useSVGFilter]
+  const filterUrl = useMemo(() => {
+    if (width <= 0 || height <= 0 || !useSVGFilter || leaseOnly) return ''
+
+    // Register the filter in the document's real SVG resource tree. Chromium
+    // does not reliably resolve a data-URI fragment from backdrop-filter;
+    // keeping the displacement map as a data image inside a same-document
+    // <filter> is the path used by the delivered web component and is what
+    // makes refraction visible in transformed portals as well.
+    return getOrCreateDOMFilter({
+      width,
+      height,
+      radius,
+      depth,
+      strength,
+      chromaticAberration,
+    })
+  }, [width, height, radius, depth, strength, chromaticAberration, useSVGFilter, leaseOnly])
+
+  const activeFilterKey = useMemo(
+    () => width > 0 && height > 0 && useSVGFilter && !leaseOnly
+      ? cacheKey({ width, height, radius, depth, strength, chromaticAberration })
+      : null,
+    [width, height, radius, depth, strength, chromaticAberration, useSVGFilter, leaseOnly],
   )
 
-  const mapUrl = ''
+  useEffect(() => {
+    if (!activeFilterKey) return
+    pinDOMFilter(activeFilterKey)
+    return () => unpinDOMFilter(activeFilterKey)
+  }, [activeFilterKey])
+
+  // Keep the raw map available for the debug surface too. The video variant
+  // uses the same geometry texture before it wraps it in the RGB displacement
+  // filter; exposing it here means debug mode never falls back to a blank
+  // layer when a surface is still waiting for a filter lease.
+  const mapUrl = useMemo(() => {
+    if (!includeMap || width <= 0 || height <= 0) return ''
+    const half = Math.floor(Math.min(width, height) / 2)
+    const safeRadius = Math.min(radius, half)
+    const safeDepth = Math.max(1, Math.min(depth, Math.max(1, half - 1)))
+    return getDisplacementMap({ width, height, radius: safeRadius, depth: safeDepth })
+  }, [includeMap, width, height, radius, depth])
 
   const buildBackdropFilter = useCallback((): string => {
     if (hasSVGFilterSupport && useSVGFilter && filterUrl) {

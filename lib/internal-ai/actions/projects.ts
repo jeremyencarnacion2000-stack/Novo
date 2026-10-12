@@ -15,8 +15,8 @@ export const registerProjectActions = (service: IInternalAIService) => {
 
       const data = await response.json();
       return { success: true, data };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    } catch {
+      return { success: false, error: 'PROJECT_CREATE_FAILED' };
     }
   });
 

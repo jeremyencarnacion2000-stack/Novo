@@ -1,11 +1,10 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plug, Check, RefreshCw, Sparkles, Link2 } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
-import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   SiNotion, SiGoogledrive, SiGmail,
   SiGooglecalendar, SiTodoist
@@ -34,10 +33,6 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
-  const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
-    onDismiss: onClose,
-    enabled: isOpen,
-  })
 
   const fetchStatuses = async () => {
     setLoading(true)
@@ -46,13 +41,13 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
       if (res.ok) {
         const data = await res.json()
         setStatuses({
-          notion: !!data.notion?.connected,
-          todoist: !!data.todoist?.connected,
-          slack: !!data.slack?.connected,
-          google: !!data.google?.connected,
-          gmail: !!data.gmail?.connected,
-          calendar: !!data.calendar?.connected || !!data.google?.connected,
-          drive: !!data.drive?.connected || !!data.google?.connected,
+          notion: data.notion === true || data.notion?.connected === true,
+          todoist: data.todoist === true || data.todoist?.connected === true,
+          slack: data.slack === true || data.slack?.connected === true,
+          google: data.google === true || data.google?.connected === true,
+          gmail: data.gmail === true || data.gmail?.connected === true,
+          calendar: data.calendar === true || data.calendar?.connected === true,
+          drive: data.drive === true || data.drive?.connected === true,
         })
       }
     } catch (err) {
@@ -96,7 +91,10 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
       description: 'Acceso a eventos, bloques de tiempo y agendamiento inteligente.',
       icon: SiGooglecalendar,
       brandColor: '#4285F4',
-      connected: !!statuses.calendar || !!statuses.google,
+      // A basic Google identity grant is not Calendar access. The status API
+      // exposes capability-level booleans so the chat connector picker does
+      // not hide the consent action behind a false "connected" state.
+      connected: !!statuses.calendar,
       oauthProvider: 'google',
     },
     {
@@ -106,7 +104,7 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
       description: 'El chatbot puede resumir y detectar tareas urgentes en tu bandeja.',
       icon: SiGmail,
       brandColor: '#EA4335',
-      connected: !!statuses.gmail || !!statuses.google,
+      connected: !!statuses.gmail,
       oauthProvider: 'google',
     },
     {
@@ -126,7 +124,7 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
       description: 'La IA puede consultar tus documentos y archivos guardados en Drive.',
       icon: SiGoogledrive,
       brandColor: '#FFBA00',
-      connected: !!statuses.drive || !!statuses.google,
+      connected: !!statuses.drive,
       oauthProvider: 'google',
     },
   ]
@@ -135,7 +133,25 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
     if (connector.connectUrl) {
       window.location.href = connector.connectUrl
     } else if (connector.oauthProvider) {
-      signIn(connector.oauthProvider)
+      const connectorScopes: Record<string, string> = {
+        googlecalendar: 'https://www.googleapis.com/auth/calendar',
+        gmail: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
+        googledrive: 'https://www.googleapis.com/auth/drive.file',
+      }
+      const requestedScope = connectorScopes[connector.id]
+      if (connector.oauthProvider === 'google' && requestedScope) {
+        // Ask only for the capability the user selected. The previous plain
+        // sign-in made every Google connector look active and could also send
+        // incompatible scopes together to Google's consent endpoint.
+        void signIn('google', { callbackUrl: '/connectors' }, {
+          scope: `openid profile email ${requestedScope}`,
+          access_type: 'offline',
+          prompt: 'consent',
+          include_granted_scopes: 'false',
+        })
+      } else {
+        void signIn(connector.oauthProvider)
+      }
     } else {
       toast({
         title: 'Próximamente',
@@ -144,33 +160,14 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-        {/* Backdrop */}
-        <motion.div
-          data-modal-drag-overlay
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-foreground/55 backdrop-blur-md"
-        />
-
-        {/* Modal Window */}
-        <motion.div
-          ref={dragSurfaceRef}
-          initial={{ opacity: 0, scale: 0.94, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 12 }}
-          transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-          className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col rounded-[32px] border border-border bg-popover/95 shadow-[0_24px_80px_rgba(0,0,0,0.28)] overflow-hidden"
-        >
-          <div aria-hidden="true" className="sm:hidden flex justify-center pt-3 pb-1 pointer-events-none">
-            <div className="h-[4px] w-10 rounded-full bg-foreground/20" />
-          </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        motionPreset="center"
+        mobilePresentation="sheet"
+        showCloseButton={false}
+        className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-[32px] border-border bg-popover/95 p-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+      >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-border/70 bg-muted/45">
             <div className="flex items-center gap-3">
@@ -178,7 +175,7 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
                 <Plug className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-foreground tracking-tight">Conectores & Plugins de IA</h3>
+                <DialogTitle className="text-base font-bold text-foreground tracking-tight">Conectores & Plugins de IA</DialogTitle>
                 <p className="text-xs text-muted-foreground">Activa integraciones para que la IA las use como herramientas</p>
               </div>
             </div>
@@ -255,8 +252,7 @@ export function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProps) {
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+      </DialogContent>
+    </Dialog>
   )
 }

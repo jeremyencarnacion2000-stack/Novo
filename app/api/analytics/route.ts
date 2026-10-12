@@ -6,6 +6,7 @@ import { getAdvancedInsights } from '@/lib/analytics-server'
 import { inngest } from '@/lib/inngest/client'
 import { updateDailyAnalytics as sharedUpdateDailyAnalytics } from '@/lib/analytics-server'
 import { calculateCurrentStreak } from '@/lib/streaks'
+import { normalizeAnalyticsDays } from '@/lib/analytics-validation'
 
 // Free plan: 30 days of history (the boundary settings-billing.tsx
 // advertises), Pro: whatever was requested. `days` is a client-supplied
@@ -16,7 +17,12 @@ async function clampDaysForPlan(userId: string, requestedDays: number): Promise<
   // Free plan: 30 days of history, Pro: whatever was requested.
   // We perform a light select of only the plan column.
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })
-  return user?.plan === 'pro' ? requestedDays : Math.min(requestedDays, 30)
+  // Keep every caller bounded, including the POST action that receives a
+  // loosely typed JSON body. Without normalising here, values such as
+  // `Infinity`, negative numbers or a non-numeric string could produce an
+  // invalid date or an unexpectedly large analytics scan.
+  const days = normalizeAnalyticsDays(requestedDays)
+  return user?.plan === 'pro' ? days : Math.min(days, 30)
 }
 
 export async function GET(request: NextRequest) {
@@ -27,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
     const userId = session.user.id
     const { searchParams } = new URL(request.url)
-    const days = await clampDaysForPlan(userId, parseInt(searchParams.get('days') || '30'))
+    const days = await clampDaysForPlan(userId, normalizeAnalyticsDays(searchParams.get('days')))
 
     const endDate = new Date()
     const startDate = new Date()
@@ -158,9 +164,11 @@ export async function GET(request: NextRequest) {
     const focusTimeString = `${hours}h ${minutes}m`
 
     const [goals, insights, streak] = await Promise.all([
-      prisma.goal.findMany({ where: { userId } }),
-      getAdvancedInsights(userId).catch((insightError) => {
-        console.error('Failed to get advanced insights:', insightError)
+      // Only status is needed for the completion ratio. Avoid loading goal
+      // descriptions/tags into the analytics request as the list grows.
+      prisma.goal.findMany({ where: { userId }, select: { status: true } }),
+      getAdvancedInsights(userId).catch(() => {
+        console.error('Failed to get advanced insights.')
         return {
           bestDay: 'N/A',
           habitInsights: { top: [], bottom: [] },
@@ -168,8 +176,8 @@ export async function GET(request: NextRequest) {
           goals: []
         }
       }),
-      calculateCurrentStreak(userId).catch((streakError) => {
-        console.error('Failed to calculate streak:', streakError)
+      calculateCurrentStreak(userId).catch(() => {
+        console.error('Failed to calculate streak.')
         return 0
       }),
     ])
@@ -201,8 +209,8 @@ export async function GET(request: NextRequest) {
       goalTrend,
       insights
     })
-  } catch (error) {
-    console.error('Analytics API error:', error)
+  } catch {
+    console.error('Analytics API error.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -234,14 +242,49 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'startSession': {
-        const sessionRecord = await prisma.userSession.create({
-          data: {
-            userId: userId,
-            modulesUsed: JSON.stringify([data.module]),
-            startTime: new Date(),
-          },
-        })
-        return NextResponse.json({ sessionId: sessionRecord.id })
+        const requestedSessionId = typeof data.sessionId === 'string' ? data.sessionId.trim() : ''
+        if (requestedSessionId.length > 128) {
+          return NextResponse.json({ error: 'Invalid analytics session id' }, { status: 400 })
+        }
+
+        // A route/layout can mount twice or lose the response after the
+        // database write. Reusing the client intent id must return the same
+        // owned session instead of opening another analytics row.
+        if (requestedSessionId) {
+          const existing = await prisma.userSession.findUnique({ where: { id: requestedSessionId } })
+          if (existing) {
+            if (existing.userId !== userId) {
+              return NextResponse.json({ error: 'Analytics session is not owned by this account' }, { status: 409 })
+            }
+            const replay = NextResponse.json({ sessionId: existing.id, replay: true })
+            replay.headers.set('X-Idempotent-Replay', 'true')
+            return replay
+          }
+        }
+
+        try {
+          const sessionRecord = await prisma.userSession.create({
+            data: {
+              ...(requestedSessionId ? { id: requestedSessionId } : {}),
+              userId,
+              modulesUsed: JSON.stringify([data.module]),
+              startTime: new Date(),
+            },
+          })
+          const response = NextResponse.json({ sessionId: sessionRecord.id, replay: false })
+          response.headers.set('X-Idempotent-Replay', 'false')
+          return response
+        } catch (error) {
+          if (requestedSessionId && typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+            const winner = await prisma.userSession.findUnique({ where: { id: requestedSessionId } })
+            if (winner?.userId === userId) {
+              const replay = NextResponse.json({ sessionId: winner.id, replay: true })
+              replay.headers.set('X-Idempotent-Replay', 'true')
+              return replay
+            }
+          }
+          throw error
+        }
       }
 
       case 'endSession': {
@@ -294,8 +337,8 @@ export async function POST(request: NextRequest) {
                 quality: data.metadata.quality || 3
               }
             })
-          } catch (e) {
-            console.error('Failed to dispatch focus.completed to Inngest:', e)
+          } catch {
+            console.error('Failed to dispatch focus.completed to Inngest.')
           }
         }
 
@@ -317,7 +360,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'getAnalyticsData': {
-        const days = await clampDaysForPlan(userId, data.days || 30)
+        const days = await clampDaysForPlan(userId, normalizeAnalyticsDays(data.days))
         const endDate = new Date()
         const startDate = new Date()
         startDate.setDate(endDate.getDate() - days)
@@ -349,7 +392,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'calculateProductivityMetrics': {
-        const days = await clampDaysForPlan(userId, data.days || 30)
+        const days = await clampDaysForPlan(userId, normalizeAnalyticsDays(data.days))
         const endDate = new Date()
         const startDate = new Date()
         startDate.setDate(endDate.getDate() - days)
@@ -377,9 +420,14 @@ export async function POST(request: NextRequest) {
           }),
         ])
 
-        const totalDays = dailyData.length
+        // The rate is measured against the requested window, not only days
+        // that already have a persisted row. A brand-new account therefore
+        // gets finite, honest zeros instead of NaN/null in JSON.
+        const totalDays = days
         const productiveDays = dailyData.filter((d) => d.productivityScore > 0).length
-        const avgTimeSpent = dailyData.reduce((sum, d) => sum + d.totalTime, 0) / totalDays / 3600 // hours
+        const avgTimeSpent = totalDays > 0
+          ? dailyData.reduce((sum, d) => sum + d.totalTime, 0) / totalDays / 3600
+          : 0 // hours
         const totalCompletions = dailyData.reduce((sum, d) => sum + d.completions, 0)
 
         // Peak hours: group by hour of day from sessions
@@ -403,7 +451,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           totalDays,
           productiveDays,
-          productivityRate: productiveDays / totalDays,
+          productivityRate: totalDays > 0 ? productiveDays / totalDays : 0,
           avgDailyTime: avgTimeSpent,
           totalCompletions,
           peakHour: parseInt(peakHour),
@@ -413,8 +461,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
-  } catch (error) {
-    console.error('Analytics API error:', error)
+  } catch {
+    console.error('Analytics API error.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

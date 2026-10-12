@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { google } from 'googleapis';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -5,15 +6,12 @@ import { prisma } from '@/lib/prisma';
 import { findGoogleAccountForScopes, toGoogleOAuthCredentials } from '@/lib/google-account';
 
 /**
- * Resolve a usable Google OAuth access token for a user — the session's
- * token if present, else the DB Account record (with expiry check). Shared
- * by any route that wants to call a Google API but must gracefully fall
- * back to non-Google data when the user hasn't connected (or their token
- * has expired) — most users sign in with credentials, not Google.
+ * Resolve a usable Google OAuth access token for a user from the server-owned
+ * Account record (with expiry and capability checks). Shared by routes that
+ * call a Google API but must gracefully fall back when the user hasn't
+ * connected that capability or the grant has expired.
  */
-export async function getGoogleAccessToken(userId: string, sessionToken?: string, requiredScopes: string[] = []): Promise<string | null> {
-    if (sessionToken) return sessionToken;
-
+export async function getGoogleAccessToken(userId: string, requiredScopes: string[] = []): Promise<string | null> {
     try {
         const account = await findGoogleAccountForScopes(userId, requiredScopes);
 
@@ -27,26 +25,19 @@ export async function getGoogleAccessToken(userId: string, sessionToken?: string
 }
 
 /**
- * Initializes a Google API client with the user's access token from the session.
+ * Initializes a Google API client from the authenticated user's server-owned
+ * Google grant. The browser session contributes identity only.
  */
-export async function getGoogleAuthClient() {
+export async function getGoogleAuthClient(requiredScopes: string[] = []) {
     const session = await getServerSession(authOptions);
 
-    if (!session?.accessToken) {
+    if (!session?.user?.id) {
         throw new Error('No access token found. User might not be logged in with Google.');
     }
 
-    const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-    );
-
-    oauth2Client.setCredentials({
-        access_token: session.accessToken,
-        refresh_token: session.refreshToken, // Optional, if we have it
-    });
-
-    return oauth2Client;
+    // Resolve the durable grant on the server. The session endpoint contains
+    // identity only, so browser clients can never read or replay OAuth tokens.
+    return getGoogleAuthClientForUser(session.user.id, requiredScopes);
 }
 
 /**
@@ -86,7 +77,7 @@ export async function getGoogleAuthClientForUser(userId: string, requiredScopes:
  */
 export const gmailService = {
     sendEmail: async (to: string, subject: string, body: string) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['gmail.send']);
         const gmail = google.gmail({ version: 'v1', auth });
 
         const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
@@ -118,7 +109,7 @@ export const gmailService = {
     },
 
     listUnread: async (maxResults = 5) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['gmail.readonly']);
         return listUnreadWithAuth(auth, maxResults);
     },
 
@@ -131,11 +122,18 @@ export const gmailService = {
 
 async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, maxResults: number, signal?: AbortSignal) {
         const gmail = google.gmail({ version: 'v1', auth });
+        // Novo only needs a compact inbox signal (subject, sender and the
+        // provider snippet). Never fetch full message bodies for context or
+        // background sync, and cap the provider request to keep latency and
+        // prompt size bounded even if a caller passes an unexpected value.
+        const boundedMaxResults = Number.isFinite(maxResults)
+            ? Math.min(Math.max(Math.trunc(maxResults), 1), 50)
+            : 5;
 
         const res = await gmail.users.messages.list({
             userId: 'me',
             q: 'is:unread',
-            maxResults,
+            maxResults: boundedMaxResults,
         }, { signal });
 
         if (!res.data.messages) return [];
@@ -144,6 +142,8 @@ async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthC
             const details = await gmail.users.messages.get({
                 userId: 'me',
                 id: msg.id!,
+                format: 'metadata',
+                metadataHeaders: ['Subject', 'From'],
             }, { signal });
 
             const headers = details.data.payload?.headers;
@@ -162,7 +162,7 @@ async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthC
  */
 export const calendarService = {
     listEvents: async (timeMin = new Date().toISOString(), maxResults = 10, timeMax?: string) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['calendar']);
         return listCalendarEventsWithAuth(auth, timeMin, maxResults, timeMax);
     },
 
@@ -172,24 +172,28 @@ export const calendarService = {
     },
 
     createEvent: async (summary: string, description: string, startTime: string, endTime: string) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['calendar']);
         return createCalendarEventWithAuth(auth, summary, description, startTime, endTime);
     },
 
-    createEventForUser: async (userId: string, summary: string, description: string, startTime: string, endTime: string) => {
+    createEventForUser: async (userId: string, summary: string, description: string, startTime: string, endTime: string, idempotencyKey?: string) => {
         const auth = await getGoogleAuthClientForUser(userId, ['calendar']);
-        return createCalendarEventWithAuth(auth, summary, description, startTime, endTime);
+        return createCalendarEventWithAuth(auth, summary, description, startTime, endTime, idempotencyKey ? `${userId}:${idempotencyKey}` : undefined);
     },
 };
 
 async function listCalendarEventsWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, timeMin: string, maxResults: number, timeMax?: string) {
         const calendar = google.calendar({ version: 'v3', auth });
 
+        const boundedMaxResults = Number.isFinite(maxResults)
+            ? Math.min(Math.max(Math.trunc(maxResults), 1), 250)
+            : 50
+
         const res = await calendar.events.list({
             calendarId: 'primary',
             timeMin,
             ...(timeMax ? { timeMax } : {}),
-            maxResults,
+            maxResults: boundedMaxResults,
             singleEvents: true,
             orderBy: 'startTime',
         });
@@ -197,7 +201,7 @@ async function listCalendarEventsWithAuth(auth: Awaited<ReturnType<typeof getGoo
         return res.data.items || [];
 }
 
-async function createCalendarEventWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, summary: string, description: string, startTime: string, endTime: string) {
+async function createCalendarEventWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, summary: string, description: string, startTime: string, endTime: string, idempotencyKey?: string) {
         const calendar = google.calendar({ version: 'v3', auth });
 
         const event = {
@@ -213,12 +217,30 @@ async function createCalendarEventWithAuth(auth: Awaited<ReturnType<typeof getGo
             },
         };
 
-        const res = await calendar.events.insert({
-            calendarId: 'primary',
-            requestBody: event,
-        });
+        // Google Calendar accepts a caller-supplied event id. Hash the
+        // user-scoped intent so a lost response/retry converges on the same
+        // external event without collapsing two intentional creates that use
+        // different keys. The hash is lowercase hex, valid for Calendar ids.
+        const eventId = idempotencyKey
+            ? createHash('sha256').update(idempotencyKey).digest('hex')
+            : undefined;
 
-        return res.data;
+        try {
+            const res = await calendar.events.insert({
+                calendarId: 'primary',
+                requestBody: eventId ? { ...event, id: eventId } : event,
+            });
+            return res.data;
+        } catch (error: any) {
+            // A duplicate deterministic id means the first request succeeded
+            // but its response was lost. Read the winner instead of creating
+            // another event or surfacing a false failure to the user.
+            if (eventId && Number(error?.code) === 409) {
+                const existing = await calendar.events.get({ calendarId: 'primary', eventId });
+                return existing.data;
+            }
+            throw error;
+        }
 }
 
 /**
@@ -228,7 +250,7 @@ async function createCalendarEventWithAuth(auth: Awaited<ReturnType<typeof getGo
 /* 
 export const fitnessService = {
     getDailySteps: async () => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['fitness.activity.read']);
         const fitness = google.fitness({ version: 'v1', auth });
 
         // Get start of today
@@ -256,7 +278,7 @@ export const fitnessService = {
     },
 
     getWorkoutHistory: async (days = 7) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['fitness.activity.read']);
         const fitness = google.fitness({ version: 'v1', auth });
 
         const endTime = new Date();
@@ -311,12 +333,16 @@ export const fitnessService = {
  */
 export const peopleService = {
     listContacts: async (pageSize = 20) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['contacts.readonly']);
         const people = google.people({ version: 'v1', auth });
+
+        const boundedPageSize = Number.isFinite(pageSize)
+            ? Math.min(Math.max(Math.trunc(pageSize), 1), 100)
+            : 20;
 
         const res = await people.people.connections.list({
             resourceName: 'people/me',
-            pageSize,
+            pageSize: boundedPageSize,
             personFields: 'names,emailAddresses,photos',
         });
 
@@ -360,7 +386,7 @@ export const driveService = {
      * Lists files from Google Drive
      */
     listFiles: async (pageSize = 10) => {
-        const auth = await getGoogleAuthClient();
+        const auth = await getGoogleAuthClient(['drive.file']);
         const drive = google.drive({ version: 'v3', auth });
 
         const res = await drive.files.list({
@@ -375,8 +401,8 @@ export const driveService = {
     /**
      * Creates a folder in Google Drive if it doesn't exist and uploads/saves a workspace backup
      */
-    exportWorkspaceBackup: async (backupData: any) => {
-        const auth = await getGoogleAuthClient();
+    exportWorkspaceBackup: async (backupData: any, idempotencyKey?: string) => {
+        const auth = await getGoogleAuthClient(['drive.file']);
         const drive = google.drive({ version: 'v3', auth });
 
         // 1. Find or create "Novo Backups" folder
@@ -401,8 +427,14 @@ export const driveService = {
             folderId = folder.data.id!;
         }
 
-        // 2. Upload file
-        const fileName = `novo_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        // 2. Upload file. A retry of the same explicit user intent reuses a
+        // deterministic filename and updates the existing Drive file instead
+        // of creating a second backup. Without a key, preserve the historical
+        // snapshot behavior and create a timestamped file.
+        const stableName = idempotencyKey
+            ? `novo_backup_${createHash('sha256').update(idempotencyKey).digest('hex')}.json`
+            : null;
+        const fileName = stableName ?? `novo_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
         const fileMetadata = {
             name: fileName,
             parents: [folderId],
@@ -413,16 +445,38 @@ export const driveService = {
             body: JSON.stringify(backupData, null, 2),
         };
 
-        const file = await drive.files.create({
-            requestBody: fileMetadata,
-            media: media,
-            fields: 'id, name, webViewLink',
-        });
+        let file;
+        let replayed = false;
+        if (stableName) {
+            const existing = await drive.files.list({
+                q: `name = '${stableName}' and '${folderId}' in parents and trashed = false`,
+                fields: 'files(id)',
+                spaces: 'drive',
+                pageSize: 1,
+            });
+            const existingId = existing.data.files?.[0]?.id;
+            if (existingId) {
+                file = await drive.files.update({
+                    fileId: existingId,
+                    media,
+                    fields: 'id, name, webViewLink',
+                });
+                replayed = true;
+            }
+        }
+        if (!file) {
+            file = await drive.files.create({
+                requestBody: fileMetadata,
+                media,
+                fields: 'id, name, webViewLink',
+            });
+        }
 
         return {
             id: file.data.id,
             name: file.data.name,
             webViewLink: file.data.webViewLink,
+            replayed,
         };
     }
 };

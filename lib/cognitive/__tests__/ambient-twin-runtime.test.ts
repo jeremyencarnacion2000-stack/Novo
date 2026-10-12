@@ -57,6 +57,28 @@ it('includes a durable Gmail aggregate as ambient context without storing mailbo
   })
 })
 
+it('does not treat a device observation alone as Twin context or an ambient trigger', async () => {
+  const { prisma } = jest.requireMock('@/lib/prisma') as { prisma: Record<string, Record<string, jest.Mock>> }
+  prisma.cognitiveTwinRecord.findUnique.mockResolvedValue(null)
+  prisma.actionPlan.findFirst.mockResolvedValue(null)
+  prisma.task.findMany.mockResolvedValue([])
+  prisma.calendarEvent.findMany.mockResolvedValue([])
+  prisma.timeBlock.findMany.mockResolvedValue([])
+  prisma.twinEvolutionLog.findMany.mockResolvedValue([])
+  prisma.cognitiveReplanRequest.findFirst.mockResolvedValue(null)
+  prisma.focusSession.findFirst.mockResolvedValue(null)
+  prisma.routine.findMany.mockResolvedValue([])
+  prisma.outcomeEvent.findMany.mockResolvedValue([])
+  prisma.behavioralSignal.findMany.mockResolvedValue([])
+  prisma.novoSignalLedger.findMany.mockResolvedValue([{ id: 'device-1', source: 'device', signalType: 'active_time_daily', label: 'Active time observed: 60 minutes', observedAt: new Date() }])
+
+  await expect(readAmbientTwinState('user-1', { trigger: 'sync' })).resolves.toMatchObject({
+    status: 'insufficient_context',
+    initiative: 'SILENT_LEARN',
+  })
+  await expect(readAmbientTwinState('user-1', { trigger: 'sync' })).resolves.not.toMatchObject({ sources: expect.arrayContaining(['device']) })
+})
+
 it('does not let derived ambient bookkeeping change its own context fingerprint', async () => {
   const { prisma } = jest.requireMock('@/lib/prisma') as { prisma: Record<string, Record<string, jest.Mock>> }
   const gmailSignal = { id: 'gmail-1', source: 'gmail', signalType: 'unread_observed', label: '2 unread', observedAt: new Date() }

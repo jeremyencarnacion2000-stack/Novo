@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        console.log(`✅ [Notion] Connected for user ${session.user.id}, workspace: ${tokenData.workspace_name}`);
+        console.log('[Notion] Connection persisted.');
     } catch (err) {
         console.error('[Notion Callback] Failed to upsert IntegrationAccount:', { name: err instanceof Error ? err.name : 'UnknownError' });
         return NextResponse.redirect(`${settingsUrl}error&reason=db_write`);

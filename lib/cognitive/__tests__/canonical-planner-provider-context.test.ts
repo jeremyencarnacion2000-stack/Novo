@@ -10,7 +10,7 @@ jest.mock('@/lib/prisma', () => ({
     novoSignalLedger: { findMany: jest.fn() },
     novoSignalSourcePreference: { findMany: jest.fn() },
     cognitiveTwinRecord: { findUnique: jest.fn() },
-    actionPlan: { updateMany: jest.fn(), create: jest.fn() },
+    actionPlan: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
     $transaction: jest.fn(),
   },
 }))
@@ -68,5 +68,22 @@ describe('canonical planner provider context bridge', () => {
     expect(actionPlanCreateData.actions.create.facts).toContain('GitHub observed: 7 commits in 14 days')
     expect(actionPlanCreateData.actions.create.facts).not.toContain('Slack activity observed')
     expect(actionPlanCreateData.actions.create.facts).not.toContain('Gmail inbox observed: 9 unread messages')
+  })
+
+  it('replays the plan recorded on a completed activity run', async () => {
+    const replayPlan = { id: 'plan-replay', userId: 'user-1', actions: [], goal: null }
+    const activity = require('@/lib/ai/activity')
+    ;(activity.getActivityRun as jest.Mock).mockResolvedValue({
+      run: { id: 'run-1', status: 'completed', resultRef: replayPlan.id },
+      events: [],
+    })
+    ;(prisma.actionPlan.findFirst as jest.Mock).mockResolvedValue(replayPlan)
+
+    const result = await planUserContext({ userId: 'user-1', timezone: 'UTC', runId: 'run-1' })
+
+    expect(result).toEqual({ plan: replayPlan, runId: 'run-1' })
+    expect(activity.appendActivityEvent).not.toHaveBeenCalled()
+    expect(prisma.actionPlan.updateMany).not.toHaveBeenCalled()
+    expect(prisma.actionPlan.create).not.toHaveBeenCalled()
   })
 })

@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import dynamic from "next/dynamic"
 import type { Task } from "@/types/project"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Calendar, Trash2, Edit2, AlertCircle, ChevronRight } from "lucide-react"
-import { TaskDialog } from "./task-dialog"
 import { format, parseISO, isPast, isToday, differenceInDays } from "date-fns"
 import { toast } from "sonner"
 import { useSession } from "next-auth/react"
@@ -17,6 +17,10 @@ import { NovoSkeleton } from "@/components/ui/NovoSkeleton"
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState"
 import { eventBus } from "@/lib/events/event-bus"
 import { createSwapy } from "swapy"
+
+const TaskDialog = dynamic(() => import("./task-dialog").then((module) => module.TaskDialog), {
+  ssr: false,
+})
 
 const columns: { status: Task["status"]; title: string; color: string }[] = [
   { status: "todo", title: "Not Started", color: "text-muted-foreground" },
@@ -29,6 +33,7 @@ export function TasksView() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [search, setSearch] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [taskDialogLoaded, setTaskDialogLoaded] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>()
   const [isLoading, setIsLoading] = useState(true)
 
@@ -57,10 +62,13 @@ export function TasksView() {
     handleStatusChangeRef.current = handleStatusChange
   })
 
-  const handleEditClick = (task: Task) => {
+  const openTaskDialog = (task?: Task) => {
     setEditingTask(task)
+    setTaskDialogLoaded(true)
     setDialogOpen(true)
   }
+
+  const handleEditClick = (task: Task) => openTaskDialog(task)
 
   const loadTasks = async () => {
     if (!session?.user?.id) return
@@ -290,7 +298,7 @@ export function TasksView() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)} data-flip-from="btn-new-task" className="w-full sm:w-auto">
+        <Button onClick={() => openTaskDialog()} data-flip-from="btn-new-task" className="w-full sm:w-auto">
           <Plus data-shared-item="icon" className="h-4 w-4 mr-2" />
           <span data-shared-item="text">New Task</span>
         </Button>
@@ -430,7 +438,7 @@ export function TasksView() {
         })}
       </div>
 
-      <TaskDialog
+      {taskDialogLoaded && <TaskDialog
         open={dialogOpen}
         onClose={() => {
           setDialogOpen(false)
@@ -438,7 +446,7 @@ export function TasksView() {
         }}
         onSave={editingTask ? handleUpdate : handleCreate}
         task={editingTask}
-      />
+      />}
 
     </div>
   )

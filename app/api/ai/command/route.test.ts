@@ -48,4 +48,18 @@ describe('POST /api/ai/command safe failures', () => {
     expect(executeFunctionCall).not.toHaveBeenCalled()
     expect(JSON.stringify(body)).not.toContain('Private task')
   })
+
+  it('rejects oversized or empty command payloads before calling the provider', async () => {
+    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-a' } })
+
+    const response = await POST(new NextRequest('http://localhost/api/ai/command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: '   ' }),
+    }))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Invalid request' })
+    expect(geminiAPI.generateResponse).not.toHaveBeenCalled()
+  })
 })

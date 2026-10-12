@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { Course, Grade } from '@/types/school';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { motion } from 'framer-motion';
 import { springConfig } from '@/lib/design-tokens';
+import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 
 export default function SchoolPage() {
   const { toast } = useToast();
@@ -33,15 +34,18 @@ export default function SchoolPage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | undefined>();
   const [educationFilter, setEducationFilter] = useState<string>('all');
   const [schoolTab, setSchoolTab] = useState<string>('courses');
+  const courseIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const gradeIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   // Fetch courses
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/school/courses');
+      const response = await fetch('/api/school/courses', { cache: 'no-store', signal });
       if (!response.ok) throw new Error('Failed to fetch courses');
       const data = await response.json();
-      setCourses(data);
-    } catch (error) {
+      if (!signal?.aborted) setCourses(Array.isArray(data) ? data : []);
+    } catch (error: unknown) {
+      if ((error as { name?: string })?.name === 'AbortError' || signal?.aborted) return;
       console.error('Error fetching courses:', error);
       toast({
         title: 'Error',
@@ -49,26 +53,34 @@ export default function SchoolPage() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
-    fetchCourses();
-  }, []);
+    const controller = new AbortController();
+    void fetchCourses(controller.signal);
+    return () => controller.abort();
+  }, [fetchCourses]);
 
   // Create course
   const handleCreateCourse = async (course: any) => {
     try {
+      const fingerprint = JSON.stringify(course);
+      const intent = courseIntentRef.current?.fingerprint === fingerprint
+        ? courseIntentRef.current
+        : { fingerprint, key: createClientIdempotencyKey() };
+      courseIntentRef.current = intent;
       const response = await fetch('/api/school/courses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify(course),
       });
 
       if (!response.ok) throw new Error('Failed to create course');
 
       toast({ title: 'Course created successfully' });
+      courseIntentRef.current = null;
       fetchCourses();
     } catch (error) {
       console.error('Error creating course:', error);
@@ -127,15 +139,21 @@ export default function SchoolPage() {
   // Add grade
   const handleAddGrade = async (grade: any) => {
     try {
+      const fingerprint = JSON.stringify(grade);
+      const intent = gradeIntentRef.current?.fingerprint === fingerprint
+        ? gradeIntentRef.current
+        : { fingerprint, key: createClientIdempotencyKey() };
+      gradeIntentRef.current = intent;
       const response = await fetch('/api/school/grades', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
         body: JSON.stringify(grade),
       });
 
       if (!response.ok) throw new Error('Failed to add grade');
 
       toast({ title: 'Grade added successfully' });
+      gradeIntentRef.current = null;
       fetchCourses();
     } catch (error) {
       console.error('Error adding grade:', error);
@@ -174,9 +192,8 @@ export default function SchoolPage() {
     setGradeDialogOpen(true);
   };
 
-  // CourseDialog/GradeDialog already play their own return flight before
-  // calling these (via useModalFlip) — wrapping again here would
-  // double-untoggle and delay the unmount by a second, redundant animation.
+  // CourseDialog/GradeDialog own their shared-element lifecycle; the page
+  // handlers only clear the selected record.
   const handleCloseCourseDialog = () => {
     setCourseDialogOpen(false);
     setEditingCourse(undefined);

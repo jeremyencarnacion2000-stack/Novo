@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../chat-input'
 
@@ -32,6 +32,28 @@ describe('ChatInput', () => {
     await user.keyboard('{Enter}')
 
     expect(sendMessage).toHaveBeenCalledWith('Hola Novo', [], false)
+  })
+
+  it('sends multiple attached documents into the active chat without requiring a separate prompt', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<ChatInput />)
+    const files = [
+      new File(['uno'], 'plan.md', { type: 'text/markdown' }),
+      new File(['dos'], 'notes.txt', { type: 'text/plain' }),
+    ]
+    const documentInput = container.querySelector('input[type="file"]:last-of-type')
+    expect(documentInput).not.toBeNull()
+    fireEvent.change(documentInput!, { target: { files } })
+
+    const send = screen.getByTitle('Enviar')
+    expect(send).toBeEnabled()
+    await user.click(send)
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      'Analiza los 2 archivos adjuntos y resume lo más importante.',
+      files,
+      false,
+    )
   })
 
   it('opens the progressive tools sheet and closes it with Escape', async () => {

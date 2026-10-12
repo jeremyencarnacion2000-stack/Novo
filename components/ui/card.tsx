@@ -28,17 +28,19 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
         depth={8}
         blur={1}
         strength={50}
-        // 8 was the "small widget" tier (60-160px); dashboard cards render at
-        // ~300-500px, where the established scale calls for 12-14 — at 8 the
-        // displacement barely spreads any pixels on a card this large, so the
-        // glass effect reads as almost invisible (see liquid-glass-aberration
-        // memory: undersized aberration on large panels looks invisible).
-        chromaticAberration={12}
+        // Dashboard cards are large enough to carry a visible edge split.
+        // Fifteen keeps the RGB fringe legible without turning the whole panel
+        // into a rainbow; compact controls use the lower preset values.
+        chromaticAberration={15}
         refractive
+        refractivePriority="ambient"
         elevation="medium"
         contrastObserver
         className={cn(
-          'text-card-foreground gap-8 p-6 lg:p-10 transition-all duration-300',
+          // Animate only paint/compositing properties. `transition-all` also
+          // interpolates padding, size, and layout when card content changes,
+          // which makes shared surfaces visibly reflow during async updates.
+          'text-card-foreground gap-8 p-6 lg:p-10 transition-[background-color,border-color,box-shadow,filter,opacity,transform] duration-300',
           className,
         )}
         style={style}
@@ -54,7 +56,10 @@ function Card({ className, style, variant = 'primary', children, ...props }: Car
       data-slot="card"
       data-variant={variant}
       className={cn(
-        'text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative isolate shadow-none overflow-hidden border transition-all duration-300',
+        // Keep the card out of its own backdrop root. Chromium otherwise
+        // samples the transparent card plane instead of the wallpaper behind
+        // it, which makes the configured liquid material look flat on desktop.
+        'novo-card-surface text-card-foreground flex flex-col gap-8 rounded-card p-6 lg:p-10 relative shadow-none overflow-hidden border transition-[background-color,border-color,box-shadow,filter,opacity,transform] duration-300',
         !hasLiquidGlassClass && 'bg-transparent',
         variant === 'primary' && !hasLiquidGlassClass && 'glass-surface',
         variant === 'secondary' && (hasLiquidGlassClass ? 'bg-foreground/[0.04]' : 'glass-surface bg-foreground/[0.04]'),

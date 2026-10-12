@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis } from 'recharts'
 import { AnalyticsOverview } from '@/components/analytics/analytics-overview'
 import { ProductivityHeatmap } from '@/components/analytics/productivity-heatmap'
 import { Badge } from '@/components/ui/badge'
@@ -160,7 +160,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                 variants={cardVariants}
                 whileHover={{ y: -5, scale: 1.015 }}
                 transition={hoverSpring}
-                style={{ willChange: 'transform' }}
               >
                 <Card variant="primary" className="h-full border-foreground/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 hover-premium-glow">
                   <CardHeader className="pb-2">
@@ -184,7 +183,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
                 variants={cardVariants}
                 whileHover={{ y: -5, scale: 1.015 }}
                 transition={hoverSpring}
-                style={{ willChange: 'transform' }}
               >
                 <Card variant="primary" className="h-full border-foreground/10 hover-premium-glow">
                   <CardHeader className="pb-2">
@@ -229,7 +227,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
               variants={cardVariants}
               whileHover={{ y: -4, scale: 1.008 }}
               transition={hoverSpring}
-              style={{ willChange: 'transform' }}
             >
               <Card variant="primary" className="border-foreground/10 hover-premium-glow">
                 <CardHeader className="pb-2">
@@ -270,7 +267,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
             variants={cardVariants}
             whileHover={{ y: -5, scale: 1.015 }}
             transition={hoverSpring}
-            style={{ willChange: 'transform' }}
             className="flex flex-col"
           >
             <Card variant="primary" className="border-foreground/10 flex flex-col h-full hover-premium-glow">
@@ -322,7 +318,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.008 }}
           transition={hoverSpring}
-          style={{ willChange: 'transform' }}
         >
           <Card variant="primary" className="border-foreground/10 overflow-hidden hover-premium-glow">
             <CardHeader className="pb-2">
@@ -391,7 +386,6 @@ export default function ClientAnalytics({ dailyData, metrics, insights }: Client
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.008 }}
           transition={hoverSpring}
-          style={{ willChange: 'transform' }}
         >
           <Card variant="primary" className="border-foreground/10 overflow-hidden hover-premium-glow">
             <CardHeader className="pb-2">

@@ -6,6 +6,8 @@ import { buildUserContext } from '@/lib/ai/context-builder';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { pickResultMessage } from '@/lib/ai/executor';
+import { readIdempotencyKey } from '@/lib/server-idempotency';
+import { shouldConsultGmail } from '@/lib/ai/gmail-context';
 
 // =============================================================================
 // MODEL CONFIGURATION  
@@ -130,7 +132,9 @@ async function callModelWithFallback(
         return { content: result.content, model: model.name };
       }
     } catch (error) {
-      console.error(`[AI Generate] Error with ${model.name}:`, error);
+      console.error(`[AI Generate] Provider failed: ${model.name}`, {
+        reason: error instanceof Error ? error.name : 'unknown',
+      });
       lastError = error as Error;
     }
   }
@@ -201,19 +205,19 @@ async function validateAndSanitizeAction(action: any, userId: string): Promise<a
   const type = String(action.type).toUpperCase();
   const payload = action.payload || {};
 
-  console.log(`[Anti-Hallucination] Validating action ${type} for user ${userId}`);
+  console.log(`[Anti-Hallucination] Validating action ${type}`);
 
   // 1. Validate TASK mutations (UPDATE/DELETE)
   if (type === 'UPDATE_TASK' || type === 'DELETE_TASK') {
     if (!payload.id) {
-      console.warn(`[Anti-Hallucination] Task action lacks ID, attempting fallback match by title: ${payload.title}`);
+      console.warn('[Anti-Hallucination] Task action lacks ID; attempting a scoped title match');
       if (payload.title) {
         const found = await prisma.task.findFirst({
           where: { userId, title: { contains: payload.title } }
         });
         if (found) {
           payload.id = found.id;
-          console.log(`[Anti-Hallucination] Matched task ID: ${found.id}`);
+          console.log('[Anti-Hallucination] Matched task by scoped title');
         }
       }
     } else {
@@ -221,7 +225,7 @@ async function validateAndSanitizeAction(action: any, userId: string): Promise<a
         where: { id: payload.id, userId }
       });
       if (!exists) {
-        console.warn(`[Anti-Hallucination] Task ID ${payload.id} does not exist. Trying title match.`);
+        console.warn('[Anti-Hallucination] Task ID not found for user; trying a scoped title match');
         if (payload.title) {
           const found = await prisma.task.findFirst({
             where: { userId, title: { contains: payload.title } }
@@ -320,6 +324,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = session.user.id;
+    const idempotency = readIdempotencyKey(request);
+    if (idempotency.invalid) {
+      return NextResponse.json({ error: 'InvalidIdempotencyKey' }, { status: 400 });
+    }
+    const idempotencyKey = idempotency.key ?? undefined;
     const body = await request.json();
     console.log('[AI API] Authenticated generation request received.');
     const { message, history, webSearchEnabled, model: requestedModel } = body;
@@ -368,7 +377,7 @@ export async function POST(request: NextRequest) {
 
         try {
           const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
-          const execResult = await executeAIAction(autoAction, userId);
+          const execResult = await executeAIAction(autoAction, userId, undefined, idempotencyKey);
 
           // Build a structured JSON that context.tsx can parse from the SSE stream
           const resultJson = {
@@ -389,7 +398,7 @@ export async function POST(request: NextRequest) {
             },
             message: execResult.success
               ? `${execResult.message || 'He generado tu archivo.'}`
-              : `Hubo un error al generar el archivo: ${execResult.error || 'Error desconocido'}`
+              : 'No se pudo generar el archivo. Intenta de nuevo.'
           };
 
           // Return as SSE stream so context.tsx can read it
@@ -419,7 +428,9 @@ export async function POST(request: NextRequest) {
     // Build Context
     let userContextStr = '';
     try {
-      const context = await buildUserContext(userId);
+      const context = await buildUserContext(userId, {
+        includeGmail: shouldConsultGmail(message || ''),
+      });
       userContextStr = context.summary;
     } catch { console.error('[AI] Context retrieval failed.'); }
 
@@ -523,7 +534,7 @@ export async function POST(request: NextRequest) {
       if (actionType === 'GENERATE_FILE') {
         try {
           const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
-          const execResult = await executeAIAction(parsed.action, userId);
+          const execResult = await executeAIAction(parsed.action, userId, undefined, idempotencyKey);
           return NextResponse.json({
             content: pickResultMessage(execResult, parsed.message, 'He realizado los cambios en tu estado cognitivo.'),
             blocks: [
@@ -573,7 +584,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const { executeAIAction, pickDisplayableFields } = await import('@/lib/ai/executor');
-        const execResult = await executeAIAction(autoAction, userId);
+        const execResult = await executeAIAction(autoAction, userId, undefined, idempotencyKey);
         return NextResponse.json({
           content: execResult.message || 'Archivo generado.',
           blocks: [

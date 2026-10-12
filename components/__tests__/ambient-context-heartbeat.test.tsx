@@ -20,12 +20,17 @@ describe('AmbientContextHeartbeat', () => {
 
   it('refreshes authenticated context outside the Dashboard and keeps a 15 minute cadence', async () => {
     render(<AmbientContextHeartbeat />)
-    expect(global.fetch).toHaveBeenCalledWith('/api/cognitive/ambient', { cache: 'no-store' })
+    // The first refresh is intentionally deferred so route data and the first
+    // interaction are not competing with the ambient reconciliation request.
+    expect(global.fetch).not.toHaveBeenCalled()
 
+    act(() => jest.advanceTimersByTime(2500))
     await act(async () => {
       await Promise.resolve()
       await Promise.resolve()
     })
+    expect(global.fetch).toHaveBeenCalledWith('/api/cognitive/ambient', { cache: 'no-store' })
+
     act(() => jest.advanceTimersByTime(15 * 60 * 1000))
     expect(global.fetch).toHaveBeenCalledTimes(2)
   })
@@ -34,6 +39,26 @@ describe('AmbientContextHeartbeat', () => {
     usePathname.mockReturnValue('/')
     render(<AmbientContextHeartbeat />)
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps its refresh schedule across authenticated section changes', async () => {
+    const view = render(<AmbientContextHeartbeat />)
+
+    act(() => jest.advanceTimersByTime(1000))
+    usePathname.mockReturnValue('/calendar')
+    view.rerender(<AmbientContextHeartbeat />)
+
+    await act(async () => {
+      jest.advanceTimersByTime(1500)
+      await Promise.resolve()
+    })
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+
+    usePathname.mockReturnValue('/routines')
+    view.rerender(<AmbientContextHeartbeat />)
+    act(() => jest.advanceTimersByTime(2500))
+    expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('does not overlap refresh requests while a previous heartbeat is in flight', async () => {

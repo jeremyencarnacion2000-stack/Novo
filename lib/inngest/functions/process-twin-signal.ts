@@ -573,7 +573,7 @@ export async function processTwinSignalHandler(
           try {
             await finishActivityRun(userId, inferenceRunId, 'failed', {
               errorCode: 'twin_inference_failed',
-              errorMessage: 'La inferencia del Twin no pudo completarse; se reintentarÃ¡ de forma segura.',
+              errorMessage: 'La inferencia del Twin no pudo completarse; se reintentará de forma segura.',
             })
           } catch { /* telemetry must not mask the original failure */ }
         }).catch(() => undefined)

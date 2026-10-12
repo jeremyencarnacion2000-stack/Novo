@@ -1,11 +1,12 @@
 'use client'
 
 import React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ChevronDown, Heart, ListMusic, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { usePlayerStore } from '@/lib/player-store'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
+import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 interface NowPlayingFullscreenProps {
     open: boolean
@@ -40,19 +41,16 @@ export function NowPlayingFullscreen({ open, onClose, onOpenQueue }: NowPlayingF
     const isLiked = likedTracks.includes(currentTrack.id)
 
     return (
-        <AnimatePresence>
-            {open && (
-                <motion.div
-                    initial={{ y: '100%' }}
-                    animate={{ y: 0 }}
-                    exit={{ y: '100%' }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
-                    dragElastic={{ top: 0, bottom: 0.5 }}
-                    onDragEnd={(_, info) => { if (info.offset.y > 120) onClose() }}
-                    className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-[#0a0a0c]"
-                >
+        <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+            <SheetContent
+                side="bottom"
+                showCloseButton={false}
+                aria-label="Reproductor expandido"
+                className="!inset-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-none !rounded-none !border-0 !bg-[#0a0a0c] !p-0 !overflow-hidden sm:!max-w-none"
+            >
+                <SheetTitle className="sr-only">Reproductor expandido</SheetTitle>
+                <SheetClose className="sr-only" aria-label="Cerrar reproductor">Cerrar</SheetClose>
+                <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#0a0a0c]">
                     {/* Ambient backdrop: blurred cover art */}
                     {currentTrack.image && (
                         <div className="absolute inset-0 pointer-events-none">
@@ -180,8 +178,8 @@ export function NowPlayingFullscreen({ open, onClose, onOpenQueue }: NowPlayingF
                             {repeatMode === 'track' ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}
                         </button>
                     </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+                </div>
+            </SheetContent>
+        </Sheet>
     )
 }

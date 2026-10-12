@@ -87,9 +87,9 @@ export const chutesAPI = {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Chutes API error:', errorText);
-                throw new Error(`Chutes API error: ${response.status} - ${errorText}`);
+                await response.arrayBuffer().catch(() => undefined);
+                console.error('Chutes API request failed', { status: response.status });
+                throw new Error('chutes_provider_unavailable');
             }
 
             const data: ChutesResponse = await response.json();
@@ -106,7 +106,9 @@ export const chutesAPI = {
                 functionCalls: [] // Chutes doesn't support function calling yet
             };
         } catch (error) {
-            console.error('Error in Chutes API:', error);
+            console.error('Chutes API request failed', {
+                reason: error instanceof Error ? error.name : 'unknown',
+            });
             throw error;
         }
     }

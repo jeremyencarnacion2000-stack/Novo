@@ -21,10 +21,9 @@ export class AIModelManager {
   private static instance: AIModelManager;
   private models: AIModel[] = [];
   private loadedModel: any = null;
+  private storageScope: string | null = null;
 
-  private constructor() {
-    this.loadModels();
-  }
+  private constructor() {}
 
   static getInstance(): AIModelManager {
     if (!AIModelManager.instance) {
@@ -34,9 +33,9 @@ export class AIModelManager {
   }
 
   private loadModels(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !this.storageScope) return;
 
-    const stored = localStorage.getItem(MODELS_STORAGE_KEY);
+    const stored = localStorage.getItem(`${MODELS_STORAGE_KEY}:${this.storageScope}`);
     if (stored) {
       this.models = JSON.parse(stored);
     }
@@ -50,8 +49,16 @@ export class AIModelManager {
   }
 
   private saveModels(): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(MODELS_STORAGE_KEY, JSON.stringify(this.models));
+    if (typeof window === 'undefined' || !this.storageScope) return;
+    localStorage.setItem(`${MODELS_STORAGE_KEY}:${this.storageScope}`, JSON.stringify(this.models));
+  }
+
+  setStorageScope(scope: string | null): void {
+    if (this.storageScope === scope) return;
+    this.storageScope = scope;
+    this.models = [];
+    this.loadedModel = null;
+    this.loadModels();
   }
 
   getModels(): AIModel[] {
@@ -63,6 +70,7 @@ export class AIModelManager {
   }
 
   async uploadModel(file: File, name: string, type: 'lora' | 'base', baseModel?: string): Promise<AIModel> {
+    if (!this.storageScope) throw new Error('No authenticated model storage scope');
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 

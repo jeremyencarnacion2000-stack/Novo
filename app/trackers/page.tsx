@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { modalFlip } from '@/lib/modal-flip'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -13,6 +13,7 @@ import { useTrackers } from '@/hooks/use-swr'
 import { useToast } from '@/hooks/use-toast'
 import { trackActivity } from '@/lib/activity-tracker'
 import { motion } from 'framer-motion'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 export default function TrackersPage() {
   const { data: trackers, error, isLoading, mutate } = useTrackers()
@@ -21,6 +22,10 @@ export default function TrackersPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTracker, setEditingTracker] = useState<Tracker | undefined>()
   const [activeTab, setActiveTab] = useState('habits')
+  const createIntentKey = useRef<string | null>(null)
+  // Keep a failed entry intent stable so a network retry replays the same
+  // server mutation instead of creating another row for the same day/value.
+  const entryIntentKeys = useRef(new Map<string, string>())
 
   const habitTrackers = Array.isArray(trackers) ? trackers.filter((t) => t && typeof t === 'object' && t.type === 'habit') : []
   const metricTrackers = Array.isArray(trackers) ? trackers.filter((t) => t && typeof t === 'object' && t.type === 'metric') : []
@@ -37,6 +42,8 @@ export default function TrackersPage() {
 
 
   const handleCreate = async (tracker: Omit<Tracker, 'id'>) => {
+    const intentKey = createIntentKey.current || createClientIdempotencyKey()
+    createIntentKey.current = intentKey
     const tempId = `temp-${Date.now()}`
     const optimisticTracker: Tracker = {
       ...tracker,
@@ -49,11 +56,6 @@ export default function TrackersPage() {
     // untoggle first: it restores the origin button's hidden icon/text and
     // plays the return flight before the dialog unmounts.
     modalFlip.untoggle('btn-new-tracker', () => setDialogOpen(false))
-    toast({
-      title: 'Tracker created',
-      description: 'Your new tracker has been created successfully.',
-    })
-
     try {
       await mutate(
         async () => {
@@ -61,6 +63,7 @@ export default function TrackersPage() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Idempotency-Key': intentKey,
             },
             body: JSON.stringify(tracker),
           })
@@ -81,6 +84,14 @@ export default function TrackersPage() {
           revalidate: true
         }
       )
+      // Keep the same key until SWR has accepted the mutation. If parsing or
+      // cache population fails after the server committed, a retry must still
+      // resolve to the original idempotent request.
+      createIntentKey.current = null
+      toast({
+        title: 'Tracker created',
+        description: 'Your new tracker has been created successfully.',
+      })
     } catch (error: any) {
       console.error('Error creating tracker:', error)
       toast({
@@ -99,11 +110,6 @@ export default function TrackersPage() {
       setDialogOpen(false)
       setEditingTracker(undefined)
     })
-    toast({
-      title: 'Tracker updated',
-      description: 'Your tracker has been updated successfully.',
-    })
-
     try {
       await mutate(
         async () => {
@@ -135,6 +141,10 @@ export default function TrackersPage() {
           revalidate: true
         }
       )
+      toast({
+        title: 'Tracker updated',
+        description: 'Your tracker has been updated successfully.',
+      })
     } catch (error: any) {
       console.error('Error updating tracker:', error)
       toast({
@@ -148,11 +158,6 @@ export default function TrackersPage() {
   const handleDelete = async (id: string) => {
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = currentTrackers.filter((t) => t.id !== id)
-
-    toast({
-      title: 'Tracker deleted',
-      description: 'Your tracker has been deleted successfully.',
-    })
 
     try {
       await mutate(
@@ -177,6 +182,10 @@ export default function TrackersPage() {
           revalidate: true
         }
       )
+      toast({
+        title: 'Tracker deleted',
+        description: 'Your tracker has been deleted successfully.',
+      })
     } catch (error: any) {
       console.error('Error deleting tracker:', error)
       toast({
@@ -196,19 +205,25 @@ export default function TrackersPage() {
 
   const handleOpenNewTracker = () => {
     setEditingTracker(undefined)
+    // A fresh dialog represents a new user intent. Do not reuse a key left
+    // behind by a failed request from a previous dialog.
+    createIntentKey.current = null
     setDialogOpen(true)
   }
 
-  // TrackerDialog already plays its own return flight before calling this
-  // (via useModalFlip) — wrapping it again here would double-untoggle and
-  // delay the unmount by a second, redundant animation.
+  // TrackerDialog owns its shared-element lifecycle; the page only closes
+  // the selected record after the dialog controller has begun its return.
   const handleDialogClose = () => {
+    createIntentKey.current = null
     setDialogOpen(false)
     setEditingTracker(undefined)
   }
 
   const handleLogEntry = async (id: string, value: number) => {
     const today = new Date().toISOString().split('T')[0]
+    const entryIntentId = `${id}:${today}:${value}`
+    const entryIntentKey = entryIntentKeys.current.get(entryIntentId) ?? createClientIdempotencyKey()
+    entryIntentKeys.current.set(entryIntentId, entryIntentKey)
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = currentTrackers.map((t) => {
       if (t.id === id) {
@@ -221,11 +236,6 @@ export default function TrackersPage() {
       return t
     })
 
-    toast({
-      title: 'Entry logged',
-      description: 'Your entry has been logged successfully.',
-    })
-
     try {
       await mutate(
         async () => {
@@ -233,6 +243,7 @@ export default function TrackersPage() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Idempotency-Key': entryIntentKey,
             },
             body: JSON.stringify({ date: today, value }),
           })
@@ -250,7 +261,8 @@ export default function TrackersPage() {
             )
           }
 
-          return response.json()
+          const loggedEntry = await response.json()
+          return loggedEntry
         },
         {
           optimisticData,
@@ -272,6 +284,13 @@ export default function TrackersPage() {
           revalidate: true
         }
       )
+      // Clear only after SWR accepts the mutation. If cache population fails
+      // after the server committed, a retry must still replay this intent.
+      entryIntentKeys.current.delete(entryIntentId)
+      toast({
+        title: 'Entry logged',
+        description: 'Your entry has been logged successfully.',
+      })
     } catch (error: any) {
       console.error('Error logging entry:', error)
       toast({

@@ -12,6 +12,23 @@ export interface ScheduledNotification {
 class NotificationScheduler {
   private scheduledNotifications: Map<string, ScheduledNotification> = new Map()
   private timeouts: Map<string, NodeJS.Timeout> = new Map()
+  private storageScope: string | null = null
+
+  private storageKey() {
+    return this.storageScope ? `novo-scheduled-notifications:${this.storageScope}` : null
+  }
+
+  // The scheduler is a module singleton, while the app can change sessions
+  // without a full page reload. Tear down the old user's timers before
+  // hydrating the new user's queue so reminders never cross accounts.
+  setStorageScope(scope: string | null) {
+    if (this.storageScope === scope) return
+    this.timeouts.forEach(timeout => clearTimeout(timeout))
+    this.timeouts.clear()
+    this.scheduledNotifications.clear()
+    this.storageScope = scope
+    if (scope) this.loadFromStorage()
+  }
 
   // Schedule a notification
   schedule(notification: Omit<ScheduledNotification, 'id'>): string {
@@ -70,7 +87,7 @@ class NotificationScheduler {
     // This would normally use the notification context, but since this is a utility class,
     // we'll need to handle it differently. For now, we'll use the browser Notification API directly.
 
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       const options: NotificationOptions = {
         body: notification.body,
         icon: '/icon.svg',
@@ -79,7 +96,12 @@ class NotificationScheduler {
         tag: `novo-${notification.type}-${notification.id}`
       }
 
-      new Notification(notification.title, options)
+      try {
+        new Notification(notification.title, options)
+      } catch {
+        // Browser permission can change between the check and construction;
+        // a reminder must never surface an unhandled error.
+      }
     }
 
     // Remove from scheduled list after execution
@@ -90,18 +112,22 @@ class NotificationScheduler {
 
   // Save scheduled notifications to localStorage
   private saveToStorage() {
+    const key = this.storageKey()
+    if (!key) return
     try {
       const notifications = Array.from(this.scheduledNotifications.values())
-      localStorage.setItem('novo-scheduled-notifications', JSON.stringify(notifications))
-    } catch (error) {
-      console.error('Failed to save scheduled notifications:', error)
+      localStorage.setItem(key, JSON.stringify(notifications))
+    } catch {
+      console.error('Failed to save scheduled notifications.')
     }
   }
 
   // Load scheduled notifications from localStorage
   loadFromStorage() {
+    const key = this.storageKey()
+    if (!key) return
     try {
-      const stored = localStorage.getItem('novo-scheduled-notifications')
+      const stored = localStorage.getItem(key)
       if (stored) {
         const notifications: ScheduledNotification[] = JSON.parse(stored)
         const now = Date.now()
@@ -120,8 +146,8 @@ class NotificationScheduler {
           }
         })
       }
-    } catch (error) {
-      console.error('Failed to load scheduled notifications:', error)
+    } catch {
+      console.error('Failed to load scheduled notifications.')
     }
   }
 
@@ -130,7 +156,8 @@ class NotificationScheduler {
     this.timeouts.forEach(timeout => clearTimeout(timeout))
     this.timeouts.clear()
     this.scheduledNotifications.clear()
-    localStorage.removeItem('novo-scheduled-notifications')
+    const key = this.storageKey()
+    if (key) localStorage.removeItem(key)
   }
 }
 

@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic, Lock, Sparkles, Plug } from 'lucide-react';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 import { GlowingOrb, type OrbState } from './glowing-orb';
 import { ConnectorsModal } from './connectors-modal';
 import { NovoPaywallDialog, type PaywallSource } from '@/components/billing/novo-paywall';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 // One row in the "+" bottom sheet — icon in a rounded box, title + optional
 // description stacked, and a trailing indicator on the right (a filled dot
@@ -134,22 +134,6 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
     const [input, setInput] = React.useState('');
     const [showMenu, setShowMenu] = React.useState(false);
     const toolsTriggerRef = React.useRef<HTMLButtonElement>(null);
-    const [portalReady, setPortalReady] = React.useState(false);
-    React.useEffect(() => setPortalReady(true), []);
-    React.useEffect(() => {
-        if (!showMenu) return;
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') setShowMenu(false);
-        };
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        document.addEventListener('keydown', onKeyDown);
-        return () => {
-            document.body.style.overflow = previousOverflow;
-            document.removeEventListener('keydown', onKeyDown);
-            toolsTriggerRef.current?.focus();
-        };
-    }, [showMenu]);
     const [showPaywall, setShowPaywall] = React.useState(false);
     const [paywallSource, setPaywallSource] = React.useState<PaywallSource>('twin-mode');
 
@@ -197,9 +181,11 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading || disabled) return;
+        if ((!input.trim() && attachedFiles.length === 0) || isLoading || disabled) return;
 
-        const message = input;
+        const message = input.trim() || (attachedFiles.length === 1
+            ? `Analiza el archivo adjunto “${attachedFiles[0].name}” y dime qué contiene.`
+            : `Analiza los ${attachedFiles.length} archivos adjuntos y resume lo más importante.`);
         const filesToSend = attachedFiles;
         setInput('');
         setAttachedFiles([]);
@@ -240,13 +226,21 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
+        e.target.value = '';
         if (files.length > 0) {
-            setAttachedFiles(prev => [...prev, ...files]);
+            const remaining = Math.max(0, 10 - attachedFiles.length);
+            const accepted = files.slice(0, remaining);
+            if (accepted.length > 0) setAttachedFiles(prev => [...prev, ...accepted]);
             setShowMenu(false);
-            toast({
-                title: "Archivos adjuntados",
-                description: `${files.length} archivo(s) agregado(s)`,
-            });
+            if (accepted.length > 0) {
+                toast({
+                    title: "Archivos adjuntados",
+                    description: `${accepted.length} archivo(s) agregado(s) a esta conversación`,
+                });
+            }
+            if (accepted.length < files.length) {
+                toast({ title: "Límite de archivos", description: "Puedes adjuntar hasta 10 archivos por mensaje." });
+            }
         }
     };
 
@@ -270,10 +264,15 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
         }
 
         if (files.length > 0) {
-            setAttachedFiles(prev => [...prev, ...files]);
+            const remaining = Math.max(0, 10 - attachedFiles.length);
+            const accepted = files.slice(0, remaining);
+            if (accepted.length > 0) setAttachedFiles(prev => [...prev, ...accepted]);
+            if (accepted.length < files.length) {
+                toast({ title: "Límite de archivos", description: "Puedes adjuntar hasta 10 archivos por mensaje." });
+            }
             toast({
                 title: "Imagen pegada",
-                description: `${files.length} imagen(es) agregada(s) desde el portapapeles`,
+                description: `${accepted.length} imagen(es) agregada(s) a esta conversación`,
             });
         }
     };
@@ -313,7 +312,7 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         row — mirrors a plain minimal input bar (a "+", the
                         placeholder, one action button) instead of stacking
                         every control in view at once. */}
-                    <div className="flex items-end gap-1 pl-1.5 pr-1.5 py-1.5 rounded-[28px] border border-border bg-popover/85 shadow-[0_8px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl transition-[border-color,background-color,box-shadow] duration-200 focus-within:border-primary/25 focus-within:bg-popover">
+                    <div className="flex items-end gap-1 pl-1.5 pr-1.5 py-1.5 rounded-[28px] bg-popover/85 shadow-[0_8px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
                         <button
                             type="button"
                             onClick={() => setShowMenu(!showMenu)}
@@ -335,7 +334,7 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                             onKeyDown={handleKeyDown}
                             onPaste={handlePaste}
                             placeholder="Escribe tu comando o pregunta aquí..."
-                            className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none resize-none px-2 py-2 text-[15px] sm:text-sm font-sans leading-relaxed min-h-[2.25rem] max-h-40 focus:ring-0 focus:outline-none focus-visible:ring-0"
+                            className="novo-message-input flex-1 border-0 bg-transparent text-foreground placeholder:text-muted-foreground outline-none resize-none px-2 py-2 text-[15px] sm:text-sm font-sans leading-relaxed min-h-[2.25rem] max-h-40 focus:ring-0 focus:outline-none focus-visible:ring-0"
                             rows={1}
                             disabled={isLoading || disabled}
                         />
@@ -357,7 +356,7 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         {/* Send Button */}
                         <button
                             type="submit"
-                            disabled={!input.trim() || isLoading || disabled}
+                            disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || disabled}
                             className="shrink-0 w-9 h-9 mb-0.5 bg-primary hover:bg-primary/80 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none text-primary-foreground rounded-full flex items-center justify-center transition-[background-color,box-shadow,transform] duration-200 active:scale-95 shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.5)]"
                             title="Enviar"
                         >
@@ -378,22 +377,22 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         like the original dropdown did, just with the new
                         row design (icon box / title+description / trailing
                         state) instead of the old cramped single-line rows. */}
-                    {showMenu && portalReady && typeof document !== 'undefined' ? createPortal((
-                        <>
-                            <div
-                                className="fixed inset-0 z-[500] bg-background/95 dark:bg-black/90 backdrop-blur-md sm:bg-transparent sm:backdrop-blur-none animate-in fade-in duration-200"
-                                onClick={() => setShowMenu(false)}
-                            />
-                            <div className="fixed bottom-0 left-0 right-0 z-[501] max-h-[80dvh] overflow-y-auto rounded-t-[28px] border-t border-x border-border bg-popover shadow-[0_-20px_60px_rgba(0,0,0,0.45)] animate-in slide-in-from-bottom duration-300 sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[380px] sm:max-h-[70vh] sm:rounded-[28px] sm:border sm:slide-in-from-bottom-2 sm:zoom-in-95">
-                                {/* Drag handle — mobile only */}
-                                <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                                    <div className="w-9 h-1 rounded-full bg-muted-foreground/30" />
-                                </div>
+                    <Dialog open={showMenu} onOpenChange={setShowMenu}>
+                        <DialogContent
+                            motionPreset="command"
+                            mobilePresentation="sheet"
+                            showCloseButton={false}
+                            onCloseAutoFocus={(event) => {
+                                event.preventDefault()
+                                toolsTriggerRef.current?.focus()
+                            }}
+                            className="max-h-[80dvh] w-full max-w-[380px] overflow-y-auto rounded-[28px] border-border bg-popover p-0 shadow-[0_24px_70px_rgba(0,0,0,0.42)] sm:max-h-[70dvh]"
+                        >
 
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-border/70">
                                     <div>
-                                        <h3 className="text-sm font-semibold text-foreground">Herramientas</h3>
+                                        <DialogTitle className="text-sm font-semibold text-foreground">Herramientas</DialogTitle>
                                         <p className="text-[11px] text-muted-foreground">Adjunta archivos o ajusta cómo responde el Twin</p>
                                     </div>
                                     <button
@@ -428,7 +427,7 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                     <SheetRow
                                         icon={Wrench}
                                         title="Búsqueda web"
-                                        description={webSearchEnabled ? 'Activada — el Twin busca en internet' : 'Usa solo su conocimiento interno'}
+                                        description={webSearchEnabled ? 'Activa — busca fuentes en internet' : 'También busca cuando necesitas datos actuales'}
                                         selected={webSearchEnabled}
                                         onClick={() => {
                                             setWebSearchEnabled(!webSearchEnabled);
@@ -476,14 +475,13 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
 
                                 {/* Safe-area padding for iOS home-indicator, mobile only */}
                                 <div className="h-[env(safe-area-inset-bottom)] sm:hidden" />
-                            </div>
-                        </>
-                    ), document.body) : null}
+                        </DialogContent>
+                    </Dialog>
 
                     {/* Hidden file inputs */}
                     <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
-                    <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                    <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
+                    <input ref={photoInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
+                    <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
                 </form>
 
                 {/* Floating Connectors / Plugins Modal */}

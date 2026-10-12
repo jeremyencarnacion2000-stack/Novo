@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Trash2, CheckCircle, Circle, Target } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 interface Goal {
     id: string
@@ -20,6 +21,7 @@ export function GoalsManager() {
     const [goals, setGoals] = useState<Goal[]>([])
     const [newGoalTitle, setNewGoalTitle] = useState('')
     const [activeTab, setActiveTab] = useState('year')
+    const goalIntentKeyRef = useRef<string | null>(null)
     const { toast } = useToast()
 
     const fetchGoals = async () => {
@@ -43,7 +45,10 @@ export function GoalsManager() {
         try {
             const response = await fetch('/api/goals', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': goalIntentKeyRef.current ??= createClientIdempotencyKey(),
+                },
                 body: JSON.stringify({
                     title: newGoalTitle,
                     timeframe: activeTab,
@@ -53,6 +58,7 @@ export function GoalsManager() {
 
             if (response.ok) {
                 setNewGoalTitle('')
+                goalIntentKeyRef.current = null
                 fetchGoals()
                 toast({ title: 'Goal added' })
             }
@@ -93,7 +99,10 @@ export function GoalsManager() {
                     <Input
                         placeholder={`Add a ${timeframe} goal...`}
                         value={newGoalTitle}
-                        onChange={(e) => setNewGoalTitle(e.target.value)}
+                        onChange={(e) => {
+                            goalIntentKeyRef.current = null
+                            setNewGoalTitle(e.target.value)
+                        }}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddGoal()}
                     />
                     <Button onClick={handleAddGoal}><Plus className="h-4 w-4" /></Button>

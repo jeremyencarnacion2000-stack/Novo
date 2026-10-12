@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { z } from 'zod';
+
+const MAX_CODE_EXECUTE_BODY_BYTES = 256_000;
+const codeExecuteRequestSchema = z.object({
+  language: z.string().trim().min(1).max(64),
+  code: z.string().min(1).max(200_000),
+  input: z.string().max(32_000).default(''),
+}).strict();
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,11 +21,16 @@ export async function POST(request: NextRequest) {
     const rl = rateLimit(`ai:code:${session.user.id}`, 5, 60_000);
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    const { language, code, input = '' } = await request.json();
-
-    if (!language || !code) {
-      return NextResponse.json({ error: 'Language and code are required' }, { status: 400 });
+    const contentLength = Number(request.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_CODE_EXECUTE_BODY_BYTES) {
+      return NextResponse.json({ error: 'Code execution payload is too large' }, { status: 413 });
     }
+
+    const parsed = codeExecuteRequestSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid code execution request' }, { status: 400 });
+    }
+    const { language, code, input } = parsed.data;
 
     // Call Piston API
     const response = await fetch('https://emkc.org/api/v2/piston/execute', {
@@ -50,8 +63,8 @@ export async function POST(request: NextRequest) {
       execution_time: data.run?.signal || null
     });
 
-  } catch (error) {
-    console.error('Code execution error:', error);
+  } catch {
+    console.error('Code execution request failed.');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

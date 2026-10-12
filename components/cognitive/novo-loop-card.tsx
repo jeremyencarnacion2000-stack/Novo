@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CalendarPlus, Check, ChevronRight, CircleAlert, Loader2, Play, Sparkles, ThumbsDown, ThumbsUp, XCircle } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 import { NovoActivitySurface } from '@/components/ai/novo-activity-surface'
 import { SignalLedgerControls } from '@/components/cognitive/signal-ledger-controls'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 type Action = { id: string; title: string; nextStep: string; explanation: string; confidence: number; estimatedMinutes?: number; status: string; facts: string[]; inferences: string[] }
 type Plan = { id: string; actions: Action[] }
@@ -49,6 +50,11 @@ export function NovoLoopCard() {
   const [staleActionIds, setStaleActionIds] = useState<string[]>([])
   const [activityRunId, setActivityRunId] = useState<string | null>(null)
   const [calendarConfirmationOpen, setCalendarConfirmationOpen] = useState(false)
+  const goalIntentKeyRef = useRef<string | null>(null)
+  const checkinIntentKeyRef = useRef<string | null>(null)
+  const planRunIdRef = useRef<string | null>(null)
+  const responseIntentKeysRef = useRef(new Map<string, string>())
+  const calendarIntentRef = useRef<{ fingerprint: string; key: string } | null>(null)
   const action = plan?.actions?.[0]
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -70,23 +76,34 @@ export function NovoLoopCard() {
     setBusy(true); setError('')
     try {
       let goalId: string | undefined
-      const runResponse = await fetch('/api/ai/activity/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'novo_loop' }) })
+      const requestedRunId = planRunIdRef.current ??= createClientIdempotencyKey()
+      const runResponse = await fetch('/api/ai/activity/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'novo_loop', runId: requestedRunId }) })
       if (!runResponse.ok) throw new Error()
       const createdRun = await runResponse.json()
       setActivityRunId(createdRun.runId)
       if (objective.trim()) {
-        const goal = await fetch('/api/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: objective.trim(), status: 'active', source: 'today' }) })
+        const goal = await fetch('/api/goals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': goalIntentKeyRef.current ??= createClientIdempotencyKey(),
+          },
+          body: JSON.stringify({ title: objective.trim(), status: 'active', source: 'today' }),
+        })
         if (!goal.ok) throw new Error()
         const createdGoal = await goal.json()
         if (typeof createdGoal?.id !== 'string') throw new Error()
         goalId = createdGoal.id
       }
-      const checkin = await fetch('/api/cognitive/loop/checkin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ energy, focus, workload, availableMinutes: minutes, currentContext: context.trim() || 'Planificación del día', timezone }) })
+      const checkin = await fetch('/api/cognitive/loop/checkin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': checkinIntentKeyRef.current ??= createClientIdempotencyKey() }, body: JSON.stringify({ energy, focus, workload, availableMinutes: minutes, currentContext: context.trim() || 'Planificación del día', timezone }) })
       if (!checkin.ok) throw new Error()
       const snapshot = await checkin.json()
-      const generated = await fetch('/api/cognitive/loop/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshotId: snapshot.snapshot.id, timezone, runId: createdRun.runId, ...(goalId ? { goalId } : {}) }) })
+      const generated = await fetch('/api/cognitive/loop/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshotId: snapshot.snapshot.id, timezone, runId: createdRun.runId || requestedRunId, ...(goalId ? { goalId } : {}) }) })
       if (!generated.ok) throw new Error()
       setPlan((await generated.json()).plan)
+      goalIntentKeyRef.current = null
+      checkinIntentKeyRef.current = null
+      planRunIdRef.current = null
     } catch { setError(text.error) } finally { setBusy(false) }
   }
 
@@ -98,11 +115,21 @@ export function NovoLoopCard() {
 
   async function respond(response: ActionResponse) {
     if (!action) return
+    const fingerprint = JSON.stringify({
+      actionId: action.id,
+      response,
+      reason: outcomeReason || null,
+      note: responseNote.trim() || null,
+      modifiedNextStep: response === 'modified' ? modifiedNextStep.trim() : null,
+    })
+    const intentKey = responseIntentKeysRef.current.get(fingerprint) ?? createClientIdempotencyKey()
+    responseIntentKeysRef.current.set(fingerprint, intentKey)
     setBusy(true); setError('')
     try {
-      const result = await fetch('/api/cognitive/loop/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: action.id, response, reason: outcomeReason || undefined, note: responseNote.trim() || undefined, ...(response === 'modified' ? { modifiedNextStep: modifiedNextStep.trim() } : {}), idempotencyKey: crypto.randomUUID() }) })
+      const result = await fetch('/api/cognitive/loop/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: action.id, response, reason: outcomeReason || undefined, note: responseNote.trim() || undefined, ...(response === 'modified' ? { modifiedNextStep: modifiedNextStep.trim() } : {}), idempotencyKey: intentKey }) })
       if (!result.ok) throw new Error()
       const payload = await result.json()
+      responseIntentKeysRef.current.delete(fingerprint)
       const updated = payload.action
       if (payload.runId) setActivityRunId(payload.runId)
       setPlan((current) => current ? { ...current, actions: current.actions.map((item) => item.id === updated.id ? { ...item, ...updated } : item) } : current)
@@ -117,8 +144,14 @@ export function NovoLoopCard() {
     try {
       const start = new Date(Date.now() + 5 * 60 * 1000)
       const end = new Date(start.getTime() + (action.estimatedMinutes ?? 25) * 60 * 1000)
-      const result = await fetch('/api/cognitive/loop/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: action.id, start: start.toISOString(), end: end.toISOString(), idempotencyKey: crypto.randomUUID(), runId: activityRunId ?? undefined }) })
+      const fingerprint = `${action.id}|${start.toISOString()}|${end.toISOString()}|${activityRunId ?? ''}`
+      const calendarIntent = calendarIntentRef.current?.fingerprint === fingerprint
+        ? calendarIntentRef.current
+        : { fingerprint, key: createClientIdempotencyKey() }
+      calendarIntentRef.current = calendarIntent
+      const result = await fetch('/api/cognitive/loop/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId: action.id, start: start.toISOString(), end: end.toISOString(), idempotencyKey: calendarIntent.key, runId: activityRunId ?? undefined }) })
       if (!result.ok) throw new Error()
+      calendarIntentRef.current = null
       setCalendarConfirmationOpen(false)
     } catch { setError(text.error) } finally { setBusy(false) }
   }
@@ -136,8 +169,8 @@ export function NovoLoopCard() {
         {calendarConfirmationOpen && <div className="rounded-2xl border border-primary/25 bg-primary/[0.05] p-3 text-xs text-foreground/80"><p className="font-semibold">{language === 'es' ? '¿Crear este bloque de enfoque en Google Calendar?' : 'Create this focus block in Google Calendar?'}</p><p className="mt-1 text-muted-foreground">{language === 'es' ? 'Se creará un bloque para esta recomendación. Puedes cancelarlo antes de enviarlo.' : 'A block will be created for this recommendation. You can cancel before sending it.'}</p><div className="mt-3 flex gap-2"><button disabled={busy} onClick={scheduleFocusBlock} className="rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50">{language === 'es' ? 'Confirmar bloque' : 'Confirm block'}</button><button disabled={busy} onClick={() => setCalendarConfirmationOpen(false)} className="rounded-full px-3 py-2 text-xs font-semibold text-muted-foreground">{language === 'es' ? 'Cancelar' : 'Cancel'}</button></div></div>}
         {['completed', 'abandoned', 'failed'].includes(action.status) && <div className="flex items-center gap-2 border-t border-foreground/[0.06] pt-4"><span className="mr-1 text-[10px] uppercase tracking-widest text-muted-foreground">{text.why}</span><button aria-label={text.helpful} disabled={busy} onClick={() => respond('helpful')} className="rounded-full p-2 text-emerald-400 hover:bg-emerald-400/10"><ThumbsUp className="size-4" /></button><button aria-label={text.notHelpful} disabled={busy} onClick={() => respond('unhelpful')} className="rounded-full p-2 text-rose-400 hover:bg-rose-400/10"><ThumbsDown className="size-4" /></button><button aria-label={language === 'es' ? 'Fue intrusiva' : 'Intrusive'} disabled={busy} onClick={() => respond('intrusive')} className="rounded-full p-2 text-amber-400 hover:bg-amber-400/10"><CircleAlert className="size-4" /></button></div>}
       </div> : <div className="space-y-4">
-        <label className="block text-xs font-bold text-foreground/75">{text.objective}<input value={objective} onChange={(event) => setObjective(event.target.value)} placeholder={text.objectivePlaceholder} className="mt-2 w-full rounded-2xl border border-foreground/10 bg-background/40 px-4 py-3 text-sm outline-none transition focus:border-primary/50" /></label><label className="block text-xs font-bold text-foreground/75">{text.context}<input value={context} onChange={(event) => setContext(event.target.value)} placeholder={text.contextPlaceholder} className="mt-2 w-full rounded-2xl border border-foreground/10 bg-background/40 px-4 py-3 text-sm outline-none transition focus:border-primary/50" /></label>
-        <div className="grid gap-3 sm:grid-cols-4">{[[text.energy, energy, setEnergy], [text.focus, focus, setFocus], [text.workload, workload, setWorkload]].map(([label, value, setter]) => <label key={label as string} className="text-xs font-bold text-foreground/70">{label as string}<input type="range" min="1" max="5" value={value as number} onChange={(event) => (setter as (value: number) => void)(Number(event.target.value))} className="mt-2 w-full accent-primary" /><span className="block text-right text-[10px] text-muted-foreground">{value as number}/5</span></label>)}<label className="text-xs font-bold text-foreground/70">{text.minutes}<input type="number" min="5" max="480" value={minutes} onChange={(event) => setMinutes(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-foreground/10 bg-background/40 px-3 py-2 text-sm" /></label></div>
+          <label className="block text-xs font-bold text-foreground/75">{text.objective}<input value={objective} onChange={(event) => { goalIntentKeyRef.current = null; checkinIntentKeyRef.current = null; planRunIdRef.current = null; setObjective(event.target.value) }} placeholder={text.objectivePlaceholder} className="mt-2 w-full rounded-2xl border border-foreground/10 bg-background/40 px-4 py-3 text-sm outline-none transition focus:border-primary/50" /></label><label className="block text-xs font-bold text-foreground/75">{text.context}<input value={context} onChange={(event) => { checkinIntentKeyRef.current = null; planRunIdRef.current = null; setContext(event.target.value) }} placeholder={text.contextPlaceholder} className="mt-2 w-full rounded-2xl border border-foreground/10 bg-background/40 px-4 py-3 text-sm outline-none transition focus:border-primary/50" /></label>
+        <div className="grid gap-3 sm:grid-cols-4">{[[text.energy, energy, setEnergy], [text.focus, focus, setFocus], [text.workload, workload, setWorkload]].map(([label, value, setter]) => <label key={label as string} className="text-xs font-bold text-foreground/70">{label as string}<input type="range" min="1" max="5" value={value as number} onChange={(event) => { checkinIntentKeyRef.current = null; planRunIdRef.current = null; (setter as (value: number) => void)(Number(event.target.value)) }} className="mt-2 w-full accent-primary" /><span className="block text-right text-[10px] text-muted-foreground">{value as number}/5</span></label>)}<label className="text-xs font-bold text-foreground/70">{text.minutes}<input type="number" min="5" max="480" value={minutes} onChange={(event) => { checkinIntentKeyRef.current = null; planRunIdRef.current = null; setMinutes(Number(event.target.value)) }} className="mt-2 w-full rounded-xl border border-foreground/10 bg-background/40 px-3 py-2 text-sm" /></label></div>
         {error && <p className="flex items-center gap-2 text-xs text-rose-400"><CircleAlert className="size-4" />{error}</p>}<button disabled={busy} onClick={generatePlan} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-xs font-bold text-primary-foreground disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : null}{text.continue}<ChevronRight className="size-3.5" /></button>
       </div>}
     </div>

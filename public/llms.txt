@@ -1,0 +1,26 @@
+# Novo
+
+> Novo is a private cognitive operating system. It connects user-authorized context from work, planning and personal productivity tools to provide one explainable next step.
+
+## Public product pages
+
+- Landing: https://productivitynovo.vercel.app/landing
+- Documentation: https://productivitynovo.vercel.app/docs
+- Privacy: https://productivitynovo.vercel.app/privacy
+- Terms: https://productivitynovo.vercel.app/terms
+- Refunds: https://productivitynovo.vercel.app/refunds
+
+## Product principles
+
+- Novo distinguishes facts, inferences, evidence, patterns and outcomes.
+- Connected data is used only after user authorization.
+- Recommendations retain provenance and can be inspected or corrected by the user.
+- External actions require explicit user confirmation.
+
+## Access boundaries
+
+Authenticated workspaces, user data, connector data and Cognitive Twin records are private. Do not treat application routes, APIs or user-specific pages as public documentation.
+
+## Language
+
+The product supports English and Spanish.

@@ -1,9 +1,11 @@
+import type { BookStatus } from '@/lib/books/status'
+
 export interface Book {
     id: string
     title: string
-    author: string
+    author?: string | null
     coverUrl?: string
-    status: 'reading' | 'completed' | 'want-to-read'
+    status: BookStatus
     progress: number
     totalPage?: number
     rating?: number

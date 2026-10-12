@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { withProviderSyncLock } from '@/lib/provider-sync-lock'
+import { z } from 'zod'
+
+const chatSessionSchema = z.object({
+    messages: z.array(z.unknown()).max(200),
+})
+
+const MAX_SERIALIZED_MESSAGES = 1_000_000
 
 export async function GET(request: NextRequest) {
     try {
@@ -25,8 +33,8 @@ export async function GET(request: NextRequest) {
             id: chatSession.id,
             messages: JSON.parse(chatSession.messages)
         })
-    } catch (error) {
-        console.error('Error fetching chat session:', error)
+    } catch {
+        console.error('Error fetching chat session.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
@@ -38,41 +46,51 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await request.json()
-        const { messages } = body
-
-        if (!Array.isArray(messages)) {
-            return NextResponse.json({ error: 'Messages must be an array' }, { status: 400 })
+        const parsed = chatSessionSchema.safeParse(await request.json())
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Messages must be an array with at most 200 items' }, { status: 400 })
         }
 
-        // Upsert the chat session (or create a new one if we want history)
-        // For now, let's keep a single "Floating Chat" session updated
-        const chatSession = await prisma.chatSession.findFirst({
-            where: { userId: session.user.id },
-            orderBy: { updatedAt: 'desc' }
-        })
-
-        if (chatSession) {
-            const updated = await prisma.chatSession.update({
-                where: { id: chatSession.id },
-                data: {
-                    messages: JSON.stringify(messages),
-                    updatedAt: new Date()
-                }
-            })
-            return NextResponse.json(updated)
-        } else {
-            const created = await prisma.chatSession.create({
-                data: {
-                    userId: session.user.id,
-                    title: 'Floating Chat',
-                    messages: JSON.stringify(messages)
-                }
-            })
-            return NextResponse.json(created)
+        const serializedMessages = JSON.stringify(parsed.data.messages)
+        if (serializedMessages.length > MAX_SERIALIZED_MESSAGES) {
+            return NextResponse.json({ error: 'Chat history is too large' }, { status: 413 })
         }
+
+        // The floating chat is intentionally one durable session per user.
+        // Serialize the find-or-create window across serverless instances so
+        // a double click or a lost response cannot create parallel sessions.
+        const chatSession = await withProviderSyncLock(
+            prisma,
+            `floating-chat:${session.user.id}`,
+            async (db) => {
+                const existing = await db.chatSession.findFirst({
+                    where: { userId: session.user.id },
+                    orderBy: { updatedAt: 'desc' },
+                })
+
+                if (existing) {
+                    return db.chatSession.update({
+                        where: { id: existing.id },
+                        data: {
+                            messages: serializedMessages,
+                            updatedAt: new Date(),
+                        },
+                    })
+                }
+
+                return db.chatSession.create({
+                    data: {
+                        userId: session.user.id,
+                        title: 'Floating Chat',
+                        messages: serializedMessages,
+                    },
+                })
+            },
+        )
+
+        return NextResponse.json(chatSession)
     } catch (error) {
-        console.error('Error saving chat session:', error)
+        console.error('Error saving chat session.')
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

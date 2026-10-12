@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiAPI } from '@/lib/gemini';
 import { ConversationMessage } from '@/types/ai';
-import { AI_FUNCTION_DECLARATIONS, executeFunctionCall } from '@/lib/ai-functions';
+import { AI_FUNCTION_DECLARATIONS } from '@/lib/ai-functions';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+
+const commandRequestSchema = z.object({
+  message: z.string().trim().min(1).max(12_000),
+  context: z.string().max(20_000).optional().default(''),
+  history: z.array(z.object({
+    id: z.string().max(200),
+    role: z.enum(['user', 'assistant']),
+    content: z.string().max(12_000),
+    timestamp: z.string().max(100),
+    attachments: z.array(z.object({
+      name: z.string().max(255),
+      size: z.number().nonnegative().max(50_000_000),
+      type: z.string().max(120),
+      url: z.string().max(4_000),
+    })).max(10).optional(),
+  })).max(40).optional().default([]),
+});
 
 const SYSTEM_PROMPT = `You are a highly intelligent and helpful AI assistant integrated into a productivity application. Your goal is to assist the user with ANY request they might have.
 
@@ -29,7 +47,6 @@ const generateAIResponse = async (
   message: string,
   context: string,
   history: ConversationMessage[],
-  userId: string
 ) => {
   console.log('[AI command] Authenticated request received.');
 
@@ -57,47 +74,6 @@ const generateAIResponse = async (
         functionResults: null,
         requiresConfirmation: true,
       };
-
-      const functionResults = [];
-
-      for (const functionCall of geminiResult.functionCalls) {
-        console.log('[AI command] Executing declared function.', { name: functionCall.name });
-        const result = await executeFunctionCall(
-          functionCall.name,
-          functionCall.args,
-          userId
-        );
-        functionResults.push({
-          name: functionCall.name,
-          result
-        });
-      }
-
-      // Create a summary of function results
-      const resultsSummary = functionResults
-        .map(fr => `Function ${fr.name}: ${fr.result.message}`)
-        .join('\n');
-
-      // Add function results to history and ask Gemini to respond
-      const updatedHistory: ConversationMessage[] = [
-        ...history,
-        { id: 'msg-' + Date.now(), role: 'user' as const, content: message, timestamp: new Date().toISOString() },
-        { id: 'msg-' + (Date.now() + 1), role: 'assistant' as const, content: `[Executed functions]\n${resultsSummary}`, timestamp: new Date().toISOString() }
-      ];
-
-      // Second call to Gemini to generate natural language response
-      console.log('[AI command] Composing post-tool response.');
-      geminiResult = await geminiAPI.generateResponse(
-        'Based on the function execution results above, provide a clear and friendly response to the user explaining what was done.',
-        context,
-        updatedHistory,
-        SYSTEM_PROMPT
-      );
-
-      return {
-        response: geminiResult.content,
-        functionResults
-      };
     }
 
     // No function calls, return the response directly
@@ -124,18 +100,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { message, context, history } = body;
-
-    if (!message) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    const parsed = commandRequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
+
+    const { message, context, history } = parsed.data;
 
     const result = await generateAIResponse(
       message,
       context || '',
       history || [],
-      session.user.id
     );
 
     return NextResponse.json({

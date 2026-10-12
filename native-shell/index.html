@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07150f" />
+    <title>Novo</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      html, body { margin: 0; min-height: 100%; background: #07150f; }
+      body { display: grid; min-height: 100vh; place-items: center; color: #d9f7e4; }
+      main { max-width: 22rem; padding: 2rem; text-align: center; }
+      p { color: #9ab9a7; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>Novo</strong>
+      <p>Opening your workspace…</p>
+    </main>
+    <script>
+      // This is only a safe offline/copy fallback. Capacitor's server.url is
+      // the canonical runtime surface and opens the authenticated app.
+      window.location.replace('https://productivitynovo.vercel.app/app');
+    </script>
+  </body>
+</html>

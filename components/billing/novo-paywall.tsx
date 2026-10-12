@@ -5,7 +5,6 @@ import { ArrowRight, Check, Loader2, ShieldCheck, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
-import { modalFlip } from '@/lib/modal-flip'
 import {
   Dialog,
   DialogContent,
@@ -324,20 +323,16 @@ export function NovoPaywallDialog({
   const copy = COPY[locale]
 
   useEffect(() => {
-    if (open) {
-      trackPaywall('paywall_viewed', source)
-      requestAnimationFrame(() => modalFlip.toggle('novo-paywall'))
-    }
+    if (!open) return
+    trackPaywall('paywall_viewed', source)
   }, [open, source])
 
-  const requestClose = () => {
-    modalFlip.untoggle('novo-paywall', () => onOpenChange(false))
-  }
+  const requestClose = () => onOpenChange(false)
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => nextOpen ? onOpenChange(true) : requestClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        data-flip-to="novo-paywall"
+        motionId="novo-paywall"
         showCloseButton={false}
         className="max-h-[calc(100dvh-1rem)] max-w-[40rem] overflow-y-auto overscroll-contain border-0 bg-transparent p-0 shadow-none [scrollbar-width:none] sm:max-h-[calc(100dvh-2rem)]"
       >

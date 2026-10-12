@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export type NovoSignalInput = {
   source: 'checkin' | 'goal' | 'task' | 'calendar' | 'outcome'
-    | 'gmail' | 'notion' | 'todoist' | 'slack' | 'github'
+    | 'gmail' | 'notion' | 'todoist' | 'slack' | 'github' | 'device' | 'vercel'
   sourceRef?: string | null
   signalType: string
   label: string
@@ -21,7 +21,13 @@ export async function upsertNovoSignals(userId: string, signals: NovoSignalInput
     ? userSettings.settings as Record<string, unknown>
     : {}
   if (settings.cognitiveLearningPaused === true) return
-  await Promise.all(signals.map((signal) => prisma.novoSignalLedger.upsert({
+  const preferences = await prisma.novoSignalSourcePreference.findMany({
+    where: { userId, source: { in: [...new Set(signals.map((signal) => signal.source))] }, excludedAt: { not: null } },
+    select: { source: true },
+  })
+  const excludedSources = new Set((preferences ?? []).map((preference) => preference.source))
+  const acceptedSignals = signals.filter((signal) => !excludedSources.has(signal.source))
+  await Promise.all(acceptedSignals.map((signal) => prisma.novoSignalLedger.upsert({
     where: { userId_fingerprint: { userId, fingerprint: signalFingerprint(signal) } },
     create: { userId, fingerprint: signalFingerprint(signal), ...signal, sourceRef: signal.sourceRef ?? null },
     update: { label: signal.label, observedAt: signal.observedAt, reliability: signal.reliability },

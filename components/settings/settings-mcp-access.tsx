@@ -18,30 +18,44 @@ type DeviceToken = {
   createdAt: string
 }
 
+type CompanionDevice = {
+  id: string
+  name: string
+  platform: string
+  connectedAt: string
+  lastVerifiedAt: string
+  revokedAt: string | null
+  scopes: string[]
+}
+
 const COPY = {
   es: {
     eyebrow: 'Acceso de agentes', title: 'Conecta un agente a Novo', description: 'Crea un token personal para que un dispositivo o agente consulte tus tareas pendientes y, solo si lo autorizas, pueda actualizarlas.',
+    companionDevices: 'Dispositivos Novo Companion', companionDeviceEmpty: 'Todavía no hay dispositivos vinculados.', companionDeviceConnected: 'Conectado', companionDeviceRevoked: 'Desvinculado', companionDeviceSince: 'Vinculado', companionDeviceVerified: 'Última verificación',
     endpoint: 'Endpoint MCP', tokenName: 'Nombre del dispositivo', namePlaceholder: 'Ej. Codex en mi portátil', readOnly: 'Solo lectura de tareas', taskWrite: 'Permitir crear, actualizar y completar tareas', expiration: 'Expiración', create: 'Crear token', cancel: 'Cancelar', copy: 'Copiar', copied: 'Copiado', oneTime: 'Guarda este token ahora. Por seguridad, Novo no podrá mostrarlo de nuevo.',
     tokenCreated: 'Token creado', configuration: 'Configuración para el cliente', active: 'Tokens activos', empty: 'Aún no hay dispositivos conectados.', revoke: 'Revocar', revoked: 'Revocado', neverUsed: 'Aún no se usó', lastUsed: 'Último uso', expires: 'Vence', security: 'Cada token está vinculado a tu cuenta, tiene alcance limitado y puede revocarse en cualquier momento. No compartas este secreto en chats, capturas o repositorios.',
-    readScope: 'Leer tareas pendientes', writeScope: 'Editar tareas', days: { '7': '7 días', '30': '30 días', '90': '90 días' }, error: 'No se pudo completar la acción. Inténtalo de nuevo.',
+    readScope: 'Leer tareas pendientes', writeScope: 'Editar tareas', companionPermission: 'Permitir vincular Novo Companion y usar su chat', companionPermissionDetails: 'Autoriza el inicio de sesión de este dispositivo y el chat de IA. No permite editar tareas ni registrar actividad por sí solo.', activityPermission: 'Permitir registrar aplicaciones y tiempos de uso', activityScope: 'Solo aplicación y duración; nunca títulos, texto, rutas o URL.', integrationRead: 'Leer el estado de fuentes conectadas', integrationReadScope: 'integrations:read · Solo consultar las conexiones existentes.', days: { '7': '7 días', '30': '30 días', '90': '90 días' }, error: 'No se pudo completar la acción. Inténtalo de nuevo.',
   },
   en: {
     eyebrow: 'Agent access', title: 'Connect an agent to Novo', description: 'Create a personal token so a device or agent can review pending tasks and, only when you allow it, update them.',
+    companionDevices: 'Novo Companion devices', companionDeviceEmpty: 'No devices are linked yet.', companionDeviceConnected: 'Connected', companionDeviceRevoked: 'Unlinked', companionDeviceSince: 'Linked', companionDeviceVerified: 'Last verified',
     endpoint: 'MCP endpoint', tokenName: 'Device name', namePlaceholder: 'e.g. Codex on my laptop', readOnly: 'Read pending tasks only', taskWrite: 'Allow creating, updating, and completing tasks', expiration: 'Expiry', create: 'Create token', cancel: 'Cancel', copy: 'Copy', copied: 'Copied', oneTime: 'Save this token now. Novo cannot show it again for security.',
     tokenCreated: 'Token created', configuration: 'Client configuration', active: 'Active tokens', empty: 'No connected devices yet.', revoke: 'Revoke', revoked: 'Revoked', neverUsed: 'Not used yet', lastUsed: 'Last used', expires: 'Expires', security: 'Each token is tied to your account, has limited scope, and can be revoked at any time. Never share this secret in chats, screenshots, or repositories.',
-    readScope: 'Read pending tasks', writeScope: 'Edit tasks', days: { '7': '7 days', '30': '30 days', '90': '90 days' }, error: 'The action could not be completed. Please try again.',
+    readScope: 'Read pending tasks', writeScope: 'Edit tasks', companionPermission: 'Connect Novo Companion and use its chat', companionPermissionDetails: 'Allows this device to sign in and use Novo AI chat. It does not allow task edits or activity capture by itself.', activityPermission: 'Record app usage and duration', activityScope: 'App and duration only; never window titles, text, paths, or URLs.', integrationRead: 'Read connected source status', integrationReadScope: 'integrations:read · View existing connections only.', days: { '7': '7 days', '30': '30 days', '90': '90 days' }, error: 'The action could not be completed. Please try again.',
   },
   fr: {
     eyebrow: 'Accès agent', title: 'Connecter un agent à Novo', description: 'Créez un jeton personnel pour qu’un appareil ou un agent consulte vos tâches en attente et, seulement si vous l’autorisez, les mette à jour.',
+    companionDevices: 'Appareils Novo Companion', companionDeviceEmpty: 'Aucun appareil n’est encore associé.', companionDeviceConnected: 'Connecté', companionDeviceRevoked: 'Dissocié', companionDeviceSince: 'Associé', companionDeviceVerified: 'Dernière vérification',
     endpoint: 'Point d’accès MCP', tokenName: 'Nom de l’appareil', namePlaceholder: 'Ex. Codex sur mon portable', readOnly: 'Lecture seule des tâches', taskWrite: 'Autoriser la création et la mise à jour', expiration: 'Expiration', create: 'Créer le jeton', cancel: 'Annuler', copy: 'Copier', copied: 'Copié', oneTime: 'Enregistrez ce jeton maintenant. Novo ne pourra pas l’afficher de nouveau.',
     tokenCreated: 'Jeton créé', configuration: 'Configuration client', active: 'Jetons actifs', empty: 'Aucun appareil connecté.', revoke: 'Révoquer', revoked: 'Révoqué', neverUsed: 'Pas encore utilisé', lastUsed: 'Dernière utilisation', expires: 'Expire', security: 'Chaque jeton est lié à votre compte, limité en portée et révocable à tout moment. Ne partagez jamais ce secret.',
-    readScope: 'Lire les tâches en attente', writeScope: 'Modifier les tâches', days: { '7': '7 jours', '30': '30 jours', '90': '90 jours' }, error: 'Impossible de terminer cette action. Réessayez.',
+    readScope: 'Lire les tâches en attente', writeScope: 'Modifier les tâches', companionPermission: 'Connecter Novo Companion et utiliser son chat', companionPermissionDetails: 'Autorise la connexion de cet appareil et le chat IA. Ne permet pas à elle seule de modifier les tâches ou de capturer l’activité.', activityPermission: 'Enregistrer les applications et leur durée d’utilisation', activityScope: 'Application et durée uniquement, jamais les titres, textes, chemins ou URL.', integrationRead: 'Lire les sources connectées', integrationReadScope: 'integrations:read · Consulter uniquement les connexions existantes.', days: { '7': '7 jours', '30': '30 jours', '90': '90 jours' }, error: 'Impossible de terminer cette action. Réessayez.',
   },
   de: {
     eyebrow: 'Agentenzugriff', title: 'Agent mit Novo verbinden', description: 'Erstelle ein persönliches Token, damit ein Gerät oder Agent offene Aufgaben einsehen und – nur mit deiner Freigabe – aktualisieren kann.',
+    companionDevices: 'Novo Companion-Geräte', companionDeviceEmpty: 'Noch keine Geräte verknüpft.', companionDeviceConnected: 'Verbunden', companionDeviceRevoked: 'Getrennt', companionDeviceSince: 'Verknüpft', companionDeviceVerified: 'Zuletzt überprüft',
     endpoint: 'MCP-Endpunkt', tokenName: 'Gerätename', namePlaceholder: 'z. B. Codex auf meinem Laptop', readOnly: 'Aufgaben nur lesen', taskWrite: 'Erstellen, aktualisieren und abschließen erlauben', expiration: 'Ablauf', create: 'Token erstellen', cancel: 'Abbrechen', copy: 'Kopieren', copied: 'Kopiert', oneTime: 'Speichere dieses Token jetzt. Novo kann es aus Sicherheitsgründen nicht erneut anzeigen.',
     tokenCreated: 'Token erstellt', configuration: 'Client-Konfiguration', active: 'Aktive Tokens', empty: 'Noch keine verbundenen Geräte.', revoke: 'Widerrufen', revoked: 'Widerrufen', neverUsed: 'Noch nicht verwendet', lastUsed: 'Zuletzt verwendet', expires: 'Läuft ab', security: 'Jedes Token ist an dein Konto gebunden, hat begrenzte Berechtigungen und kann jederzeit widerrufen werden. Teile dieses Geheimnis nie.',
-    readScope: 'Offene Aufgaben lesen', writeScope: 'Aufgaben bearbeiten', days: { '7': '7 Tage', '30': '30 Tage', '90': '90 Tage' }, error: 'Die Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.',
+    readScope: 'Offene Aufgaben lesen', writeScope: 'Aufgaben bearbeiten', companionPermission: 'Novo Companion verbinden und Chat verwenden', companionPermissionDetails: 'Erlaubt die Anmeldung dieses Geräts und den Novo-KI-Chat. Gewährt allein weder Aufgabenänderungen noch Aktivitätserfassung.', activityPermission: 'Apps und Nutzungsdauer erfassen', activityScope: 'Nur App und Dauer; niemals Fenstertitel, Text, Pfade oder URLs.', integrationRead: 'Status verbundener Quellen lesen', integrationReadScope: 'integrations:read · Nur bestehende Verbindungen ansehen.', days: { '7': '7 Tage', '30': '30 Tage', '90': '90 Tage' }, error: 'Die Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.',
   },
 } as const
 
@@ -67,11 +81,17 @@ export function SettingsMcpAccess() {
   const locale = language === 'es' || language === 'fr' || language === 'de' ? language : 'en'
   const copy = COPY[locale]
   const [tokens, setTokens] = useState<DeviceToken[]>([])
+  const [devices, setDevices] = useState<CompanionDevice[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [areDevicesLoading, setAreDevicesLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [name, setName] = useState('')
   const [allowTaskWrites, setAllowTaskWrites] = useState(false)
+  const [allowCompanion, setAllowCompanion] = useState(false)
+  const [allowDeviceActivity, setAllowDeviceActivity] = useState(false)
   const [allowTwinRead, setAllowTwinRead] = useState(false)
+  const [allowProjectsRead, setAllowProjectsRead] = useState(false)
+  const [allowIntegrationRead, setAllowIntegrationRead] = useState(false)
   const [allowIntegrationSync, setAllowIntegrationSync] = useState(false)
   const [days, setDays] = useState<7 | 30 | 90>(30)
   const [createdToken, setCreatedToken] = useState<string | null>(null)
@@ -94,7 +114,21 @@ export function SettingsMcpAccess() {
     }
   }, [copy.error])
 
-  useEffect(() => { void loadTokens() }, [loadTokens])
+  const loadDevices = useCallback(async () => {
+    setAreDevicesLoading(true)
+    try {
+      const response = await fetch('/api/companion/devices', { cache: 'no-store' })
+      if (!response.ok) throw new Error('load failed')
+      const payload = await readJsonResponse(response)
+      setDevices(Array.isArray(payload.devices) ? payload.devices as CompanionDevice[] : [])
+    } catch {
+      setDevices([])
+    } finally {
+      setAreDevicesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void loadTokens(); void loadDevices() }, [loadTokens, loadDevices])
 
   const createToken = async () => {
     setError(null)
@@ -103,7 +137,7 @@ export function SettingsMcpAccess() {
       const response = await fetch('/api/mcp/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ name, allowTaskWrites, allowTwinRead, allowIntegrationSync, expiresInDays: days }),
+        body: JSON.stringify({ name, allowTaskWrites, allowCompanion, allowDeviceActivity, allowTwinRead, allowProjectsRead, allowIntegrationRead, allowIntegrationSync, expiresInDays: days }),
       })
       const payload = await readJsonResponse(response)
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'create failed')
@@ -111,7 +145,10 @@ export function SettingsMcpAccess() {
       setCreatedToken(payload.token)
       setName('')
       setAllowTaskWrites(false)
+      setAllowCompanion(false)
+      setAllowDeviceActivity(false)
       setAllowTwinRead(false)
+      setAllowIntegrationRead(false)
       setAllowIntegrationSync(false)
       await loadTokens()
     } catch (cause) {
@@ -173,10 +210,26 @@ export function SettingsMcpAccess() {
           <input type="checkbox" checked={allowTaskWrites} onChange={(event) => setAllowTaskWrites(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
           <span><span className="block text-sm font-semibold text-foreground/80">{allowTaskWrites ? copy.taskWrite : copy.readOnly}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">{copy.readScope}{allowTaskWrites ? ` · ${copy.writeScope}` : ''}</span></span>
         </label>
+        <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
+          <input type="checkbox" checked={allowCompanion} onChange={(event) => setAllowCompanion(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+          <span><span className="block text-sm font-semibold text-foreground/80">{copy.companionPermission}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">device:connect · ai:chat · {copy.companionPermissionDetails}</span></span>
+        </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
+            <input type="checkbox" checked={allowProjectsRead} onChange={(event) => setAllowProjectsRead(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+            <span><span className="block text-sm font-semibold text-foreground/80">{locale==='es'?'Leer y relacionar mis proyectos de Novo':'Read and relate my Novo projects'}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">{locale==='es'?'Permite reconocer el mismo proyecto en Novo, tus carpetas, GitHub y Vercel.':'Recognize the same project in Novo, your folders, GitHub and Vercel.'}</span></span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
+            <input type="checkbox" checked={allowDeviceActivity} onChange={(event) => setAllowDeviceActivity(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+            <span><span className="block text-sm font-semibold text-foreground/80">{copy.activityPermission}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">device:activity:write · {copy.activityScope}</span></span>
+          </label>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
             <input type="checkbox" checked={allowTwinRead} onChange={(event) => setAllowTwinRead(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
             <span><span className="block text-sm font-semibold text-foreground/80">Permitir leer el contexto del Twin</span><span className="mt-1 block text-xs leading-5 text-foreground/50">twin:read</span></span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
+            <input type="checkbox" checked={allowIntegrationRead} onChange={(event) => setAllowIntegrationRead(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+            <span><span className="block text-sm font-semibold text-foreground/80">{copy.integrationRead}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">{copy.integrationReadScope}</span></span>
           </label>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
             <input type="checkbox" checked={allowIntegrationSync} onChange={(event) => setAllowIntegrationSync(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
@@ -198,6 +251,20 @@ export function SettingsMcpAccess() {
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">{copy.configuration}</p>
         <pre className="mt-2 overflow-x-auto rounded-2xl border border-foreground/10 bg-[#101111] p-4 text-xs leading-5 text-[#d9e4dc]">{config}</pre>
       </section> : null}
+
+      <section className="rounded-[28px] border border-foreground/[0.08] bg-foreground/[0.02] p-5 sm:p-7">
+        <h3 className="font-bold text-foreground">{copy.companionDevices}</h3>
+        {areDevicesLoading ? <div className="flex h-16 items-center justify-center text-foreground/40"><Loader2 className="size-5 animate-spin" /></div> : devices.length === 0 ? <p className="py-6 text-sm text-foreground/45">{copy.companionDeviceEmpty}</p> : <div className="mt-4 divide-y divide-foreground/[0.06]">{devices.map((device) => {
+          const isRevoked = Boolean(device.revokedAt)
+          return <div key={device.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-foreground/85">{device.name}</p><span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', isRevoked ? 'bg-foreground/[0.08] text-foreground/50' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300')}>{isRevoked ? copy.companionDeviceRevoked : copy.companionDeviceConnected}</span></div>
+              <p className="mt-1 text-xs text-foreground/45">{device.platform} · {copy.companionDeviceSince}: {localizedDate(device.connectedAt, locale) ?? '—'} · {copy.companionDeviceVerified}: {localizedDate(device.lastVerifiedAt, locale) ?? '—'}</p>
+              <p className="mt-1 font-mono text-[10px] text-foreground/35">{device.scopes.join(' · ')}</p>
+            </div>
+          </div>
+        })}</div>}
+      </section>
 
       <section className="rounded-[28px] border border-foreground/[0.08] bg-foreground/[0.02] p-5 sm:p-7">
         <div className="flex items-center justify-between gap-4"><h3 className="font-bold text-foreground">{copy.active}</h3><code className="rounded-lg bg-foreground/[0.06] px-2 py-1 text-xs text-foreground/60">{endpoint}</code></div>

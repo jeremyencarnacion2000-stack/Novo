@@ -1,5 +1,15 @@
 import { z } from 'zod'
 
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+
+const daysOfWeekSchema = z.union([
+  z.string().max(256),
+  z.array(z.enum(WEEKDAYS)).max(7),
+]).nullable().optional().transform((value) => {
+  if (Array.isArray(value)) return JSON.stringify(value)
+  return value
+})
+
 export const routineTaskSchema = z.object({
   id: z.string().optional(),
   text: z.string().min(1, 'Task text is required'),
@@ -31,6 +41,8 @@ export const routineSchema = z.object({
   timeOfDay: z.string().min(1, 'Time of day is required'),
   duration: z.number().min(1, 'Duration is required'),
   isActive: z.boolean().optional().default(true),
+  scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Scheduled time must use HH:mm').nullable().optional(),
+  daysOfWeek: daysOfWeekSchema,
 
   // New structured fields
   objective: z.string().optional().nullable(),

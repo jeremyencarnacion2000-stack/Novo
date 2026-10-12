@@ -12,11 +12,9 @@ const SITE_URL = process.env.NEXTAUTH_URL || 'https://productivitynovo.vercel.ap
 const TITLE = 'Novo — Cognitive Operating System'
 const DESCRIPTION = 'Deja de organizar tareas. Novo construye un Gemelo Cognitivo a partir de tu comportamiento real para responder una sola pregunta: ¿qué deberías hacer ahora mismo?'
 
-// metadataBase + the openGraph/twitter blocks were missing entirely — every
-// link share (WhatsApp, X, LinkedIn, Discord) rendered as a bare URL with no
-// preview card, no image, and a stale "Productivity Hub" title from before
-// the rebrand. app/opengraph-image.tsx supplies the actual card image;
-// Next.js auto-wires it into these tags once metadataBase is set.
+// Keep the share card metadata explicit: every link share (WhatsApp, X,
+// LinkedIn, Discord) should carry Novo's current title, description and
+// generated preview image rather than the pre-rebrand default.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
@@ -73,6 +71,7 @@ export default async function RootLayout({
 }>) {
   const requestHeaders = await headers()
   const requestPath = requestHeaders.get('x-novo-path') ?? requestHeaders.get('x-matched-path') ?? ''
+  const isLandingPage = requestPath === '/landing' || requestPath.startsWith('/landing/')
   // OAuth consent is a browser hand-off surface, not part of the authenticated
   // product shell. Keeping it outside ClientLayoutRouter prevents the sidebar,
   // wallpaper and app-level navigation from appearing behind the authorization
@@ -80,6 +79,10 @@ export default async function RootLayout({
   const isStandalonePage =
     requestPath === '/landing' ||
     requestPath.startsWith('/landing/') ||
+    requestPath === '/app' ||
+    requestPath.startsWith('/app/') ||
+    requestPath === '/auth' ||
+    requestPath.startsWith('/auth/') ||
     requestPath === '/oauth/consent' ||
     requestPath.startsWith('/oauth/consent/') ||
     requestPath === '/docs' ||
@@ -90,20 +93,27 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Keep this a plain stylesheet link: layout is a Server Component and
+            React event handlers are not serializable here. The authenticated
+            shell still avoids loading the landing-only Outfit face. */}
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
-        {/* Outfit — landing-only display font (app/landing/page.tsx scopes it via
-            an inline font-family on its root div). Loaded here, not next/font/google,
-            for the same offline/CI build-reliability reason as Inter above. Every
-            other page keeps --font-sans: Inter unchanged. */}
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&display=swap" rel="stylesheet" />
+        {/* Outfit is a landing-only display face. Do not make the authenticated
+            app pay for a second font stylesheet or font download. */}
+        {isLandingPage && (
+          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&display=swap" rel="stylesheet" />
+        )}
       </head>
 
-      {/* ── Google Analytics 4 ── loads after hydration, non-blocking */}
+      {/* ── Google Analytics 4 ── loads after hydration, non-blocking. It is
+          intentionally lazy: analytics is useful for product learning but is
+          not part of the app interaction path. Deferring the 150 KB third-
+          party script keeps sign-in and the first authenticated surface free
+          to render; the page_view config runs once the browser is idle. */}
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        strategy="afterInteractive"
+        strategy="lazyOnload"
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script id="google-analytics" strategy="lazyOnload">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}

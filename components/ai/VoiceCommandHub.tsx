@@ -172,9 +172,20 @@ interface VoiceCommandHubProps {
   /** When true, renders as a compact floating pill */
   compact?: boolean
   className?: string
+  /** Mounts the recorder/event bridge without adding a second visible control. */
+  headless?: boolean
 }
 
-export function VoiceCommandHub({ compact = false, className = '' }: VoiceCommandHubProps) {
+function emitVoiceState(state: 'listening' | 'thinking' | 'idle') {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('voice-command-hub-state-change', { detail: { state } }))
+  // Keep the existing chat composer/hero in sync while both surfaces migrate
+  // to the same recorder. This alias is intentionally temporary-compatible:
+  // it avoids reviving the retired GeminiLiveOrb just to service /ai.
+  window.dispatchEvent(new CustomEvent('gemini-live-state-change', { detail: { state } }))
+}
+
+export function VoiceCommandHub({ compact = false, className = '', headless = false }: VoiceCommandHubProps) {
   const { bioState } = useCognitiveEngine()
 
   const [recording, setRecording] = useState(false)
@@ -220,9 +231,7 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
         }
 
         setProcessing(true)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('voice-command-hub-state-change', { detail: { state: 'thinking' } }))
-        }
+        emitVoiceState('thinking')
         try {
           const text = await whisperAPI.transcribeAudio(blob)
           setLastTranscript(text)
@@ -230,13 +239,18 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
           if (!text.trim()) {
             setError('No speech detected. Try again.')
             setProcessing(false)
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('voice-command-hub-state-change', { detail: { state: 'idle' } }))
-            }
+            emitVoiceState('idle')
             return
           }
 
-          const result = await executeVoiceCommand(text, bioState!)
+          if (!bioState) {
+            setError('The cognitive engine is still starting. Try again in a moment.')
+            setProcessing(false)
+            emitVoiceState('idle')
+            return
+          }
+
+          const result = await executeVoiceCommand(text, bioState)
           setLastResult(result)
 
           setHistory(prev => [
@@ -284,20 +298,17 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
           setError(err?.message ?? 'Transcription failed. Check your microphone.')
         } finally {
           setProcessing(false)
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('voice-command-hub-state-change', { detail: { state: 'idle' } }))
-          }
+          emitVoiceState('idle')
         }
       }
 
       recorder.start()
       mediaRecorderRef.current = recorder
       setRecording(true)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('voice-command-hub-state-change', { detail: { state: 'listening' } }))
-      }
+      emitVoiceState('listening')
     } catch (err: any) {
       setError(err?.message ?? 'Microphone access denied.')
+      emitVoiceState('idle')
     }
   }, [bioState])
 
@@ -307,6 +318,19 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
     }
     setRecording(false)
   }, [])
+
+  // The fullscreen /ai composer predates this hub and emits the legacy event
+  // name. Keep one recorder implementation by routing that event here rather
+  // than mounting the retired GeminiLiveOrb as a second floating control.
+  useEffect(() => {
+    if (!headless) return
+    const toggle = () => {
+      if (recording) stopRecording()
+      else if (!processing) void startRecording()
+    }
+    window.addEventListener('toggle-gemini-live', toggle)
+    return () => window.removeEventListener('toggle-gemini-live', toggle)
+  }, [headless, processing, recording, startRecording, stopRecording])
 
   // Keyboard shortcut: hold Space
   useEffect(() => {
@@ -332,7 +356,7 @@ export function VoiceCommandHub({ compact = false, className = '' }: VoiceComman
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  if (!bioState) return null
+  if (headless || !bioState) return null
 
   if (compact) {
     return (

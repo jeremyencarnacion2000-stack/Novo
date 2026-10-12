@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 const businessClientSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -42,7 +48,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
   } catch (error) {
-    console.error('Error fetching business data:', error)
+    console.error('Error fetching business data.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -56,6 +62,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { type, ...data } = body
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(request)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
 
     if (type === 'clients') {
       const parsedBody = businessClientSchema.safeParse(data)
@@ -63,42 +71,57 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
       }
 
-      const { name, status, projects } = parsedBody.data
-      const client = await prisma.businessClient.create({
-        data: {
-          name,
-          status,
-          projects,
-          userId: session.user.id
-        }
+      const result = await runIdempotentCreate(prisma, {
+        userId: session.user.id,
+        scope: 'business_client_create',
+        idempotencyKey,
+        fingerprint: createMutationFingerprint({ type, ...parsedBody.data }),
+        resourceType: 'business_client',
+        create: (db) => db.businessClient.create({
+          data: { ...parsedBody.data, userId: session.user.id },
+        }),
+        findResource: (resourceId, db) => db.businessClient.findFirst({
+          where: { id: resourceId, userId: session.user.id },
+        }),
       })
 
-      return NextResponse.json(client, { status: 201 })
+      const response = NextResponse.json(result.resource, { status: result.replay ? 200 : 201 })
+      response.headers.set('X-Idempotent-Replay', String(result.replay))
+      return response
     } else if (type === 'content') {
       const parsedBody = businessContentIdeaSchema.safeParse(data)
       if (!parsedBody.success) {
         return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
       }
 
-      const { title, platform, status } = parsedBody.data
-      const content = await prisma.businessContentIdea.create({
-        data: {
-          title,
-          platform,
-          status,
-          userId: session.user.id
-        }
+      const result = await runIdempotentCreate(prisma, {
+        userId: session.user.id,
+        scope: 'business_content_create',
+        idempotencyKey,
+        fingerprint: createMutationFingerprint({ type, ...parsedBody.data }),
+        resourceType: 'business_content_idea',
+        create: (db) => db.businessContentIdea.create({
+          data: { ...parsedBody.data, userId: session.user.id },
+        }),
+        findResource: (resourceId, db) => db.businessContentIdea.findFirst({
+          where: { id: resourceId, userId: session.user.id },
+        }),
       })
 
-      return NextResponse.json(content, { status: 201 })
+      const response = NextResponse.json(result.resource, { status: result.replay ? 200 : 201 })
+      response.headers.set('X-Idempotent-Replay', String(result.replay))
+      return response
     } else {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
     }
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error creating business data:', error)
+    console.error('Error creating business data.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -132,7 +155,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting business data:', error)
+    console.error('Error deleting business data.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

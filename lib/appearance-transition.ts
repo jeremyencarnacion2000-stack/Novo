@@ -1,3 +1,6 @@
+import { shouldReduceNovoMotion } from '@/hooks/use-novo-motion-policy'
+import { safeViewTransition } from '@/lib/view-transition'
+
 type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => unknown
 }
@@ -14,15 +17,14 @@ export function runAppearanceTransition(update: () => void) {
     return
   }
 
-  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  if (prefersReducedMotion) {
+  if (shouldReduceNovoMotion()) {
     update()
     return
   }
 
   const viewTransitionDocument = document as ViewTransitionDocument
   if (typeof viewTransitionDocument.startViewTransition === 'function') {
-    viewTransitionDocument.startViewTransition(update)
+    safeViewTransition(update)
     return
   }
 

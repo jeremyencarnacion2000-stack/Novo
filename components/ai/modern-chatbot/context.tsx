@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment, MessageBlock, Attachment } from './types';
 import { splitSseLines, parseFinalSseLine } from '@/lib/ai/sse-buffer';
 import { sileo } from '@/lib/sileo-bell';
+import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -38,7 +39,11 @@ const AUTO_EXECUTE_ACTION_TYPES = new Set([
 ]);
 
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
-    const { status: authStatus } = useSession();
+    const { data: session, status: authStatus } = useSession();
+    const chatbotStorageKey = session?.user?.id ? `user:${session.user.id}` : null;
+    const accountGenerationRef = React.useRef(0);
+    const accountAbortRef = React.useRef<AbortController | null>(null);
+    const [hydratedChatbotKey, setHydratedChatbotKey] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -58,6 +63,16 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     const conversationsRef = React.useRef(conversations);
+    // A single chat submission may involve several async stages (attachment
+    // parsing, provider fetch, SSE consumption). UI state alone is not a safe
+    // lock because two events can enter before React re-renders; this ref
+    // prevents duplicate user messages and duplicate AI activity runs.
+    const sendInFlightRef = React.useRef(false);
+    // Keep action confirmation outside React state so two pointer events in
+    // the same render cannot execute a mutation twice. Keys survive a failed
+    // request, allowing an explicit retry to replay the server mutation.
+    const executingActionRef = React.useRef(new Set<string>());
+    const actionIntentKeysRef = React.useRef(new Map<string, string>());
     useEffect(() => {
         conversationsRef.current = conversations;
     }, [conversations]);
@@ -97,18 +112,46 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // on every page load, since ChatbotProvider mounts app-wide).
     const justLoadedFromDbRef = React.useRef(false);
 
+    // ChatbotProvider survives auth transitions. Reset the in-memory account
+    // boundary before loading another user's conversations and cancel work
+    // that could otherwise resolve after the session changed.
+    useEffect(() => {
+        accountGenerationRef.current += 1;
+        accountAbortRef.current?.abort();
+        accountAbortRef.current = null;
+        setHydratedChatbotKey(null);
+        setConversations([]);
+        setCurrentConversationId(null);
+        setStreamingMessage(null);
+        setIsLoading(false);
+        setIsTyping(false);
+        setStatusMessage(null);
+        setError(null);
+        sendInFlightRef.current = false;
+        executingActionRef.current.clear();
+        actionIntentKeysRef.current.clear();
+        persistedRef.current.clear();
+        justLoadedFromDbRef.current = false;
+        savingRef.current.clear();
+        dirtySaveRef.current.clear();
+    }, [authStatus, chatbotStorageKey]);
+
     // Load from database on mount. ChatbotProvider mounts app-wide (including
     // public /landing, /auth/* pages), so both fetches below wait for a real
     // session — otherwise every logged-out page load throws two 401s.
     useEffect(() => {
-        if (authStatus !== 'authenticated') return;
+        if (authStatus !== 'authenticated' || !chatbotStorageKey) return;
+        const generation = accountGenerationRef.current;
+        const controller = new AbortController();
+        accountAbortRef.current = controller;
+        const scopedKey = (key: string) => `${key}:${chatbotStorageKey}`;
 
         async function loadConversations() {
             try {
-                const response = await fetch('/api/ai-conversations');
-                if (response.ok) {
+                const response = await fetch('/api/ai-conversations', { signal: controller.signal });
+                if (response.ok && !controller.signal.aborted && accountGenerationRef.current === generation) {
                     const dbConversations = await response.json();
-                    if (dbConversations.length > 0) {
+                    if (!controller.signal.aborted && accountGenerationRef.current === generation && dbConversations.length > 0) {
                         const formattedConversations = dbConversations.map((conv: any) => {
                             persistedRef.current.add(conv.id);
                             return {
@@ -134,17 +177,17 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     }
                 }
             } catch (error) {
-                console.error('Failed to load conversations from database:', error);
+                if (!controller.signal.aborted) console.error('Failed to load conversations from database:', error);
             }
         }
         loadConversations();
 
-        const sidebarState = localStorage.getItem(SIDEBAR_KEY);
+        const sidebarState = localStorage.getItem(scopedKey(SIDEBAR_KEY));
         if (sidebarState) {
             setSidebarCollapsed(sidebarState === 'true');
         }
 
-        const storedModel = localStorage.getItem(MODEL_KEY);
+        const storedModel = localStorage.getItem(scopedKey(MODEL_KEY));
         if (storedModel) {
             let mappedModel = storedModel;
             if (mappedModel === 'qwen-2.5-coder-32b' || mappedModel === 'qwen3-32b' || mappedModel === 'qwen/qwen3-32b' || mappedModel === 'llama-3.3-70b-versatile') {
@@ -156,11 +199,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Ensure it is one of the available models
-            const isValid = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gemini-flash-latest'].includes(mappedModel);
-            const finalModel = isValid ? mappedModel : 'openai/gpt-oss-120b';
+            const isValid = ['auto', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gemini-flash-latest'].includes(mappedModel);
+            const finalModel = isValid ? mappedModel : 'auto';
             
             setSelectedModel(finalModel);
-            localStorage.setItem(MODEL_KEY, finalModel);
         }
 
         // Read before the "Save Twin Mode preference" effect below can run —
@@ -168,10 +210,11 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         // and writes "false" to this same key, so reading it lazily inside
         // this .then() always saw "false" instead of the true first-run
         // null, meaning Pro's "default on" branch could never fire.
-        const storedTwinModeAtMount = localStorage.getItem(TWIN_MODE_KEY);
-        fetch('/api/billing/status')
+        const storedTwinModeAtMount = localStorage.getItem(scopedKey(TWIN_MODE_KEY));
+        fetch('/api/billing/status', { signal: controller.signal })
             .then(r => r.ok ? r.json() : null)
             .then(status => {
+                if (controller.signal.aborted || accountGenerationRef.current !== generation) return;
                 const isPro = status?.plan === 'pro';
                 setTwinModeAvailable(isPro);
 
@@ -185,90 +228,124 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     setTwinMode(isPro);
                 }
             })
-            .catch(() => {});
-    }, [authStatus]);
+            .catch(error => {
+                if (!controller.signal.aborted) console.error('Failed to load chat billing status:', error);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted && accountGenerationRef.current === generation) {
+                    setHydratedChatbotKey(chatbotStorageKey);
+                }
+            });
+
+        return () => controller.abort();
+    }, [authStatus, chatbotStorageKey]);
 
     // Track which conversations are currently being saved to avoid duplicates
     const savingRef = React.useRef<Set<string>>(new Set());
+    // A state update can arrive while its previous write is still in flight.
+    // Remember that a newer snapshot exists so it is persisted immediately
+    // after the current request, instead of being silently skipped.
+    const dirtySaveRef = React.useRef<Set<string>>(new Set());
+
+    const saveConversation = useCallback(async (conv: Conversation): Promise<void> => {
+        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        const generation = accountGenerationRef.current;
+        const signal = accountAbortRef.current?.signal;
+        const cleanId = conv.id.replace(/\/$/, '');
+        if (savingRef.current.has(cleanId)) {
+            dirtySaveRef.current.add(cleanId);
+            return;
+        }
+
+        savingRef.current.add(cleanId);
+        try {
+            if (signal?.aborted || generation !== accountGenerationRef.current) return;
+            const isPersisted = persistedRef.current.has(cleanId);
+            if (isPersisted) {
+                await fetch(`/api/ai-conversations/${cleanId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model }),
+                    signal,
+                });
+            } else {
+                const response = await fetch('/api/ai-conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: cleanId, title: conv.title, messages: conv.messages, model: conv.model }),
+                    signal,
+                });
+                if (response.ok && generation === accountGenerationRef.current) {
+                    persistedRef.current.add(cleanId);
+
+                    // A replay means the original create reached the server
+                    // but its response was lost. The row may contain the
+                    // snapshot from that first attempt, which can be older
+                    // than the one currently in memory (for example when the
+                    // user kept typing while the request was in flight).
+                    // Converge with the latest local snapshot immediately so
+                    // a retry can never silently discard the new messages.
+                    if (response.headers.get('X-Idempotent-Replay') === 'true') {
+                        const replayUpdate = await fetch(`/api/ai-conversations/${cleanId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model }),
+                            signal,
+                        });
+                        if (!replayUpdate.ok) {
+                            throw new Error(`Conversation replay reconciliation failed (${replayUpdate.status})`);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            if (!signal?.aborted) console.error('Failed to save conversation to database:', error);
+        } finally {
+            savingRef.current.delete(cleanId);
+            if (generation === accountGenerationRef.current && dirtySaveRef.current.delete(cleanId)) {
+                const latest = conversationsRef.current.find((item) => item.id === conv.id);
+                if (latest) void saveConversation(latest);
+            }
+        }
+    }, [chatbotStorageKey, hydratedChatbotKey]);
 
     // Save conversations to database when they change
     useEffect(() => {
-        async function saveToDatabase() {
-            if (justLoadedFromDbRef.current) {
-                // This run was triggered by loading conversations from the DB,
-                // not a real edit — they're already persisted as-is.
-                justLoadedFromDbRef.current = false;
-                return;
-            }
-            if (conversations.length === 0) return;
-
-            const conversationsToSave = conversations.filter(conv => {
-                // Only save if it has messages or a non-default title
-                return conv.messages.length > 0 || conv.title !== 'Nueva conversación';
-            });
-
-            for (const conv of conversationsToSave) {
-                if (savingRef.current.has(conv.id)) continue;
-
-                try {
-                    savingRef.current.add(conv.id);
-
-                    const cleanId = conv.id.replace(/\/$/, '');
-                    const isPersisted = persistedRef.current.has(cleanId);
-
-                    if (isPersisted) {
-                        // Update existing
-                        await fetch(`/api/ai-conversations/${cleanId}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                title: conv.title,
-                                messages: conv.messages,
-                                model: conv.model
-                            })
-                        });
-                    } else {
-                        // Create new
-                        const response = await fetch('/api/ai-conversations', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                id: cleanId,
-                                title: conv.title,
-                                messages: conv.messages,
-                                model: conv.model
-                            })
-                        });
-                        if (response.ok) {
-                            persistedRef.current.add(cleanId);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to save conversation to database:', error);
-                } finally {
-                    savingRef.current.delete(conv.id);
-                }
-            }
+        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        if (justLoadedFromDbRef.current) {
+            // This run was triggered by loading conversations from the DB,
+            // not a real edit — they're already persisted as-is.
+            justLoadedFromDbRef.current = false;
+            return;
         }
+        if (conversations.length === 0) return;
 
-        const timeoutId = setTimeout(saveToDatabase, 2000); // Increased delay to reduce noise
+        const conversationsToSave = conversations.filter(conv => (
+            conv.messages.length > 0 || conv.title !== 'Nueva conversación'
+        ));
+        const timeoutId = setTimeout(() => {
+            for (const conv of conversationsToSave) void saveConversation(conv);
+        }, 2000); // Increased delay to reduce noise
         return () => clearTimeout(timeoutId);
-    }, [conversations]);
+    }, [conversations, saveConversation, chatbotStorageKey, hydratedChatbotKey]);
 
     // Save sidebar state
     useEffect(() => {
-        localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed.toString());
-    }, [sidebarCollapsed]);
+        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        localStorage.setItem(`${SIDEBAR_KEY}:${chatbotStorageKey}`, sidebarCollapsed.toString());
+    }, [sidebarCollapsed, chatbotStorageKey, hydratedChatbotKey]);
 
     // Save model selection
     useEffect(() => {
-        localStorage.setItem(MODEL_KEY, selectedModel);
-    }, [selectedModel]);
+        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        localStorage.setItem(`${MODEL_KEY}:${chatbotStorageKey}`, selectedModel);
+    }, [selectedModel, chatbotStorageKey, hydratedChatbotKey]);
 
     // Save Twin Mode preference
     useEffect(() => {
-        localStorage.setItem(TWIN_MODE_KEY, twinMode.toString());
-    }, [twinMode]);
+        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        localStorage.setItem(`${TWIN_MODE_KEY}:${chatbotStorageKey}`, twinMode.toString());
+    }, [twinMode, chatbotStorageKey, hydratedChatbotKey]);
 
     const currentConversation = conversations.find(c => c.id === currentConversationId);
     const messages = currentConversation?.messages || [];
@@ -340,6 +417,11 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     const sendMessage = useCallback(async (content: string, files?: File[], webSearchEnabled?: boolean) => {
         if (!content.trim()) return;
+        if (sendInFlightRef.current) return;
+        sendInFlightRef.current = true;
+        const requestGeneration = accountGenerationRef.current;
+        const accountSignal = accountAbortRef.current?.signal;
+        const isStaleRequest = () => accountSignal?.aborted || requestGeneration !== accountGenerationRef.current;
 
         // Auto-create a conversation if none is active
         let activeConversationId = currentConversationId;
@@ -388,6 +470,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     ctx?.drawImage(img, 0, 0, width, height);
                     resolve(canvas.toDataURL('image/jpeg', quality));
                 };
+                img.onerror = () => resolve(base64Str);
             });
         };
 
@@ -404,7 +487,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                             formData.append('file', file);
                             const parseResponse = await fetch('/api/ai/parse-document', {
                                 method: 'POST',
-                                body: formData
+                                body: formData,
+                                signal: accountSignal,
                             });
                             if (parseResponse.ok) {
                                 const parseData = await parseResponse.json();
@@ -417,8 +501,20 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                         }
                     }
 
-                    // Create attachment for display
-                    return new Promise<Attachment>((resolve, reject) => {
+                    // Create attachment for display. Only images need a data URL
+                    // for the preview/model; document blobs are parsed above and
+                    // must not be copied into every conversation save.
+                    if (!isImage) {
+                        return {
+                            id: crypto.randomUUID(),
+                            name: file.name,
+                            type: file.type || 'application/octet-stream',
+                            url: '',
+                            size: file.size,
+                        };
+                    }
+
+                    return new Promise<Attachment>((resolve) => {
                         const reader = new FileReader();
                         reader.onload = async () => {
                             let url = reader.result as string;
@@ -437,7 +533,17 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                 size: file.size
                             });
                         };
-                        reader.onerror = reject;
+                        // Treat an unreadable preview as a non-fatal attachment
+                        // problem. Rejecting here happened before sendMessage's
+                        // network try/finally and could leave its in-flight lock
+                        // stuck forever after a failed FileReader.
+                        reader.onerror = () => resolve({
+                            id: crypto.randomUUID(),
+                            name: file.name,
+                            type: file.type || 'application/octet-stream',
+                            url: '',
+                            size: file.size,
+                        });
                         reader.readAsDataURL(file);
                     });
                 })
@@ -448,6 +554,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const processedContent = documentContext
             ? content.trim() + documentContext
             : content.trim();
+
+        // Auth can change while an attachment is being parsed. Do not let a
+        // completed old request write a message into the next account.
+        if (isStaleRequest()) {
+            sendInFlightRef.current = false;
+            return;
+        }
 
         const userMessage: Message = {
             id: crypto.randomUUID(),
@@ -502,6 +615,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             const response = await fetch('/api/ai/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: accountSignal,
                 body: JSON.stringify({
                     message: processedContent,
                     history: history.map(m => ({ role: m.role, content: m.content })),
@@ -511,6 +625,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     twinMode
                 })
             });
+
+            if (isStaleRequest()) return;
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -544,6 +660,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
+                if (isStaleRequest()) return;
 
                 const { lines, buffer } = splitSseLines(decoder.decode(value, { stream: true }), sseBuffer);
                 sseBuffer = buffer;
@@ -598,6 +715,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 accumulatedContent += finalFrame.content;
             }
 
+            if (isStaleRequest()) return;
             setStreamingMessage(null);
 
             let finalContent = accumulatedContent;
@@ -635,7 +753,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                         cleanedJson = cleanedJson.replace(/,\s*([}\]])/g, '$1');
 
                         const parsed = JSON.parse(cleanedJson);
-                        console.log('[Chatbot] Parsed JSON:', parsed);
+                        // Structured replies can contain private journal or
+                        // connector data; keep model output out of browser logs.
 
                         // 1. Robust Action Extraction
                         let rawAction = parsed.action || parsed.accion;
@@ -669,7 +788,6 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                             } : null
                         };
 
-                        console.log('[Chatbot] Mapped Structure:', mapped);
 
                         const isStructured = mapped.message || mapped.analysis || mapped.plan || mapped.action;
 
@@ -808,7 +926,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                     try {
                                         const execResponse = await fetch('/api/ai/execute', {
                                             method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Idempotency-Key': createClientIdempotencyKey(),
+                                            },
                                             body: JSON.stringify({
                                                 action: { ...action, payload: { ...action.payload, confirmed: true } }
                                             })
@@ -929,6 +1050,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 sources: activeSources,
             };
 
+            if (isStaleRequest()) return;
             setConversations(prev => prev.map(c =>
                 c.id === activeConversationId
                     ? {
@@ -939,10 +1061,11 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     : c
             ));
 
-        } catch (err) {
-            const errMsg = err instanceof Error ? err.message : 'Error desconocido';
+        } catch {
+            if (isStaleRequest()) return;
+            const errMsg = 'No se pudo completar la solicitud.';
             setError(errMsg);
-            console.error('Send message error:', err);
+            console.error('[Chatbot] Send message failed.');
             setStreamingMessage(null);
             // Nothing in chat-area.tsx/chat-input.tsx renders context.error —
             // without this, a request that fails before/outside the stream
@@ -951,7 +1074,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             const errorMessage: Message = {
                 id: crypto.randomUUID(),
                 role: 'assistant',
-                content: `⚠️ No se pudo obtener una respuesta: ${errMsg}. Intenta de nuevo.`,
+                content: `⚠️ ${errMsg} Intenta de nuevo.`,
                 timestamp: new Date().toISOString(),
             };
             setConversations(prev => prev.map(c =>
@@ -960,9 +1083,12 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     : c
             ));
         } finally {
-            setIsLoading(false);
-            setIsTyping(false);
-            setStatusMessage(null);
+            if (!isStaleRequest()) {
+                sendInFlightRef.current = false;
+                setIsLoading(false);
+                setIsTyping(false);
+                setStatusMessage(null);
+            }
         }
     }, [currentConversationId, selectedModel, twinMode]);
 
@@ -975,6 +1101,15 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         const block = message.blocks.find(b => b.id === blockId);
         if (!block || block.type !== 'confirmation') return;
+
+        const executionId = `${messageId}:${blockId}`;
+        if (executingActionRef.current.has(executionId)) return;
+        executingActionRef.current.add(executionId);
+        const idempotencyKey = actionIntentKeysRef.current.get(executionId) ?? createClientIdempotencyKey();
+        actionIntentKeysRef.current.set(executionId, idempotencyKey);
+        const requestGeneration = accountGenerationRef.current;
+        const accountSignal = accountAbortRef.current?.signal;
+        const isStaleRequest = () => accountSignal?.aborted || requestGeneration !== accountGenerationRef.current;
 
         const updatedBlocks = message.blocks.map(b =>
             b.id === blockId ? { ...b, status: 'executing' as const } : b
@@ -1001,12 +1136,14 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     confirmed: true
                 }
             };
-            console.log('[Chatbot] Executing action with confirmation:', confirmedAction);
             const response = await fetch('/api/ai/execute', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+                signal: accountSignal,
                 body: JSON.stringify({ action: confirmedAction })
             });
+
+            if (isStaleRequest()) return;
 
             const result = await response.json();
             if (result.code === 'Free plan monthly AI action limit reached') {
@@ -1072,12 +1209,14 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                         const followUpResponse = await fetch('/api/ai/stream', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
+                            signal: accountSignal,
                             body: JSON.stringify({
                                 message: `The user originally asked: "${originalRequest}". The system returned the following data from a SYSTEM_QUERY. Please present this data in a clean, formatted, and readable way using markdown. Highlight the most important/critical items. Do NOT create any action or JSON - just format the data nicely:\n\n${dataSummary}`,
                                 history: conversation.messages.slice(-4).map(m => ({ role: m.role, content: m.content })),
                             })
                         });
 
+                        if (isStaleRequest()) return;
                         if (followUpResponse.ok && followUpResponse.body) {
                             const reader = followUpResponse.body.getReader();
                             const decoder = new TextDecoder();
@@ -1147,6 +1286,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                         setStatusMessage(null);
                     }
                 } catch (followUpError) {
+                    if (isStaleRequest()) return;
                     console.error('[Chatbot] Auto-follow-up error:', followUpError);
                     setIsLoading(false);
                     setIsTyping(false);
@@ -1154,8 +1294,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
-        } catch (error) {
-            console.error('Execution error:', error);
+        } catch {
+            if (isStaleRequest()) return;
+            console.error('[Chatbot] Action execution failed.');
             const errorBlock: MessageBlock = {
                 id: executingBlock.id,
                 type: 'result',
@@ -1170,6 +1311,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 m.id === messageId ? { ...m, blocks: finalBlocks } : m
             );
             updateConversation(currentConversationId!, { messages: finalMessages });
+        } finally {
+            executingActionRef.current.delete(executionId);
         }
     }, [conversations, currentConversationId, updateConversation]);
 

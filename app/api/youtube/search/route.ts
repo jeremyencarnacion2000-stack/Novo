@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { getYTMusic } from '@/lib/ytmusic';
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get('q');
-  const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 50);
+  const q = searchParams.get('q')?.trim() || '';
+  const requestedLimit = Number.parseInt(searchParams.get('limit') || '20', 10)
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 50)
+    : 20
 
   if (!q) {
     return NextResponse.json({ error: 'Missing q param' }, { status: 400 });
+  }
+  if (q.length > 200) {
+    return NextResponse.json({ error: 'Search query is too long' }, { status: 400 });
   }
 
   try {
@@ -31,8 +44,8 @@ export async function GET(req: Request) {
           duration_ms: (song.duration ?? 0) * 1000,
         };
       });
-    } catch (songErr) {
-      console.warn('[youtube/search] searchSongs failed, trying searchVideos:', songErr);
+    } catch {
+      console.warn('[youtube/search] searchSongs failed, trying searchVideos.');
     }
 
     // Fallback: music videos if no songs returned
@@ -53,14 +66,14 @@ export async function GET(req: Request) {
             duration_ms: (video.duration ?? 0) * 1000,
           };
         });
-      } catch (videoErr) {
-        console.warn('[youtube/search] searchVideos fallback also failed:', videoErr);
+      } catch {
+        console.warn('[youtube/search] searchVideos fallback also failed.');
       }
     }
 
     return NextResponse.json({ tracks });
-  } catch (error: any) {
-    console.error('[youtube/search] Critical error:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    console.error('[youtube/search] Critical error.');
+    return NextResponse.json({ error: 'Video search temporarily unavailable' }, { status: 500 });
   }
 }

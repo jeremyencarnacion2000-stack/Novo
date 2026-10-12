@@ -21,7 +21,14 @@ export async function POST(req: NextRequest) {
     try {
       const result = await linkTodoistTaskPersisted({ userId: session.user.id, connectionId: account.id, taskId: parsed.data.externalTaskId, internalType: parsed.data.internalEntityType, internalId: parsed.data.internalEntityId }, async (connection, taskId) => getCanonicalTodoistTask((connection as { accessToken: string }).accessToken, taskId));
       return NextResponse.json(result, { status: 200 });
-    } catch (error) { const message = error instanceof Error ? error.message : 'link_failed'; return NextResponse.json({ error: message }, { status: message.includes('conflict') ? 409 : 422 }); }
+    } catch (error) {
+      // Keep provider/database diagnostics server-side. The client only needs
+      // a stable code to render a retry or ownership explanation.
+      const message = error instanceof Error ? error.message : '';
+      const code = message === 'Active mapping conflict' ? 'mapping_conflict' : 'todoist_link_failed';
+      console.error('[Todoist mappings] Link failed:', code);
+      return NextResponse.json({ error: code }, { status: code === 'mapping_conflict' ? 409 : 422 });
+    }
   }
   const mutation = mutateSchema.safeParse(body);
   if (!mutation.success) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });

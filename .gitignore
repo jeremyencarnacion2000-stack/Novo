@@ -24,3 +24,26 @@ node_modules
 cap_sync_log.txt
 tmp/
 .vercel-tmp/
+
+# Local data, generated exports and browser review artifacts
+out/
+*.db
+.codex/
+.gstack-*
+.tmp/
+app-response.html
+headers.txt
+browse-audit.jsonl
+landing-*-audit*.png
+landing-*-final.png
+landing-title-*.png
+native-login-check.png
+android/redirect-check.png
+task-*-rereview*.md
+todoist-vertical-rereview.md
+apple-liquid-morph-lab-v*/
+apple-liquid-morphing-lab.html
+command-center-liquid-nav-v2.html
+liquid-glass-repo-video-variant*/
+index(9).html
+index(10).html

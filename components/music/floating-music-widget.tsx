@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { usePlayerStore } from '@/lib/player-store';
 import {
@@ -15,7 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { NowPlayingFullscreen } from '@/components/music/now-playing-fullscreen';
+import dynamic from "next/dynamic";
+
+const NowPlayingFullscreen = dynamic(
+  () => import("@/components/music/now-playing-fullscreen").then((module) => ({ default: module.NowPlayingFullscreen })),
+  { ssr: false },
+);
 import { useMobileOverlay } from '@/components/mobile-overlay-provider';
 
 interface Particle {
@@ -29,31 +34,39 @@ interface Particle {
 const FloatingMusicWidgetComponent = () => {
   const { suppressSecondary } = useMobileOverlay();
   const pathname = usePathname();
+  const isMusicPage = !!pathname?.startsWith("/music");
 
-  const {
-    currentTrack,
-    isPlaying,
-    isOpen,
-    togglePlayPause,
-    nextTrack,
-    previousTrack,
-    setVolume,
-    volume,
-    progress,
-    isReady
-  } = usePlayerStore();
+
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const isOpen = usePlayerStore((state) => state.isOpen);
+  const togglePlayPause = usePlayerStore((state) => state.togglePlayPause);
+  const nextTrack = usePlayerStore((state) => state.nextTrack);
+  const previousTrack = usePlayerStore((state) => state.previousTrack);
+  const setVolume = usePlayerStore((state) => state.setVolume);
+  const volume = usePlayerStore((state) => state.volume);
+  const progress = usePlayerStore((state) => isMusicPage ? state.progress : 0);
+  const isReady = usePlayerStore((state) => state.isReady);
 
   // ── All hooks must be declared before any conditional return ──────────────
   // Reward triggers
-  const [isRewarding, setIsRewarding] = useState(false);
   const [rewardParticles, setRewardParticles] = useState<Particle[]>([]);
   // Full-screen Now Playing (opened by tapping the pill's track info)
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [fullscreenMounted, setFullscreenMounted] = useState(false);
+  const openFullscreen = () => {
+    setFullscreenMounted(true);
+    setFullscreenOpen(true);
+  };
+  const rewardParticlesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Decoupled Global Reward Listener for instant feedback
   useEffect(() => {
     const handleHabitCompleted = () => {
-      setIsRewarding(true);
+      // A second completion should restart the same visual reward instead of
+      // leaving multiple timers racing to update state. This also keeps the
+      // effect deterministic when a user completes several habits quickly.
+      if (rewardParticlesTimerRef.current) clearTimeout(rewardParticlesTimerRef.current);
 
       // Spawn dazzling crystal fragments
       const newParticles: Particle[] = Array.from({ length: 15 }).map((_, idx) => ({
@@ -65,23 +78,22 @@ const FloatingMusicWidgetComponent = () => {
       }));
       setRewardParticles(newParticles);
 
-      setTimeout(() => {
-        setIsRewarding(false);
-      }, 2600);
-
-      setTimeout(() => {
+      rewardParticlesTimerRef.current = setTimeout(() => {
         setRewardParticles([]);
+        rewardParticlesTimerRef.current = null;
       }, 1400);
     };
 
     window.addEventListener('habit-completed', handleHabitCompleted);
-    return () => window.removeEventListener('habit-completed', handleHabitCompleted);
+    return () => {
+      window.removeEventListener('habit-completed', handleHabitCompleted);
+      if (rewardParticlesTimerRef.current) clearTimeout(rewardParticlesTimerRef.current);
+      rewardParticlesTimerRef.current = null;
+    };
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
   if (suppressSecondary) return null;
-
-  const isMusicPage = !!pathname?.startsWith('/music');
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -97,7 +109,7 @@ const FloatingMusicWidgetComponent = () => {
   if (isMusicPage && isOpen && currentTrack) {
     return (
       <>
-      <NowPlayingFullscreen open={fullscreenOpen} onClose={() => setFullscreenOpen(false)} />
+      {fullscreenMounted && <NowPlayingFullscreen open={fullscreenOpen} onClose={() => setFullscreenOpen(false)} />}
       <div
         // Below `md`, components/mobile-nav.tsx floats its own pill+FAB at
         // `bottom-4` — stacking this player above it (not sharing the same
@@ -111,8 +123,8 @@ const FloatingMusicWidgetComponent = () => {
           role="button"
           tabIndex={0}
           aria-label="Abrir reproductor a pantalla completa"
-          onClick={() => setFullscreenOpen(true)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFullscreenOpen(true) }}
+          onClick={openFullscreen}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openFullscreen() }}
           className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1 sm:w-[210px] sm:flex-none relative z-10 cursor-pointer active:scale-[0.98] transition-transform"
         >
           <div className="relative group flex-shrink-0">

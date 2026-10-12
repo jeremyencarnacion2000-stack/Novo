@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ArrowLeft, ArrowUpRight, Check, ChevronDown, CircleAlert, EyeOff, Loader2, Search, Sparkles } from 'lucide-react'
 import type { CognitiveGraphNode, CognitiveGraphSnapshot, CognitiveLens } from '@/lib/cognitive-graph/types'
@@ -264,7 +264,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
     // Cognitive error state. Subsequent requests are warm and return quickly.
     const timeout = window.setTimeout(() => controller.abort(), 45_000)
     setLoading(true)
-    const params = new URLSearchParams({ lens })
+    const params = new URLSearchParams({ lens, limit: '35', since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() })
     if (focusNodeId) params.set('focus', focusNodeId)
     fetch(`/api/cognitive/graph?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
@@ -300,9 +300,11 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     const refreshAgentState = async () => {
+      if (document.visibilityState !== 'visible') return
       try {
-        const response = await fetch('/api/cognitive/agent-actions', { cache: 'no-store' })
+        const response = await fetch('/api/cognitive/agent-actions', { cache: 'no-store', signal: controller.signal })
         if (!response.ok) return
         const payload = await response.json() as { proposals?: TwinAgentProposal[]; twin?: { confidenceScore: number; trustLevel: string } | null }
         if (!active) return
@@ -313,15 +315,32 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
       }
     }
     void refreshAgentState()
-    const timer = window.setInterval(() => void refreshAgentState(), 15_000)
-    return () => { active = false; window.clearInterval(timer) }
+    let timer: number | null = window.setInterval(() => void refreshAgentState(), 15_000)
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshAgentState()
+        if (timer === null) timer = window.setInterval(() => void refreshAgentState(), 15_000)
+      } else if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    return () => {
+      active = false
+      controller.abort()
+      if (timer !== null) window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+    }
   }, [retryKey])
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     const refreshInference = async () => {
+      if (document.visibilityState !== 'visible') return
       try {
-        const response = await fetch('/api/cognitive/inference/status', { cache: 'no-store' })
+        const response = await fetch('/api/cognitive/inference/status', { cache: 'no-store', signal: controller.signal })
         if (!response.ok) return
         const payload = await response.json() as { run?: { id?: string } | null }
         if (active) setInferenceRunId(payload.run?.id ?? null)
@@ -330,8 +349,23 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
       }
     }
     void refreshInference()
-    const timer = window.setInterval(() => void refreshInference(), 10_000)
-    return () => { active = false; window.clearInterval(timer) }
+    let timer: number | null = window.setInterval(() => void refreshInference(), 10_000)
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshInference()
+        if (timer === null) timer = window.setInterval(() => void refreshInference(), 10_000)
+      } else if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    return () => {
+      active = false
+      controller.abort()
+      if (timer !== null) window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+    }
   }, [])
 
   const visibleNodes = useMemo(() => {
@@ -357,7 +391,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
   const visibleError = error ?? (!loading && !snapshot ? 'No se pudo recuperar el contexto cognitivo. Intenta actualizar para reanudar.' : null)
   const learningNodes = snapshot?.nodes.filter((node) => node.cluster === 'learning' || node.cluster === 'adaptation') ?? []
 
-  function selectNode(nodeId: string) {
+  const selectNode = useCallback((nodeId: string) => {
     const now = Date.now()
     if (lastSelectionRef.current?.id === nodeId && now - lastSelectionRef.current.at < 420) {
       setInspectorOpen(true)
@@ -366,7 +400,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
     lastSelectionRef.current = { id: nodeId, at: now }
     setSelectedId(nodeId)
     setGraphMode('focus')
-  }
+  }, [])
 
   function selectLens(nextLens: CognitiveLens) {
     setLens(nextLens)

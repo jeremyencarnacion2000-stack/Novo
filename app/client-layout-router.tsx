@@ -15,7 +15,14 @@ export default function ClientLayoutRouter({ children }: { children: ReactNode }
   // layout can persist and this router becomes the final authority. Keep the
   // acquisition page independent here too so signed-in visitors never mount
   // global widgets or an app loading placeholder over the landing content.
-  if (pathname?.startsWith('/landing')) return <>{children}</>
+  // `/app` is a server-side resolver, not a product surface. Keeping it out
+  // of the authenticated shell lets its login/onboarding redirect complete
+  // without mounting the welcome carousel or app loading chrome first.
+  if (
+    pathname?.startsWith('/landing') ||
+    pathname?.startsWith('/app') ||
+    pathname?.startsWith('/auth')
+  ) return <>{children}</>
   if (pathname?.startsWith('/cognitive')) return <CognitiveClientLayout>{children}</CognitiveClientLayout>
   return <FullClientLayout>{children}</FullClientLayout>
 }

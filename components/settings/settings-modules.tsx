@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { LiquidSwitch } from '@/components/ui/liquid-switch'
 import { useToast } from '@/hooks/use-toast'
@@ -8,10 +9,36 @@ import { useCognitiveTwin } from '@/lib/cognitive-twin-context'
 import { cn } from '@/lib/utils'
 import { Section, ALL_MODULES } from './settings-shared'
 import type { DisabledModule } from './settings-shared'
+import { toCognitiveTwinSyncPayload } from '@/lib/cognitive-twin-sync'
 
 export function SettingsModules() {
   const { toast } = useToast()
   const { twin, updateTwin } = useCognitiveTwin()
+  const persistenceQueueRef = useRef(Promise.resolve())
+
+  // The sync endpoint intentionally accepts only client-owned Twin fields.
+  // Do not send the full hydrated Twin object (userId/version/trustLevel and
+  // timestamps are server-owned and the route rejects unknown keys). Queue
+  // writes so rapid module toggles cannot race and persist an older layout.
+  const persistWorkspaceLayout = (updated: typeof twin) => {
+    const payload = toCognitiveTwinSyncPayload(updated)
+    persistenceQueueRef.current = persistenceQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await fetch('/api/cognitive-twin/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!response.ok) throw new Error(`Twin sync failed (${response.status})`)
+      })
+      .catch(() => {
+        toast({
+          title: 'Could not save workspace layout',
+          description: 'Your change is kept locally and will retry on the next update.',
+        })
+      })
+  }
 
   // Module sorting/pinning actions
   const enabledModules = twin.workspaceLayout?.enabledModules || []
@@ -28,11 +55,7 @@ export function SettingsModules() {
       }
     }
     updateTwin(updated)
-    fetch('/api/cognitive-twin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
-    }).catch(() => {})
+    persistWorkspaceLayout(updated)
   }
 
   const handleReorderModule = (index: number, direction: 'up' | 'down') => {
@@ -52,11 +75,7 @@ export function SettingsModules() {
       }
     }
     updateTwin(updated)
-    fetch('/api/cognitive-twin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
-    }).catch(() => {})
+    persistWorkspaceLayout(updated)
   }
 
   const handleTogglePinModule = (moduleId: string) => {
@@ -76,11 +95,7 @@ export function SettingsModules() {
       }
     }
     updateTwin(updated)
-    fetch('/api/cognitive-twin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
-    }).catch(() => {})
+    persistWorkspaceLayout(updated)
   }
 
   const handleRestoreTwinRecommendations = () => {
@@ -101,11 +116,7 @@ export function SettingsModules() {
       }
     }
     updateTwin(updated)
-    fetch('/api/cognitive-twin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
-    }).catch(() => {})
+    persistWorkspaceLayout(updated)
 
     toast({
       title: 'Recommendations Applied',

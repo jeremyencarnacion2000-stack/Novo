@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const followArtistSchema = z.object({
+  artistId: z.string().trim().min(1).max(200),
+  artistName: z.string().trim().min(1).max(300).optional(),
+  imageUrl: z.string().trim().max(2000).optional().nullable(),
+  action: z.enum(['follow', 'unfollow']),
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,11 +18,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { artistId, artistName, imageUrl, action } = await req.json();
-
-    if (!artistId || !action) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    const parsed = followArtistSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid follow request', details: parsed.error.flatten() }, { status: 400 });
     }
+    const { artistId, artistName, imageUrl, action } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -33,13 +41,13 @@ export async function POST(req: NextRequest) {
           },
         },
         update: {
-          name: artistName,
+          name: artistName || 'Unknown artist',
           imageUrl: imageUrl,
         },
         create: {
           userId: user.id,
           artistId: artistId,
-          name: artistName,
+          name: artistName || 'Unknown artist',
           imageUrl: imageUrl,
         },
       });
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Unfollowed artist' });
     }
   } catch (error: any) {
-    console.error('[MUSIC_FOLLOW_API_ERROR]', error);
+    console.error('[MUSIC_FOLLOW_API_ERROR]');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -81,7 +89,7 @@ export async function GET(req: NextRequest) {
     
         return NextResponse.json(user.followedArtists);
       } catch (error: any) {
-        console.error('[MUSIC_FOLLOW_GET_API_ERROR]', error);
+        console.error('[MUSIC_FOLLOW_GET_API_ERROR]');
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
 }

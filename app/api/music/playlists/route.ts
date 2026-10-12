@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 export async function GET() {
   try {
@@ -23,8 +29,9 @@ export async function GET() {
     })
 
     return NextResponse.json(playlists)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch {
+    console.error('[music/playlists] list failed')
+    return NextResponse.json({ error: 'Unable to load playlists right now' }, { status: 500 })
   }
 }
 
@@ -48,18 +55,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing name' }, { status: 400 })
     }
 
-    const playlist = await prisma.musicPlaylist.create({
-      data: {
-        name,
-        description,
-        tracks: tracks || [],
-        userId: user.id,
-      }
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(req)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+
+    const playlistData = {
+      name: String(name).trim(),
+      description: description ?? null,
+      tracks: tracks || [],
+      userId: user.id,
+    }
+    const result = await runIdempotentCreate(prisma, {
+      userId: user.id,
+      scope: 'music_playlist_create',
+      idempotencyKey,
+      fingerprint: createMutationFingerprint(playlistData),
+      resourceType: 'music_playlist',
+      create: (db) => db.musicPlaylist.create({ data: playlistData }),
+      findResource: (resourceId, db) => db.musicPlaylist.findFirst({
+        where: { id: resourceId, userId: user.id },
+      }),
     })
 
-    return NextResponse.json(playlist)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(result.resource, {
+      status: result.replay ? 200 : 201,
+      headers: { 'X-Idempotent-Replay': String(result.replay) },
+    })
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+    console.error('[music/playlists] create failed')
+    return NextResponse.json({ error: 'Unable to create playlist right now' }, { status: 500 })
   }
 }
-

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { safeViewTransition } from '@/hooks/use-view-transition'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +25,6 @@ import { Plus, X, Sparkles } from 'lucide-react'
 import { Routine, RoutineTask } from '@/types/routine'
 import { Checkbox } from '@/components/ui/checkbox'
 import routineTemplates from '@/data/routine-templates.json'
-import { useModalFlip } from '@/hooks/use-modal-flip'
 
 interface RoutineDialogProps {
   open: boolean
@@ -58,8 +56,7 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   const [showTemplates, setShowTemplates] = useState(false)
 
   const flipKey = routine ? `routine-${routine.id}` : 'btn-new-routine'
-  const closeFlip = useModalFlip(flipKey, open)
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
 
   useEffect(() => {
     if (routine) {
@@ -150,7 +147,7 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent
-        data-flip-to={flipKey}
+        motionId={flipKey}
         className="max-w-2xl max-h-[90dvh] overflow-y-auto"
       >
         <form onSubmit={handleSubmit}>
@@ -342,7 +339,7 @@ export function RoutineDialog({ open, onClose, onSave, routine }: RoutineDialogP
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">{routine ? 'Update' : 'Create'} Routine</Button>
+            <Button ripple type="submit">{routine ? 'Update' : 'Create'} Routine</Button>
           </DialogFooter>
         </form>
       </DialogContent>

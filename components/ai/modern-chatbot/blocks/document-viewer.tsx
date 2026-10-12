@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useRef } from 'react';
 import { X, Maximize2, Minimize2, Download, ExternalLink } from 'lucide-react';
+import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 interface DocumentViewerProps {
     content: string;
@@ -13,15 +13,7 @@ interface DocumentViewerProps {
 
 export function DocumentViewer({ content, mimeType, filename, onClose }: DocumentViewerProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [mounted, setMounted] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
-
-    useEffect(() => {
-        setMounted(true);
-        // Prevent body scroll when panel is open
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
-    }, []);
 
     const isHTML = mimeType === 'text/html' || filename.endsWith('.html');
     const isCSV = mimeType === 'text/csv' || filename.endsWith('.csv');
@@ -85,19 +77,12 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
         }
     };
 
-    const panelContent = (
-        <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 z-[250] bg-black/50 backdrop-blur-sm transition-opacity duration-300"
-                onClick={onClose}
-                style={{ opacity: mounted ? 1 : 0 }}
-            />
-
-            {/* Side Panel */}
-            <div
-                className={`fixed top-0 right-0 z-[251] h-full flex flex-col bg-[var(--popover)]/98 backdrop-blur-2xl shadow-[-8px_0_30px_rgba(0,0,0,0.5)] border-l border-white/10 transition-transform duration-300 ease-out ${isFullscreen ? 'w-full' : 'w-[min(600px,85vw)]'}`}
-                style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+    return (
+        <Sheet open onOpenChange={(open) => !open && onClose?.()}>
+            <SheetContent
+                side="right"
+                showCloseButton={false}
+                className={`h-full max-w-none gap-0 border-l border-white/10 bg-[var(--popover)]/98 p-0 shadow-[-8px_0_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl transition-[width] duration-300 ${isFullscreen ? '!w-full' : '!w-[min(600px,85vw)]'}`}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03] shrink-0">
@@ -108,7 +93,7 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
                             </span>
                         </div>
                         <div className="min-w-0">
-                            <span className="text-sm font-medium text-white/90 truncate block">{filename}</span>
+                            <SheetTitle className="text-sm font-medium text-white/90 truncate block">{filename}</SheetTitle>
                             <span className="text-[10px] text-white/40 uppercase tracking-wider">{mimeType}</span>
                         </div>
                     </div>
@@ -135,13 +120,14 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
                             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </button>
                         {onClose && (
-                            <button
-                                onClick={onClose}
-                                className="p-2 rounded-lg hover:bg-red-500/20 text-white/50 hover:text-red-400 transition-colors"
-                                title="Cerrar"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <SheetClose asChild>
+                                <button
+                                    className="p-2 rounded-lg hover:bg-red-500/20 text-white/50 hover:text-red-400 transition-colors"
+                                    title="Cerrar"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </SheetClose>
                         )}
                     </div>
                 </div>
@@ -205,11 +191,7 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
                         </div>
                     )}
                 </div>
-            </div>
-        </>
+            </SheetContent>
+        </Sheet>
     );
-
-    // Use portal to render at document body level so it overlays everything
-    if (typeof window === 'undefined') return null;
-    return createPortal(panelContent, document.body);
 }

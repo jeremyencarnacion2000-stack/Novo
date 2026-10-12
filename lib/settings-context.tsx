@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useSession } from 'next-auth/react'
 import { runAppearanceTransition } from '@/lib/appearance-transition'
@@ -97,36 +97,68 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const settingsSaveQueueRef = useRef(Promise.resolve())
+  // Session changes can happen while a settings read/write is still in flight
+  // (for example, signing out in one tab and signing into another account in
+  // the same tab). Keep every async operation tied to the session generation
+  // that created it so an old account can never hydrate or overwrite the new
+  // account's preferences.
+  const settingsGenerationRef = useRef(0)
+  const settingsUserIdRef = useRef<string | null>(null)
+  const settingsWriteRevisionRef = useRef(0)
+  const settingsDirtyRef = useRef(false)
 
   // Load settings from database when user logs in
   useLayoutEffect(() => {
-    const loadSettings = async () => {
-      if (status === 'loading') return
+    const userId = status === 'authenticated' ? session?.user?.id ?? null : null
+    const generation = ++settingsGenerationRef.current
+    settingsUserIdRef.current = userId
+    settingsDirtyRef.current = false
+    let active = true
+    const controller = new AbortController()
 
-      if (status === 'authenticated' && session?.user?.id) {
+    // Clear the previous account's visual preferences before the next paint.
+    // This prevents a brief cross-account flash while the new snapshot loads.
+    setIsLoaded(false)
+    setSettings(defaultSettings)
+
+    if (status === 'loading') {
+      return () => {
+        active = false
+        controller.abort()
+      }
+    }
+
+    const loadSettings = async () => {
+      if (userId) {
         try {
-          const response = await fetch('/api/user-settings')
+          const response = await fetch('/api/user-settings', { signal: controller.signal })
+          if (!active || generation !== settingsGenerationRef.current || settingsUserIdRef.current !== userId) return
+
           if (response.ok) {
             const data = await response.json()
-            if (data.settings) {
-              setSettings({ ...defaultSettings, ...data.settings })
-            } else {
-              setSettings(defaultSettings)
-            }
+            if (!active || generation !== settingsGenerationRef.current || settingsUserIdRef.current !== userId) return
+            setSettings(data.settings ? { ...defaultSettings, ...data.settings } : defaultSettings)
           }
         } catch (error) {
-          console.error('Failed to load settings from database:', error)
-          // Fallback to default settings
+          if (!active || generation !== settingsGenerationRef.current || settingsUserIdRef.current !== userId) return
+          if ((error as { name?: string })?.name !== 'AbortError') {
+            console.error('Failed to load settings from database.')
+          }
           setSettings(defaultSettings)
         }
-      } else {
-        // User not logged in, use default settings
-        setSettings(defaultSettings)
       }
+
+      if (!active || generation !== settingsGenerationRef.current || settingsUserIdRef.current !== userId) return
       setIsLoaded(true)
     }
 
-    loadSettings()
+    void loadSettings()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, [session?.user?.id, status])
 
 
@@ -362,12 +394,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.backgroundBlur, settings.backgroundDimness, settings.autoContrast, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.showAnimations, settings.backgroundBlur, settings.backgroundDimness, settings.autoContrast, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return
 
+    let disposed = false
+    let timerId: ReturnType<typeof setTimeout> | null = null
+
     const scheduleReminder = () => {
+      if (disposed) return
       const now = new Date()
       const [hours, minutes] = settings.reminderTime.split(':').map(Number)
       const scheduledTime = new Date(now)
@@ -379,13 +415,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       const timeUntilReminder = scheduledTime.getTime() - now.getTime()
 
-      const timerId = setTimeout(() => {
+      timerId = setTimeout(() => {
+        if (disposed) return
         // Show notification
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Novo Reminder', {
-            body: 'Time to check your daily tasks and routines!',
-            icon: '/icon.svg',
-          })
+          try {
+            new Notification('Novo Reminder', {
+              body: 'Time to check your daily tasks and routines!',
+              icon: '/icon.svg',
+            })
+          } catch {
+            // A permission change or webview policy can reject construction;
+            // the reminder loop must still reschedule cleanly.
+          }
         }
         // Reschedule for next day
         scheduleReminder()
@@ -394,37 +436,63 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       return timerId
     }
 
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    scheduleReminder()
+    return () => {
+      disposed = true
+      if (timerId !== null) clearTimeout(timerId)
+      timerId = null
     }
-
-    const timerId = scheduleReminder()
-    return () => clearTimeout(timerId)
   }, [settings.dailyReminder, settings.reminderTime, isLoaded])
 
   // Save settings to database
   useEffect(() => {
-    if (isLoaded && session?.user?.id && status === 'authenticated') {
-      const saveSettings = async () => {
-        try {
-          await fetch('/api/user-settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ settings })
-          })
-        } catch (error) {
-          console.error('Failed to save settings to database:', error)
-        }
-      }
+    if (isLoaded && settingsDirtyRef.current && session?.user?.id && status === 'authenticated') {
+      const userId = session.user.id
+      const generation = settingsGenerationRef.current
+      const revision = ++settingsWriteRevisionRef.current
+      const controller = new AbortController()
 
       // Debounce saving to avoid too many API calls
-      const timeoutId = setTimeout(saveSettings, 500)
-      return () => clearTimeout(timeoutId)
+      const timeoutId = setTimeout(() => {
+        // Full settings snapshots are intentional, but overlapping requests
+        // can arrive out of order on a slow connection and resurrect an older
+        // theme/material choice. Serialize snapshots so the last UI state is
+        // also the last state persisted on the server. The generation and
+        // revision checks additionally prevent an old account (or an older
+        // snapshot for this account) from being sent after a session switch.
+        const snapshot = settings
+        settingsSaveQueueRef.current = settingsSaveQueueRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            if (
+              generation !== settingsGenerationRef.current ||
+              revision !== settingsWriteRevisionRef.current ||
+              settingsUserIdRef.current !== userId
+            ) return
+
+            const response = await fetch('/api/user-settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: controller.signal,
+              body: JSON.stringify({ settings: snapshot }),
+            })
+            if (!response.ok) throw new Error(`Settings save failed (${response.status})`)
+          })
+          .catch((error) => {
+            if ((error as { name?: string })?.name !== 'AbortError') {
+              console.error('Failed to save settings to database.')
+            }
+          })
+      }, 500)
+      return () => {
+        clearTimeout(timeoutId)
+        controller.abort()
+      }
     }
   }, [settings, isLoaded, session?.user?.id, status])
 
   const updateSettings = (updates: Partial<AppSettings>) => {
+    settingsDirtyRef.current = true
     const commit = () => setSettings((prev) => {
       const next = { ...prev, ...updates }
 
@@ -451,17 +519,39 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }
 
   const resetSettings = async () => {
+    // Reset persists explicitly below. Keep the debounced save effect from
+    // sending the same full snapshot a second time.
+    settingsDirtyRef.current = false
     runAppearanceTransition(() => flushSync(() => setSettings(defaultSettings)))
-    if (session?.user?.id) {
-      try {
-        await fetch('/api/user-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ settings: defaultSettings })
+    const userId = session?.user?.id ?? null
+    if (userId) {
+      const generation = settingsGenerationRef.current
+      const revision = ++settingsWriteRevisionRef.current
+      const controller = new AbortController()
+      settingsSaveQueueRef.current = settingsSaveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (
+            generation !== settingsGenerationRef.current ||
+            revision !== settingsWriteRevisionRef.current ||
+            settingsUserIdRef.current !== userId
+          ) return
+
+          const response = await fetch('/api/user-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({ settings: defaultSettings })
+          })
+          if (!response.ok) throw new Error(`Settings reset failed (${response.status})`)
         })
-      } catch (error) {
-        console.error('Failed to reset settings in database:', error)
-      }
+        .catch((error) => {
+          if ((error as { name?: string })?.name !== 'AbortError') {
+            console.error('Failed to reset settings in database.')
+          }
+        })
+
+      await settingsSaveQueueRef.current
     }
   }
 

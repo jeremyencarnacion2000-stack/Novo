@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useModalFlip } from '@/hooks/use-modal-flip';
 
 interface Grade {
     id?: string;
@@ -82,8 +81,7 @@ export function GradeDialog({ open, onClose, onSave, courseId, grade }: GradeDia
         : '0.0';
 
     const flipKey = `grade-${courseId}`;
-    const closeFlip = useModalFlip(flipKey, open);
-    const handleClose = () => closeFlip(onClose);
+    const handleClose = onClose;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -93,7 +91,7 @@ export function GradeDialog({ open, onClose, onSave, courseId, grade }: GradeDia
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent data-flip-to={flipKey} flipAnchored className="sm:max-w-[400px]">
+            <DialogContent motionId={flipKey} flipAnchored className="sm:max-w-[400px]">
                 <DialogHeader>
                     <DialogTitle>
                         <span data-shared-item="text">{grade ? 'Edit Grade' : 'Add Grade'}</span>

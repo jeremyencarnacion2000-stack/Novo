@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { ModernChatbot } from './index'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface MobileChatSheetProps {
     onClose: () => void
@@ -49,21 +50,22 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
     const bottom = dragging ? Math.max(EXPANDED_BOTTOM, restingBottom - dragY) : restingBottom
     const bottomStyle: React.CSSProperties = {
         bottom,
+        height: `calc(100dvh - ${bottom}px)`,
         transition: dragging ? 'none' : 'bottom 0.32s cubic-bezier(0.25,1,0.5,1)',
     }
 
     return (
-        <>
-            <div
-                data-flip-overlay="mobile-ai-panel"
-                className="modal-flip-overlay fixed top-0 left-0 right-0 z-[5000] bg-black/70 md:hidden"
-                style={bottomStyle}
-            />
-            <div
-                data-flip-to="mobile-ai-panel"
-                className="modal-flip-target fixed top-0 left-0 right-0 z-[5001] rounded-b-[40px] overflow-hidden md:hidden flex flex-col"
+        <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+            <DialogContent
+                motionPreset="shared"
+                motionId="mobile-ai-panel"
+                showCloseButton={false}
+                aria-label="Chat móvil"
+                overlayClassName="md:hidden bg-black/70"
+                className="!fixed !top-0 !left-0 !right-0 !bottom-auto !h-auto !w-full !max-w-none !translate-x-0 !translate-y-0 !rounded-b-[40px] !rounded-t-none !border-0 !bg-background !p-0 !flex !flex-col md:hidden overflow-hidden"
                 style={bottomStyle}
             >
+                <DialogTitle className="sr-only">Chat móvil</DialogTitle>
                 <div className="flex-1 min-h-0 overflow-hidden">
                     <ModernChatbot onMobileClose={onClose} />
                 </div>
@@ -79,7 +81,7 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
                 >
                     <div className="w-9 h-[3px] rounded-full bg-white/20" />
                 </div>
-            </div>
-        </>
+            </DialogContent>
+        </Dialog>
     )
 }

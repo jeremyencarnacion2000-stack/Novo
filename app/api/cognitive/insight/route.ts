@@ -7,6 +7,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -31,33 +37,53 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid insight type' }, { status: 400 })
     }
 
-    const insight = await prisma.insight.create({
-      data: {
-        userId,
-        type,
-        content: String(content).slice(0, 1000), // max 1000 chars
-        status: 'unread',
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(request)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+
+    const insightData = {
+      userId,
+      type,
+      content: String(content).slice(0, 1000), // max 1000 chars
+      status: 'unread',
+    }
+    const result = await runIdempotentCreate(prisma, {
+      userId,
+      scope: 'cognitive_insight_create',
+      idempotencyKey,
+      fingerprint: createMutationFingerprint({ type, content: insightData.content }),
+      resourceType: 'insight',
+      create: async (db) => {
+        const insight = await db.insight.create({ data: insightData })
+
+        // Keep the snapshot update in the same transaction as the insight so
+        // a transport retry cannot leave a partial cognitive write behind.
+        await db.userCognitiveSnapshot.upsert({
+          where: { userId },
+          create: {
+            userId,
+            lastInsightGeneratedAt: new Date(),
+            fatigueEstimate: 'unavailable',
+            focusTimeToday: 0,
+            productivityScore: 0,
+            overdueTasks: 0,
+          },
+          update: {
+            lastInsightGeneratedAt: new Date(),
+          },
+        })
+        return insight
       },
+      findResource: (resourceId, db) => db.insight.findFirst({ where: { id: resourceId, userId } }),
     })
 
-    // Also update cognitive snapshot's lastInsightGeneratedAt
-    await prisma.userCognitiveSnapshot.upsert({
-      where: { userId },
-      create: {
-        userId,
-        lastInsightGeneratedAt: new Date(),
-        fatigueEstimate: 'unavailable',
-        focusTimeToday: 0,
-        productivityScore: 0,
-        overdueTasks: 0,
-      },
-      update: {
-        lastInsightGeneratedAt: new Date(),
-      },
+    return NextResponse.json(result.resource, {
+      status: result.replay ? 200 : 201,
+      headers: { 'X-Idempotent-Replay': String(result.replay) },
     })
-
-    return NextResponse.json(insight, { status: 201 })
-  } catch {
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     console.error('[cognitive/insight] POST failed.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

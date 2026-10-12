@@ -34,8 +34,8 @@ export async function GET(
     }
 
     return NextResponse.json(activityEntry)
-  } catch (error) {
-    console.error('Error fetching activity history entry:', error)
+  } catch {
+    console.error('Error fetching activity history entry.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -78,7 +78,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating activity history entry:', error)
+    console.error('Error updating activity history entry.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -107,8 +107,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting activity history entry:', error)
+  } catch {
+    console.error('Error deleting activity history entry.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

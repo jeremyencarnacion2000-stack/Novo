@@ -44,7 +44,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating tracker:', error)
+    console.error('Error updating tracker.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -70,7 +70,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting tracker:', error)
+    console.error('Error deleting tracker.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

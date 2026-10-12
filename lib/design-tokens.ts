@@ -101,6 +101,29 @@ export const springConfig = {
   wobbly:  { type: 'spring' as const, stiffness: 200, damping: 14 },
 } as const;
 
+/**
+ * Apple Liquid Motion calibration shared by high-intent controls.
+ * The morph lab keeps the press restrained and the material stable while only
+ * the composited transform changes, so text and glass never deform together.
+ */
+export const appleLiquidMotion = {
+  pressScale: 0.965,
+  hoverScale: 1.012,
+  pressTransition: {
+    type: 'spring' as const,
+    stiffness: 520,
+    damping: 34,
+    mass: 0.72,
+  },
+  morphTransition: {
+    type: 'spring' as const,
+    stiffness: 300,
+    damping: 30,
+    mass: 0.82,
+  },
+  reducedDuration: 0.16,
+} as const;
+
 // ── Base Animation Variants ───────────────────────────────────────────────────
 export const animationPresets = {
   fadeIn: {
@@ -149,28 +172,28 @@ export type AnimationVariant = keyof typeof animationPresets;
 export const tapPresets = {
   /** Standard button — crisp, confident */
   button: {
-    whileTap:   { scale: 0.96,  transition: { duration: 0.09, ease: [0.16, 1, 0.3, 1] } },
-    whileHover: { scale: 1.02,  transition: { duration: 0.12, ease: [0.16, 1, 0.3, 1] } },
+    whileTap:   { scale: appleLiquidMotion.pressScale, transition: appleLiquidMotion.pressTransition },
+    whileHover: { scale: appleLiquidMotion.hoverScale, transition: appleLiquidMotion.pressTransition },
   },
   /** Card that opens something — press to "push in" */
   card: {
-    whileTap:   { scale: 0.97,  transition: { duration: 0.12, ease: [0.16, 1, 0.3, 1] } },
-    whileHover: { scale: 1.012, y: -2, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } },
+    whileTap:   { scale: appleLiquidMotion.pressScale, transition: appleLiquidMotion.pressTransition },
+    whileHover: { scale: appleLiquidMotion.hoverScale, y: -2, transition: appleLiquidMotion.pressTransition },
   },
   /** Icon button — tight, playful spring */
   icon: {
-    whileTap:   { scale: 0.88, rotate: -4, transition: { duration: 0.08, ease: [0.34, 1.56, 0.64, 1] } },
-    whileHover: { scale: 1.1,             transition: { duration: 0.14, ease: [0.34, 1.56, 0.64, 1] } },
+    whileTap:   { scale: appleLiquidMotion.pressScale, rotate: -4, transition: appleLiquidMotion.pressTransition },
+    whileHover: { scale: appleLiquidMotion.hoverScale, transition: appleLiquidMotion.pressTransition },
   },
   /** Destructive action — slower, deliberate */
   danger: {
-    whileTap:   { scale: 0.94, transition: { duration: 0.14, ease: [0.16, 1, 0.3, 1] } },
-    whileHover: { scale: 1.01, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } },
+    whileTap:   { scale: 0.975, transition: appleLiquidMotion.pressTransition },
+    whileHover: { scale: appleLiquidMotion.hoverScale, transition: appleLiquidMotion.pressTransition },
   },
   /** Toggle/checkbox — satisfying "click" feel */
   toggle: {
-    whileTap:   { scale: 0.90, transition: { duration: 0.08, ease: [0.34, 1.56, 0.64, 1] } },
-    whileHover: { scale: 1.05, transition: { duration: 0.12, ease: [0.34, 1.56, 0.64, 1] } },
+    whileTap:   { scale: appleLiquidMotion.pressScale, transition: appleLiquidMotion.pressTransition },
+    whileHover: { scale: appleLiquidMotion.hoverScale, transition: appleLiquidMotion.pressTransition },
   },
 } as const;
 

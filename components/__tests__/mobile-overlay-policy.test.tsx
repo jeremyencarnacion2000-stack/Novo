@@ -55,10 +55,11 @@ jest.mock('@/lib/focus-context', () => ({
     mode: 'work',
     formatTime: () => '00:00',
   }),
+  useFocusControls: () => ({ isActive: false, mode: 'work' }),
 }))
 
 jest.mock('@/lib/player-store', () => ({
-  usePlayerStore: () => ({
+  usePlayerStore: (selector: (state: Record<string, unknown>) => unknown) => selector({
     currentTrack: {
       id: 'track-1',
       uri: 'track-1',
@@ -283,8 +284,11 @@ describe('mobile overlay policy', () => {
 
       expect(targets).toHaveLength(5)
       targets.forEach((target) => {
-        expect(target).toHaveClass('min-w-[44px]')
-        expect(target).toHaveClass('min-h-[44px]')
+        // The four route buttons are 44px; the menu control is 48px.
+        const minWidth = target.className.match(/min-w-\[(\d+)px\]/)
+        const minHeight = target.className.match(/min-h-\[(\d+)px\]/)
+        expect(Number(minWidth?.[1])).toBeGreaterThanOrEqual(44)
+        expect(Number(minHeight?.[1])).toBeGreaterThanOrEqual(44)
       })
       expect(overlayRoot).toHaveStyle('--mobile-safe-area-bottom: env(safe-area-inset-bottom)')
       expect(navigation).toHaveStyle('padding-bottom: var(--mobile-safe-area-bottom)')

@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  createMutationFingerprint,
+  IdempotencyConflictError,
+  readIdempotencyKey,
+  runIdempotentCreate,
+} from '@/lib/server-idempotency'
 
 export async function POST(req: Request) {
   try {
@@ -25,22 +31,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Create a history entry
-    const historyEntry = await prisma.musicHistory.create({
-      data: {
-        userId: user.id,
-        trackId,
-        title,
-        artist,
-        artistId,
-        thumbnail,
-      }
+    const { key: idempotencyKey, invalid } = readIdempotencyKey(req)
+    if (invalid) return NextResponse.json({ error: 'Invalid Idempotency-Key' }, { status: 400 })
+
+    const historyData = { userId: user.id, trackId, title, artist, artistId, thumbnail }
+    const result = await runIdempotentCreate(prisma, {
+      userId: user.id,
+      scope: 'music_history_create',
+      idempotencyKey,
+      fingerprint: createMutationFingerprint(historyData),
+      resourceType: 'music_history',
+      create: (db) => db.musicHistory.create({ data: historyData }),
+      findResource: (resourceId, db) => db.musicHistory.findFirst({
+        where: { id: resourceId, userId: user.id },
+      }),
     })
 
-    return NextResponse.json(historyEntry)
-  } catch (error: any) {
-    console.error('History API error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(result.resource, {
+      status: result.replay ? 200 : 201,
+      headers: { 'X-Idempotent-Replay': String(result.replay) },
+    })
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+    console.error('[music/history] save failed')
+    return NextResponse.json({ error: 'Unable to save listening history right now' }, { status: 500 })
   }
 }
 
@@ -67,7 +83,8 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json(history)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch {
+    console.error('[music/history] list failed')
+    return NextResponse.json({ error: 'Unable to load listening history right now' }, { status: 500 })
   }
 }

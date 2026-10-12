@@ -36,14 +36,19 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [isDeletingAll, setIsDeletingAll] = useState(false)
+  const [isResettingTwin, setIsResettingTwin] = useState(false)
   const [availableBackups, setAvailableBackups] = useState<{ date: string, data: any }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load available backups on mount
   useEffect(() => {
-    const backups = DataIntegrator.getAvailableBackups()
+    if (!session?.user?.id) {
+      setAvailableBackups([])
+      return
+    }
+    const backups = DataIntegrator.getAvailableBackups(session.user.id)
     setAvailableBackups(backups)
-  }, [])
+  }, [session?.user?.id])
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -172,7 +177,9 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
       const response = await fetch('/api/user/data', { method: 'DELETE' })
       if (!response.ok) throw new Error('Failed to delete server data')
 
-      localStorage.clear()
+      // Remove only this account's client-side state. A global clear() would
+      // also wipe another account's preferences/backups in a shared browser.
+      DataIntegrator.clearUserLocalData(session.user.id)
       resetSettings()
       toast({
         title: 'All data deleted',
@@ -192,18 +199,29 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
     }
   }
 
-  const handleResetTwin = () => {
+  const handleResetTwin = async () => {
     if (!confirm('Reset Cognitive Twin? This will clear all learned patterns.')) return
-    resetTwin()
-    toast({
-      title: 'Twin reset',
-      description: 'Cognitive Twin has been cleared and will re-learn from scratch.'
-    })
+    setIsResettingTwin(true)
+    try {
+      const didReset = await resetTwin()
+      toast(didReset
+        ? {
+            title: 'Twin reset',
+            description: 'Cognitive Twin has been cleared and will re-learn from scratch.'
+          }
+        : {
+            title: 'Reset failed',
+            description: 'The Twin could not be reset on the server. Nothing was changed.',
+            variant: 'destructive',
+          })
+    } finally {
+      setIsResettingTwin(false)
+    }
   }
 
   const handleClearCache = () => {
     if (!confirm('Clear local cache?')) return
-    localStorage.clear()
+    if (session?.user?.id) DataIntegrator.clearUserLocalData(session.user.id)
     toast({
       title: 'Cache cleared',
       description: 'Local cache has been wiped. Reloading to sync from server.'
@@ -312,7 +330,7 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
       {/* Danger zone actions */}
       <Section title="Danger Zone">
         <div className="rounded-2xl border border-red-500/10 bg-red-500/[0.01] p-5 space-y-2">
-          <DangerAction icon={RefreshCw} label="Reset Cognitive Twin" description="Erase learned intelligence profile patterns. Cannot be undone." onClick={handleResetTwin} />
+          <DangerAction icon={RefreshCw} label="Reset Cognitive Twin" description="Erase learned intelligence profile patterns. Cannot be undone." onClick={handleResetTwin} loading={isResettingTwin} />
           <DangerAction icon={Trash2} label={t('settings.delete_all')} description="Permanently delete all workspace items and settings. Cannot be undone." onClick={handleDeleteAllData} loading={isDeletingAll} />
         </div>
       </Section>

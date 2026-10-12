@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(client)
   } catch (error) {
-    console.error('Error fetching client:', error)
+    console.error('Error fetching client.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -74,7 +74,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating client:', error)
+    console.error('Error updating client.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -104,7 +104,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting client:', error)
+    console.error('Error deleting client.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -6,6 +6,8 @@ import { Search, Heart, Play, Pause, Loader2, AlertCircle, Music, Home, Compass,
 import { usePlayerStore } from '@/lib/player-store'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 const DEFAULT_IMG = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=1000"
 
@@ -174,9 +176,18 @@ export default function MusicPage() {
   const [likedSongs, setLikedSongs] = useState<any[]>([])
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set())
   const [followedArtistIds, setFollowedArtistIds] = useState<Set<string>>(new Set())
+  // A single click should own the optimistic transition until the server has
+  // acknowledged it. Without this guard two fast taps could prepend the same
+  // liked track twice or issue follow/unfollow requests in the wrong order.
+  const [pendingLikeIds, setPendingLikeIds] = useState<Set<string>>(new Set())
+  const pendingLikeIdsRef = useRef(new Set<string>())
+  const [pendingFollowArtistIds, setPendingFollowArtistIds] = useState<Set<string>>(new Set())
+  const pendingFollowArtistIdsRef = useRef(new Set<string>())
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [newPlaylistDesc, setNewPlaylistDesc] = useState('')
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false)
+  const playlistIntentKeyRef = useRef<string | null>(null)
 
   // UI Dropdown/Overlay state
   const [activeTrackMenuId, setActiveTrackMenuId] = useState<string | null>(null)
@@ -198,6 +209,10 @@ export default function MusicPage() {
   const jpopScrollRef = useRef<HTMLDivElement>(null)
   const albumsScrollRef = useRef<HTMLDivElement>(null)
   const recentScrollRef = useRef<HTMLDivElement>(null)
+  const homeRequestRef = useRef<AbortController | null>(null)
+  const userDataRequestRef = useRef<AbortController | null>(null)
+  const artistRequestRef = useRef<AbortController | null>(null)
+  const searchRequestRef = useRef<AbortController | null>(null)
 
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
@@ -206,41 +221,66 @@ export default function MusicPage() {
     }
   }
 
-  const { playTrack, togglePlayPause, currentTrack, isPlaying } = usePlayerStore()
+  const playTrack = usePlayerStore((state) => state.playTrack)
+  const togglePlayPause = usePlayerStore((state) => state.togglePlayPause)
+  const currentTrack = usePlayerStore((state) => state.currentTrack)
+  const isPlaying = usePlayerStore((state) => state.isPlaying)
 
   // Load home recommendations
   const loadHomeData = async () => {
+    homeRequestRef.current?.abort()
+    const controller = new AbortController()
+    homeRequestRef.current = controller
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch('/api/ytmusic/home')
+      const res = await fetch('/api/ytmusic/home', { signal: controller.signal })
+      if (controller.signal.aborted || homeRequestRef.current !== controller) return
       if (res.ok) {
         const d = await res.json()
+        if (controller.signal.aborted || homeRequestRef.current !== controller) return
         setTrending(d.topTracks || [])
         setPlaylists(d.playlists || [])
         setTopArtists(d.topArtists || [])
       } else {
         const err = await res.json()
+        if (controller.signal.aborted || homeRequestRef.current !== controller) return
         setError(err.error || 'Failed to load music data')
       }
-    } catch (e: any) { 
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || controller.signal.aborted) return
       setError(e.message || 'Network error loading music data')
-    } finally { 
-      setLoading(false) 
+    } finally {
+      if (homeRequestRef.current === controller) {
+        homeRequestRef.current = null
+        setLoading(false)
+      }
     }
   }
 
   // Load custom user playlists & liked songs
   const loadUserData = async () => {
-    if (!session) return
+    userDataRequestRef.current?.abort()
+    const controller = new AbortController()
+    userDataRequestRef.current = controller
+    if (!session) {
+      setCustomPlaylists([])
+      setLikedSongs([])
+      setLikedTrackIds(new Set())
+      setFollowedArtistIds(new Set())
+      setRecentlyPlayed([])
+      userDataRequestRef.current = null
+      return
+    }
     try {
       // Parallel load
-      const [playlistsRes, likedRes, followRes, historyRes] = await Promise.all([
-        fetch('/api/music/playlists'),
-        fetch('/api/music/liked'),
-        fetch('/api/music/follow'),
-        fetch('/api/music/history')
+        const [playlistsRes, likedRes, followRes, historyRes] = await Promise.all([
+        fetch('/api/music/playlists', { signal: controller.signal }),
+        fetch('/api/music/liked', { signal: controller.signal }),
+        fetch('/api/music/follow', { signal: controller.signal }),
+        fetch('/api/music/history', { signal: controller.signal }),
       ])
+      if (controller.signal.aborted || userDataRequestRef.current !== controller) return
       
       if (playlistsRes.ok) {
         const playlistsData = await playlistsRes.json()
@@ -263,23 +303,27 @@ export default function MusicPage() {
         setRecentlyPlayed(historyData || [])
       }
     } catch (e) {
+      if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) return
       console.error("Failed to load user custom music data:", e)
+    } finally {
+      if (userDataRequestRef.current === controller) userDataRequestRef.current = null
     }
   }
 
   // Follow/Unfollow artist
   const toggleFollowArtist = async (artistId: string, artistName: string, imageUrl: string) => {
-    if (!session) return
+    if (!session || pendingFollowArtistIdsRef.current.has(artistId)) return
+    pendingFollowArtistIdsRef.current.add(artistId)
+    setPendingFollowArtistIds(prev => new Set(prev).add(artistId))
     
     const isFollowing = followedArtistIds.has(artistId)
-    const newFollowed = new Set(followedArtistIds)
-    if (isFollowing) {
-      newFollowed.delete(artistId)
-    } else {
-      newFollowed.add(artistId)
-    }
     // Optimistic UI update
-    setFollowedArtistIds(newFollowed)
+    setFollowedArtistIds(prev => {
+      const next = new Set(prev)
+      if (isFollowing) next.delete(artistId)
+      else next.add(artistId)
+      return next
+    })
 
     try {
       const res = await fetch('/api/music/follow', {
@@ -295,55 +339,84 @@ export default function MusicPage() {
 
       if (!res.ok) {
         // Rollback on error
-        const rolledBack = new Set(followedArtistIds)
-        setFollowedArtistIds(rolledBack)
+        setFollowedArtistIds(prev => {
+          const next = new Set(prev)
+          if (isFollowing) next.add(artistId)
+          else next.delete(artistId)
+          return next
+        })
         console.error("Failed to toggle follow status")
       } else {
         // Refresh home data since topArtists now includes or excludes followed artists
-        loadHomeData()
+        void loadHomeData()
       }
     } catch (e) {
       // Rollback on error
-      const rolledBack = new Set(followedArtistIds)
-      setFollowedArtistIds(rolledBack)
+      setFollowedArtistIds(prev => {
+        const next = new Set(prev)
+        if (isFollowing) next.add(artistId)
+        else next.delete(artistId)
+        return next
+      })
       console.error("Failed to toggle follow status:", e)
+    } finally {
+      pendingFollowArtistIdsRef.current.delete(artistId)
+      setPendingFollowArtistIds(prev => {
+        const next = new Set(prev)
+        next.delete(artistId)
+        return next
+      })
     }
   }
 
   useEffect(() => {
-    loadHomeData()
+    void loadHomeData()
+    return () => homeRequestRef.current?.abort()
   }, [])
 
   useEffect(() => {
-    if (session) {
-      loadUserData()
-    }
+    void loadUserData()
+    return () => userDataRequestRef.current?.abort()
   }, [session])
 
   // Load selected artist profile details
   const loadArtistProfile = async (id: string) => {
+    artistRequestRef.current?.abort()
+    const controller = new AbortController()
+    artistRequestRef.current = controller
     try {
       setArtistLoading(true)
-      const res = await fetch(`/api/ytmusic/artist/${id}`)
+      const res = await fetch(`/api/ytmusic/artist/${id}`, { signal: controller.signal })
+      if (controller.signal.aborted || artistRequestRef.current !== controller) return
       if (res.ok) {
         const d = await res.json()
+        if (controller.signal.aborted || artistRequestRef.current !== controller) return
         setArtistData(d)
       } else {
         console.error('Failed to load artist details')
       }
     } catch (e) {
+      if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) return
       console.error(e)
     } finally {
-      setArtistLoading(false)
+      if (artistRequestRef.current === controller) {
+        artistRequestRef.current = null
+        setArtistLoading(false)
+      }
     }
   }
 
   useEffect(() => {
     if (selectedArtistId) {
-      loadArtistProfile(selectedArtistId)
-    } else {
       setArtistData(null)
+      void loadArtistProfile(selectedArtistId)
+    } else {
+      artistRequestRef.current?.abort()
+      artistRequestRef.current = null
+      setArtistData(null)
+      setArtistLoading(false)
     }
+    return () => artistRequestRef.current?.abort()
   }, [selectedArtistId])
 
   // Close dropdown menu when clicking outside
@@ -362,25 +435,44 @@ export default function MusicPage() {
 
   // Search logic
   useEffect(() => {
+    searchRequestRef.current?.abort()
+    searchRequestRef.current = null
     if (!searchQuery.trim()) {
       setSearchResults([])
+      setSearching(false)
       return 
     }
+    const controller = new AbortController()
+    searchRequestRef.current = controller
     const t = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(searchQuery)}`)
+        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(searchQuery)}`, { signal: controller.signal })
+        if (controller.signal.aborted || searchRequestRef.current !== controller) return
         const d = await res.json()
+        if (controller.signal.aborted || searchRequestRef.current !== controller) return
         if (res.ok) {
           setSearchResults(d.tracks || [])
         } else {
           console.error('Search error:', d.error)
           setSearchResults([])
         }
-      } catch (e: any) { console.error(e); setSearchResults([]) }
-      finally { setSearching(false) }
+      } catch (e: any) {
+        if (e?.name === 'AbortError' || controller.signal.aborted) return
+        console.error(e)
+        setSearchResults([])
+      } finally {
+        if (searchRequestRef.current === controller) {
+          searchRequestRef.current = null
+          setSearching(false)
+        }
+      }
     }, 600)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      controller.abort()
+      if (searchRequestRef.current === controller) searchRequestRef.current = null
+    }
   }, [searchQuery])
 
   // Navigation history manager
@@ -471,50 +563,41 @@ export default function MusicPage() {
       return [optimisticEntry, ...filtered].slice(0, 20)
     })
 
-    // POST to database history API
-    if (session) {
-      fetch('/api/music/history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trackId: songId,
-          title: songName,
-          artist: songArtist,
-          artistId: songArtistId,
-          thumbnail: songThumbnail
-        })
-      }).catch(err => console.error("Failed to post to history API:", err))
-    }
+    // History is persisted by GlobalPlayer when the actual player loads a new
+    // track. Keeping one owner prevents a play from this page from creating
+    // two history rows (the old page-level POST raced the player effect).
   }
 
   // Toggle Like Track logic
   const handleToggleLike = async (track: any, e?: React.MouseEvent) => {
     e?.stopPropagation()
     const songId = track.trackId || track.id
+    if (!songId || pendingLikeIdsRef.current.has(songId)) return
+    pendingLikeIdsRef.current.add(songId)
+    setPendingLikeIds(prev => new Set(prev).add(songId))
     const isLiked = likedTrackIds.has(songId)
     const action = isLiked ? 'remove' : 'add'
+    const newLike = {
+      trackId: songId,
+      title: track.name || track.title,
+      artist: track.artists?.[0]?.name || track.artist || 'Unknown',
+      artistId: track.artists?.[0]?.id || track.artistId || '',
+      thumbnail: track.image || track.thumbnail || DEFAULT_IMG,
+      duration: track.duration_ms || track.duration || 240000
+    }
     
     // Update local state optimistically
-    const updatedIds = new Set(likedTrackIds)
-    if (isLiked) {
-      updatedIds.delete(songId)
-      setLikedSongs(prev => prev.filter(t => t.trackId !== songId))
-    } else {
-      updatedIds.add(songId)
-      const newLike = {
-        trackId: songId,
-        title: track.name || track.title,
-        artist: track.artists?.[0]?.name || track.artist || 'Unknown',
-        artistId: track.artists?.[0]?.id || track.artistId || '',
-        thumbnail: track.image || track.thumbnail || DEFAULT_IMG,
-        duration: track.duration_ms || track.duration || 240000
-      }
-      setLikedSongs(prev => [newLike, ...prev])
-    }
-    setLikedTrackIds(updatedIds)
+    setLikedTrackIds(prev => {
+      const next = new Set(prev)
+      if (isLiked) next.delete(songId)
+      else next.add(songId)
+      return next
+    })
+    if (isLiked) setLikedSongs(prev => prev.filter(t => t.trackId !== songId))
+    else setLikedSongs(prev => prev.some(t => t.trackId === songId) ? prev : [newLike, ...prev])
 
     try {
-      await fetch('/api/music/liked', {
+      const response = await fetch('/api/music/liked', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -527,19 +610,40 @@ export default function MusicPage() {
           duration: track.duration_ms || track.duration || 240000
         })
       })
+      if (!response.ok) throw new Error('like_update_failed')
     } catch (error) {
+      // Restore the exact pre-click state, even if the request failed after
+      // the optimistic render. This avoids a “liked” icon that is out of sync
+      // with the persisted library.
+      setLikedTrackIds(prev => {
+        const next = new Set(prev)
+        if (isLiked) next.add(songId)
+        else next.delete(songId)
+        return next
+      })
+      if (isLiked) setLikedSongs(prev => prev.some(t => t.trackId === songId) ? prev : [newLike, ...prev])
+      else setLikedSongs(prev => prev.filter(t => t.trackId !== songId))
       console.error('Error toggling like track:', error)
+    } finally {
+      pendingLikeIdsRef.current.delete(songId)
+      setPendingLikeIds(prev => {
+        const next = new Set(prev)
+        next.delete(songId)
+        return next
+      })
     }
   }
 
   // Playlist management functions
   const handleCreatePlaylist = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newPlaylistName.trim()) return
+    if (!newPlaylistName.trim() || isCreatingPlaylist) return
+    setIsCreatingPlaylist(true)
     try {
+      const idempotencyKey = playlistIntentKeyRef.current ??= createClientIdempotencyKey()
       const res = await fetch('/api/music/playlists', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           name: newPlaylistName,
           description: newPlaylistDesc,
@@ -551,11 +655,14 @@ export default function MusicPage() {
         setCustomPlaylists(prev => [newPl, ...prev])
         setNewPlaylistName('')
         setNewPlaylistDesc('')
+        playlistIntentKeyRef.current = null
         setIsCreatePlaylistOpen(false)
         navigateTo(`playlist:${newPl.id}`)
       }
     } catch (error) {
       console.error('Failed to create playlist:', error)
+    } finally {
+      setIsCreatingPlaylist(false)
     }
   }
 
@@ -671,6 +778,7 @@ export default function MusicPage() {
     const artistObject = track.artists?.[0] || { name: track.artist || 'Unknown', id: track.artistId || null }
 
     const isLiked = likedTrackIds.has(songId)
+    const isLikePending = pendingLikeIds.has(songId)
 
     return (
       <div
@@ -717,6 +825,7 @@ export default function MusicPage() {
             onClick={(e) => handleToggleLike(track, e)}
             className={cn(
               "h-4 w-4 transition-all hover:scale-115 cursor-pointer",
+              isLikePending && "pointer-events-none opacity-50 animate-pulse",
               isLiked ? "text-[#1db954] fill-[#1db954] opacity-100" : "sm:opacity-0 sm:group-hover:opacity-100 hover:text-[#1db954]"
             )} 
           />
@@ -1066,14 +1175,17 @@ export default function MusicPage() {
                         </button>
                         <button 
                           onClick={() => toggleFollowArtist(artistData.id, artistData.name, artistData.thumbnails?.[0]?.url || DEFAULT_IMG)}
+                          disabled={pendingFollowArtistIds.has(artistData.id)}
                           className={cn(
-                            "font-bold text-sm px-6 py-3 rounded-full hover:scale-105 transition-all active:scale-95 border",
+                            "font-bold text-sm px-6 py-3 rounded-full hover:scale-105 transition-all active:scale-95 border disabled:pointer-events-none disabled:opacity-60",
                             followedArtistIds.has(artistData.id) 
                               ? "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white"
                               : "bg-white text-black border-transparent hover:bg-white/90"
                           )}
                         >
-                          {followedArtistIds.has(artistData.id) ? '✓ Following' : '+ Follow'}
+                          {pendingFollowArtistIds.has(artistData.id)
+                            ? 'Updating…'
+                            : followedArtistIds.has(artistData.id) ? '✓ Following' : '+ Follow'}
                         </button>
                       </div>
                     </div>
@@ -1591,9 +1703,13 @@ export default function MusicPage() {
       </div>
 
       {/* ─── CREATE PLAYLIST GLASSMORPHIC MODAL ─── */}
-      {isCreatePlaylistOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-[#191b16]/95 border border-white/10 rounded-[28px] p-8 w-full max-w-md shadow-2xl relative">
+      <Dialog open={isCreatePlaylistOpen} onOpenChange={setIsCreatePlaylistOpen}>
+        <DialogContent
+          motionPreset="center"
+          mobilePresentation="sheet"
+          showCloseButton={false}
+          className="w-full max-w-md rounded-[28px] border-white/10 bg-[#191b16]/95 p-8 text-white shadow-2xl"
+        >
             <button 
               onClick={() => setIsCreatePlaylistOpen(false)}
               className="absolute top-6 right-6 text-[#b3b3b3] hover:text-white transition-colors"
@@ -1605,7 +1721,7 @@ export default function MusicPage() {
               <div className="w-10 h-10 rounded-xl bg-[#1db954] flex items-center justify-center shadow-lg">
                 <FolderPlus className="h-5 w-5 text-black" />
               </div>
-              <h3 className="text-xl font-bold text-white tracking-tight">Create Playlist</h3>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">Create Playlist</DialogTitle>
             </div>
 
             <form onSubmit={handleCreatePlaylist} className="space-y-4">
@@ -1614,8 +1730,12 @@ export default function MusicPage() {
                 <input 
                   type="text"
                   required
+                  disabled={isCreatingPlaylist}
                   value={newPlaylistName}
-                  onChange={e => setNewPlaylistName(e.target.value)}
+                  onChange={e => {
+                    playlistIntentKeyRef.current = null
+                    setNewPlaylistName(e.target.value)
+                  }}
                   placeholder="e.g. My Study Beats"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-[#b3b3b3]/40 focus:outline-none focus:ring-1 focus:ring-[#1db954] transition-all"
                 />
@@ -1624,8 +1744,12 @@ export default function MusicPage() {
               <div>
                 <label className="block text-xs font-bold text-[#b3b3b3] uppercase tracking-wider mb-2">Description (Optional)</label>
                 <textarea 
+                  disabled={isCreatingPlaylist}
                   value={newPlaylistDesc}
-                  onChange={e => setNewPlaylistDesc(e.target.value)}
+                  onChange={e => {
+                    playlistIntentKeyRef.current = null
+                    setNewPlaylistDesc(e.target.value)
+                  }}
                   placeholder="Add an optional description..."
                   rows={3}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-[#b3b3b3]/40 focus:outline-none focus:ring-1 focus:ring-[#1db954] transition-all resize-none"
@@ -1642,15 +1766,15 @@ export default function MusicPage() {
                 </button>
                 <button 
                   type="submit"
-                  className="bg-[#1db954] hover:bg-[#1ed760] text-black font-bold text-xs px-6 py-2.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-md"
+                  disabled={isCreatingPlaylist}
+                  className="bg-[#1db954] hover:bg-[#1ed760] text-black font-bold text-xs px-6 py-2.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-md disabled:cursor-wait disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  Create
+                  {isCreatingPlaylist ? 'Creating…' : 'Create'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

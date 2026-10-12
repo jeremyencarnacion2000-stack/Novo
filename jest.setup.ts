@@ -2,6 +2,9 @@
 import '@testing-library/jest-dom';
 import fetch from 'node-fetch';
 
+// Jest's jsdom environment does not consistently expose the platform fetch
+// constructors, so keep this compatibility shim scoped to the dev-only test
+// setup. The application bundle still uses the native Next/Node fetch.
 if (!globalThis.fetch) {
   (globalThis as any).fetch = fetch;
   (globalThis as any).Request = (fetch as any).Request;

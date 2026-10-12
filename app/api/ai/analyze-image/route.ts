@@ -3,6 +3,35 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { z } from 'zod';
+
+const MAX_IMAGE_BODY_BYTES = 8_000_000;
+const MAX_IMAGE_URL_LENGTH = 2_048;
+const MAX_IMAGE_BASE64_LENGTH = 8_000_000;
+
+const imageAnalysisRequestSchema = z.object({
+  imageUrl: z.string().trim().max(MAX_IMAGE_URL_LENGTH).optional(),
+  imageBase64: z.string().max(MAX_IMAGE_BASE64_LENGTH).optional(),
+}).strict().superRefine((value, context) => {
+  if (!value.imageUrl && !value.imageBase64) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'image_required' });
+  }
+
+  if (value.imageUrl && value.imageBase64) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'single_image_source', path: ['imageUrl'] });
+  }
+
+  if (value.imageUrl) {
+    try {
+      const parsed = new URL(value.imageUrl);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'unsupported_image_url', path: ['imageUrl'] });
+      }
+    } catch {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_image_url', path: ['imageUrl'] });
+    }
+  }
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,11 +43,17 @@ export async function POST(request: NextRequest) {
     const rl = rateLimit(`ai:analyze:${session.user.id}`, 10, 60_000);
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    const { imageUrl, imageBase64 } = await request.json();
-
-    if (!imageUrl && !imageBase64) {
-      return NextResponse.json({ error: 'Se requiere imageUrl o imageBase64' }, { status: 400 });
+    const contentLength = Number(request.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BODY_BYTES) {
+      return NextResponse.json({ error: 'Image payload is too large' }, { status: 413 });
     }
+
+    const rawBody = await request.json().catch(() => null);
+    const parsedRequest = imageAnalysisRequestSchema.safeParse(rawBody);
+    if (!parsedRequest.success) {
+      return NextResponse.json({ error: 'Invalid image request' }, { status: 400 });
+    }
+    const { imageUrl, imageBase64 } = parsedRequest.data;
 
     // Inicializar cliente de Google Vision AI
     const client = new ImageAnnotatorClient();
@@ -86,10 +121,10 @@ export async function POST(request: NextRequest) {
       safeSearch
     });
 
-  } catch (error) {
-    console.error('Error analizando imagen:', error);
+  } catch {
+    console.error('Error analizando imagen.');
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { error: 'Unable to analyze this image right now' },
       { status: 500 }
     );
   }

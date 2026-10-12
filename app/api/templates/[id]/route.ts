@@ -46,7 +46,7 @@ export async function GET(
 
         return NextResponse.json({ template });
     } catch (error) {
-        console.error('Error fetching template:', error);
+        console.error('Error fetching template.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -101,7 +101,7 @@ export async function PUT(
 
         return NextResponse.json({ template });
     } catch (error) {
-        console.error('Error updating template:', error);
+        console.error('Error updating template.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -144,7 +144,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting template:', error);
+        console.error('Error deleting template.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -198,7 +198,7 @@ export async function POST(
             name: template.name,
         });
     } catch (error) {
-        console.error('Error using template:', error);
+        console.error('Error using template.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

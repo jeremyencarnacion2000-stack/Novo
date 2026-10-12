@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createLemonSqueezyCheckout, LEMONSQUEEZY_VARIANT_IDS, type BillingInterval } from '@/lib/lemonsqueezy'
+import { z } from 'zod'
+import {
+  createLemonSqueezyCheckout,
+  LemonSqueezyError,
+  LEMONSQUEEZY_VARIANT_IDS,
+  verifyLemonSqueezyConfiguration,
+} from '@/lib/lemonsqueezy'
+
+const checkoutSchema = z.object({
+  interval: z.enum(['month', 'year']).default('month'),
+  source: z.enum(['settings', 'twin-mode', 'limit', 'landing-intent']).default('settings'),
+  locale: z.enum(['en', 'es', 'fr', 'de']).default('en'),
+})
 
 // Creates a Lemon Squeezy Checkout for the Novo Pro subscription. Lemon
 // Squeezy is the live billing path (Merchant of Record) since Stripe isn't
@@ -14,14 +26,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { interval, source, locale } = (await request.json().catch(() => ({}))) as {
-    interval?: BillingInterval
-    source?: string
-    locale?: string
+  const parsedInput = checkoutSchema.safeParse(await request.json().catch(() => ({})))
+  if (!parsedInput.success) {
+    return NextResponse.json({ error: 'Invalid checkout request' }, { status: 400 })
   }
-  const variantId = LEMONSQUEEZY_VARIANT_IDS[interval === 'year' ? 'year' : 'month']
+  const { interval, source, locale } = parsedInput.data
+  const variantId = LEMONSQUEEZY_VARIANT_IDS[interval]
   if (!variantId) {
-    return NextResponse.json({ error: 'Lemon Squeezy variant not configured' }, { status: 500 })
+    return NextResponse.json({ error: 'Billing is temporarily unavailable' }, { status: 503 })
   }
 
   const receiptCopy = {
@@ -42,17 +54,23 @@ export async function POST(request: NextRequest) {
       note: 'Danke, dass du Novo Pro gewählt hast. Dein Tarif wird automatisch in deinem Konto aktiviert.',
     },
   } as const
-  const safeLocale = locale === 'es' || locale === 'fr' || locale === 'de' ? locale : 'en'
   const appUrl = (process.env.NEXTAUTH_URL || request.nextUrl.origin).replace(/\/$/, '')
-  const url = await createLemonSqueezyCheckout({
-    variantId,
-    userId: session.user.id,
-    email: session.user.email,
-    source,
-    redirectUrl: `${appUrl}/settings?tab=billing&upgraded=1`,
-    receiptButtonText: receiptCopy[safeLocale].button,
-    receiptThankYouNote: receiptCopy[safeLocale].note,
-  })
+  try {
+    await verifyLemonSqueezyConfiguration({ appUrl })
+    const url = await createLemonSqueezyCheckout({
+      variantId,
+      userId: session.user.id,
+      email: session.user.email,
+      source,
+      redirectUrl: `${appUrl}/settings?tab=billing&upgraded=1`,
+      receiptButtonText: receiptCopy[locale].button,
+      receiptThankYouNote: receiptCopy[locale].note,
+    })
 
-  return NextResponse.json({ url })
+    return NextResponse.json({ url })
+  } catch (error) {
+    const code = error instanceof LemonSqueezyError ? error.code : 'checkout_unavailable'
+    console.error('[Billing] Lemon Squeezy checkout unavailable:', code)
+    return NextResponse.json({ error: 'Billing is temporarily unavailable' }, { status: 503 })
+  }
 }

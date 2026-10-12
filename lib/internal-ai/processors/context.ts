@@ -33,8 +33,8 @@ export const registerContextProcessor = (service: IInternalAIService) => {
                     suggestions
                 }
             };
-        } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        } catch {
+            return { success: false, error: 'CONTEXT_PROCESSING_FAILED' };
         }
     });
 };

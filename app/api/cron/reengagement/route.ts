@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
     try {
         const result = await maybeRunReengagement();
         return NextResponse.json(result);
-    } catch (error) {
-        console.error('[Cron: reengagement] Run failed:', (error as Error).message);
+    } catch {
+        console.error('[Cron: reengagement] Run failed.');
         return NextResponse.json({ error: 'Cron run failed' }, { status: 500 });
     }
 }

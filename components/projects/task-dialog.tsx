@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { Task } from "@/types/project"
 import { useNotifications } from "@/lib/notification-context"
-import { useModalFlip } from "@/hooks/use-modal-flip"
 import { useTranslation } from "@/lib/i18n"
 
 interface TaskDialogProps {
@@ -42,8 +41,7 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
   const [dueDate, setDueDate] = useState("")
 
   const flipKey = task ? `task-${task.id}` : "btn-new-task"
-  const closeFlip = useModalFlip(flipKey, open)
-  const handleClose = () => closeFlip(onClose)
+  const handleClose = onClose
   const selectedDate: CalendarDate | null = dueDate ? parseDate(dueDate) : null
 
   useEffect(() => {
@@ -86,7 +84,7 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
       <DialogContent
-        data-flip-to={flipKey}
+        motionId={flipKey}
         showCloseButton={false}
         className="max-w-[min(25rem,calc(100%-1.5rem))] overflow-visible rounded-[28px] border-white/20 bg-background/95 p-4 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-5"
       >
@@ -235,7 +233,7 @@ export function TaskDialog({ open, onClose, onSave, task }: TaskDialogProps) {
             <Button type="button" variant="ghost" onClick={handleClose} className="size-9 rounded-full p-0 text-muted-foreground hover:bg-foreground/[0.06] active:scale-[0.97]" aria-label={t("taskDialog.cancel")}>
               <X className="size-3.5" strokeWidth={1.5} />
             </Button>
-            <Button type="submit" className="h-9 rounded-full bg-foreground px-4 text-xs font-medium text-background shadow-none transition-[background,transform] duration-150 hover:bg-foreground/85 active:scale-[0.97]">
+            <Button ripple type="submit" className="h-9 rounded-full bg-foreground px-4 text-xs font-medium text-background shadow-none transition-[background,transform] duration-150 hover:bg-foreground/85 active:scale-[0.97]">
               <Check className="mr-1.5 size-3.5" strokeWidth={1.8} />
               {task ? t("taskDialog.save") : t("taskDialog.create")}
             </Button>

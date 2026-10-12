@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { groqAPI } from '@/lib/groq'
 import { openRouterAPI } from '@/lib/openrouter'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { z } from 'zod'
+
+const analyzeRequestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(['assistant', 'user']),
+    content: z.string().trim().min(1).max(6_000),
+  })).min(1).max(24),
+  language: z.enum(['en', 'es', 'fr', 'de']).default('en'),
+})
 
 const SYSTEM_PROMPT = `You are Novo's onboarding analyst. Read the user's onboarding conversation and infer their real cognitive/work profile from what they actually said — do not invent details they didn't mention or imply.
 
@@ -33,8 +44,8 @@ async function analyzeWithLLM(textLog: string, language: string) {
   let raw: string
   try {
     raw = (await groqAPI.generateResponse(userMessage, '', [], prompt, 'openai/gpt-oss-120b')).content
-  } catch (groqError) {
-    console.error('[Onboarding Analyze] Groq failed, trying OpenRouter:', groqError)
+  } catch {
+    console.error('[Onboarding Analyze] Groq failed, trying OpenRouter.', { provider: 'groq' })
     raw = (await openRouterAPI.generateResponse(userMessage, '', [], prompt, 'openai/gpt-oss-20b:free')).content
   }
   const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json\n?|\n?```/g, '').trim()
@@ -52,20 +63,34 @@ function extractGoalAnswer(messages: any[]): string {
 
 export async function POST(req: Request) {
   try {
-    const { messages, language = 'en' } = await req.json()
+    const parsed = analyzeRequestSchema.safeParse(await req.json())
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid onboarding transcript' }, { status: 400 })
+    }
+
+    const { messages, language } = parsed.data
     const textLog = messages
       .map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`)
       .join('\n')
     const rawGoalAnswer = extractGoalAnswer(messages)
 
-    try {
-      const profile = await analyzeWithLLM(textLog, language)
-      // Belt-and-suspenders: if the LLM ever drops the field, fall back to
-      // the raw text the user typed rather than losing the goal entirely.
-      profile.longTermGoal = profile.longTermGoal || rawGoalAnswer
-      return NextResponse.json(profile)
-    } catch (llmError) {
-      console.error('[Onboarding Analyze] LLM analysis failed, falling back to heuristic parser:', llmError)
+    // Public onboarding can still show the flow, but it must not be an
+    // unauthenticated proxy to paid AI providers. Signed-in users receive the
+    // richer provider analysis; anonymous previews use the deterministic parser
+    // below and never send their transcript off-platform.
+    const session = await getServerSession(authOptions)
+    if (session?.user?.id) {
+      try {
+        const profile = await analyzeWithLLM(textLog, language)
+        // Belt-and-suspenders: if the LLM ever drops the field, fall back to
+        // the raw text the user typed rather than losing the goal entirely.
+        profile.longTermGoal = profile.longTermGoal || rawGoalAnswer
+        return NextResponse.json(profile)
+      } catch {
+        console.error('[Onboarding Analyze] LLM analysis failed; falling back to heuristic parser.')
+      }
+    } else {
+      console.info('[Onboarding Analyze] Anonymous preview; using local profile inference.')
     }
 
     // Local heuristic fallback — only reached if every LLM provider failed or
@@ -206,7 +231,8 @@ export async function POST(req: Request) {
       },
       selfDiscoveryText: fullNarrative,
     })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Error processing onboarding data' }, { status: 500 })
+  } catch {
+    console.error('[Onboarding Analyze] request failed.')
+    return NextResponse.json({ error: 'Unable to process your onboarding answers right now' }, { status: 500 })
   }
 }

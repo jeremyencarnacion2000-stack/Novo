@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const updateDealSchema = z.object({
+    title: z.string().trim().min(1).max(500).optional(),
+    value: z.union([z.number().finite(), z.string().regex(/^\d+(\.\d+)?$/)]).optional(),
+    stage: z.string().trim().min(1).max(100).optional(),
+    probability: z.number().finite().min(0).max(100).optional(),
+    expectedClose: z.string().trim().max(100).refine((value) => Number.isFinite(Date.parse(value)), 'expectedClose must be a valid date').optional().nullable(),
+    notes: z.string().max(5000).optional().nullable(),
+});
 
 // PUT /api/business/deals/[id] - Update a deal
 export async function PUT(
@@ -25,7 +35,11 @@ export async function PUT(
 
         const { id } = await params;
         const body = await request.json();
-        const { title, value, stage, probability, expectedClose, notes } = body;
+        const parsed = updateDealSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const { title, value, stage, probability, expectedClose, notes } = parsed.data;
 
         // Verify ownership
         const existing = await prisma.deal.findFirst({
@@ -39,8 +53,8 @@ export async function PUT(
         const deal = await prisma.deal.update({
             where: { id },
             data: {
-                ...(title && { title }),
-                ...(value !== undefined && { value: parseFloat(value) }),
+                ...(title !== undefined && { title }),
+                ...(value !== undefined && { value: typeof value === 'number' ? value : parseFloat(value) }),
                 ...(stage && { stage }),
                 ...(probability !== undefined && { probability }),
                 ...(expectedClose && { expectedClose: new Date(expectedClose) }),
@@ -69,7 +83,7 @@ export async function PUT(
 
         return NextResponse.json({ deal });
     } catch (error) {
-        console.error('Error updating deal:', error);
+        console.error('Error updating deal.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
@@ -112,7 +126,7 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting deal:', error);
+        console.error('Error deleting deal.');
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

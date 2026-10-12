@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(gratitude)
   } catch (error) {
-    console.error('Error fetching gratitude:', error)
+    console.error('Error fetching gratitude.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -72,7 +72,7 @@ export async function PUT(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error updating gratitude:', error)
+    console.error('Error updating gratitude.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -102,7 +102,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting gratitude:', error)
+    console.error('Error deleting gratitude.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

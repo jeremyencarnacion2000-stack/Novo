@@ -36,7 +36,7 @@ export async function GET(
 
     return NextResponse.json(item)
   } catch (error) {
-    console.error('Error fetching checklist item:', error)
+    console.error('Error fetching checklist item.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -95,13 +95,17 @@ export async function PUT(
     })
 
     // Sincronizar con la task relacionada si se actualizó 'completed' y existe taskId
+    // Completing an already-completed item is an idempotent state update. Do
+    // not emit a second completion event (or increment daily analytics) when a
+    // retry/reconnect repeats the same PUT.
+    const transitionedToCompleted = completed === true && currentItem.completed === false
     if (completed !== undefined) {
       const itemWithTaskId = await prisma.checklistItem.findUnique({
         where: { id },
         select: { taskId: true, text: true }
       })
 
-      if (completed) {
+      if (transitionedToCompleted) {
         // Track analytics
         const { trackServerCompletion } = await import('@/lib/analytics-server')
         await trackServerCompletion(session.user.id, 'task', 'checklist', {
@@ -126,7 +130,7 @@ export async function PUT(
 
     return NextResponse.json(updatedItem)
   } catch (error) {
-    console.error('Error updating checklist item:', error)
+    console.error('Error updating checklist item.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -156,7 +160,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting checklist item:', error)
+    console.error('Error deleting checklist item.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

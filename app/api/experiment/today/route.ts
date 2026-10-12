@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
 import { decryptCondition } from '@/lib/experiment/crypto'
 import { computeRealWindow, computeControlWindow } from '@/lib/experiment/deep-work-window'
 
@@ -10,6 +11,12 @@ function todayDateOnly(): Date {
   d.setHours(0, 0, 0, 0)
   return d
 }
+
+const experimentCheckinSchema = z.object({
+  subjectiveFocusScore: z.number().int().min(1).max(5),
+  subjectiveFatigueScore: z.number().int().min(1).max(5),
+  notes: z.string().trim().max(2000).optional().nullable(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,7 +71,7 @@ export async function GET(request: NextRequest) {
       subjectiveFatigueScore: null,
     })
   } catch (error) {
-    console.error('Error resolving today\'s experiment window:', error)
+    console.error('Error resolving today\'s experiment window.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -77,14 +84,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { subjectiveFocusScore, subjectiveFatigueScore, notes } = body
-
-    if (
-      typeof subjectiveFocusScore !== 'number' || subjectiveFocusScore < 1 || subjectiveFocusScore > 5 ||
-      typeof subjectiveFatigueScore !== 'number' || subjectiveFatigueScore < 1 || subjectiveFatigueScore > 5
-    ) {
-      return NextResponse.json({ error: 'subjectiveFocusScore and subjectiveFatigueScore must be integers 1-5' }, { status: 400 })
+    const parsed = experimentCheckinSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid check-in', details: parsed.error.flatten() }, { status: 400 })
     }
+    const { subjectiveFocusScore, subjectiveFatigueScore, notes } = parsed.data
 
     const date = todayDateOnly()
     const day = await prisma.experimentDay.findUnique({
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
       subjectiveFatigueScore: updated.subjectiveFatigueScore,
     })
   } catch (error) {
-    console.error('Error recording experiment check-in:', error)
+    console.error('Error recording experiment check-in.')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

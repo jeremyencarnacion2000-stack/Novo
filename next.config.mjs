@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: process.env.NEXT_PUBLIC_CAPACITOR === 'true' ? 'export' : undefined,
+  // Native shells use `capacitor.config.ts` to load the deployed `/app`
+  // resolver. Keep the server-backed build as the default; a full static
+  // export cannot represent OAuth callbacks or authenticated API routes.
+  output: process.env.NEXT_PUBLIC_CAPACITOR_STATIC_EXPORT === 'true' ? 'export' : undefined,
   reactStrictMode: true,
   compress: true,
   // Type-check IS enforced at build time (tsc baseline is clean at 0 errors as of
@@ -10,7 +13,10 @@ const nextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
-    unoptimized: true,
+    // The landing uses layered artwork, so shipping the source PNGs directly
+    // makes the first viewport unnecessarily heavy. Native shells do not
+    // render this local bundle; they load the optimized web surface remotely.
+    unoptimized: process.env.NEXT_PUBLIC_CAPACITOR_STATIC_EXPORT === 'true',
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production'
@@ -18,6 +24,9 @@ const nextConfig = {
       : false,
   },
   experimental: {
+    // Reduce peak compilation memory on constrained development machines.
+    // This changes build memory usage, not runtime behavior or type-check gates.
+    webpackMemoryOptimizations: true,
     // Deep tree-shaking: only ship icons/components actually imported
     optimizePackageImports: [
       'lucide-react',
@@ -33,7 +42,7 @@ const nextConfig = {
     ],
   },
   // ponytail: --webpack flag required for prod builds on Windows; Turbopack native binary segfaults
-  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma', 'onnxruntime-node', '@xenova/transformers'],
+  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma'],
   // Optimize for Vercel serverless functions
   poweredByHeader: false,
   async headers() {

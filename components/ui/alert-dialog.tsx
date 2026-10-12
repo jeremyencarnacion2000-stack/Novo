@@ -5,11 +5,61 @@ import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog'
 
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
+import { useNativeDialogMotion, type NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
+
+const AlertMotionContext = React.createContext<{
+  registerController: (controller: NativeDialogMotionController | null) => void
+} | null>(null)
 
 function AlertDialog({
+  open,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
-  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
+  const [present, setPresent] = React.useState(open ?? defaultOpen ?? false)
+  const controllerRef = React.useRef<NativeDialogMotionController | null>(null)
+  const previousOpenRef = React.useRef(open)
+  const registerController = React.useCallback((controller: NativeDialogMotionController | null) => {
+    controllerRef.current = controller
+  }, [])
+  const finishClose = React.useCallback((notify: boolean) => {
+    const complete = () => {
+      setPresent(false)
+      if (notify) onOpenChange?.(false)
+    }
+    const controller = controllerRef.current
+    if (controller) controller.close(complete)
+    else complete()
+  }, [onOpenChange])
+
+  React.useLayoutEffect(() => {
+    if (open === undefined) return
+    const wasOpen = previousOpenRef.current
+    previousOpenRef.current = open
+    if (open) {
+      if (!present) setPresent(true)
+      else if (wasOpen === false) controllerRef.current?.open()
+    } else if (wasOpen === true && present) {
+      finishClose(false)
+    }
+  }, [finishClose, open, present])
+
+  const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    if (nextOpen) {
+      setPresent(true)
+      onOpenChange?.(true)
+    } else {
+      finishClose(true)
+    }
+  }, [finishClose, onOpenChange])
+  const context = React.useMemo(() => ({ registerController }), [registerController])
+
+  return (
+    <AlertMotionContext.Provider value={context}>
+      <AlertDialogPrimitive.Root {...props} data-slot="alert-dialog" open={present} onOpenChange={handleOpenChange} />
+    </AlertMotionContext.Provider>
+  )
 }
 
 function AlertDialogTrigger({
@@ -36,7 +86,7 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50',
+        'fixed inset-0 z-50 bg-black/50 opacity-0',
         className,
       )}
       {...props}
@@ -46,16 +96,30 @@ function AlertDialogOverlay({
 
 function AlertDialogContent({
   className,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+  const surfaceRef = React.useRef<HTMLDivElement | null>(null)
+  const overlayRef = React.useRef<HTMLDivElement | null>(null)
+  const motionContext = React.useContext(AlertMotionContext)
+  React.useImperativeHandle(forwardedRef, () => surfaceRef.current as HTMLDivElement)
+  useNativeDialogMotion({
+    surfaceRef,
+    overlayRef,
+    preset: 'alert',
+    enabled: true,
+    registerController: motionContext?.registerController,
+  })
+
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      <AlertDialogOverlay ref={overlayRef} />
       <AlertDialogPrimitive.Content
+        ref={surfaceRef}
         data-slot="alert-dialog-content"
         aria-describedby={undefined}
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
+          'bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[26px] border p-6 shadow-lg sm:max-w-lg',
           className,
         )}
         {...props}

@@ -9,9 +9,6 @@ declare module 'next-auth' {
       email?: string | null
       image?: string | null
     } & DefaultSession['user']
-    accessToken?: string // Spotify access token
-    refreshToken?: string // Spotify refresh token  
-    provider?: string // Authentication provider (e.g., \"spotify\", \"google\")
     error?: 'RefreshAccessTokenError' // Error for token refresh failures
   }
 }

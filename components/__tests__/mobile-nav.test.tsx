@@ -1,8 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
-import fs from 'node:fs'
-import path from 'node:path'
 import { MobileNav } from '../mobile-nav'
 import { MobileOverlayProvider } from '../mobile-overlay-provider'
 import { AppSidebar } from '../app-sidebar'
@@ -61,7 +59,15 @@ jest.mock('@/hooks/use-modal-flip', () => ({
 }))
 
 jest.mock('@/components/ui/GlassSurface', () => ({
-  GlassSurface: () => <div data-testid="glass-surface" />,
+  GlassSurface: (props: any) => (
+    <div
+      data-testid={props['data-testid']}
+      data-glass-refractive={props.refractive ? 'true' : undefined}
+      data-glass-preset={props.preset}
+      data-glass-priority={props.refractivePriority}
+      data-glass-active={props.refractiveActive === false ? 'false' : 'true'}
+    />
+  ),
 }))
 
 function renderMobileNav() {
@@ -191,14 +197,113 @@ describe('MobileNav', () => {
     expect(screen.getByRole('link', { name: 'Workout' })).toHaveAttribute('href', '/routines')
   })
 
-  it('keeps the shared-element nav origin mounted while the workspace menu is open', async () => {
+  it('keeps the mobile navigation rail and plus as separate glass controls at rest', () => {
+    renderMobileNav()
+
+    const rail = screen.getByTestId('mobile-nav-rail-glass')
+    const plus = screen.getByTestId('mobile-nav-plus-glass')
+    const sharedOrigin = document.querySelector('[data-flip-from="mobile-nav-panel"]')
+
+    expect(rail).not.toBe(plus)
+    expect(rail).toHaveAttribute('data-glass-preset', 'navigation')
+    expect(plus).toHaveAttribute('data-glass-preset', 'navigation')
+    expect(sharedOrigin).toContainElement(rail)
+    expect(sharedOrigin).toContainElement(plus)
+  })
+
+  it('carries primary destinations into the panel that replaces the rail', async () => {
     const user = userEvent.setup()
     renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
-    expect(document.querySelector('[data-flip-from="mobile-nav-panel"]')).not.toBeNull()
+    const drawer = screen.getByRole('dialog', { name: 'Workspace menu' })
+    for (const destination of ['Dashboard', 'Cognitivo', 'Chat', 'Actividad']) {
+      expect(within(drawer).getByRole('button', { name: destination })).toBeInTheDocument()
+    }
+  })
+
+  it('keeps the shared-element nav origin mounted while the workspace menu is open', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+    const originalRail = document.querySelector('[data-flip-from="mobile-nav-panel"]')
+    expect(originalRail).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    const currentRail = document.querySelector('[data-flip-from="mobile-nav-panel"]')
+    expect(currentRail).toBe(originalRail)
+    expect(currentRail?.querySelectorAll('button')).toHaveLength(5)
+    expect(currentRail?.querySelector('[aria-label="Close menu"]')).not.toBeNull()
     expect(screen.getByRole('dialog', { name: 'Workspace menu' })).toBeInTheDocument()
+  })
+
+  it('morphs the plus control into the drawer close control and closes from that shared element', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+
+    const openButton = screen.getByRole('button', { name: 'Open menu' })
+    expect(openButton.querySelector('[data-shared-item="mobile-nav-close"]')).toHaveProperty('tagName', 'svg')
+
+    await user.click(openButton)
+
+    const drawer = screen.getByRole('dialog', { name: 'Workspace menu' })
+    const closeButton = within(drawer).getByRole('button', { name: 'Close menu' })
+    expect(closeButton.querySelector('[data-shared-item="mobile-nav-close"]')).toHaveProperty('tagName', 'svg')
+
+    await user.click(closeButton)
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
+  })
+
+  it('uses the navigation liquid-glass treatment for the active workspace item', async () => {
+    pathname = '/calendar'
+    const user = userEvent.setup()
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    const activityLens = screen.getByTestId('workspace-active-glass-indicator')
+    expect(activityLens).toHaveAttribute('data-glass-refractive', 'true')
+    expect(activityLens).toHaveAttribute('data-glass-preset', 'navigation')
+    expect(activityLens).toHaveAttribute('data-glass-priority', 'interactive')
+    expect(activityLens).toHaveAttribute('data-glass-active', 'true')
+  })
+
+  it('uses the navigation liquid-glass surface and control language across the open panel', async () => {
+    pathname = '/calendar'
+    const user = userEvent.setup()
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    const panel = screen.getByRole('dialog', { name: 'Workspace menu' })
+    const panelGlass = screen.getByTestId('workspace-panel-glass-surface')
+    const activeDestination = screen.getByRole('button', { name: 'Calendar' })
+
+    expect(panel).toHaveClass('novo-mobile-nav-panel')
+    expect(panel).not.toHaveClass('novo-focus-surface')
+    expect(panelGlass).toHaveAttribute('data-glass-refractive', 'true')
+    expect(panelGlass).toHaveAttribute('data-glass-preset', 'navigation')
+    expect(panelGlass).toHaveAttribute('data-glass-priority', 'interactive')
+    expect(panelGlass).toHaveAttribute('data-glass-active', 'true')
+    expect(activeDestination).toHaveClass('novo-nav-glass-control')
+    expect(activeDestination).toHaveAttribute('data-active', 'true')
+    expect(screen.getByTestId('workspace-active-glass-indicator').closest('.isolate')).toBeNull()
+  })
+
+  it('keeps background navigation inert until the drawer exit finishes', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const nav = document.querySelector('nav[aria-label="Primary mobile navigation"]')
+    expect(nav).toHaveAttribute('inert')
+
+    await user.click(screen.getByTestId('workspace-backdrop'))
+    expect(nav).toHaveAttribute('inert')
+
+    await waitFor(() => expect(nav).not.toHaveAttribute('inert'))
   })
 
   it('does not promote Workout as a critical quick action', () => {
@@ -208,10 +313,4 @@ describe('MobileNav', () => {
     expect(screen.queryByText('Start Workout')).not.toBeInTheDocument()
   })
 
-  it('uses Focus Surface without the legacy drawer blur override', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'components', 'mobile-section-drawer.tsx'), 'utf8')
-
-    expect(source).toContain('novo-focus-surface')
-    expect(source).not.toContain('glass-blur-xl')
-  })
 })

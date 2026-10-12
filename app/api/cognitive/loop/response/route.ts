@@ -7,6 +7,7 @@ import { trackNovoLoopEvent } from '@/lib/cognitive/events'
 import { canTransitionRecommendation, isTerminalRecommendationState } from '@/lib/cognitive/action-state-machine'
 import { appendActivityEvent, createActivityRun, finishActivityRun } from '@/lib/ai/activity'
 import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime'
+import { withProviderSyncLock } from '@/lib/provider-sync-lock'
 
 const analyticsByResponse: Record<string, any> = {
   accepted: 'recommendation_accepted', modified: 'recommendation_modified', postponed: 'recommendation_postponed',
@@ -58,17 +59,34 @@ export async function POST(request: NextRequest) {
   if (response === 'modified' && !modifiedNextStep) return NextResponse.json({ error: 'A modified next step is required' }, { status: 400 })
 
   let result
+  let replayedInsideLock = false
   try {
-    result = await prisma.$transaction(async (tx) => {
-    let taskId = action.taskId
+    result = await withProviderSyncLock(prisma, `recommendation:${userId}:${action.id}`, async (tx) => {
+    // Re-read inside the lock. A second tab may have accepted this
+    // recommendation after the preflight query above; using the stale action
+    // would create a second Task for the same recommendation.
+    const lockedAction = await tx.recommendedAction.findFirst({ where: { id: action.id, userId }, include: { plan: true } })
+    if (!lockedAction) throw new Error('recommendation_not_found')
+    const existingInsideLock = await tx.outcomeEvent.findUnique({ where: { idempotencyKey } })
+    if (existingInsideLock) {
+      if (existingInsideLock.userId !== userId || existingInsideLock.recommendedActionId !== lockedAction.id) {
+        throw new Error('idempotency_key_conflict')
+      }
+      replayedInsideLock = true
+      return lockedAction
+    }
+    if (!canTransitionRecommendation(lockedAction.status, response)) {
+      throw new Error(`invalid_transition:${lockedAction.status}`)
+    }
+    let taskId = lockedAction.taskId
     if (response === 'accepted' && !taskId) {
-      const task = await tx.task.create({ data: { userId, title: action.title, status: 'todo', priority: 'medium', tags: '[]' } })
+      const task = await tx.task.create({ data: { userId, title: lockedAction.title, status: 'todo', priority: 'medium', tags: '[]' } })
       taskId = task.id
     }
     const now = new Date()
-    const nextState = feedback.has(response) ? action.status : response
+    const nextState = feedback.has(response) ? lockedAction.status : response
     const updated = await tx.recommendedAction.update({
-      where: { id: action.id },
+      where: { id: lockedAction.id },
       data: {
         status: nextState, statusAt: now, responseNote: note, responseAt: now, lastActor: 'user',
         ...(taskId ? { taskId } : {}),
@@ -79,7 +97,7 @@ export async function POST(request: NextRequest) {
       },
     })
     await tx.outcomeEvent.create({ data: {
-      userId, planId: action.planId, recommendedActionId: action.id, type: response,
+      userId, planId: lockedAction.planId, recommendedActionId: lockedAction.id, type: response,
       metadata: { actor: 'user', ...(reason ? { reason } : {}), ...(note ? { note } : {}) }, idempotencyKey,
     } })
     if (response === 'completed' && taskId) await tx.task.updateMany({ where: { id: taskId, userId }, data: { status: 'done' } })
@@ -92,8 +110,18 @@ export async function POST(request: NextRequest) {
       const duplicate = await prisma.outcomeEvent.findUnique({ where: { idempotencyKey } })
       if (duplicate?.userId === userId && duplicate.recommendedActionId === action.id) return NextResponse.json({ action, duplicate: true })
     }
+    if (error instanceof Error && error.message === 'idempotency_key_conflict') {
+      return NextResponse.json({ error: 'Idempotency key conflict' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message.startsWith('invalid_transition:')) {
+      return NextResponse.json({ error: `Invalid transition from ${error.message.slice('invalid_transition:'.length)} to ${response}` }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'recommendation_not_found') {
+      return NextResponse.json({ error: 'Recommendation not found' }, { status: 404 })
+    }
     throw error
   }
+  if (replayedInsideLock) return NextResponse.json({ action: result, duplicate: true })
   await trackNovoLoopEvent(userId, analyticsByResponse[response], { actionId, planId: action.planId })
   const runId = await recordOutcomeActivity(userId, action.id, response)
   if (['completed', 'modified', 'postponed', 'dismissed', 'unhelpful', 'intrusive'].includes(response)) {

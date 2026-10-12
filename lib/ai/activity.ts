@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { trackNovoLoopEvent } from '@/lib/cognitive/events'
+import { withProviderSyncLock } from '@/lib/provider-sync-lock'
 import type { NovoActivityEvent, NovoActivityPhase, NovoActivitySurface } from './activity-contract'
 export type { NovoActivityEvent, NovoActivityPhase, NovoActivitySurface } from './activity-contract'
 
@@ -15,14 +16,33 @@ export async function createActivityRun(userId: string, surface: NovoActivitySur
   const now = new Date()
   // Opportunistic compaction keeps the table bounded even when the scheduled
   // cleanup job is delayed. Only expired operational records are removed.
-  await prisma.aiActivityRun.deleteMany({ where: { expiresAt: { lt: now } } })
-  const run = await prisma.aiActivityRun.create({ data: { id, userId, surface, phase: 'initializing', expiresAt: new Date(now.getTime() + 30 * 60_000) } })
-  await trackNovoLoopEvent(userId, 'ai_run_started', { runId: run.id, surface })
-  return run
+  await prisma.aiActivityRun.deleteMany({ where: { userId, expiresAt: { lt: now } } })
+  // The browser keeps the run id across reconnects. If the original response
+  // was lost, return the owned run instead of creating a second run or leaking
+  // a duplicate-key 500.
+  const existing = await prisma.aiActivityRun.findFirst({ where: { id, userId } })
+  if (existing) return existing
+
+  try {
+    const run = await prisma.aiActivityRun.create({ data: { id, userId, surface, phase: 'initializing', expiresAt: new Date(now.getTime() + 30 * 60_000) } })
+    await trackNovoLoopEvent(userId, 'ai_run_started', { runId: run.id, surface })
+    return run
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+      const winner = await prisma.aiActivityRun.findFirst({ where: { id, userId } })
+      if (winner) return winner
+    }
+    throw error
+  }
 }
 
 export async function appendActivityEvent(userId: string, input: Omit<NovoActivityEvent, 'sequence' | 'timestamp'> & { sequence?: number; timestamp?: Date; detail?: string; toolName?: string }) {
-  const event = await prisma.$transaction(async (tx) => {
+  // Activity producers can race during reconnects, stream retries, and an
+  // Inngest delivery that overlaps the browser stream. Serialize the tiny
+  // read(sequence) → insert(event) → update(run) window per run so the unique
+  // (runId, sequence) invariant is enforced before Postgres has to reject a
+  // duplicate frame.
+  const event = await withProviderSyncLock(prisma, `activity:${userId}:${input.runId}`, async (tx) => {
     const run = await tx.aiActivityRun.findFirst({ where: { id: input.runId, userId } })
     if (!run) throw new Error('activity_run_not_found')
     if (['completed', 'failed', 'cancelled', 'expired'].includes(run.status)) return null

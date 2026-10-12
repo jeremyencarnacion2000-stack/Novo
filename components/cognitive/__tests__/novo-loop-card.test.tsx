@@ -43,9 +43,12 @@ describe('NovoLoopCard outcome controls', () => {
 
   it('plans against the objective created from this form', async () => {
     const user = userEvent.setup()
-    ;(global.fetch as jest.Mock) = jest.fn((url: string) => {
+    ;(global.fetch as jest.Mock) = jest.fn((url: string, init?: RequestInit) => {
       if (url === '/api/cognitive/loop/plan') return Promise.resolve(new Response(JSON.stringify({ plan: null, staleActions: [] }), { status: 200 }))
-      if (url === '/api/ai/activity/runs') return Promise.resolve(new Response(JSON.stringify({ runId: 'run-1', run: null }), { status: 200 }))
+      if (url === '/api/ai/activity/runs') {
+        if (init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ runId: JSON.parse(String(init.body)).runId, run: null }), { status: 201 }))
+        return Promise.resolve(new Response(JSON.stringify({ run: null }), { status: 200 }))
+      }
       if (url === '/api/goals') return Promise.resolve(new Response(JSON.stringify({ id: 'goal-created-for-plan' }), { status: 200 }))
       if (url === '/api/cognitive/loop/checkin') return Promise.resolve(new Response(JSON.stringify({ snapshot: { id: 'snapshot-1' } }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify(activePlan), { status: 201 }))
@@ -60,6 +63,13 @@ describe('NovoLoopCard outcome controls', () => {
       '/api/cognitive/loop/plan',
       expect.objectContaining({ body: expect.stringContaining('goal-created-for-plan') }),
     ))
+
+    const calls = (global.fetch as jest.Mock).mock.calls
+    const runCall = calls.find(([url, init]) => url === '/api/ai/activity/runs' && init?.method === 'POST')
+    const planCall = calls.find(([url, init]) => url === '/api/cognitive/loop/plan' && init?.method === 'POST')
+    expect(runCall).toBeDefined()
+    expect(planCall).toBeDefined()
+    expect(JSON.parse(runCall[1].body).runId).toBe(JSON.parse(planCall[1].body).runId)
   })
 
   it('shows a bounded confidence label and its limitation', async () => {

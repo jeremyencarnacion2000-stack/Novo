@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { startSession, endSession, trackEvent } from '@/lib/analytics'
+import { createClientIdempotencyKey } from '@/lib/client-idempotency'
 
 // Map routes to module names
 const routeToModule: Record<string, string> = {
@@ -32,6 +33,7 @@ export function useSessionTracking() {
     const pathname = usePathname()
     const sessionIdRef = useRef<string | null>(null)
     const currentModuleRef = useRef<string | null>(null)
+    const sessionIntentRef = useRef<{ module: string; id: string } | null>(null)
     const [isTracking, setIsTracking] = useState(false)
 
     useEffect(() => {
@@ -41,32 +43,41 @@ export function useSessionTracking() {
         const module = Object.entries(routeToModule).find(([route]) =>
             pathname?.startsWith(route)
         )?.[1] || 'unknown'
+        let active = true
 
-        // If module changed, end previous session and start new one
+        // Analytics is useful but never part of the first interaction. Give
+        // the route and its visual shell a moment to settle before opening a
+        // session or sending a page-view request.
         const handleModuleChange = async () => {
-            // End previous session if exists
+            if (!active) return
+
             if (sessionIdRef.current && currentModuleRef.current !== module) {
                 await endSession(sessionIdRef.current)
+                if (!active) return
                 sessionIdRef.current = null
             }
 
-            // Start new session for current module
             if (!sessionIdRef.current || currentModuleRef.current !== module) {
-                const newSession = await startSession(userId, module)
+                const intent = sessionIntentRef.current?.module === module
+                    ? sessionIntentRef.current.id
+                    : createClientIdempotencyKey()
+                sessionIntentRef.current = { module, id: intent }
+                const newSession = await startSession(userId, module, intent)
+                if (!active) return
                 if (newSession?.id) {
                     sessionIdRef.current = newSession.id
                     currentModuleRef.current = module
+                    sessionIntentRef.current = null
                     setIsTracking(true)
                 }
-
-                // Track page view event
-                await trackEvent(userId, 'page_view', module)
+                if (active) await trackEvent(userId, 'page_view', module)
             }
         }
 
-        handleModuleChange()
+        const startTimer = window.setTimeout(() => {
+            void handleModuleChange()
+        }, 1000)
 
-        // End session on page unload
         const handleBeforeUnload = () => {
             if (sessionIdRef.current) {
                 const blob = new Blob([JSON.stringify({
@@ -80,9 +91,11 @@ export function useSessionTracking() {
         window.addEventListener('beforeunload', handleBeforeUnload)
 
         return () => {
+            active = false
+            window.clearTimeout(startTimer)
             window.removeEventListener('beforeunload', handleBeforeUnload)
         }
-    }, [session?.user?.id, pathname])
+    }, [session?.user?.id, pathname] )
 
     // Clean up session on unmount
     useEffect(() => {

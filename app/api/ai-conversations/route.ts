@@ -10,6 +10,10 @@ const aiConversationSchema = z.object({
   messages: z.any() // Assuming messages can be any JSON structure
 })
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,11 +28,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(conversations)
-  } catch (error) {
-    console.error('Error fetching AI conversations:', error)
+  } catch {
+    console.error('Error fetching AI conversations.')
     return NextResponse.json({
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Unable to load AI conversations right now'
     }, { status: 500 })
   }
 }
@@ -49,24 +52,54 @@ export async function POST(request: NextRequest) {
 
     const { id, title, messages } = parsedBody.data
 
-    const conversation = await prisma.aIConversation.create({
-      data: {
-        ...(id && { id }),
-        title,
-        messages,
-        userId: session.user.id
+    // The chat client creates a stable UUID before its debounced save. If the
+    // request is delivered and the response is lost, the retry must converge
+    // on that same row instead of surfacing a duplicate-key 500.
+    if (id) {
+      const existing = await prisma.aIConversation.findFirst({
+        where: { id, userId: session.user.id },
+      })
+      if (existing) {
+        const response = NextResponse.json(existing)
+        response.headers.set('X-Idempotent-Replay', 'true')
+        return response
       }
-    })
+    }
 
-    return NextResponse.json(conversation, { status: 201 })
+    let conversation
+    try {
+      conversation = await prisma.aIConversation.create({
+        data: {
+          ...(id && { id }),
+          title,
+          messages,
+          userId: session.user.id
+        }
+      })
+    } catch (error) {
+      if (id && isUniqueConstraintError(error)) {
+        const winner = await prisma.aIConversation.findFirst({
+          where: { id, userId: session.user.id },
+        })
+        if (winner) {
+          const response = NextResponse.json(winner)
+          response.headers.set('X-Idempotent-Replay', 'true')
+          return response
+        }
+      }
+      throw error
+    }
+
+    const response = NextResponse.json(conversation, { status: 201 })
+    response.headers.set('X-Idempotent-Replay', 'false')
+    return response
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }
-    console.error('Error creating AI conversation:', error)
+    console.error('Error creating AI conversation.')
     return NextResponse.json({
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Unable to create an AI conversation right now'
     }, { status: 500 })
   }
 }
