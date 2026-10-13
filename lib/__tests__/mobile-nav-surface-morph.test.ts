@@ -1,184 +1,105 @@
-import { gsap } from 'gsap'
-import { criticalSpring } from '@/hooks/use-shared-surface-morph'
-import { withSharedSurfaceBounce } from '@/lib/modal-motion'
-import { modalFlip } from '@/lib/modal-flip'
+import fs from 'node:fs'
+import path from 'node:path'
+import { LIQUID_MORPH_CONFIG, LiquidMorphSpring } from '@/components/command-center-liquid-morph'
 
-type TimelineDouble = {
-  options: gsap.TimelineVars
-  tweens: Array<{ target: gsap.TweenTarget; vars: gsap.TweenVars }>
-  to: jest.Mock
-  eventCallback: jest.Mock
-  timeScale: jest.Mock
-  play: jest.Mock
-  reverse: jest.Mock
-  kill: jest.Mock
-}
+describe('mobile navigation liquid morph', () => {
+  let now = 0
+  let nextFrameId = 1
+  let frames: Map<number, FrameRequestCallback>
+  let requestFrameSpy: jest.SpyInstance
+  let cancelFrameSpy: jest.SpyInstance
+  let performanceSpy: jest.SpyInstance
 
-function createTimelineDouble(options: gsap.TimelineVars = {}): TimelineDouble {
-  const timeline: TimelineDouble = {
-    options,
-    tweens: [],
-    to: jest.fn((target: gsap.TweenTarget, vars: gsap.TweenVars) => {
-      timeline.tweens.push({ target, vars })
-      return timeline
-    }),
-    eventCallback: jest.fn(() => timeline),
-    timeScale: jest.fn(() => timeline),
-    play: jest.fn(() => timeline),
-    reverse: jest.fn(() => timeline),
-    kill: jest.fn(() => timeline),
+  const advanceFrames = (durationMs: number, stepMs = 16) => {
+    const end = now + durationMs
+    while (now < end && frames.size) {
+      now = Math.min(end, now + stepMs)
+      const active = Array.from(frames.entries())
+      frames.clear()
+      active.forEach(([, callback]) => callback(now))
+    }
   }
-  return timeline
-}
-
-function rect(left: number, top: number, width: number, height: number): DOMRect {
-  return {
-    x: left,
-    y: top,
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-    width,
-    height,
-    toJSON: () => ({}),
-  } as DOMRect
-}
-
-describe('mobile navigation surface morph', () => {
-  const timelines: TimelineDouble[] = []
-  let timelineSpy: jest.SpyInstance
 
   beforeEach(() => {
-    timelines.length = 0
-    document.documentElement.dataset.novoMotion = 'full'
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: jest.fn().mockImplementation((media: string) => ({
-        matches: false,
-        media,
-        onchange: null,
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn(),
-      })),
+    now = 0
+    nextFrameId = 1
+    frames = new Map()
+    requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      const id = nextFrameId++
+      frames.set(id, callback)
+      return id
     })
-
-    timelineSpy = jest.spyOn(gsap, 'timeline').mockImplementation(((options?: gsap.TimelineVars) => {
-      const timeline = createTimelineDouble(options)
-      timelines.push(timeline)
-      return timeline as unknown as gsap.core.Timeline
-    }) as typeof gsap.timeline)
+    cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => {
+      frames.delete(id)
+    })
+    performanceSpy = jest.spyOn(performance, 'now').mockImplementation(() => now)
   })
 
   afterEach(() => {
-    modalFlip.cancel('mobile-nav-panel')
-    timelineSpy.mockRestore()
-    document.body.replaceChildren()
-    delete document.documentElement.dataset.novoMotion
+    frames.clear()
+    requestFrameSpy.mockRestore()
+    cancelFrameSpy.mockRestore()
+    performanceSpy.mockRestore()
   })
 
-  it('morphs the real dialog surface from the rail without creating a second glass bridge', () => {
-    const origin = document.createElement('div')
-    origin.dataset.flipFrom = 'mobile-nav-panel'
-    origin.style.borderRadius = '9999px'
-    origin.getBoundingClientRect = () => rect(16, 700, 360, 56)
-    const originClose = document.createElement('button')
-    originClose.dataset.sharedItem = 'mobile-nav-close'
-    originClose.getBoundingClientRect = () => rect(320, 706, 48, 44)
-    origin.append(originClose)
+  it('uses the calibrated physical response and returns to the compact rail', () => {
+    expect(LIQUID_MORPH_CONFIG.spring).toEqual({ openResponse: 0.56, closeResponse: 0.5, damping: 0.9 })
+    const settled = jest.fn()
+    const spring = new LiquidMorphSpring(jest.fn(), settled)
 
-    const target = document.createElement('section')
-    target.dataset.flipTo = 'mobile-nav-panel'
-    target.dataset.modalMotionState = 'preparing'
-    target.style.borderRadius = '32px'
-    target.getBoundingClientRect = () => rect(16, 400, 360, 356)
-    const targetClose = document.createElement('button')
-    targetClose.dataset.sharedItem = 'mobile-nav-close'
-    targetClose.dataset.slot = 'dialog-close'
-    targetClose.getBoundingClientRect = () => rect(320, 408, 40, 40)
-    const contentRoot = document.createElement('div')
-    contentRoot.dataset.modalContent = ''
-    contentRoot.append(document.createElement('span'))
-    target.append(targetClose, contentRoot)
-    document.body.append(origin, target)
+    spring.setTarget(1)
+    advanceFrames(1800)
+    expect(spring.value).toBe(1)
+    expect(settled).toHaveBeenLastCalledWith(1)
 
-    modalFlip.toggle('mobile-nav-panel')
-
-    const bridge = document.querySelector<HTMLElement>('[data-modal-motion-bridge]')
-    expect(bridge).toBeNull()
-    const openingTimeline = timelines[0]
-    const openingMorph = openingTimeline.tweens.find(({ target: tweenTarget, vars }) =>
-      tweenTarget === target && typeof vars.clipPath === 'string' && vars.duration === 0.59,
-    )
-    expect(openingMorph).toBeDefined()
-    expect(openingMorph?.vars.clipPath).toContain('inset(0px 0px 0px 0px')
-    expect((openingMorph?.vars.ease as (progress: number) => number)(0.5)).toBeCloseTo(
-      withSharedSurfaceBounce(criticalSpring(7.35))(0.5),
-      8,
-    )
-    expect((openingMorph?.vars.ease as (progress: number) => number)(0.8)).toBeGreaterThan(1)
-    const flyingClose = document.querySelector<HTMLElement>('[data-flying-clone]')
-    expect(flyingClose).not.toBeNull()
-    expect(openingTimeline.to).toHaveBeenCalledWith(
-      flyingClose,
-      expect.objectContaining({ rotation: 45 }),
-      0.006,
-    )
-    expect(target.style.clipPath).toContain('inset(')
-    expect(target.style.opacity).toBe('1')
-    expect(origin.style.opacity).toBe('0')
-    expect(openingTimeline.to).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ opacity: 1, y: 0, duration: 0.22 }),
-      0.21,
-    )
+    spring.setTarget(0)
+    advanceFrames(1800)
+    expect(spring.value).toBe(0)
+    expect(settled).toHaveBeenLastCalledWith(0)
+    expect(frames.size).toBe(0)
+    spring.destroy()
   })
 
-  it('returns the dialog surface to the rail and restores the original navigation surface', () => {
-    const origin = document.createElement('div')
-    origin.dataset.flipFrom = 'mobile-nav-panel'
-    origin.style.borderRadius = '9999px'
-    origin.getBoundingClientRect = () => rect(16, 700, 360, 56)
-    const originClose = document.createElement('button')
-    originClose.dataset.sharedItem = 'mobile-nav-close'
-    origin.append(originClose)
-    const target = document.createElement('section')
-    target.dataset.flipTo = 'mobile-nav-panel'
-    target.dataset.modalMotionState = 'open'
-    target.style.borderRadius = '32px'
-    target.getBoundingClientRect = () => rect(16, 400, 360, 356)
-    const targetClose = document.createElement('button')
-    targetClose.dataset.sharedItem = 'mobile-nav-close'
-    targetClose.dataset.slot = 'dialog-close'
-    const contentRoot = document.createElement('div')
-    contentRoot.dataset.modalContent = ''
-    contentRoot.append(document.createElement('span'))
-    target.append(targetClose, contentRoot)
-    document.body.append(origin, target)
+  it('reverses from the current physical state without restarting the spring', () => {
+    const spring = new LiquidMorphSpring(jest.fn())
+    spring.setTarget(1)
+    advanceFrames(160)
+    const interrupted = spring.value
+    expect(interrupted).toBeGreaterThan(0)
+    expect(interrupted).toBeLessThan(1)
 
-    modalFlip.toggle('mobile-nav-panel')
-    const openingTimeline = timelines[0]
-    openingTimeline.options.onComplete?.()
+    spring.setTarget(0)
+    expect(spring.value).toBe(interrupted)
+    advanceFrames(1500)
+    expect(spring.value).toBe(0)
 
-    modalFlip.untoggle('mobile-nav-panel')
-    const closingTimeline = timelines[1]
-    const flyingClose = document.querySelector<HTMLElement>('[data-flying-clone]')
-    expect(flyingClose).not.toBeNull()
-    expect(closingTimeline.to).toHaveBeenCalledWith(
-      flyingClose,
-      expect.objectContaining({ rotation: -45 }),
-      0.006,
-    )
-    expect(closingTimeline.tweens.some(({ target: tweenTarget, vars }) =>
-      tweenTarget === target && typeof vars.clipPath === 'string' && vars.duration === 0.52,
-    )).toBe(true)
-    expect(document.querySelector('[data-modal-motion-bridge]')).toBeNull()
-    expect(origin.style.opacity).toBe('0')
-    closingTimeline.options.onComplete?.()
-    expect(origin.style.opacity).toBe('')
-    expect(target.style.opacity).toBe('0')
+    spring.setTarget(1)
+    expect(spring.value).toBe(0)
+    advanceFrames(1500)
+    expect(spring.value).toBe(1)
+    spring.destroy()
+  })
+
+  it('keeps one owner for the navigation material, rail, FAB, and panel geometry', () => {
+    const source = (file: string) => fs.readFileSync(path.join(process.cwd(), ...file.split('/')), 'utf8')
+    const morph = source('components/command-center-liquid-morph.tsx')
+    const drawer = source('components/mobile-section-drawer.tsx')
+    const hook = source('hooks/use-shared-dialog-motion.ts')
+
+    expect(morph).toContain('springRef.current?.setTarget(active ? 1 : 0)')
+    expect(morph).toContain("if (motionMode === 'full')")
+    expect(morph).toContain('springRef.current?.setImmediate(active ? 1 : 0)')
+    expect(morph).toContain('panel.style.clipPath = clipPath')
+    expect(morph).toContain('fab.style.transform =')
+    expect(drawer).toContain('motionId="mobile-nav-panel"')
+    // Other shared dialogs retain their existing controller. The nav-specific
+    // branches coordinate presence and leave geometry to the liquid spring.
+    const openNav = hook.match(/if \(isLiquidNav\) \{([\s\S]*?)\n    \}/)?.[1]
+    const closeNav = hook.match(/const close = useCallback[\s\S]*?if \(isLiquidNav\) \{([\s\S]*?)\n    \}/)?.[1]
+    expect(openNav).toBeDefined()
+    expect(closeNav).toContain('onComplete()')
+    expect(openNav).not.toContain('modalFlip.')
+    expect(closeNav).not.toContain('modalFlip.')
+    expect(morph).not.toContain('gsap.')
   })
 })

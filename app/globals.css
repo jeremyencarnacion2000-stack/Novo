@@ -2679,22 +2679,6 @@ html[data-novo-motion="off"] .novo-now-gradient-field {
 /* The Hub keeps one optical surface. These two lightweight skins only tune
    the chrome tint while clip-path performs the physical morph; they never
    introduce a second refractive lens. */
-.context-hub-chrome,
-.context-hub-chrome [data-hub-skin] {
-  border-radius: inherit;
-}
-.context-hub-chrome [data-hub-skin="compact"] {
-  opacity: 1;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(255,255,255,.12), transparent 42%),
-    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.12));
-}
-.context-hub-chrome [data-hub-skin="expanded"] {
-  opacity: .72;
-  background:
-    linear-gradient(145deg, rgba(255,255,255,.08), transparent 40%),
-    linear-gradient(180deg, rgba(4,10,18,.18), rgba(0,0,0,.28));
-}
 
 
 /* --- Soundwave Equalizer Bar Animation --- */
@@ -3156,4 +3140,182 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 :root[data-novo-motion='reduced'] [data-app-viewport] .novo-motion-context-node {
   transition-property: opacity;
   transition-duration: 160ms;
+}
+/* Restored physical navigation merge and detached Pomodoro material. */
+@layer components {
+  .novo-nav-glass-control,
+  .novo-sidebar-nav-button {
+    --novo-nav-aberration: 0.2;
+    isolation: isolate;
+    overflow: hidden;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
+    transition:
+      background-color 180ms ease,
+      box-shadow 220ms ease,
+      color 180ms ease,
+      transform 220ms var(--novo-spring);
+  }
+
+  .novo-nav-glass-control::before,
+  .novo-sidebar-nav-button::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0;
+    background:
+      linear-gradient(110deg,
+        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
+        transparent 23%,
+        transparent 76%,
+        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
+    filter: blur(0.6px);
+    mix-blend-mode: screen;
+    transition: opacity 180ms ease;
+  }
+
+  .novo-nav-glass-control:hover,
+  .novo-nav-glass-control:focus-visible,
+  .novo-sidebar-nav-button:hover,
+  .novo-sidebar-nav-button:focus-visible {
+    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
+    backdrop-filter: var(--novo-context-backdrop-filter);
+    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 3px 14px rgba(0, 0, 0, 0.08);
+  }
+
+  .novo-nav-glass-control:hover::before,
+  .novo-nav-glass-control:focus-visible::before,
+  .novo-sidebar-nav-button:hover::before,
+  .novo-sidebar-nav-button:focus-visible::before {
+    opacity: 0.55;
+  }
+  .novo-nav-glass-control[data-active='true'],
+  .novo-sidebar-nav-button[data-active='true'] {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .novo-nav-glass-control[data-active='true']::before,
+  .novo-sidebar-nav-button[data-active='true']::before {
+    opacity: 0;
+  }
+  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
+    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    isolation: auto;
+  }
+
+  .novo-mobile-nav-shell {
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  }
+
+  .novo-mobile-nav-fab {
+    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
+  }
+  .novo-mobile-nav-panel--compact {
+    bottom: var(--novo-mobile-nav-panel-bottom) !important;
+  }
+  .novo-mobile-nav-liquid-geometry {
+    position: absolute;
+    top: 50%;
+    right: 24px;
+    z-index: 0;
+    width: 56px;
+    height: 40px;
+    pointer-events: none;
+    opacity: 0;
+    border: 1px solid rgba(255, 255, 255, 0.86);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.40));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(255, 255, 255, 0.20), 0 10px 26px rgba(76, 55, 39, 0.10);
+    transform: translate3d(0, -50%, 0) scale(0.58, 0.72);
+    transform-origin: center;
+    filter: url('#novo-mobile-nav-liquid-merge');
+    will-change: opacity, transform;
+  }
+
+  .novo-mobile-nav-liquid-blob {
+    position: absolute;
+    top: 4px;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.2), transparent 44%),
+      linear-gradient(135deg, rgba(255, 183, 218, 0.09), rgba(255, 255, 255, 0.055) 48%, rgba(145, 224, 255, 0.085));
+  }
+
+  .novo-mobile-nav-liquid-blob--rail { left: 0; }
+  .novo-mobile-nav-liquid-blob--fab { right: 0; }
+
+  [data-liquid-merge-state='opening']:not([data-liquid-morph-controller]) .novo-mobile-nav-liquid-geometry {
+    animation: novo-mobile-nav-liquid-merge-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  [data-liquid-merge-state='closing']:not([data-liquid-morph-controller]) .novo-mobile-nav-liquid-geometry {
+    animation: novo-mobile-nav-liquid-merge-out 200ms cubic-bezier(0.3, 0, 1, 1) 300ms both;
+  }
+
+  @keyframes novo-mobile-nav-liquid-merge-in {
+    0% { opacity: 0; transform: translate3d(0, -50%, 0) scale(0.58, 0.72); }
+    42% { opacity: 0.92; transform: translate3d(0, -50%, 0) scale(1.08, 0.96); }
+    100% { opacity: 0.72; transform: translate3d(0, -50%, 0) scale(1, 1); }
+  }
+
+  @keyframes novo-mobile-nav-liquid-merge-out {
+    0% { opacity: 0.72; transform: translate3d(0, -50%, 0) scale(1, 1); }
+    100% { opacity: 0; transform: translate3d(0, -50%, 0) scale(0.58, 0.72); }
+  }
+
+  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-nav-glass-control,
+  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-sidebar-nav-button {
+    transition: opacity 160ms ease;
+  }
+
+  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-mobile-nav-liquid-geometry,
+  :root[data-novo-motion='off'] [data-app-viewport] .novo-mobile-nav-liquid-geometry {
+    animation: none;
+    opacity: 0;
+    transform: translate3d(0, -50%, 0) scale(0.58, 0.72);
+  }
+}
+.novo-mobile-nav-shell {
+  box-shadow: 0 8px 22px rgba(0,0,0,.12) !important;
+}
+.novo-mobile-nav-fab {
+  box-shadow: 0 8px 22px rgba(0,0,0,.14) !important;
+}
+.pomodoro-liquid-geometry {
+  position: absolute;
+  inset: auto;
+  overflow: visible;
+  pointer-events: none;
+  contain: none;
+}
+.pomodoro-liquid-blob {
+  position: absolute;
+  box-sizing: border-box;
+  /* Opaque geometry feeds the alpha threshold; the SVG's final transfer
+     applies the shared .58 glass tint after the bodies have really merged. */
+  background: rgb(7,13,24);
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  will-change: left, top, width, height, opacity, border-radius, transform;
+}
+[data-flip-from].modal-flip-source-active:not([data-liquid-morph-controller]) {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: none !important;
+}
+[data-liquid-morph-controller].modal-flip-source-active {
+  opacity: 1 !important;
 }

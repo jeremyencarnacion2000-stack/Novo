@@ -113,10 +113,6 @@ const QuickCapture = dynamic(
   () => import('@/components/quick-capture').then(m => ({ default: m.QuickCapture })),
   { ssr: false }
 )
-const PomodoroWidget = dynamic(
-  () => import('@/components/pomodoro-widget').then(m => ({ default: m.PomodoroWidget })),
-  { ssr: false }
-)
 const WelcomeCarousel = dynamic(
   () => import('@/components/onboarding/welcome-screen').then(m => ({ default: m.WelcomeCarousel })),
   { ssr: false }
@@ -488,7 +484,6 @@ function AuthenticatedWidgets() {
     <>
       {!isCognitiveRoute && <CommandPaletteOnDemand />}
       {ready && !isCognitiveRoute && <ContextHub />}
-      {ready && !isCognitiveRoute && <PomodoroWidget />}
       {ready && !isCognitiveRoute && secondaryReady && !isChatRoute && <NotificationCenter />}
       {ready && <SettingsModal />}
       {ready && !isCognitiveRoute && secondaryReady && <FloatingMusicWidget />}

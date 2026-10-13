@@ -10,7 +10,9 @@ import { appleLiquidMotion, springConfig } from '@/lib/design-tokens'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRef } from 'react'
+import { CommandCenterLiquidMorph } from '@/components/command-center-liquid-morph'
 
 export function MobileNav() {
     const router = useRouter()
@@ -19,6 +21,22 @@ export function MobileNav() {
     const { activeOverlay, closeOverlay, openOverlay, suppressSecondary } = useMobileOverlay()
     const drawerOpen = activeOverlay === 'navigation'
     const [drawerMounted, setDrawerMounted] = useState(false)
+    const liquidSourceRef = useRef<HTMLDivElement>(null)
+    const liquidRailRef = useRef<HTMLDivElement>(null)
+    const liquidFabRef = useRef<HTMLButtonElement>(null)
+    const liquidPlusGlyphRef = useRef<SVGSVGElement>(null)
+    const liquidMergeState = drawerMounted
+        ? (drawerOpen ? 'opening' : 'closing')
+        : 'rest'
+
+    // The dialog portal can finish its focus-restoration callback after a
+    // reversed spring. Keep the physical exit visible, but always release the
+    // real navbar afterwards so its buttons cannot remain inert.
+    useEffect(() => {
+        if (!drawerMounted || drawerOpen) return
+        const release = window.setTimeout(() => setDrawerMounted(false), 780)
+        return () => window.clearTimeout(release)
+    }, [drawerMounted, drawerOpen])
 
     const handleCloseDrawer = (options?: { historyAction?: 'back' | 'replace' | 'none' }) =>
         closeOverlay(options)
@@ -70,13 +88,44 @@ export function MobileNav() {
                     FLIP uses it only as the opening/closing origin; the two
                     controls remain distinct glass surfaces while idle. */}
                 <div
+                    ref={liquidSourceRef}
                     data-flip-from="mobile-nav-panel"
+                    data-liquid-morph-controller="true"
+                    data-liquid-merge-state={liquidMergeState}
                     className="relative mx-auto flex items-center gap-3"
                 >
+                    {/* This is the geometry layer only: two soft blobs create a
+                        short-lived liquid neck between the real rail and FAB.
+                        The controls and their SVG lenses stay above it, so text
+                        and icons never pass through the goo filter. */}
+                    <svg aria-hidden="true" width="0" height="0" className="absolute">
+                        <defs>
+                            <filter
+                                id="novo-mobile-nav-liquid-merge"
+                                x="-80%"
+                                y="-80%"
+                                width="260%"
+                                height="260%"
+                                colorInterpolationFilters="sRGB"
+                            >
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="liquid-blur" />
+                                <feColorMatrix
+                                    in="liquid-blur"
+                                    type="matrix"
+                                    values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -8"
+                                />
+                            </filter>
+                        </defs>
+                    </svg>
+                    <div data-liquid-merge-geometry aria-hidden="true" className="novo-mobile-nav-liquid-geometry">
+                        <span className="novo-mobile-nav-liquid-blob novo-mobile-nav-liquid-blob--rail" />
+                        <span className="novo-mobile-nav-liquid-blob novo-mobile-nav-liquid-blob--fab" />
+                    </div>
                     <div
+                        ref={liquidRailRef}
                         data-testid="mobile-nav-rail"
                         className={cn(
-                            "relative isolate flex items-center gap-1 rounded-full pointer-events-auto p-1 novo-mobile-nav-shell",
+                            "relative z-10 isolate flex items-center gap-1 rounded-full pointer-events-auto p-1 novo-mobile-nav-shell",
                             isCompactPath ? "px-3 py-1.5" : "px-2 py-2"
                         )}
                     >
@@ -161,10 +210,11 @@ export function MobileNav() {
                     </div>
 
                     <motion.button
+                        ref={liquidFabRef}
                         onClick={handleFabClick}
                         data-testid={drawerMounted ? undefined : 'mobile-primary-target'}
                         aria-label={drawerOpen ? "Close menu" : "Open menu"}
-                        className="novo-mobile-nav-fab relative isolate flex min-h-[48px] min-w-[48px] items-center justify-center overflow-hidden rounded-full pointer-events-auto"
+                        className="novo-mobile-nav-fab relative z-10 isolate flex min-h-[44px] min-w-[44px] min-h-[48px] min-w-[48px] items-center justify-center overflow-hidden rounded-full pointer-events-auto"
                         whileTap={{ scale: appleLiquidMotion.pressScale }}
                         transition={appleLiquidMotion.pressTransition}
                     >
@@ -181,17 +231,18 @@ export function MobileNav() {
                             className="pointer-events-none absolute inset-0 z-0 h-full w-full"
                             style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
                         />
-                        <motion.div
-                            className="relative z-10"
-                            animate={{ rotate: drawerOpen ? 45 : 0 }}
-                            transition={springConfig.snappy}
-                        >
+                        {/* The liquid controller owns this glyph's entire
+                            flight and rotation. Keeping it out of a second
+                            Framer transform prevents the + → close handoff
+                            from being overwritten midway through the morph. */}
+                        <div className="relative z-10">
                             <Plus
+                                ref={liquidPlusGlyphRef}
                                 data-shared-item="mobile-nav-close"
                                 className="h-5 w-5 text-foreground"
                                 strokeWidth={2.25}
                             />
-                        </motion.div>
+                        </div>
                     </motion.button>
                 </div>
             </nav>
@@ -199,12 +250,21 @@ export function MobileNav() {
             {/* Keep the real rail mounted as the physical FLIP origin. Dialog
                 owns deferred portal presence through the complete exit flight. */}
             {drawerMounted && (
-                <MobileSectionDrawer
-                    open={drawerOpen}
-                    onClose={handleCloseDrawer}
-                    onOpenVoice={handleOpenVoice}
-                    onExitComplete={() => setDrawerMounted(false)}
-                />
+                <>
+                    <MobileSectionDrawer
+                        open={drawerOpen}
+                        onClose={handleCloseDrawer}
+                        onOpenVoice={handleOpenVoice}
+                    />
+                    <CommandCenterLiquidMorph
+                        active={drawerOpen}
+                        mounted={drawerMounted}
+                        sourceRef={liquidSourceRef}
+                        railRef={liquidRailRef}
+                        fabRef={liquidFabRef}
+                        plusGlyphRef={liquidPlusGlyphRef}
+                    />
+                </>
             )}
         </>
     )

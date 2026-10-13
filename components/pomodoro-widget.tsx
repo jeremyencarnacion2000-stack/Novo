@@ -1,161 +1,118 @@
 'use client'
 
-import { memo } from 'react'
+import { forwardRef } from 'react'
 import { useFocus, useFocusControls } from '@/lib/focus-context'
-import { Timer, Play, Pause, RotateCcw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { GlassSurface } from '@/components/ui/GlassSurface'
-import { usePathname } from 'next/navigation'
+import { Pause, Play, RotateCcw, Timer, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
-import { appleLiquidMotion } from '@/lib/design-tokens'
 
-export function PomodoroWidget() {
-    const { mode, time, isActive } = useFocus()
-    const pathname = usePathname()
-    const isFocusPage = pathname === '/focus'
-
-    const isDefaultTime = time === (mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60)
-    const isModified = time > 0 && !isDefaultTime
-
-    if (!isActive && !isModified) {
-        return null
-    }
-
-    return <PomodoroWidgetContent isFocusPage={isFocusPage} />
+type PomodoroWidgetProps = {
+  open: boolean
+  animating: boolean
+  onClose: (keyboardActivated: boolean) => void
 }
 
-const PomodoroWidgetContent = memo(function PomodoroWidgetContent({ isFocusPage }: { isFocusPage: boolean }) {
-    const { mode, isActive, toggleTimer, resetTimer } = useFocusControls()
-
-    const getModeLabel = () => {
-        switch (mode) {
-            case 'work': return 'Trabajo'
-            case 'shortBreak': return 'Descanso'
-            case 'longBreak': return 'Descanso Largo'
-        }
-    }
-
-    const getModeColor = () => {
-        switch (mode) {
-            case 'work': return 'bg-red-500'
-            case 'shortBreak': return 'bg-green-500'
-            case 'longBreak': return 'bg-blue-500'
-        }
-    }
+export const PomodoroWidget = forwardRef<HTMLDivElement, PomodoroWidgetProps>(
+  function PomodoroWidget({ open, animating, onClose }, ref) {
+    const { mode, time, formatTime, isActive, progress, selectedTaskId, tasks } = useFocus()
+    const { toggleTimer, resetTimer } = useFocusControls()
+    const modeLabel = mode === 'work' ? 'Trabajo' : mode === 'shortBreak' ? 'Descanso' : 'Descanso largo'
+    const modeColor = mode === 'work' ? 'bg-red-500' : mode === 'shortBreak' ? 'bg-emerald-500' : 'bg-sky-500'
+    const selectedTask = tasks.find(task => task.id === selectedTaskId && !task.completed)
+    const progressValue = Math.min(100, Math.max(0, Math.round(progress)))
 
     return (
-        <AnimatePresence mode="wait">
-            <motion.div
-                layout
-                // Keep typography on its own layer: the lab materializes the surface with
-                // spatial drift rather than scaling the timer glyphs and labels.
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={appleLiquidMotion.morphTransition}
-                className={cn(
-                    // z-[55]: above other floating z-50 surfaces — an active
-                    // countdown stays visible instead of getting covered.
-                    "fixed z-[55] shadow-2xl border-white/10",
-                    isFocusPage
-                        // left-4/right-32 (not centered w-calc/max-w): GeminiLiveOrb
-                        // (components/ai/GeminiLiveOrb.tsx) floats fixed at
-                        // bottom:5rem/right:1rem, ~104px wide (settings gear + orb)
-                        // when disconnected, spanning the same bottom-20 vertical
-                        // band this pill used to center itself across full-width
-                        // into — the mic rendered on top of this pill's right edge
-                        // (it has the higher z-index). right-32 (128px) leaves
-                        // clearance so they sit side by side instead of stacking.
-                        ? "bottom-20 left-4 right-32 h-16 rounded-full flex items-center px-6 justify-between bg-black/40 border border-white/20"
-                        // right-16 keeps clearance from ContextHub capsule (46px) on the right edge
-                        : "top-6 right-16 w-[160px] p-4 rounded-3xl bg-black/40 border-white/10 flex flex-col items-center gap-3"
-                )}
+      <div
+        ref={ref}
+        data-pomodoro-surface
+        className="fixed right-16 top-6 z-[63] h-[148px] w-40 overflow-hidden rounded-[24px] border border-white/[0.12] bg-transparent text-white shadow-[0_18px_48px_rgba(0,0,0,0.4)]"
+        aria-hidden={!open || animating}
+        inert={!open || animating}
+        style={{ opacity: 0, clipPath: 'circle(0px at 50% 50%)', pointerEvents: 'none' }}
+      >
+        <GlassSurface
+          aria-hidden
+          preset="panel"
+          refractive
+          radius={24}
+          depth={10}
+          strength={100}
+          chromaticAberration={15}
+          refractivePriority="interactive"
+          refractiveActive={open || animating}
+          backgroundColor="rgba(7, 13, 24, 0.58)"
+          elevation="high"
+          className="pointer-events-none"
+          style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
+        />
+
+        <div data-pomodoro-content role="region" aria-label="Temporizador Pomodoro" className="relative z-[1] flex h-full flex-col items-center justify-between px-3 py-0.5">
+          <div className="flex w-full items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Timer aria-hidden="true" className="h-3 w-3 text-white/60" />
+              <span className={cn('rounded-full px-2 py-0.5 text-[9px] font-semibold text-white', modeColor)}>
+                {modeLabel}
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-label="Cerrar Pomodoro y volver al Hub"
+              onClick={(event) => onClose(event.detail === 0)}
+              className="-mr-2 grid h-11 w-11 place-items-center rounded-lg text-white/90 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             >
-                <GlassSurface
-                    preset={isFocusPage ? "control" : "panel"}
-                    refractive
-                    radius={isFocusPage ? 9999 : 24}
-                    depth={4}
-                    strength={35}
-                    chromaticAberration={isFocusPage ? 2.5 : 4.5}
-                    refractivePriority="interactive"
-                    webComponent
-                    backgroundColor="transparent"
-                    elevation="low"
-                    aria-hidden
-                    className="pointer-events-none"
-                    style={{ position: 'absolute', inset: '-3px', zIndex: 0, borderRadius: 'inherit' }}
-                />
-                {/* Left Section: Badge — `relative z-10`: the GlassSurface
-                    backdrop above is `position:absolute` with z-index:0, which
-                    (per CSS stacking rules) paints AFTER non-positioned in-flow
-                    content regardless of DOM order — so without an explicit
-                    stacking context here, the glass/blur layer rendered on top
-                    of this content instead of behind it, blurring the badge
-                    and text themselves rather than just what's behind the
-                    widget. Same `relative z-10` pattern used in app/focus's
-                    own timer card and mobile-nav.tsx's active pill. */}
-                <motion.div layout className="relative z-10 flex items-center gap-2">
-                    {!isFocusPage && <Timer className="h-3 w-3 text-muted-foreground" />}
-                    <Badge variant="outline" className={cn(
-                        "border-0 text-white font-medium transition-colors duration-500",
-                        getModeColor(),
-                        isFocusPage ? "px-3 py-1 text-xs" : "text-[10px] px-2 py-0.5"
-                    )}>
-                        {getModeLabel()}
-                    </Badge>
-                </motion.div>
+              <X aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          </div>
 
-                {/* Center Section: Time */}
-                <motion.div
-                    layout
-                    className={cn(
-                        "relative z-10 font-mono font-bold tabular-nums text-white",
-                        isFocusPage ? "text-2xl" : "text-3xl"
-                    )}
-                >
-                    <PomodoroTimerText />
-                </motion.div>
+          <div role="timer" aria-label="Tiempo restante" className="font-mono text-[28px] font-bold leading-none tracking-[-0.06em] tabular-nums text-white drop-shadow-sm">
+            {formatTime(time)}
+          </div>
 
-                {/* Right Section: Controls */}
-                <motion.div layout className="relative z-10 flex items-center gap-1">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleTimer}
-                        aria-label={isActive ? "Pause timer" : "Play timer"}
-                        className={cn(
-                            "rounded-full hover:bg-white/10 text-white transition-all",
-                            isFocusPage ? "h-10 w-10 p-0" : "h-8 w-8 p-0"
-                        )}
-                    >
-                        {isActive ? (
-                            <Pause className={cn(isFocusPage ? "h-5 w-5" : "h-4 w-4")} />
-                        ) : (
-                            <Play className={cn(isFocusPage ? "h-5 w-5 ml-1" : "h-4 w-4 ml-0.5")} />
-                        )}
-                    </Button>
-                    {!isFocusPage && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={resetTimer}
-                            aria-label="Reset timer"
-                            className="h-10 w-10 p-0 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-                        >
-                            <RotateCcw className="h-4 w-4" />
-                        </Button>
-                    )}
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
+          <div className="w-full min-w-0 space-y-1">
+            <div className="flex min-w-0 items-center justify-between gap-2 text-[9px] text-white/85">
+              <span title={selectedTask?.text ?? 'Sin tarea seleccionada'} className="min-w-0 truncate">
+                {selectedTask?.text ?? 'Sin tarea seleccionada'}
+              </span>
+              <span className="shrink-0 font-mono tabular-nums">{progressValue}%</span>
+            </div>
+            <div
+              role="progressbar"
+              aria-label="Progreso del intervalo"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressValue}
+              className="h-1 w-full overflow-hidden rounded-full bg-white/20"
+            >
+              <div aria-hidden="true" className="h-full rounded-full bg-emerald-300 transition-[width] duration-300" style={{ width: `${progressValue}%` }} />
+            </div>
+            <span role="status" aria-live="polite" className="sr-only">
+              Temporizador {isActive ? 'en marcha' : 'en pausa'} · {modeLabel}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              data-pomodoro-primary
+              onClick={toggleTimer}
+              aria-label={isActive ? 'Pausar temporizador' : 'Continuar temporizador'}
+              className="grid h-11 w-11 place-items-center rounded-full text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              {isActive ? <Pause aria-hidden="true" className="h-4 w-4" /> : <Play aria-hidden="true" className="ml-0.5 h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={resetTimer}
+              aria-label="Reiniciar temporizador"
+              className="grid h-11 w-11 place-items-center rounded-full text-white/90 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
     )
-})
+  },
+)
 
-function PomodoroTimerText() {
-    const { time, formatTime } = useFocus()
-    return <>{formatTime(time)}</>
-}
+PomodoroWidget.displayName = 'PomodoroWidget'

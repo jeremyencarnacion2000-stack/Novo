@@ -4,6 +4,7 @@
 !.env.example
 .gstack/
 .next/
+/.tmp/
 out/
 coverage/
 .tmp-*

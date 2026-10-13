@@ -21,10 +21,9 @@ interface MobileSectionDrawerProps {
     open?: boolean
     onClose: (options?: { historyAction?: 'back' | 'replace' | 'none' }) => void
     onOpenVoice?: () => void
-    onExitComplete?: () => void
 }
 
-export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitComplete }: MobileSectionDrawerProps) {
+export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: MobileSectionDrawerProps) {
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
@@ -89,15 +88,27 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                 overlayClassName="md:hidden"
                 overlayProps={{
                     'data-testid': 'workspace-backdrop',
-                    className: 'bg-black/60 md:hidden',
+                    // The navigation is a lightweight, contextual expansion —
+                    // it should keep the current screen present, not turn into
+                    // a page-blocking modal.
+                    className: '!bg-transparent !backdrop-blur-none md:hidden',
+                    // Update the external state at the gesture, not after the
+                    // deferred portal exit. The shared controller then keeps
+                    // the dialog mounted while the same liquid spring returns.
+                    onPointerDown: () => onClose(),
                 }}
                 showCloseButton={false}
                 data-mobile-overlay="navigation"
+                data-liquid-morph-panel="true"
                 aria-label="Workspace menu"
-                onCloseAutoFocus={() => {
-                    if (!open) onExitComplete?.()
-                }}
-                className="!fixed !left-4 !right-4 !top-auto !bottom-[var(--mobile-navigation-bottom)] !w-auto !max-w-none !translate-x-0 !translate-y-0 rounded-[32px] border border-border/20 !bg-transparent novo-mobile-nav-panel overflow-hidden p-0 shadow-[0_10px_34px_rgba(0,0,0,0.18)] md:hidden"
+                onEscapeKeyDown={() => onClose()}
+                onPointerDownOutside={() => onClose()}
+                className="!fixed !left-4 !right-4 !top-auto !w-auto !max-w-none !max-h-[14rem] !translate-x-0 !translate-y-0 !rounded-[28px] !border-0 !bg-transparent novo-mobile-nav-panel novo-mobile-nav-panel--compact overflow-hidden p-0 shadow-[0_16px_36px_rgba(0,0,0,0.2)] md:hidden"
+                // Dialog portals render outside MobileOverlayProvider, so the
+                // provider-scoped --mobile-navigation-bottom token cannot be
+                // used here. Keep this surface on the exact physical baseline
+                // of the rail and FAB with a self-contained safe-area value.
+                style={{ '--novo-mobile-nav-panel-bottom': 'calc(1rem + env(safe-area-inset-bottom))' } as React.CSSProperties}
                 >
                     <DialogTitle className="sr-only">Workspace menu</DialogTitle>
                     <GlassSurface
@@ -106,7 +117,11 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                         preset="navigation"
                         refractive
                         refractivePriority="interactive"
+                        refractiveActive={open}
                         webComponent
+                        // This is deliberately the same optical material as
+                        // the rail and + control. The contour changes during
+                        // the handoff; the glass identity does not.
                         backgroundColor="rgba(255,255,255,0.055)"
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[32px]"
@@ -114,14 +129,15 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                     />
                     <DialogClose
                         aria-label="Close menu"
-                        className="novo-nav-glass-control absolute right-3 top-2 z-20 flex size-10 items-center justify-center rounded-full border border-foreground/[0.08] bg-foreground/[0.035] text-foreground/55 transition-colors hover:bg-foreground/[0.07] hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-95"
+                        onClick={() => onClose()}
+                        className="novo-nav-glass-control absolute right-2 top-2 z-20 flex size-8 items-center justify-center rounded-full border border-foreground/[0.08] bg-foreground/[0.035] text-foreground/55 transition-colors hover:bg-foreground/[0.07] hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-95"
                     >
                         <X data-shared-item="mobile-nav-close" className="size-4" strokeWidth={1.8} />
                     </DialogClose>
                     {/* Handle — drag down from here to dismiss with native physics */}
                     <div
                         aria-hidden="true"
-                        className="relative z-10 flex justify-center pt-3.5 pb-3 pointer-events-none select-none"
+                        className="relative z-10 flex justify-center pt-2.5 pb-1.5 pointer-events-none select-none"
                     >
                         <div className="w-9 h-[4px] rounded-full bg-foreground/15 hover:bg-foreground/30 transition-colors" />
                     </div>
@@ -129,14 +145,14 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                     {/* Sections */}
                     <div
                         data-modal-content
-                        className="relative z-10 px-5 pb-6 max-h-[65dvh] overflow-y-auto scrollbar-hide"
+                        className="relative z-10 max-h-[calc(14rem-1.5rem)] overflow-y-auto px-3 pb-3 scrollbar-hide"
                     >
                         {sections.map((section) => (
-                            <div key={section.title} className="mb-5 last:mb-2">
-                                <p className="text-[9px] font-semibold text-foreground/15 uppercase tracking-[0.3em] pl-1 mb-2.5">
+                            <div key={section.title} className="mb-3 last:mb-1">
+                                <p className="mb-1 pl-1 text-[8px] font-semibold uppercase tracking-[0.24em] text-foreground/30">
                                     {section.title}
                                 </p>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 gap-1.5">
                                     {section.items.map((item) => {
                                         const Icon = item.icon
                                         const currentPath = pathname ?? ''
@@ -148,7 +164,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                                                 key={item.href}
                                                 onClick={() => handleNavigate(item.href)}
                                                 className={cn(
-                                                    "novo-nav-glass-control relative flex flex-col items-center gap-2.5 py-4 px-2 rounded-[22px] transition-all duration-200 active:scale-95",
+                                                    "novo-nav-glass-control relative flex min-h-[54px] flex-col items-center gap-1 rounded-[16px] px-1 py-2 transition-all duration-200 active:scale-95",
                                                     active
                                                         ? "bg-primary/12 text-primary ring-1 ring-primary/20"
                                                         : "bg-foreground/[0.02] text-foreground/35 hover:bg-foreground/[0.04] hover:text-foreground/50"
@@ -156,7 +172,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                                                 data-active={active}
                                             >
                                                 <div className={cn(
-                                                    "relative h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
+                                                    "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
                                                     active
                                                         ? "bg-primary/15"
                                                         : "bg-foreground/[0.03]"
@@ -177,12 +193,12 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                                                     )}
                                                     <Icon
                                                         data-shared-item={item.sharedId}
-                                                        className="relative z-10 h-[20px] w-[20px]"
+                                                        className="relative z-10 h-4 w-4"
                                                         strokeWidth={active ? 1.8 : 1.4}
                                                     />
                                                 </div>
                                                 <span className={cn(
-                                                    "text-[10px] font-medium tracking-tight",
+                                                    "text-[9px] font-medium tracking-tight",
                                                     active ? "opacity-90" : "opacity-55"
                                                 )}>
                                                     {item.title}
@@ -195,11 +211,11 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                         ))}
 
                         {/* Footer actions */}
-                        <div className="grid grid-cols-2 gap-2.5 mt-3 pt-4 border-t border-foreground/[0.04]">
+                        <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-foreground/[0.06] pt-2">
                             {onOpenVoice && (
                                 <button
                                     onClick={onOpenVoice}
-                                    className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                    className="novo-nav-glass-control relative flex h-10 min-h-[40px] items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] text-foreground/45 transition-all hover:bg-foreground/[0.05] active:scale-95"
                                 >
                                     <Mic className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                     <span className="text-[11px] font-medium tracking-wide">Voz</span>
@@ -210,21 +226,21 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onExitC
                                     window.dispatchEvent(new CustomEvent('open-command-palette'))
                                     onClose({ historyAction: 'none' })
                                 }}
-                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                    className="novo-nav-glass-control relative flex h-10 min-h-[40px] items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] text-foreground/45 transition-all hover:bg-foreground/[0.05] active:scale-95"
                             >
                                 <Search className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">Buscar</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/settings')}
-                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                    className="novo-nav-glass-control relative flex h-10 min-h-[40px] items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] text-foreground/45 transition-all hover:bg-foreground/[0.05] active:scale-95"
                             >
                                 <Settings className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.settings')}</span>
                             </button>
                             <button
                                 onClick={() => handleNavigate('/profile')}
-                                className="novo-nav-glass-control relative min-h-[44px] flex items-center justify-center gap-2.5 h-[52px] rounded-2xl bg-foreground/[0.03] text-foreground/35 active:scale-95 transition-all hover:bg-foreground/[0.05]"
+                                    className="novo-nav-glass-control relative flex h-10 min-h-[40px] items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] text-foreground/45 transition-all hover:bg-foreground/[0.05] active:scale-95"
                             >
                                 <User className="h-[18px] w-[18px]" strokeWidth={1.4} />
                                 <span className="text-[11px] font-medium tracking-wide">{t('sidebar.profile')}</span>

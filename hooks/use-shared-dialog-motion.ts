@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useLayoutEffect } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import { modalFlip } from '@/lib/modal-flip'
 import type { NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
 
@@ -19,18 +19,35 @@ export function useSharedDialogMotion({
   enabled: boolean
   registerController?: (controller: NativeDialogMotionController | null) => void
 }) {
+  const isLiquidNav = motionId === 'mobile-nav-panel'
+  const exitTimer = useRef<number | null>(null)
   const open = useCallback(() => {
     if (!motionId) return
+    if (isLiquidNav) {
+      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
+      exitTimer.current = null
+      return
+    }
     modalFlip.toggle(motionId)
-  }, [motionId])
+  }, [isLiquidNav, motionId])
 
   const close = useCallback((onComplete: () => void) => {
+    if (isLiquidNav) {
+      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
+      // CommandCenterLiquidMorph owns the rail, + and panel geometry. Keep
+      // the portal present through its return; never start a second animator.
+      exitTimer.current = window.setTimeout(() => {
+        exitTimer.current = null
+        onComplete()
+      }, 760)
+      return
+    }
     if (!motionId) {
       onComplete()
       return
     }
     modalFlip.untoggle(motionId, onComplete)
-  }, [motionId])
+  }, [isLiquidNav, motionId])
 
   useLayoutEffect(() => {
     if (!enabled || !motionId) return
@@ -43,16 +60,18 @@ export function useSharedDialogMotion({
     const start = () => {
       if (!cancelled) open()
     }
-    if (motionId === 'mobile-nav-panel') start()
+    if (isLiquidNav) start()
     else if (typeof queueMicrotask === 'function') queueMicrotask(start)
     else Promise.resolve().then(start)
 
     return () => {
       cancelled = true
-      modalFlip.cancel(motionId)
+      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
+      exitTimer.current = null
+      if (!isLiquidNav) modalFlip.cancel(motionId)
       registerController?.(null)
     }
-  }, [close, enabled, motionId, open, registerController])
+  }, [close, enabled, isLiquidNav, motionId, open, registerController])
 
   return { open, close }
 }
