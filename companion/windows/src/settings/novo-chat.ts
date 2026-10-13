@@ -1,5 +1,6 @@
 import { Bridge, onEvent, type NovoContextFolder } from '../core/bridge';
 import { accountLabel } from '../core/novo-chat';
+import { runtimeLabel } from '../core/project-work';
 import type { Settings } from '../core/state';
 import { h, clear } from '../views/dom';
 import { t } from '../i18n/i18n';
@@ -9,6 +10,7 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   let disposed=false;let unsubscribe:(()=>void)|null=null;let generation=0;
   const status=h('p',{class:'hint',role:'status',text:t('Cargando modelos de tu cuenta…')});
   const permission=h('p',{class:'hint',hidden:true});
+  const runtimes=h('div',{class:'hint',role:'status',text:t('Comprobando capacidades de este PC…')});
   const model=h('select',{'aria-label':t('Modelo de Novo')});
   const twin=h('input',{type:'checkbox',checked:settings.novoTwinMode,'aria-label':t('Personalizar con mi Twin')});
   const connections=h('input',{type:'checkbox',checked:settings.novoLocalConnections,'aria-label':t('Consultar conexiones locales')});
@@ -53,9 +55,11 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),
     h('button',{type:'button',text:t('Seguimiento y memoria de proyectos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/settings?tab=twin`);else failure();});}}),
+    h('h2',{text:t('Trabajos delegados')}),h('p',{class:'hint',text:t('Activa reglas por proyecto en Seguimiento y memoria. Cada regla elige un PC y una carpeta. Seguir un proyecto no autoriza ejecutar cambios.')}),runtimes,
     h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo reconoce repositorios y proyectos de Vercel y sincroniza sus nombres y estado. Las rutas y claves se quedan en este PC. Puedes quitar el acceso en cualquier momento.')}),
     folderList,h('div',{class:'row'},pick,folderStatus));
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});
+  void Bridge.projectWorkRuntimes().then(items=>{if(disposed)return;clear(runtimes);for(const item of items)runtimes.append(h('p',{text:runtimeLabel(item)}));}).catch(()=>{if(!disposed)runtimes.textContent=t('No se pudieron verificar las capacidades de este PC.');});
   void onEvent('novo-account-changed',()=>void verify()).then(stop=>{if(disposed)stop();else unsubscribe=stop;});
   return {el:section,dispose:()=>{disposed=true;++generation;unsubscribe?.();}};
 }

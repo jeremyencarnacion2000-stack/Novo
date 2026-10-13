@@ -93,6 +93,7 @@ export const Bridge = {
   openNovo: () => call<void>("companion_panel_open"),
   novoAccountStatus: () => IS_TAURI ? novoCall<NativeAccountStatus>('novo_account_status') : Promise.resolve<NativeAccountStatus>({state:'demo',authorization:null,lastVerifiedAt:null,revocationPending:false}),
   novoChatModels: () => novoCall<NovoChatModel[]>('novo_chat_models'),
+  projectWorkRuntimes: () => novoCall<import('./project-work').ProjectWorkRuntime[]>('project_work_runtimes'),
   novoConversations: () => novoCall<ConversationSummary[]>('novo_conversations'),
   novoConversationGet: (id:string) => novoCall<AccountConversation>('novo_conversation_get',{id}),
   novoChatStart: (input:CompanionChatRequest) => novoCall<void>('novo_chat_start',{input}),

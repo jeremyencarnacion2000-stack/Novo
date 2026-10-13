@@ -11,6 +11,7 @@ mod codex_plan;
 mod config_file;
 mod context_folders;
 mod workspace_catalog;
+mod project_work;
 mod query_context;
 mod desktop;
 mod files;
@@ -720,6 +721,7 @@ pub fn run() {
             context_folders::companion_context_folders_pick,
             context_folders::companion_context_folders_remove,
             context_folders::companion_context_search,
+            project_work::project_work_runtimes,
             companion_minimize,
             companion_panel_open,
             boot,
@@ -822,6 +824,7 @@ pub fn run() {
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             workspace_catalog::start(handle.clone());
+            project_work::start(handle.clone());
             shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())
         })
