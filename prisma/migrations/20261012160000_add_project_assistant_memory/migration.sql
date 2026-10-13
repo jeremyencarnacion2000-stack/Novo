@@ -17,6 +17,7 @@ CREATE TABLE "project_assistant_sources" (
     "memoryId" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
     "sourceKey" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
     "repository" TEXT,
     "vercelProjectId" TEXT,
     "deviceId" TEXT,

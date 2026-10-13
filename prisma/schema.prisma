@@ -422,6 +422,7 @@ model ProjectAssistantSource {
   memoryId        String
   kind            String
   sourceKey       String
+  title           String
   repository      String?
   vercelProjectId String?
   deviceId        String?

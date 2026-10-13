@@ -34,5 +34,5 @@ export type AssistantMemoryView={
 export const PROJECT_ASSISTANT_FRESH_MS=15*60*1000
 
 export class ProjectAssistantError extends Error {
-  constructor(public readonly status:400|403|404|409|503,public readonly code:string){super(code);this.name='ProjectAssistantError'}
+  constructor(public readonly status:400|401|403|404|409|413|503,public readonly code:string){super(code);this.name='ProjectAssistantError'}
 }
