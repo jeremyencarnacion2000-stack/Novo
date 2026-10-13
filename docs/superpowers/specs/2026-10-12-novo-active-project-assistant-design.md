@@ -1,6 +1,6 @@
 # Novo: seguimiento activo, ejecución y memoria continua
 
-Estado: propuesta para revisión, todavía no aprobada ni implementada.
+Estado: diseño aprobado por el usuario; implementación pendiente.
 Fecha: 12 de octubre de 2026.
 
 ## Intención del usuario
