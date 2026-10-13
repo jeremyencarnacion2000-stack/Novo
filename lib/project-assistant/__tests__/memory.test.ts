@@ -1,4 +1,4 @@
-jest.mock('@/lib/prisma',()=>({prisma:{projectAssistantMemory:{},projectAssistantSource:{},project:{},novoSignalSourcePreference:{},companionDevice:{},$transaction:undefined}}))
+jest.mock('@/lib/prisma',()=>({prisma:{userSettings:{},novoSignalLedger:{deleteMany:jest.fn()},twinEvolutionLog:{deleteMany:jest.fn()},projectAssistantMemory:{},projectAssistantSource:{},project:{},novoSignalSourcePreference:{},companionDevice:{},$transaction:undefined}}))
 import {prisma} from '@/lib/prisma'
 import {recordProjectObservations,readProjectAssistantMemories,updateProjectAssistantMemory,clearProjectAssistantMemory} from '../memory'
 
@@ -28,6 +28,7 @@ beforeEach(()=>{
   db.novoSignalSourcePreference.findMany=jest.fn(async()=>[])
   db.companionDevice.findMany=jest.fn(async()=>[])
   db.project.findFirst=jest.fn(async()=>null)
+  db.userSettings.findUnique=jest.fn(async()=>null)
 })
 
 test('project identity persists across requests and duplicate delivery',async()=>{
@@ -55,7 +56,18 @@ test('forgetting keeps a tombstone and cannot be undone by queued observations',
   await recordProjectObservations('owner',[{...observation,observedAt:'2026-10-12T18:02:00Z'}],{now:new Date('2026-10-12T18:03:00Z')})
   expect(await readProjectAssistantMemories('owner',{access})).toEqual([])
   expect(memories).toHaveLength(1)
+  expect(db.novoSignalLedger.deleteMany).toHaveBeenCalledWith({where:{userId:'owner',source:'project_assistant',sourceRef:'m1'}})
   await expect(updateProjectAssistantMemory('other','m1',{revision:2,trackingMode:'on'})).rejects.toMatchObject({code:'memory_not_found'})
+})
+test('pausing prevents new facts and excluding projects removes private project context',async()=>{
+  db.userSettings.findUnique.mockResolvedValue({settings:{ambientTwinPaused:true}})
+  expect(await recordProjectObservations('owner',[observation],{now:new Date(at)})).toMatchObject({changed:0,paused:true})
+  expect(memories).toHaveLength(0)
+  db.userSettings.findUnique.mockResolvedValue(null)
+  db.project.findFirst.mockResolvedValue({id:'p1'})
+  await recordProjectObservations('owner',[{kind:'novo',sourceKey:'p1',title:'Private',observedAt:at,facts:{status:'in-progress',priority:'high',progress:2,tasks:[]}}],{now:new Date(at)})
+  db.novoSignalSourcePreference.findMany.mockResolvedValue([{source:'projects'}])
+  expect(await readProjectAssistantMemories('owner',{access})).toEqual([])
 })
 
 test('scope filtering excludes source facts, labels and user corrections',async()=>{

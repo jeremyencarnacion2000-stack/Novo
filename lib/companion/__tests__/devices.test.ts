@@ -7,6 +7,7 @@ jest.mock('@/lib/prisma', () => ({prisma:{
   $transaction:jest.fn(), $executeRaw:jest.fn(),
   companionDevice:{findUnique:jest.fn(), findFirst:jest.fn(), create:jest.fn(), update:jest.fn(), updateMany:jest.fn(), findMany:jest.fn()},
   companionWorkContext:{deleteMany:jest.fn()},
+  projectAssistantSource:{updateMany:jest.fn()},
   oAuthModel:{deleteMany:jest.fn()}, mcpAuditLog:{create:jest.fn()},
 }}))
 
@@ -53,6 +54,7 @@ it('reconnect revokes both previous token rows and Grant inside the device trans
   expect(db.oAuthModel.deleteMany).toHaveBeenCalledWith({where:{accountId:'owner', OR:[{grantId:'old-grant'}, {type:'Grant', modelId:'old-grant'}]}})
   expect(db.companionDevice.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({grantId:'grant', revokedAt:null})}))
   expect(db.companionWorkContext.deleteMany).toHaveBeenCalledWith({where:{userId:'owner',sourceDeviceId:deviceId}})
+  expect(db.projectAssistantSource.updateMany).toHaveBeenCalledWith({where:{userId:'owner',deviceId},data:{facts:{},availability:'revoked'}})
 })
 it('refuses to reuse a revoked connection without a new grant', async () => {
   ;(db.companionDevice.findUnique as jest.Mock).mockResolvedValue(row({revokedAt:originalTime}))

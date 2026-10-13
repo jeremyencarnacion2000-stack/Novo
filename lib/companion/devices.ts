@@ -53,6 +53,7 @@ export async function registerCompanionDevice(actor:CompanionOAuthPrincipal, inp
     if (current) {
       await revokeGrant(tx, actor.userId, current.grantId)
       await tx.companionWorkContext.deleteMany({ where: { userId: actor.userId, sourceDeviceId: deviceId } })
+      await tx.projectAssistantSource.updateMany({where:{userId:actor.userId,deviceId},data:{facts:{},availability:'revoked'}})
     }
     const data = {name, platform, clientId:actor.clientId, grantId:actor.grantId,
       scopes:[...actor.scopes].sort(), connectedAt:now, lastVerifiedAt:now, revokedAt:null}
@@ -93,6 +94,7 @@ export async function revokeCompanionDevice(userId:string, id:string): Promise<v
     if (device.revokedAt) return
     await revokeGrant(tx, userId, device.grantId)
     await tx.companionWorkContext.deleteMany({ where: { userId, sourceDeviceId: id } })
+    await tx.projectAssistantSource.updateMany({where:{userId,deviceId:id},data:{facts:{},availability:'revoked'}})
     await tx.companionDevice.update({where:deviceKey(userId, id), data:{revokedAt:new Date()}})
     await auditDevice(tx, {userId, clientId:device.clientId}, id, 'revoke')
   })

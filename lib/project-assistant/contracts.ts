@@ -33,6 +33,13 @@ export type AssistantMemoryView={
 }
 export const PROJECT_ASSISTANT_FRESH_MS=15*60*1000
 
+export function parseProjectSourceObservation(source:{kind:string;sourceKey:string;title:string;repository?:string|null;vercelProjectId?:string|null;deviceId?:string|null;observedAt:Date;facts:unknown}):ProjectObservation|null {
+  if(!Number.isFinite(source.observedAt.getTime()))return null
+  const sourceKey=source.kind==='folder'?source.sourceKey.split(':').pop():source.kind==='agent'&&source.deviceId?source.sourceKey.slice(source.deviceId.length+1):source.sourceKey
+  const result=projectObservationSchema.safeParse({kind:source.kind,sourceKey,title:source.title,repository:source.repository??undefined,vercelProjectId:source.vercelProjectId??undefined,observedAt:source.observedAt.toISOString(),facts:source.facts})
+  return result.success?result.data:null
+}
+
 export class ProjectAssistantError extends Error {
   constructor(public readonly status:400|401|403|404|409|413|503,public readonly code:string){super(code);this.name='ProjectAssistantError'}
 }
