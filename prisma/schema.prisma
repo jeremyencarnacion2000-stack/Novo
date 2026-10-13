@@ -109,6 +109,8 @@ model User {
   mcpPersonalAccessTokens McpPersonalAccessToken[]
   mcpAuditLogs McpAuditLog[]
   companionDevices CompanionDevice[]
+  projectAssistantMemories ProjectAssistantMemory[]
+  projectAssistantSources ProjectAssistantSource[]
   mutationRequests MutationRequest[]
   cognitiveReplanRequests CognitiveReplanRequest[]
 
@@ -386,11 +388,54 @@ model Project {
   tasks     Task[]
   timeBlocks TimeBlock[]
   quickNotes QuickNote[]
+  assistantMemories ProjectAssistantMemory[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
   @@index([userId])
   @@map("projects")
+}
+
+model ProjectAssistantMemory {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  title        String
+  trackingMode String   @default("auto")
+  correction   String?
+  revision     Int      @default(1)
+  clearedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sources      ProjectAssistantSource[]
+
+  @@index([userId, clearedAt, updatedAt])
+  @@index([userId, projectId])
+  @@map("project_assistant_memories")
+}
+
+model ProjectAssistantSource {
+  id              String   @id @default(cuid())
+  userId          String
+  memoryId        String
+  kind            String
+  sourceKey       String
+  repository      String?
+  vercelProjectId String?
+  deviceId        String?
+  facts           Json
+  observedAt      DateTime
+  lastAttemptAt   DateTime?
+  availability    String   @default("available")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memory          ProjectAssistantMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, sourceKey])
+  @@index([userId, memoryId])
+  @@index([userId, deviceId])
+  @@map("project_assistant_sources")
 }
 
 model Subtask {
