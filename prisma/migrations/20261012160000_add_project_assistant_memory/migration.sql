@@ -5,6 +5,7 @@ CREATE TABLE "project_assistant_memories" (
     "title" TEXT NOT NULL,
     "trackingMode" TEXT NOT NULL DEFAULT 'auto',
     "correction" TEXT,
+    "manualIdentity" BOOLEAN NOT NULL DEFAULT false,
     "revision" INTEGER NOT NULL DEFAULT 1,
     "clearedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

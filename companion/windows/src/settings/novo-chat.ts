@@ -52,7 +52,8 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})),
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),
-    h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo busca archivos relacionados y reconoce repositorios y proyectos de Vercel en esas carpetas. Puedes quitar el acceso en cualquier momento.')}),
+    h('button',{type:'button',text:t('Seguimiento y memoria de proyectos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/settings?tab=twin`);else failure();});}}),
+    h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo reconoce repositorios y proyectos de Vercel y sincroniza sus nombres y estado. Las rutas y claves se quedan en este PC. Puedes quitar el acceso en cualquier momento.')}),
     folderList,h('div',{class:'row'},pick,folderStatus));
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});
   void onEvent('novo-account-changed',()=>void verify()).then(stop=>{if(disposed)stop();else unsubscribe=stop;});

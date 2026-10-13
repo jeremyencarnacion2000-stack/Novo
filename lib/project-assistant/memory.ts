@@ -2,6 +2,7 @@ import type {Prisma,ProjectAssistantMemory,ProjectAssistantSource} from '@prisma
 import {prisma} from '@/lib/prisma'
 import {withProviderSyncLock} from '@/lib/provider-sync-lock'
 import {resolveObservationIdentity} from './identity'
+import {projectMemoryLinkSchema} from './contracts'
 import {projectObservationSchema,projectMemoryPatchSchema,parseProjectSourceObservation,ProjectAssistantError,PROJECT_ASSISTANT_FRESH_MS,type ProjectObservation,type ProjectMemoryPatch,type ProjectAssistantAccess,type AssistantMemoryView} from './contracts'
 
 type MemoryRecord=ProjectAssistantMemory&{sources:ProjectAssistantSource[]}
@@ -156,5 +157,23 @@ export async function clearProjectAssistantMemory(userId:string,id:string,revisi
     await tx.projectAssistantSource.updateMany({where:{userId,memoryId:id},data:{facts:{},availability:'forgotten'}})
     await tx.novoSignalLedger.deleteMany({where:{userId,source:'project_assistant',sourceRef:id}})
     await tx.twinEvolutionLog.deleteMany({where:{userId,changeType:'project_context_updated',newValue:{contains:`"memoryId":${JSON.stringify(id)}`}}})
+  })
+}
+
+/** Only an explicit owner decision can bind sources with conflicting identifiers. */
+export async function linkProjectAssistantMemories(userId:string,id:string,input:unknown) {
+  const parsed=projectMemoryLinkSchema.safeParse(input)
+  if(!parsed.success||parsed.data.targetId===id)throw new ProjectAssistantError(400,'invalid_memory_link')
+  const {revision,targetId,targetRevision}=parsed.data
+  await withProviderSyncLock(prisma,`project-memory:${userId}`,async tx=>{
+    const source=await tx.projectAssistantMemory.findFirst({where:{id,userId,clearedAt:null}})
+    const target=await tx.projectAssistantMemory.findFirst({where:{id:targetId,userId,clearedAt:null}})
+    if(!source||!target)throw new ProjectAssistantError(404,'memory_not_found')
+    if(source.revision!==revision||target.revision!==targetRevision)throw new ProjectAssistantError(409,'revision_conflict')
+    if(source.projectId&&target.projectId&&source.projectId!==target.projectId)throw new ProjectAssistantError(409,'different_novo_projects')
+    const updated=await tx.projectAssistantMemory.updateMany({where:{id:targetId,userId,revision:targetRevision,clearedAt:null},data:{manualIdentity:true,projectId:target.projectId??source.projectId,title:!target.projectId&&source.projectId?source.title:target.title,revision:{increment:1}}})
+    const retired=await tx.projectAssistantMemory.updateMany({where:{id,userId,revision,clearedAt:null},data:{clearedAt:new Date(),correction:null,trackingMode:'off',revision:{increment:1}}})
+    if(!updated.count||!retired.count)throw new ProjectAssistantError(409,'revision_conflict')
+    await tx.projectAssistantSource.updateMany({where:{userId,memoryId:id},data:{memoryId:targetId}})
   })
 }

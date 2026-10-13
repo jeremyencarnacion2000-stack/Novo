@@ -97,6 +97,8 @@ export interface IntegrationInfo {
 }
 
 export interface Settings {
+  /** Native account setting; never edited by the appearance/preferences UI. */
+  readonly companionApiOrigin?: string;
   soundEnabled: boolean;
   soundVolume: number;
   autoCloseInterval: number;

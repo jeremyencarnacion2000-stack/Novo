@@ -403,6 +403,7 @@ model ProjectAssistantMemory {
   title        String
   trackingMode String   @default("auto")
   correction   String?
+  manualIdentity Boolean @default(false)
   revision     Int      @default(1)
   clearedAt    DateTime?
   createdAt    DateTime @default(now())

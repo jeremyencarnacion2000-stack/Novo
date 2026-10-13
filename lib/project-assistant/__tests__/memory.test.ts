@@ -1,6 +1,6 @@
 jest.mock('@/lib/prisma',()=>({prisma:{userSettings:{},novoSignalLedger:{deleteMany:jest.fn()},twinEvolutionLog:{deleteMany:jest.fn()},projectAssistantMemory:{},projectAssistantSource:{},project:{},novoSignalSourcePreference:{},companionDevice:{},$transaction:undefined}}))
 import {prisma} from '@/lib/prisma'
-import {recordProjectObservations,readProjectAssistantMemories,updateProjectAssistantMemory,clearProjectAssistantMemory} from '../memory'
+import {recordProjectObservations,readProjectAssistantMemories,updateProjectAssistantMemory,clearProjectAssistantMemory,linkProjectAssistantMemories} from '../memory'
 
 const db=prisma as any
 let memories:any[],sources:any[],serial:Promise<unknown>
@@ -9,7 +9,7 @@ const observation={kind:'github' as const,sourceKey:'owner/novo',title:'Reposito
 const access={personal:true,projects:true,integrations:true,currentWorkContext:true}
 const matches=(row:any,where:any):boolean=>Object.entries(where??{}).every(([key,value]:any)=>{
   if(key==='userId_kind_sourceKey')return matches(row,value)
-  if(key==='id'||key==='userId'||key==='memoryId'||key==='revision'||key==='clearedAt')return row[key]===value
+  if(key==='id'||key==='userId'||key==='memoryId'||key==='revision'||key==='clearedAt'||key==='kind'||key==='sourceKey')return row[key]===value
   if(key==='deviceId'&&value?.in)return value.in.includes(row.deviceId)
   return true
 })
@@ -87,4 +87,18 @@ test('local observations need a bound device and revoked devices are not usable'
   expect(await readProjectAssistantMemories('owner',{access,now:new Date(at)})).toEqual([])
   db.companionDevice.findMany.mockResolvedValue([{deviceId:workspace}])
   expect((await readProjectAssistantMemories('owner',{access,now:new Date(at)}))[0].sources[0].deviceId).toBe(workspace)
+})
+test('explicit owned linking merges source identities, checks both revisions and preserves the chosen correction',async()=>{
+  await recordProjectObservations('owner',[observation],{now:new Date(at)})
+  await recordProjectObservations('owner',[{...observation,sourceKey:'owner/another',repository:'owner/another',title:'Local project'}],{now:new Date(at)})
+  memories[0].correction='Mantener esta corrección'
+  await expect(linkProjectAssistantMemories('other','m1',{revision:1,targetId:'m2',targetRevision:1})).rejects.toMatchObject({code:'memory_not_found'})
+  await expect(linkProjectAssistantMemories('owner','m1',{revision:3,targetId:'m2',targetRevision:1})).rejects.toMatchObject({code:'revision_conflict'})
+  await linkProjectAssistantMemories('owner','m2',{revision:1,targetId:'m1',targetRevision:1})
+  expect(memories[0].correction).toBe('Mantener esta corrección')
+  expect(memories[0].manualIdentity).toBe(true)
+  expect(sources.every(source=>source.memoryId==='m1')).toBe(true)
+  await recordProjectObservations('owner',[{...observation,sourceKey:'owner/another',repository:'owner/another',title:'Local project',observedAt:'2026-10-12T18:03:00Z'}],{now:new Date('2026-10-12T18:04:00Z')})
+  expect(memories).toHaveLength(2)
+  expect((await readProjectAssistantMemories('owner',{access}))).toHaveLength(1)
 })
