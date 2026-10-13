@@ -218,7 +218,7 @@ export function SettingsMcpAccess() {
           <span><span className="block text-sm font-semibold text-foreground/80">{locale==='es'?'Permitir trabajos delegados y contexto de carpetas':'Allow delegated work and chosen folder context'}</span><span className="mt-1 block text-xs leading-5 text-foreground/60">{locale==='es'?'Conecta Novo Companion y elige después los proyectos, el PC y las capacidades en Seguimiento.':'Connect Novo Companion, then choose projects, the PC and capabilities in Following.'}</span></span>
         </label>
         <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
-          <input type="checkbox" checked={allowCompanion} onChange={(event) => setAllowCompanion(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+          <input type="checkbox" checked={allowCompanion} onChange={(event) => {setAllowCompanion(event.target.checked);if(!event.target.checked)setAllowWorkExecution(false)}} className="mt-0.5 size-4 accent-primary" />
           <span><span className="block text-sm font-semibold text-foreground/80">{copy.companionPermission}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">device:connect · ai:chat · {copy.companionPermissionDetails}</span></span>
         </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
