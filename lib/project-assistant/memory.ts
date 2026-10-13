@@ -5,7 +5,7 @@ import {resolveObservationIdentity} from './identity'
 import {projectObservationSchema,projectMemoryPatchSchema,parseProjectSourceObservation,ProjectAssistantError,PROJECT_ASSISTANT_FRESH_MS,type ProjectObservation,type ProjectMemoryPatch,type ProjectAssistantAccess,type AssistantMemoryView} from './contracts'
 
 type MemoryRecord=ProjectAssistantMemory&{sources:ProjectAssistantSource[]}
-type ObservationOptions={deviceId?:string;now?:Date}
+type ObservationOptions={deviceId?:string;now?:Date;replaceInventory?:boolean;guard?:(tx:Prisma.TransactionClient)=>Promise<void>}
 const fullAccess:ProjectAssistantAccess={personal:true,projects:true,integrations:true,development:true,currentWorkContext:true}
 
 /** Validate before storing; the device namespace is assigned by the authenticated caller. */
@@ -23,9 +23,17 @@ export async function recordProjectObservations(userId:string,observations:Proje
     return result.data
   })
   return withProviderSyncLock(prisma,`project-memory:${userId}`,async tx=>{
+    await options.guard?.(tx)
+    const currentSettings=await tx.userSettings?.findUnique({where:{userId},select:{settings:true}})
+    const currentPrefs=currentSettings?.settings as Record<string,unknown>|null
+    if(currentPrefs?.cognitiveLearningPaused===true||currentPrefs?.ambientTwinPaused===true)return {changed:0,conflicts:0,paused:true}
+    const excludedRows=await tx.novoSignalSourcePreference.findMany({where:{userId,excludedAt:{not:null}},select:{source:true}})
+    const excluded=new Set(excludedRows.map(row=>row.source))
     const records=await tx.projectAssistantMemory.findMany({where:{userId},include:{sources:{where:{userId}}},take:500})
     let changed=0,conflicts=0
-    for(const observation of parsed){
+    for(const raw of parsed){
+      if(excluded.has(raw.kind==='novo'?'projects':raw.kind==='folder'||raw.kind==='agent'?'work_context':raw.kind))continue
+      const observation=raw.kind==='novo'&&excluded.has('tasks')?{...raw,facts:{...raw.facts,tasks:[]}}:raw
       const local=observation.kind==='folder'||observation.kind==='agent'
       const sourceKey=local?`${options.deviceId}:${observation.sourceKey}`:observation.sourceKey
       const repository=observation.repository??(observation.kind==='github'?observation.sourceKey:null)
@@ -68,6 +76,10 @@ export async function recordProjectObservations(userId:string,observations:Proje
           if(projectId){record.projectId=projectId;record.title=observation.title}
         }
       }
+    }
+    if(options.replaceInventory&&options.deviceId){
+      const keys=parsed.filter(item=>item.kind==='folder').map(item=>`${options.deviceId}:${item.sourceKey}`)
+      await tx.projectAssistantSource.updateMany({where:{userId,deviceId:options.deviceId,kind:'folder',sourceKey:{notIn:keys}},data:{facts:{},availability:'removed'}})
     }
     return {changed,conflicts}
   })

@@ -42,7 +42,7 @@ export async function buildProjectQueryContext(userId:string,query:string,hints:
           const data=await fetchGitHubDeveloperContext(resolveIntegrationCredential(github.accessToken,{userId,provider:'github'}),fetch,{repositories,query})
           for(const row of data){
             evidence.push({source:'github',name:row.repository,repository:row.repository.toLowerCase()})
-            const parsed=projectObservationSchema.safeParse({kind:'github',sourceKey:row.repository,title:row.repository,repository:row.repository,observedAt:observedAt.toISOString(),facts:{openPullRequests:row.openPullRequests,requestedReviewers:row.requestedReviewers,latestReviewState:row.latestReviewState,ci:row.ci}})
+            const parsed=projectObservationSchema.safeParse({kind:'github',sourceKey:row.repository,title:row.repository,repository:row.repository,observedAt:observedAt.toISOString(),facts:{openPullRequests:row.openPullRequests,requestedReviewers:row.requestedReviewers,latestReviewState:row.latestReviewState,ci:row.ci,commit:row.commit,failedCheckIds:row.failedCheckIds}})
             if(parsed.success)observations.push(parsed.data)
           }
           if(data.length)sources.push('github')

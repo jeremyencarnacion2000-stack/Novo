@@ -22,7 +22,7 @@ export const projectObservationSchema=z.discriminatedUnion('kind',[
 })
 export type ProjectObservation=z.infer<typeof projectObservationSchema>
 export type ProjectSourceKind=ProjectObservation['kind']
-export const projectObservationsSchema=z.object({observations:z.array(projectObservationSchema).max(100)}).strict()
+export const projectObservationsSchema=z.object({observations:z.array(projectObservationSchema).max(100),replaceInventory:z.boolean().optional()}).strict()
 export const projectMemoryPatchSchema=z.object({revision:z.number().int().positive(),trackingMode:z.enum(['auto','on','off']).optional(),correction:safeAssistantText(480).nullable().optional()}).strict()
 export type ProjectMemoryPatch=z.infer<typeof projectMemoryPatchSchema>
 export type ProjectAssistantAccess={personal:boolean;projects?:boolean;integrations:boolean;development?:boolean;currentWorkContext?:boolean}

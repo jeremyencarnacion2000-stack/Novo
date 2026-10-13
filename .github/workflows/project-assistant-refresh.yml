@@ -1,0 +1,24 @@
+name: Novo project refresh
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: novo-project-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Refresh authorized project sources
+        env:
+          NOVO_REFRESH_SECRET: ${{ secrets.NOVO_PROJECT_REFRESH_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NOVO_REFRESH_SECRET"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+            --max-time 280 --header "Authorization: Bearer $NOVO_REFRESH_SECRET" \
+            https://productivitynovo.vercel.app/api/cron/project-assistant

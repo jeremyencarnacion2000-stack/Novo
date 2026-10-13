@@ -10,6 +10,7 @@ mod claude;
 mod codex_plan;
 mod config_file;
 mod context_folders;
+mod workspace_catalog;
 mod query_context;
 mod desktop;
 mod files;
@@ -820,6 +821,7 @@ pub fn run() {
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
             integrations::start(handle.clone());
+            workspace_catalog::start(handle.clone());
             shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())
         })

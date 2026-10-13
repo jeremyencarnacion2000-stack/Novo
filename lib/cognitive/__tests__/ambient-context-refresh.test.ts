@@ -2,6 +2,7 @@
 
 jest.mock('@/lib/plugins/plugin-orchestrator', () => ({ syncAllPlugins: jest.fn() }))
 jest.mock('@/lib/cognitive/ambient-twin-runtime', () => ({ runAmbientTwinForUser: jest.fn() }))
+jest.mock('@/lib/project-assistant/refresh',()=>({refreshProjectAssistantForUser:jest.fn(async()=>({status:'refreshed'}))}))
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findMany: jest.fn() },

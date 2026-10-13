@@ -5,6 +5,8 @@ export type GitHubDeveloperRepositorySummary = {
   latestReviewState: 'approved' | 'changes_requested' | 'commented' | 'pending' | 'none'
   ci: { passed: number; failed: number; pending: number }
   pullRequests?: {number:number;title:string}[]
+  commit?:string
+  failedCheckIds?:string[]
 }
 
 type Fetcher = typeof fetch
@@ -113,8 +115,16 @@ async function summarizeRepository(repo: GitHubRepo, token: string, fetcher: Fet
     requestedReviewers,
     latestReviewState: latestReviewState(reviewPayload, requestedReviewers > 0),
     ci: checkCounts(checksPayload),
-    ...(detailed?{pullRequests:pulls.slice(0,8).flatMap(p=>typeof p.title==='string'&&Number.isSafeInteger(p.number)?[{number:Number(p.number),title:p.title.slice(0,180)}]:[])}:{}),
+    ...(detailed?{pullRequests:pulls.slice(0,8).flatMap(p=>typeof p.title==='string'&&Number.isSafeInteger(p.number)?[{number:Number(p.number),title:p.title.slice(0,180)}]:[]),...checkIdentity(checksPayload)}:{}),
   }
+}
+
+function checkIdentity(payload:unknown):{commit?:string;failedCheckIds:string[]} {
+  const runs=payload&&typeof payload==='object'&&Array.isArray((payload as {check_runs?:unknown}).check_runs)?(payload as {check_runs:unknown[]}).check_runs:[]
+  const checked=runs.flatMap(row=>row&&typeof row==='object'?[row as Record<string,unknown>]:[])
+  const commit=checked.map(row=>row.head_sha).find((value):value is string=>typeof value==='string'&&/^[a-f0-9]{40,64}$/i.test(value))
+  const failedCheckIds=checked.filter(row=>row.status==='completed'&&!['success','neutral','skipped'].includes(String(row.conclusion))).flatMap(row=>typeof row.id==='number'&&Number.isSafeInteger(row.id)?[String(row.id)]:[]).slice(0,100)
+  return {...(commit?{commit}:{}),failedCheckIds}
 }
 
 export async function fetchGitHubDeveloperContext(
