@@ -15,8 +15,9 @@ const issueSchema = z.object({
   allowIntegrationRead: z.boolean().default(false),
   allowIntegrationSync: z.boolean().default(false),
   allowCompanion: z.boolean().default(false),
+  allowWorkExecution:z.boolean().default(false),
   expiresInDays: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
-})
+}).strict().refine(input=>!input.allowWorkExecution||input.allowCompanion,{message:'Companion consent required'})
 
 function requireUserId(session: { user?: { id?: string | null } } | null): string | null {
   return session?.user?.id ?? null
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
     if (parsed.data.allowIntegrationRead) scopes.push('integrations:read')
     if (parsed.data.allowIntegrationSync) scopes.push('integrations:read', 'integrations:write')
     if (parsed.data.allowCompanion) scopes.push('device:connect', 'ai:chat')
+    if(parsed.data.allowWorkExecution)scopes.push('projects:read','device:work:read','device:work:execute','device:work-context:read','device:work-context:write')
     // Count and insert under the same advisory lock. Without this, two device
     // requests arriving together can both observe nine active tokens and issue
     // an eleventh one, bypassing the product limit.

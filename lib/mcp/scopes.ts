@@ -21,6 +21,8 @@ export const MCP_SCOPE_DESCRIPTIONS: Record<string, string> = {
   'device:activity:write': 'Registrar aplicaciones y duración de uso desde el escritorio; no incluye contenido, títulos, rutas ni URLs',
   'device:work-context:read': 'Leer el enfoque de trabajo que compartas con Novo Companion',
   'device:work-context:write': 'Compartir o quitar tu enfoque de trabajo desde Novo Companion',
+  'device:work:read': 'Consultar los trabajos delegados al dispositivo y su estado',
+  'device:work:execute': 'Realizar trabajos delimitados de proyectos en carpetas elegidas con Novo Companion',
 }
 
 export const MCP_SCOPES = Object.keys(MCP_SCOPE_DESCRIPTIONS)

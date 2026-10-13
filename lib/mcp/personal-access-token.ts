@@ -9,6 +9,7 @@ export const MCP_DEVICE_SCOPES = [
   'integrations:read', 'integrations:write', 'device:activity:write',
   'device:connect', 'ai:chat', 'device:activity:read',
   'device:work-context:read', 'device:work-context:write',
+  'projects:read', 'device:work:read', 'device:work:execute',
 ] as const
 export type McpDeviceScope = (typeof MCP_DEVICE_SCOPES)[number]
 
@@ -41,6 +42,9 @@ export function normalizeMcpDeviceScopes(scopes: readonly string[]): McpDeviceSc
   if (requested.has('device:activity:read')) normalized.push('device:activity:read')
   if (requested.has('device:work-context:read')) normalized.push('device:work-context:read')
   if (requested.has('device:work-context:write')) normalized.push('device:work-context:write')
+  if (requested.has('projects:read')) normalized.push('projects:read')
+  if (requested.has('device:work:read')) normalized.push('device:work:read')
+  if (requested.has('device:work:execute')) normalized.push('device:work:execute')
   return normalized
 }
 

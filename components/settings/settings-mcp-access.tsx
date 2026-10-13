@@ -88,6 +88,7 @@ export function SettingsMcpAccess() {
   const [name, setName] = useState('')
   const [allowTaskWrites, setAllowTaskWrites] = useState(false)
   const [allowCompanion, setAllowCompanion] = useState(false)
+  const [allowWorkExecution,setAllowWorkExecution]=useState(false)
   const [allowDeviceActivity, setAllowDeviceActivity] = useState(false)
   const [allowTwinRead, setAllowTwinRead] = useState(false)
   const [allowProjectsRead, setAllowProjectsRead] = useState(false)
@@ -137,7 +138,7 @@ export function SettingsMcpAccess() {
       const response = await fetch('/api/mcp/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, allowTaskWrites, allowCompanion, allowDeviceActivity, allowTwinRead, allowProjectsRead, allowIntegrationRead, allowIntegrationSync, expiresInDays: days }),
+        body: JSON.stringify({ name, allowTaskWrites, allowCompanion, allowDeviceActivity, allowTwinRead, allowProjectsRead, allowIntegrationRead, allowIntegrationSync, allowWorkExecution, expiresInDays: days }),
       })
       const payload = await readJsonResponse(response)
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'create failed')
@@ -146,6 +147,8 @@ export function SettingsMcpAccess() {
       setName('')
       setAllowTaskWrites(false)
       setAllowCompanion(false)
+      setAllowWorkExecution(false)
+      setAllowProjectsRead(false)
       setAllowDeviceActivity(false)
       setAllowTwinRead(false)
       setAllowIntegrationRead(false)
@@ -209,6 +212,10 @@ export function SettingsMcpAccess() {
         <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
           <input type="checkbox" checked={allowTaskWrites} onChange={(event) => setAllowTaskWrites(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
           <span><span className="block text-sm font-semibold text-foreground/80">{allowTaskWrites ? copy.taskWrite : copy.readOnly}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">{copy.readScope}{allowTaskWrites ? ` · ${copy.writeScope}` : ''}</span></span>
+        </label>
+        <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
+          <input type="checkbox" checked={allowWorkExecution} disabled={!allowCompanion} onChange={event=>setAllowWorkExecution(event.target.checked)} className="mt-1 accent-primary" />
+          <span><span className="block text-sm font-semibold text-foreground/80">{locale==='es'?'Permitir trabajos delegados y contexto de carpetas':'Allow delegated work and chosen folder context'}</span><span className="mt-1 block text-xs leading-5 text-foreground/60">{locale==='es'?'Conecta Novo Companion y elige después los proyectos, el PC y las capacidades en Seguimiento.':'Connect Novo Companion, then choose projects, the PC and capabilities in Following.'}</span></span>
         </label>
         <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
           <input type="checkbox" checked={allowCompanion} onChange={(event) => setAllowCompanion(event.target.checked)} className="mt-0.5 size-4 accent-primary" />

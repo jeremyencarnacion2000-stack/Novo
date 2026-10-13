@@ -1737,6 +1737,8 @@ model CompanionDevice {
   connectedAt     DateTime  @default(now())
   lastVerifiedAt  DateTime  @default(now())
   revokedAt       DateTime?
+  workCapabilities String[] @default([])
+  workLastSeenAt DateTime?
   chatTurns       CompanionChatTurn[]
 
   @@unique([userId, deviceId])

@@ -27,7 +27,7 @@ const OAUTH_CLIENT_SCOPES_KEY: &str = "novo-oauth-client-scopes";
 const OAUTH_REVOCATIONS_KEY: &str = "novo-oauth-pending-revocations";
 const OAUTH_STAGED_KEY: &str = "novo-oauth-staged-authorization";
 const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
-const COMPANION_OAUTH_SCOPES: &str = "device:connect ai:chat twin:read projects:read device:activity:read device:activity:write device:work-context:read device:work-context:write integrations:read";
+const COMPANION_OAUTH_SCOPES: &str = "device:connect ai:chat twin:read projects:read device:activity:read device:activity:write device:work-context:read device:work-context:write integrations:read device:work:read device:work:execute";
 const IDLE_AFTER_SECONDS: u64 = 300;
 
 #[derive(Clone,Serialize,Deserialize)]

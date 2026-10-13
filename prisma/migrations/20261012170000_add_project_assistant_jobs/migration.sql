@@ -1,4 +1,7 @@
 -- CreateTable
+ALTER TABLE "companion_devices" ADD COLUMN "workCapabilities" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], ADD COLUMN "workLastSeenAt" TIMESTAMP(3);
+
+-- CreateTable
 CREATE TABLE "project_delegations" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,

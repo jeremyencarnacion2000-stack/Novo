@@ -20,11 +20,12 @@ export async function saveDelegation(userId:string,input:unknown){
   return withProviderSyncLock(prisma,`project-memory:${userId}`,async tx=>{
     // Disabling an existing rule is always possible, including with an offline/revoked PC.
     const current=await tx.projectDelegation.findFirst({where:{userId,memoryId:data.memoryId}})
-    if(data.enabled||!current)await requireDelegationBinding(tx,userId,data)
+    if(data.enabled||!current||data.deviceId!==current.deviceId||data.workspaceId!==current.workspaceId)await requireDelegationBinding(tx,userId,data)
     if(current){
       if(current.version!==version)throw new ProjectAssistantError(409,'revision_conflict')
       const saved=await tx.projectDelegation.updateMany({where:{id:current.id,userId,version},data:{...data,verification:data.verification as Prisma.InputJsonValue,version:{increment:1}}})
       if(!saved.count)throw new ProjectAssistantError(409,'revision_conflict')
+      await tx.projectWork.updateMany({where:{userId,delegationId:current.id,phase:{in:['pending','waiting_device','running','awaiting_confirmation']}},data:{phase:'cancelled',reasonCode:'delegation_changed',finishedAt:new Date(),revision:{increment:1}}})
       return {...current,...data,version:version+1}
     }
     if(version!==0)throw new ProjectAssistantError(409,'revision_conflict')

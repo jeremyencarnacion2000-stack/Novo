@@ -37,4 +37,8 @@ describe('MCP personal-access-token primitives', () => {
     expect(scopes).not.toContain('tasks:write')
     expect(scopes).not.toContain('device:activity:write')
   })
+  it('preserves project and execution permission only when explicitly requested',()=>{
+    expect(normalizeMcpDeviceScopes(['device:connect','ai:chat'])).not.toContain('device:work:execute')
+    expect(normalizeMcpDeviceScopes(['projects:read','device:work:read','device:work:execute'])).toEqual(expect.arrayContaining(['projects:read','device:work:read','device:work:execute']))
+  })
 })

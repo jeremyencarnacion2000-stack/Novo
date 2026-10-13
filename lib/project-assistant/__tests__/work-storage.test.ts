@@ -29,6 +29,11 @@ test('activation binds owned memory, device and selected workspace and increment
   db.projectAssistantSource.findFirst.mockResolvedValue(null)
   await expect(saveDelegation('owner',{...input,version:1})).rejects.toMatchObject({code:'workspace_not_authorized'})
 })
+test('pausing cancels queued work even when the device is unavailable',async()=>{
+  db.companionDevice.findFirst.mockResolvedValue(null)
+  await saveDelegation('owner',{...input,version:1,enabled:false})
+  expect(db.projectWork.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({userId:'owner',delegationId:'r1'}),data:expect.objectContaining({phase:'cancelled',reasonCode:'delegation_changed'})}))
+})
 test('foreign memory or missing device execution grant cannot activate a delegation',async()=>{
   db.projectAssistantMemory.findFirst.mockResolvedValue(null)
   await expect(saveDelegation('other',input)).rejects.toMatchObject({code:'memory_not_found'})

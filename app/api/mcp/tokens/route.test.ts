@@ -50,6 +50,15 @@ describe('POST /api/mcp/tokens', () => {
     const scopes=(issueMcpPersonalAccessToken as jest.Mock).mock.calls[0][0].scopes
     expect(scopes).toContain('projects:read');expect(scopes).not.toContain('tasks:write');expect(scopes).not.toContain('twin:write')
   })
+  it('requires Companion consent and issues bounded work/context scopes without general task writes',async()=>{
+    const body={name:'Novo PC',allowWorkExecution:true,allowCompanion:false}
+    const request=(value:unknown)=>new Request('http://localhost/api/mcp/tokens',{method:'POST',body:JSON.stringify(value)})
+    expect((await POST(request(body) as never)).status).toBe(400)
+    expect((await POST(request({...body,allowCompanion:true}) as never)).status).toBe(201)
+    const scopes=(issueMcpPersonalAccessToken as jest.Mock).mock.calls[0][0].scopes
+    expect(scopes).toEqual(expect.arrayContaining(['device:work:read','device:work:execute','device:work-context:write','projects:read']))
+    expect(scopes).not.toContain('tasks:write');expect(scopes).not.toContain('integrations:write')
+  })
 
   it('allows read-only integration context without integration writes', async () => {
     const request = new Request('http://localhost/api/mcp/tokens', {
