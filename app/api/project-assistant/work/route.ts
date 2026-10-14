@@ -5,11 +5,13 @@ import {requireProjectAssistantSession,projectAssistantJson,projectAssistantErro
 import {enqueueProjectWork} from '@/lib/project-assistant/jobs'
 import {projectWorkView} from '@/lib/project-assistant/device-work'
 import {workCapabilitySchema} from '@/lib/project-assistant/work-contracts'
+import {reconcileAbandonedProviderActions} from '@/lib/project-assistant/work-decisions'
 export const dynamic='force-dynamic'
 export async function GET(request:Request){
   try{
     const userId=await requireProjectAssistantSession(),memoryId=new URL(request.url).searchParams.get('memoryId')??undefined
     if(memoryId&&!assistantId.safeParse(memoryId).success)throw new ProjectAssistantError(400,'invalid_memory')
+    await reconcileAbandonedProviderActions(userId)
     const [work,delegations,devices,workspaces]=await Promise.all([
       prisma.projectWork.findMany({where:{userId,...(memoryId?{memoryId}:{})},orderBy:{updatedAt:'desc'},take:50}),
       prisma.projectDelegation.findMany({where:{userId,...(memoryId?{memoryId}:{})},orderBy:{updatedAt:'desc'},take:100}),

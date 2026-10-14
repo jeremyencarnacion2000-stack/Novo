@@ -6,7 +6,7 @@ const fetchMock=jest.fn()
 beforeEach(()=>{fetchMock.mockReset();global.fetch=fetchMock;fetchMock.mockResolvedValue({ok:true,status:200,json:async()=>({work:[{id:'job-1',memoryId:'memory-1',deviceId:'device-1',workspaceId:'workspace-1',capability:'project.diagnose',objective:'Revisar Novo',phase:'waiting_device',revision:1,sequence:1,mode:'manual',reasonCode:null,result:null,decision:null,createdAt:'2026-10-14T12:00:00Z',updatedAt:'2026-10-14T12:00:00Z',startedAt:null,finishedAt:null}],delegations:[],devices:[],workspaces:[]})})})
 
 test('chat can open the one shared activity surface and shows the pending count',async()=>{
-  render(<ProjectWorkLink/>);const link=await screen.findByRole('link',{name:'Trabajos de Novo: 1 pendientes'})
+  render(<ProjectWorkLink/>);const link=await screen.findByRole('link',{name:'Trabajos de Novo: 1 pendiente'})
   expect(link).toHaveAttribute('href','/activity')
 })
 

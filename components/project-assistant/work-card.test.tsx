@@ -30,6 +30,39 @@ test('a prepared typed action waits for review and sends exact arguments only af
   await waitFor(()=>expect(fetchMock).toHaveBeenNthCalledWith(4,`/api/project-assistant/work/${work.id}/decision`,expect.objectContaining({method:'PATCH',body:JSON.stringify({revision:5,requestId:pending.requestId,fingerprint:pending.fingerprint,decision:'confirm'})})))
 })
 
+test('requires a second confirmation before creating a GitHub issue and displays the exact payload',async()=>{
+  const githubOperation={kind:'github.issue.create',repository:'acme/novo',title:'Corregir vista previa',body:'La vista previa queda pendiente.'}
+  const githubPending={...pending,operation:githubOperation}
+  const pendingWork={...work,phase:'awaiting_confirmation',revision:5,decision:githubPending}
+  fetchMock.mockResolvedValueOnce(response({work:[pendingWork],delegations:[],devices:[],workspaces:[]}))
+  fetchMock.mockResolvedValueOnce(response({work:{...pendingWork,phase:'completed',revision:7,decision:{...githubPending,state:'applied',decision:'confirm',operationResult:{kind:'github_issue',resourceId:'42'}}}}))
+  fetchMock.mockResolvedValueOnce(response({work:[{...pendingWork,phase:'completed',revision:7,decision:{...githubPending,state:'applied',decision:'confirm',operationResult:{kind:'github_issue',resourceId:'42'}}}],delegations:[],devices:[],workspaces:[]}))
+  render(<WorkHarness/>);
+  expect(await screen.findByText('acme/novo')).toBeInTheDocument()
+  expect(screen.getByText('Corregir vista previa')).toBeInTheDocument()
+  expect(screen.getByText('La vista previa queda pendiente.')).toBeInTheDocument()
+  const confirm=screen.getByRole('button',{name:'Confirmar y ejecutar'})
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  fireEvent.click(confirm)
+  await waitFor(()=>expect(fetchMock).toHaveBeenNthCalledWith(2,`/api/project-assistant/work/${work.id}/decision`,expect.objectContaining({method:'PATCH',body:JSON.stringify({revision:5,requestId:pending.requestId,fingerprint:pending.fingerprint,decision:'confirm'})})))
+  await waitFor(()=>expect(fetchMock).toHaveBeenCalledTimes(3))
+})
+
+test('shows the exact Vercel project, source deployment and production target before confirmation',async()=>{
+  const vercelOperation={kind:'vercel.deployment.redeploy',projectId:'prj_novo',projectName:'Novo',deploymentId:'dpl_preview',target:'production' as const}
+  const vercelPending={...pending,operation:vercelOperation}
+  const pendingWork={...work,phase:'awaiting_confirmation',revision:5,decision:vercelPending}
+  fetchMock.mockResolvedValue(response({work:[pendingWork],delegations:[],devices:[],workspaces:[]}))
+  render(<ProjectWorkCard work={pendingWork} devices={[]}/>);
+  const review=screen.getByRole('region',{name:'Acción pendiente de aprobación'})
+  expect(review).toHaveTextContent('Novo')
+  expect(review).toHaveTextContent('prj_novo')
+  expect(review).toHaveTextContent('dpl_preview')
+  expect(review).toHaveTextContent('Producción')
+  expect(screen.getByRole('button',{name:'Confirmar y ejecutar'})).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
 test('shows which PC is expected and keeps cancel available only while active',async()=>{
   const activeWork={...work,phase:'waiting_device'}
   render(<ProjectWorkCard work={activeWork} devices={[{id:activeWork.deviceId,name:'Mi PC',capabilities:['project.diagnose'],lastSeenAt:null,canExecute:true}]}/>);

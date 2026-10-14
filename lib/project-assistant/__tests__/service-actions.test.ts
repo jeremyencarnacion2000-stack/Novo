@@ -1,4 +1,4 @@
-import {executeApprovedServiceAction} from '../service-actions'
+import {approvedWorkOperationSchema,executeApprovedServiceAction} from '../service-actions'
 const tx:any={task:{create:jest.fn(async()=>({id:'task-1'}))},quickNote:{create:jest.fn(async()=>({id:'note-1'}))},calendarEvent:{create:jest.fn(async()=>({id:'event-1'}))}}
 beforeEach(()=>{jest.clearAllMocks()})
 
@@ -22,4 +22,12 @@ test('rejects arbitrary mutation and invalid ranges without reaching any adapter
   await expect(executeApprovedServiceAction(tx,'owner',{kind:'task.delete',id:'anything'})).rejects.toMatchObject({code:'invalid_service_action'})
   await expect(executeApprovedServiceAction(tx,'owner',{kind:'calendar.create',title:'Evento',start:'2026-10-15T11:00:00Z',end:'2026-10-15T10:00:00Z'})).rejects.toMatchObject({code:'invalid_service_action'})
   expect(tx.task.create).not.toHaveBeenCalled();expect(tx.quickNote.create).not.toHaveBeenCalled();expect(tx.calendarEvent.create).not.toHaveBeenCalled()
+})
+
+test('accepts only exact GitHub and Vercel provider actions while refusing path traversal and credentials',()=>{
+  expect(approvedWorkOperationSchema.safeParse({kind:'github.issue.create',repository:'acme/novo',title:'Revisar issue',body:'Documentación: https://example.com/guide'}).success).toBe(true)
+  expect(approvedWorkOperationSchema.safeParse({kind:'github.issue.create',repository:'../novo',title:'Issue',body:''}).success).toBe(false)
+  expect(approvedWorkOperationSchema.safeParse({kind:'github.issue.create',repository:'acme/novo',title:'Issue',body:'github_pat_abcdefghijklmnopqrstuvwxyz1234567890'}).success).toBe(false)
+  expect(approvedWorkOperationSchema.safeParse({kind:'vercel.deployment.redeploy',projectId:'prj_novo',projectName:'Novo',deploymentId:'dpl_release',target:'production'}).success).toBe(true)
+  expect(approvedWorkOperationSchema.safeParse({kind:'vercel.deployment.redeploy',projectId:'prj_novo',projectName:'Novo',deploymentId:'dpl_release',target:'unknown',url:'https://attacker.invalid'}).success).toBe(false)
 })
