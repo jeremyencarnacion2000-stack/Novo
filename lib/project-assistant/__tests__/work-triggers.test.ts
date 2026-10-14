@@ -23,7 +23,7 @@ test('paused/excluded and stale or untracked evidence do not execute work',async
   db.userSettings.findUnique.mockResolvedValue({settings:{ambientTwinPaused:true}});await dispatchDelegationTriggers('owner',now);expect(enqueueProjectWork).not.toHaveBeenCalled()
   db.userSettings.findUnique.mockResolvedValue(null);db.novoSignalSourcePreference.findMany.mockResolvedValue([{source:'github'}]);await dispatchDelegationTriggers('owner',now);expect(enqueueProjectWork).not.toHaveBeenCalled()
   db.novoSignalSourcePreference.findMany.mockResolvedValue([])
-  const records=await readProjectAssistantRecords('owner',{});records[0].sources[0].observedAt=new Date(now.getTime()-16*60000);await dispatchDelegationTriggers('owner',now);expect(enqueueProjectWork).not.toHaveBeenCalled()
+  const records=await readProjectAssistantRecords('owner',{personal:true,integrations:true,currentWorkContext:true});records[0].sources[0].observedAt=new Date(now.getTime()-16*60000);await dispatchDelegationTriggers('owner',now);expect(enqueueProjectWork).not.toHaveBeenCalled()
   records[0].sources[0].observedAt=now;records[0].trackingMode='off';await dispatchDelegationTriggers('owner',now);expect(enqueueProjectWork).not.toHaveBeenCalled()
 })
 test('owner day boundaries include offset changes and never use rolling 24 hours',()=>{

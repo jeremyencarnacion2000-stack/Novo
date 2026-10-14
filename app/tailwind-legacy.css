@@ -2417,6 +2417,9 @@
   .min-w-0 {
     min-width: calc(var(--spacing) * 0);
   }
+  .min-w-4 {
+    min-width: calc(var(--spacing) * 4);
+  }
   .min-w-5 {
     min-width: calc(var(--spacing) * 5);
   }
@@ -3093,6 +3096,11 @@
       border-top-style: var(--tw-border-style);
       border-top-width: calc(1px * var(--tw-divide-y-reverse));
       border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+    }
+  }
+  .divide-border {
+    :where(& > :not(:last-child)) {
+      border-color: var(--border);
     }
   }
   .divide-border\/30 {
@@ -7344,6 +7352,10 @@
   .\!leading-relaxed {
     --tw-leading: var(--leading-relaxed) !important;
     line-height: var(--leading-relaxed) !important;
+  }
+  .leading-4 {
+    --tw-leading: calc(var(--spacing) * 4);
+    line-height: calc(var(--spacing) * 4);
   }
   .leading-5 {
     --tw-leading: calc(var(--spacing) * 5);
@@ -13840,10 +13852,27 @@
         }
     }
 }
+  .focus-visible\:outline {
+    &:focus-visible {
+      outline-style: var(--tw-outline-style);
+      outline-width: 1px;
+    }
+  }
   .focus-visible\:outline-1 {
     &:focus-visible {
       outline-style: var(--tw-outline-style);
       outline-width: 1px;
+    }
+  }
+  .focus-visible\:outline-2 {
+    &:focus-visible {
+      outline-style: var(--tw-outline-style);
+      outline-width: 2px;
+    }
+  }
+  .focus-visible\:outline-offset-2 {
+    &:focus-visible {
+      outline-offset: 2px;
     }
   }
   .focus-visible\:outline-ring {
@@ -17781,11 +17810,6 @@
           rotate: 180deg;
         }
       }
-    }
-  }
-  .\[role\=\"alert\"\]\:visible {
-    &:is(role="alert") {
-      visibility: visible;
     }
   }
   .\*\:\[span\]\:last\:flex {

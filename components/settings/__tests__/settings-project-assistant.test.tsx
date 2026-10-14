@@ -1,9 +1,10 @@
 import {render,screen,fireEvent,waitFor} from '@testing-library/react'
 import {SettingsProjectAssistant} from '../settings-project-assistant'
+jest.mock('next-auth/react',()=>({useSession:()=>({data:{user:{id:'owner-test'}},status:'authenticated'})}))
 const memory={id:'m1',title:'Novo',trackingMode:'on',tracked:true,revision:2,correction:null,taskCount:2,blockerCount:1,nextStep:'Revisar el bloqueo detectado',updatedAt:'2026-10-12T18:00:00Z',sources:[{kind:'github',sourceKey:'owner/novo',repository:'owner/novo',observedAt:'2026-10-12T18:00:00Z',fresh:false,available:true}]}
 const response=(body:unknown,status=200)=>({ok:status===200,status,json:async()=>body})
 const fetchMock=jest.fn()
-beforeEach(()=>{fetchMock.mockReset();global.fetch=fetchMock;fetchMock.mockResolvedValue(response({memories:[memory],refresh:{background:'unavailable',intervalMinutes:15}}))})
+beforeEach(()=>{fetchMock.mockReset();global.fetch=fetchMock;fetchMock.mockImplementation((url:string)=>Promise.resolve(url==='/api/project-assistant/work'?response({work:[],delegations:[],devices:[],workspaces:[]}):response({memories:[memory],refresh:{background:'unavailable',intervalMinutes:15}})))})
 test('loads actual following/freshness and keeps configuration reachable in a vertical layout',async()=>{
   render(<SettingsProjectAssistant/>);expect(screen.getByText('Cargando seguimiento…')).toBeInTheDocument()
   await screen.findByText('Novo');expect(screen.getByText(/Última evidencia guardada/)).toBeInTheDocument()

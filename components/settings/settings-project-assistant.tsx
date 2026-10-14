@@ -2,6 +2,8 @@
 import {useCallback,useEffect,useState} from 'react'
 import {Button} from '@/components/ui/button'
 import type {AssistantMemoryView} from '@/lib/project-assistant/contracts'
+import {useProjectAssistant} from '@/hooks/use-project-assistant'
+import {DelegationControls} from '@/components/project-assistant/delegation-controls'
 
 type Snapshot={memories:AssistantMemoryView[];refresh?:{background:string;intervalMinutes:number}}
 const sourceNames:Record<string,string>={novo:'Novo',github:'GitHub',vercel:'Vercel',folder:'Carpeta del PC',agent:'Agente local'}
@@ -9,6 +11,7 @@ const issue=(status:number)=>status===401?'Inicia sesión para consultar tu segu
 
 export function SettingsProjectAssistant(){
   const [snapshot,setSnapshot]=useState<Snapshot>({memories:[]}),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
+  const assistant=useProjectAssistant()
   const load=useCallback(async(signal?:AbortSignal)=>{
     setLoading(true);setError('')
     try{const response=await fetch('/api/project-assistant',{cache:'no-store',signal});if(!response.ok)throw new Error(issue(response.status));const body=await response.json();if(!Array.isArray(body.memories))throw new Error(issue(503));setSnapshot(body)}catch(failure){if(!signal?.aborted)setError(failure instanceof Error?failure.message:issue(503))}finally{if(!signal?.aborted)setLoading(false)}
@@ -26,11 +29,11 @@ export function SettingsProjectAssistant(){
     {notice&&<p role="status" className="text-sm">{notice}</p>}
     {loading&&<p role="status" className="text-sm text-muted-foreground">Cargando seguimiento…</p>}
     {!loading&&!error&&!snapshot.memories.length&&<p className="py-4 text-sm text-muted-foreground">Actualiza las fuentes para empezar a seguir tus proyectos.</p>}
-    <ul className="divide-y divide-border">{snapshot.memories.map(memory=><MemoryRow key={memory.id} memory={memory} others={snapshot.memories.filter(row=>row.id!==memory.id&&(!row.linkedProjectId||!memory.linkedProjectId||row.linkedProjectId===memory.linkedProjectId))} busy={busy} mutate={mutate}/>)}</ul>
+    <ul className="divide-y divide-border">{snapshot.memories.map(memory=><MemoryRow key={memory.id} memory={memory} others={snapshot.memories.filter(row=>row.id!==memory.id&&(!row.linkedProjectId||!memory.linkedProjectId||row.linkedProjectId===memory.linkedProjectId))} busy={busy} mutate={mutate} assistant={assistant}/>)}</ul>
     <p className="text-sm text-muted-foreground">Seguir un proyecto autoriza consultas y memoria. Para que Novo prepare trabajo por ti, activa una delegación con el PC y las capacidades que elijas.</p>
   </section>
 }
-function MemoryRow({memory,others,busy,mutate}:{memory:AssistantMemoryView;others:AssistantMemoryView[];busy:boolean;mutate:(url:string,method:string,body:unknown)=>Promise<boolean>}){
+function MemoryRow({memory,others,busy,mutate,assistant}:{memory:AssistantMemoryView;others:AssistantMemoryView[];busy:boolean;mutate:(url:string,method:string,body:unknown)=>Promise<boolean>;assistant:ReturnType<typeof useProjectAssistant>}){
   const [correction,setCorrection]=useState(memory.correction??''),[target,setTarget]=useState(''),[forgetting,setForgetting]=useState(false)
   const base=`/api/project-assistant/${encodeURIComponent(memory.id)}`
   return <li className="min-w-0 py-5">
@@ -41,5 +44,6 @@ function MemoryRow({memory,others,busy,mutate}:{memory:AssistantMemoryView;other
       {others.length>0&&<form onSubmit={event=>{event.preventDefault();const selected=others.find(row=>row.id===target);if(selected)void mutate(`${base}/link`,'POST',{revision:memory.revision,targetId:selected.id,targetRevision:selected.revision})}} className="space-y-2"><label htmlFor={`link-${memory.id}`} className="block text-sm">Estas fuentes pertenecen al mismo proyecto que…</label><select id={`link-${memory.id}`} value={target} onChange={event=>setTarget(event.target.value)} className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"><option value="">Elige un proyecto</option>{others.map(row=><option value={row.id} key={row.id}>{row.title}</option>)}</select><p className="text-sm text-muted-foreground">Vincular conserva las fuentes y la configuración del proyecto elegido. No cambia tus tareas.</p><Button variant="outline" disabled={busy||!target} type="submit">Vincular fuentes</Button></form>}
       {!forgetting?<Button variant="ghost" disabled={busy} aria-label={`Olvidar memoria de ${memory.title}`} onClick={()=>setForgetting(true)}>Olvidar esta memoria</Button>:<div className="space-y-2"><p className="text-sm">Novo dejará de usar estos recuerdos. Tus proyectos y archivos se conservan.</p><div className="flex flex-wrap gap-2"><Button variant="destructive" disabled={busy} onClick={()=>void mutate(base,'DELETE',{revision:memory.revision})}>Confirmar olvido</Button><Button variant="outline" disabled={busy} onClick={()=>setForgetting(false)}>Conservar memoria</Button></div></div>}
     </div></details>
+    <DelegationControls key={`${memory.id}:${assistant.delegations.find(row=>row.memoryId===memory.id)?.version??'new'}`} memoryId={memory.id} delegation={assistant.delegations.find(row=>row.memoryId===memory.id)} devices={assistant.devices} workspaces={assistant.workspaces.filter(row=>row.memoryId===memory.id)}/>
   </li>
 }
