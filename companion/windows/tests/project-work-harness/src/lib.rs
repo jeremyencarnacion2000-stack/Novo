@@ -28,7 +28,7 @@ mod tests {
             "--ignore-rules",
             "approval_policy=\"never\"",
             "network.enabled=false",
-            "windows.sandbox=\"mxc\"",
+            "windows.sandbox=\"elevated\"",
             "web_search=\"disabled\"",
         ] {
             assert!(joined.contains(required), "{required}");
