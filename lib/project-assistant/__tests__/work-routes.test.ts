@@ -4,10 +4,12 @@ jest.mock('@/lib/companion/auth',()=>({requireCompanionOAuth:jest.fn()}))
 jest.mock('@/lib/companion/devices',()=>({requireActiveCompanionDevice:jest.fn()}))
 jest.mock('@/lib/project-assistant/device-work',()=>({claimDeviceWork:jest.fn(async()=>null),requireWorkStep:jest.fn(),reportDeviceWork:jest.fn(),projectWorkView:(job:unknown)=>job}))
 jest.mock('@/lib/project-assistant/jobs',()=>({enqueueProjectWork:jest.fn(async()=>({id:'j1'})),cancelProjectWork:jest.fn()}))
+jest.mock('../work-decisions',()=>({reconcileAbandonedProviderActions:jest.fn(async()=>0)}))
 jest.mock('@/lib/prisma',()=>({prisma:{projectWork:{findMany:jest.fn()},projectDelegation:{findMany:jest.fn()},companionDevice:{findMany:jest.fn()},projectAssistantSource:{findMany:jest.fn()}}}))
 import {requireProjectAssistantSession} from '../http'
 import {requireCompanionOAuth} from '@/lib/companion/auth'
 import {enqueueProjectWork} from '../jobs'
+import {reconcileAbandonedProviderActions} from '../work-decisions'
 import {POST as claim} from '@/app/api/companion/work/route'
 import {POST as enqueue,GET as list} from '@/app/api/project-assistant/work/route'
 import {prisma} from '@/lib/prisma'
@@ -16,6 +18,7 @@ beforeEach(()=>{jest.clearAllMocks();(requireProjectAssistantSession as jest.Moc
 test('only owned canonical jobs are listed without leases or execution credentials',async()=>{
   const response=await list(new Request('https://novo.test/api/project-assistant/work'))
   expect(response.status).toBe(200)
+  expect(reconcileAbandonedProviderActions).toHaveBeenCalledWith('owner')
   expect(prisma.projectWork.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({userId:'owner'})}))
   expect(await response.text()).not.toContain('leaseToken')
 })

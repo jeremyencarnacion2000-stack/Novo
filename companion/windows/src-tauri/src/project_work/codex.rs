@@ -48,7 +48,7 @@ pub fn permission_args(workspace: &Path, writable: bool) -> Vec<String> {
         "-c".into(),
         "permissions.novo.network.enabled=false".into(),
         "-c".into(),
-        "windows.sandbox=\"mxc\"".into(),
+        "windows.sandbox=\"elevated\"".into(),
         "-c".into(),
         "approval_policy=\"never\"".into(),
         "-c".into(),
@@ -235,4 +235,26 @@ pub fn system_node() -> Result<PathBuf, String> {
         .into_iter()
         .find(|path| path.is_absolute() && path.is_file())
         .ok_or("runtime_unavailable".into())
+}
+
+#[cfg(test)]
+mod permission_tests {
+    use super::permission_args;
+    use std::path::Path;
+
+    #[test]
+    fn windows_codex_uses_elevated_sandbox_and_denies_secrets_and_network() {
+        let args = permission_args(Path::new("C:/Users/Angel/work/project"), true);
+        let settings: Vec<_> = args
+            .windows(2)
+            .filter_map(|pair| (pair[0] == "-c").then_some(pair[1].as_str()))
+            .collect();
+
+        assert!(settings.contains(&"windows.sandbox=\"elevated\""));
+        assert!(settings.contains(&"permissions.novo.network.enabled=false"));
+        assert!(settings.iter().any(|setting| setting.contains("**/.env*")));
+        assert!(settings.iter().any(|setting| setting.contains("**/credentials*")));
+        assert!(settings.iter().any(|setting| setting.contains("**/auth.json")));
+        assert!(!settings.contains(&"windows.sandbox=\"mxc\""));
+    }
 }
