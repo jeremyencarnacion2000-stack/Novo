@@ -68,6 +68,6 @@
 
 ## Verification ledger
 
-- The last observed production refresh workflow run is successful `workflow_dispatch` run [38629955211](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/38629955211). As of 2026-10-14 22:55 UTC, no post-reactivation `schedule` run had appeared; the 22:52 UTC candidate had passed without a receipt. Continue observing the next interval.
+- The last observed production refresh workflow run is successful `workflow_dispatch` run [38629955211](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/38629955211). As of 2026-10-14 23:07 UTC, no post-reactivation `schedule` event had appeared. The cron offset is shifted to `10,25,40,55` while retaining 15-minute intervals; verify an actual scheduled receipt after the update reaches `main`.
 - The Windows Companion installer has not been rebuilt or published from this change yet. Windows CI must pass before release.
 - Local `npm run build` and local Windows native builds were intentionally avoided due to prior disk pressure and host saturation; Vercel and GitHub CI will provide those checks.
