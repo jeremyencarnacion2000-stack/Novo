@@ -20,7 +20,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SOURCE = resolve(here, "../../NotchBuddy/Resources/Localizable.xcstrings");
+// Pinned MIT source shipped with this fork; no neighboring Mac checkout required.
+const SOURCE = resolve(here, "../tests/fixtures/upstream-localizable.xcstrings");
 const OUTPUT = resolve(here, "../src/i18n/strings.json");
 
 /** The languages Coucou ships, in the Mac's picker order. English is the source. */

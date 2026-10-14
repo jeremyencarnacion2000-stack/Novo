@@ -94,6 +94,8 @@ const globalsSource = fs.readFileSync(globalsPath, 'utf8')
   .replace(/@import\s+['"]\.\/tailwind-legacy\.css['"];?\s*/g, '')
 const rendered = await postcss([tailwindcss()]).process(globalsSource, { from: globalsPath })
 const legacyCss = flattenNestedMedia(flattenLayers(rendered.css))
+  .replace(/[\t ]+(?=\r?$)/gm, '')
+  .trimEnd()
 const legacy = `/* Generated for legacy WebViews that cannot parse CSS cascade layers or nested media. */\n${legacyCss}\n`
 fs.writeFileSync(path.join(root, 'app', 'tailwind-legacy.css'), legacy)
 console.log(`Tailwind source candidates: ${sorted.length}`)

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { runAmbientTwinForUser } from '@/lib/cognitive/ambient-twin-runtime'
 import { syncAllPlugins } from '@/lib/plugins/plugin-orchestrator'
+import {refreshProjectAssistantForUser} from '@/lib/project-assistant/refresh'
 
 const INTERACTIVE_REFRESH_INTERVAL_MS = 15 * 60 * 1000
 const AMBIENT_REFRESH_FINGERPRINT = 'ambient:authorized-sources-refresh'
@@ -136,6 +137,7 @@ export async function refreshAmbientContextForUser(
     }
 
     const plugins = await syncAllPlugins(userId)
+    await refreshProjectAssistantForUser(userId)
     const ambient = await runAmbientTwinForUser(userId, { trigger: 'sync' })
     await recordAmbientRefresh(userId, sourceRef)
     await finishAmbientRefreshClaim(claim, 'completed')

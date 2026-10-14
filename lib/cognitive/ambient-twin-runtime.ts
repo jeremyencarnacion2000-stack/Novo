@@ -5,6 +5,7 @@ import { planUserContext } from '@/lib/cognitive/canonical-planner'
 import { processOneCognitiveReplanRequest } from '@/lib/cognitive/process-replan-requests'
 import { getOrCreateTwin } from '@/lib/cognitive/get-or-create-twin'
 import { appendActivityEvent, createActivityRun, finishActivityRun, getActivityRun } from '@/lib/ai/activity'
+import { reconcileNovoProjectMemories } from '@/lib/project-assistant/reconcile'
 
 export type AmbientTrigger = 'startup' | 'sync' | 'task_created' | 'task_completed' | 'calendar_changed' | 'agent_outcome' | 'focus_completed' | 'user_correction'
 export type AmbientRecommendation = { id: string; title: string; nextStep: string; taskId: string | null; estimatedMinutes: number | null; confidence: number; explanation: string; status: string }
@@ -105,6 +106,8 @@ async function persistAmbientObservation(userId: string, state: AmbientTwinState
 }
 
 export async function runAmbientTwinForUser(userId: string, options: { trigger: AmbientTrigger; timezone?: string; now?: Date }) {
+  // Existing Twin reconciliation remains usable during an additive rollout.
+  await reconcileNovoProjectMemories(userId, options.now).catch(() => undefined)
   const state = await readAmbientTwinState(userId, options); if (state.status !== 'active') return state; const now = options.now ?? new Date(); await persistAmbientObservation(userId, state, now); let planning: AmbientTwinState['planning'] = state.planning; let planningError: string | undefined
   if ((isSignificantAmbientTrigger(options.trigger) || (options.trigger === 'sync' && state.deadlineApproaching)) && state.contextChanged) { try { const replan = await processOneCognitiveReplanRequest(now, userId); const failed = 'failed' in replan && replan.failed; const leasedByAnotherWorker = ('leaseLost' in replan && replan.leaseLost) || ('raced' in replan && replan.raced); if (replan.processed && !failed) planning = 'completed'; else if (failed) planning = 'failed'; else if (leasedByAnotherWorker) planning = 'pending'; else { const snapshot = await prisma.cognitiveStateSnapshot.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' }, select: { id: true } }); if (snapshot) { await planUserContext({ userId, timezone: options.timezone ?? 'UTC', snapshotId: snapshot.id, trigger: `ambient:${options.trigger}` }); planning = 'completed' } else planning = 'insufficient_context' } } catch (error) { planning = error instanceof Error && ['no_recommendation', 'state_snapshot_required'].includes(error.message) ? 'insufficient_context' : 'failed'; planningError = 'ambient_planning_failed' } }
   return { ...state, planning, ...(planningError ? { planningError } : {}) }

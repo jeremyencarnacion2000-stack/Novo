@@ -17,7 +17,13 @@ function deviceView(row: CompanionDevice): CompanionDeviceView {
 }
 const deviceKey = (userId:string, deviceId:string) => ({userId_deviceId:{userId, deviceId}})
 async function lockDevice(tx:Prisma.TransactionClient, userId:string, deviceId:string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`project-memory:${userId}`}))`
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`novo:device:${userId}:${deviceId}`}, 0))`
+}
+async function stopDeviceWork(tx:Prisma.TransactionClient,userId:string,deviceId:string){
+  await tx.projectDelegation.updateMany({where:{userId,deviceId,enabled:true},data:{enabled:false,version:{increment:1}}})
+  await tx.projectWork.updateMany({where:{userId,deviceId,phase:{in:['running','awaiting_confirmation']}},data:{phase:'uncertain',reasonCode:'device_revoked',revision:{increment:1}}})
+  await tx.projectWork.updateMany({where:{userId,deviceId,phase:{in:['pending','waiting_device']}},data:{reasonCode:'device_revoked',revision:{increment:1}}})
 }
 async function revokeGrant(tx:Prisma.TransactionClient, userId:string, grantId:string) {
   await tx.oAuthModel.deleteMany({where:{accountId:userId, OR:[{grantId}, {type:'Grant', modelId:grantId}]}})
@@ -53,9 +59,11 @@ export async function registerCompanionDevice(actor:CompanionOAuthPrincipal, inp
     if (current) {
       await revokeGrant(tx, actor.userId, current.grantId)
       await tx.companionWorkContext.deleteMany({ where: { userId: actor.userId, sourceDeviceId: deviceId } })
+      await tx.projectAssistantSource.updateMany({where:{userId:actor.userId,deviceId},data:{facts:{},availability:'revoked'}})
+      await stopDeviceWork(tx,actor.userId,deviceId)
     }
     const data = {name, platform, clientId:actor.clientId, grantId:actor.grantId,
-      scopes:[...actor.scopes].sort(), connectedAt:now, lastVerifiedAt:now, revokedAt:null}
+      scopes:[...actor.scopes].sort(), connectedAt:now, lastVerifiedAt:now, revokedAt:null,workCapabilities:[],workLastSeenAt:null}
     const record = current
       ? await tx.companionDevice.update({where:deviceKey(actor.userId, deviceId), data})
       : await tx.companionDevice.create({data:{userId:actor.userId, deviceId, ...data}})
@@ -93,7 +101,9 @@ export async function revokeCompanionDevice(userId:string, id:string): Promise<v
     if (device.revokedAt) return
     await revokeGrant(tx, userId, device.grantId)
     await tx.companionWorkContext.deleteMany({ where: { userId, sourceDeviceId: id } })
-    await tx.companionDevice.update({where:deviceKey(userId, id), data:{revokedAt:new Date()}})
+    await tx.projectAssistantSource.updateMany({where:{userId,deviceId:id},data:{facts:{},availability:'revoked'}})
+    await stopDeviceWork(tx,userId,id)
+    await tx.companionDevice.update({where:deviceKey(userId, id), data:{revokedAt:new Date(),workCapabilities:[],workLastSeenAt:null}})
     await auditDevice(tx, {userId, clientId:device.clientId}, id, 'revoke')
   })
 }

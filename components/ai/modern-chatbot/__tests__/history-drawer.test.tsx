@@ -29,6 +29,9 @@ jest.mock('../welcome-hero', () => ({
   VoiceListeningOverlay: () => null,
 }))
 jest.mock('@/lib/i18n', () => ({ useTranslation: () => ({ language: 'es' }) }))
+jest.mock('@/hooks/use-project-assistant', () => ({
+  useProjectAssistant: () => ({ work: [], status: 'ready', error: null, devices: [], delegations: [], workspaces: [] }),
+}))
 
 describe('ModernChatbot conversation history', () => {
   beforeAll(() => {

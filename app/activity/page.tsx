@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NovoActivitySurface } from '@/components/ai/novo-activity-surface'
+import { ProjectAssistantActivity } from '@/components/project-assistant/activity'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export default async function ActivityPage() {
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">Consulta el estado verificable de tu última ejecución y recupera el contexto si la conexión se interrumpió.</p>
       </header>
       {run ? <NovoActivitySurface runId={run.id} /> : <div className="rounded-3xl border border-dashed border-foreground/15 bg-foreground/[0.02] p-8 text-sm text-muted-foreground">Aún no hay ejecuciones del Novo Loop.</div>}
+      <ProjectAssistantActivity />
     </main>
   )
 }

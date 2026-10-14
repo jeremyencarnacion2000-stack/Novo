@@ -109,6 +109,11 @@ model User {
   mcpPersonalAccessTokens McpPersonalAccessToken[]
   mcpAuditLogs McpAuditLog[]
   companionDevices CompanionDevice[]
+  projectAssistantMemories ProjectAssistantMemory[]
+  projectDelegations ProjectDelegation[]
+  projectWorks ProjectWork[]
+  projectWorkEvents ProjectWorkEvent[]
+  projectAssistantSources ProjectAssistantSource[]
   mutationRequests MutationRequest[]
   cognitiveReplanRequests CognitiveReplanRequest[]
 
@@ -386,11 +391,137 @@ model Project {
   tasks     Task[]
   timeBlocks TimeBlock[]
   quickNotes QuickNote[]
+  assistantMemories ProjectAssistantMemory[]
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
 
   @@index([userId])
   @@map("projects")
+}
+
+model ProjectAssistantMemory {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  title        String
+  trackingMode String   @default("auto")
+  correction   String?
+  manualIdentity Boolean @default(false)
+  revision     Int      @default(1)
+  clearedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sources      ProjectAssistantSource[]
+  delegation   ProjectDelegation?
+  work         ProjectWork[]
+
+  @@index([userId, clearedAt, updatedAt])
+  @@index([userId, projectId])
+  @@map("project_assistant_memories")
+}
+
+model ProjectAssistantSource {
+  id              String   @id @default(cuid())
+  userId          String
+  memoryId        String
+  kind            String
+  sourceKey       String
+  title           String
+  repository      String?
+  vercelProjectId String?
+  deviceId        String?
+  facts           Json
+  observedAt      DateTime
+  lastAttemptAt   DateTime?
+  availability    String   @default("available")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memory          ProjectAssistantMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, sourceKey])
+  @@index([userId, memoryId])
+  @@index([userId, deviceId])
+  @@map("project_assistant_sources")
+}
+
+model ProjectDelegation {
+  id String @id @default(cuid())
+  userId String
+  memoryId String @unique
+  deviceId String
+  workspaceId String
+  capabilities String[]
+  triggers String[]
+  enabled Boolean @default(false)
+  version Int @default(1)
+  dailyLimit Int @default(3)
+  timezone String @default("UTC")
+  verification Json
+  timeoutSeconds Int @default(600)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  memory ProjectAssistantMemory @relation(fields:[memoryId],references:[id],onDelete:Cascade)
+  work ProjectWork[]
+  @@index([userId,enabled])
+  @@map("project_delegations")
+}
+model ProjectWork {
+  id String @id @default(cuid())
+  userId String
+  memoryId String
+  projectKey String
+  delegationId String
+  ruleVersion Int
+  deviceId String
+  workspaceId String
+  capability String
+  objective String
+  mode String
+  requestKey String
+  requestFingerprint String
+  trigger Json?
+  scope Json
+  phase String @default("waiting_device")
+  revision Int @default(1)
+  leaseTokenHash String?
+  leaseVersion Int @default(0)
+  leaseExpiresAt DateTime?
+  executionId String?
+  baseCommit String?
+  sequence Int @default(0)
+  decision Json?
+  result Json?
+  reasonCode String?
+  startedAt DateTime?
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  memory ProjectAssistantMemory @relation(fields:[memoryId],references:[id],onDelete:Cascade)
+  delegation ProjectDelegation @relation(fields:[delegationId],references:[id],onDelete:Cascade)
+  events ProjectWorkEvent[]
+  @@unique([userId,requestKey])
+  @@index([userId,projectKey,phase])
+  @@index([userId,deviceId,phase,createdAt])
+  @@index([userId,mode,startedAt])
+  @@map("project_work")
+}
+model ProjectWorkEvent {
+  id String @id @default(cuid())
+  userId String
+  jobId String
+  sequence Int
+  kind String
+  summary String
+  fingerprint String
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  job ProjectWork @relation(fields:[jobId],references:[id],onDelete:Cascade)
+  @@unique([jobId,sequence])
+  @@index([userId,createdAt])
+  @@map("project_work_events")
 }
 
 model Subtask {
@@ -1606,6 +1737,8 @@ model CompanionDevice {
   connectedAt     DateTime  @default(now())
   lastVerifiedAt  DateTime  @default(now())
   revokedAt       DateTime?
+  workCapabilities String[] @default([])
+  workLastSeenAt DateTime?
   chatTurns       CompanionChatTurn[]
 
   @@unique([userId, deviceId])

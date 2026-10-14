@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { ProjectWorkLink } from '@/components/project-assistant/activity';
 
 interface ModernChatbotProps {
     // Provided when this is rendered inside the mobile fullscreen chat sheet
@@ -157,6 +158,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                             >
                                 <PanelLeft className="w-4 h-4" />
                             </button>
+                            <ProjectWorkLink />
                             {/* Back on mobile — closes the flip sheet if we're inside
                                 one, otherwise (direct /ai visit) navigates home */}
                             {onMobileClose ? (

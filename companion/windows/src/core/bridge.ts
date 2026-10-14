@@ -20,6 +20,7 @@ export interface NovoWorkContext {
   canClear: boolean;
 }
 export interface NovoContextFolder {id:string;name:string}
+export interface LocalProjectArtifact {id:string;summary:string;baseCommit:string|null;changedPaths:string[];verificationStatus:'passed'|'failed'|'not_run'|null;modifiedAt:string|null;workspaceReady:boolean;patchReady:boolean}
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -93,6 +94,9 @@ export const Bridge = {
   openNovo: () => call<void>("companion_panel_open"),
   novoAccountStatus: () => IS_TAURI ? novoCall<NativeAccountStatus>('novo_account_status') : Promise.resolve<NativeAccountStatus>({state:'demo',authorization:null,lastVerifiedAt:null,revocationPending:false}),
   novoChatModels: () => novoCall<NovoChatModel[]>('novo_chat_models'),
+  projectWorkRuntimes: () => novoCall<import('./project-work').ProjectWorkRuntime[]>('project_work_runtimes'),
+  projectWorkArtifacts: () => callOrThrow<LocalProjectArtifact[]>('project_work_artifacts'),
+  projectWorkOpenArtifact: (artifactId:string) => callOrThrow<void>('project_work_open_artifact',{artifactId}),
   novoConversations: () => novoCall<ConversationSummary[]>('novo_conversations'),
   novoConversationGet: (id:string) => novoCall<AccountConversation>('novo_conversation_get',{id}),
   novoChatStart: (input:CompanionChatRequest) => novoCall<void>('novo_chat_start',{input}),

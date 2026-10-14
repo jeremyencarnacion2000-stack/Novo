@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8").replace(/\r\n/g, '\n');
 test("the installed app keeps the island and uses one unified settings surface", () => {
   assert.match(read("index.html"), /src\/main.ts/);
   assert.match(read("companion.html"), /src\/settings\/main.ts/);

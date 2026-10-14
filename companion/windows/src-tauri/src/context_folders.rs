@@ -136,6 +136,10 @@ fn read_saved() -> Result<Vec<SavedFolder>, String> {
     }
 }
 
+pub(crate) fn selected_paths() -> Result<Vec<(String, PathBuf)>, String> {
+    Ok(read_saved()?.into_iter().filter_map(|folder|folder.path.canonicalize().ok().filter(|path|path.is_dir()).map(|path|(folder.id,path))).collect())
+}
+
 fn write_saved(folders: &[SavedFolder]) -> Result<(), String> {
     let dir = crate::settings::config_dir();
     crate::platform::ensure_private_dir(&dir).map_err(|_| "context_unavailable")?;

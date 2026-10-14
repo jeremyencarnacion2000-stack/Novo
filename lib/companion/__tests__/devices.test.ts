@@ -7,6 +7,8 @@ jest.mock('@/lib/prisma', () => ({prisma:{
   $transaction:jest.fn(), $executeRaw:jest.fn(),
   companionDevice:{findUnique:jest.fn(), findFirst:jest.fn(), create:jest.fn(), update:jest.fn(), updateMany:jest.fn(), findMany:jest.fn()},
   companionWorkContext:{deleteMany:jest.fn()},
+  projectAssistantSource:{updateMany:jest.fn()},
+  projectDelegation:{updateMany:jest.fn()}, projectWork:{updateMany:jest.fn()},
   oAuthModel:{deleteMany:jest.fn()}, mcpAuditLog:{create:jest.fn()},
 }}))
 
@@ -53,6 +55,8 @@ it('reconnect revokes both previous token rows and Grant inside the device trans
   expect(db.oAuthModel.deleteMany).toHaveBeenCalledWith({where:{accountId:'owner', OR:[{grantId:'old-grant'}, {type:'Grant', modelId:'old-grant'}]}})
   expect(db.companionDevice.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({grantId:'grant', revokedAt:null})}))
   expect(db.companionWorkContext.deleteMany).toHaveBeenCalledWith({where:{userId:'owner',sourceDeviceId:deviceId}})
+  expect(db.projectAssistantSource.updateMany).toHaveBeenCalledWith({where:{userId:'owner',deviceId},data:{facts:{},availability:'revoked'}})
+  expect(db.projectDelegation.updateMany).toHaveBeenCalledWith({where:{userId:'owner',deviceId,enabled:true},data:{enabled:false,version:{increment:1}}})
 })
 it('refuses to reuse a revoked connection without a new grant', async () => {
   ;(db.companionDevice.findUnique as jest.Mock).mockResolvedValue(row({revokedAt:originalTime}))
@@ -92,7 +96,8 @@ it('revocation is idempotent and unknown/other-owner devices cannot be revoked',
   expect(db.oAuthModel.deleteMany).not.toHaveBeenCalled()
   ;(db.companionDevice.findUnique as jest.Mock).mockResolvedValue(row())
   await revokeCompanionDevice('owner', deviceId)
-  expect(db.companionDevice.update).toHaveBeenCalledWith(expect.objectContaining({data:{revokedAt:originalTime}}))
+  expect(db.companionDevice.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({revokedAt:originalTime,workCapabilities:[],workLastSeenAt:null})}))
+  expect(db.projectWork.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:{userId:'owner',deviceId,phase:{in:['running','awaiting_confirmation']}},data:expect.objectContaining({phase:'uncertain',reasonCode:'device_revoked'})}))
   expect(db.companionWorkContext.deleteMany).toHaveBeenCalledWith({where:{userId:'owner',sourceDeviceId:deviceId}})
   ;(db.companionDevice.findUnique as jest.Mock).mockResolvedValue(row({revokedAt:originalTime}))
   jest.clearAllMocks()

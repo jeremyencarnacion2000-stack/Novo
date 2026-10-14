@@ -8,6 +8,7 @@ import { useTranslation } from '@/lib/i18n'
 import { ConfidenceGauge, TrustBadge, OrbPrimitive, TelemetryPill } from '@/components/cognitive/primitives'
 import { TrustCenter } from '@/components/cognitive/trust-center'
 import { Section, Row, OptionButton } from './settings-shared'
+import { SettingsProjectAssistant } from './settings-project-assistant'
 
 export function SettingsTwin() {
   const { twin } = useCognitiveTwin()
@@ -82,6 +83,7 @@ export function SettingsTwin() {
       </Section>
 
       <TrustCenter language={language === 'es' ? 'es' : 'en'} />
+      <Section title="Seguimiento de proyectos"><SettingsProjectAssistant /></Section>
 
       <Section title="Adaptation Level">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

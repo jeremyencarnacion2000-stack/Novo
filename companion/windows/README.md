@@ -1,8 +1,14 @@
 # Novo Companion para Windows
 
-Versión actual: **0.2.7**.
+Versión preparada: **0.2.8**.
 
-[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.7/Novo-Companion-Windows-0.2.7-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.7/Novo-Companion-Windows-0.2.7.msi)
+[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.8/Novo-Companion-Windows-0.2.8-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.8/Novo-Companion-Windows-0.2.8.msi)
+
+## Novedades de 0.2.8
+
+- Unifica la cuenta, el asistente, las conexiones, las carpetas autorizadas y la actividad delegada bajo la identidad de Novo.
+- Comparte el mismo estado de seguimiento entre el Companion, el chat y la actividad web. Los trabajos distinguen seguimiento de permiso de ejecución, muestran los resultados y requieren aprobación para guardar cambios internos.
+- Presenta los archivos y comprobaciones de una propuesta con su referencia local. El parche permanece en el PC autorizado y los archivos originales no se modifican.
 
 ## Conectar
 
@@ -25,7 +31,7 @@ Los instaladores se generan en `release/`. No se guardan en Git: se publican com
 
 ## Estado de las comprobaciones
 
-La versión 0.2.7 compiló e instaló correctamente. Pasaron 367 de 368 pruebas. La comprobación de paridad del catálogo de traducciones requiere el archivo externo del proyecto original `NotchBuddy/Resources/Localizable.xcstrings`, que no forma parte de este repositorio.
+El seguimiento actualiza Twin y el contexto del proyecto desde fuentes autorizadas y resultados verificados. No lee el historial completo de Codex. La actualización en segundo plano requiere configurar el secreto `NOVO_PROJECT_REFRESH_SECRET` en GitHub Actions para que el flujo llame al endpoint protegido de Vercel.
 
 El contexto de Codex procede de las sesiones observadas por la integración; la lectura completa de su historial y la actualización automática persistente del Twin siguen pendientes.
 

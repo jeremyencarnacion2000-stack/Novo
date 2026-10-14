@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novo · estados locales</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,"Segoe UI",sans-serif;background:#050505;color:#f5f6f8}
+    *{box-sizing:border-box}body{margin:0;padding:28px;max-width:1280px;margin-inline:auto}
+    h1{font-size:24px;margin:0 0 8px}h2{font-size:17px;margin:24px 0 12px}p,small{color:#c8c9d1}
+    .controls{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-block:20px}
+    label{display:flex;gap:8px;align-items:center;font-size:13px}
+    select,button{font:inherit;color:inherit;background:#252447;border:1px solid #ffffff28;border-radius:8px;padding:7px 12px}
+    button{cursor:pointer}input[type=range]{width:220px;accent-color:#6366f1}
+    :focus-visible{outline:2px solid #818cf8;outline-offset:3px}
+    #contact-sheet{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+    .sample{border:1px solid #ffffff17;background:#141417;border-radius:12px;min-height:110px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .sample.light{background:#f1f0eb;color:#26272c}.sample.light small{color:#4b4c55}
+    .sample strong{font-size:12px;font-weight:500}.sample small{font-size:10px}
+    .pair{display:flex;align-items:center;gap:12px;height:70px}.pair canvas{display:block}
+    .sequence{max-width:100%;overflow:auto;border:1px solid #ffffff17;border-radius:12px;background:#0c0c0e;padding:8px;width:658px}
+    #greeting{display:block;width:640px;height:150px}
+    #upload-layer{position:relative;width:640px;height:176px}#upload-overlay{position:absolute;inset:0}
+    .upload-hit{position:absolute;opacity:0} .upload-hit:focus-visible{opacity:1;background:#252447}
+    #interactive{background:#141417;border:1px solid #ffffff17;border-radius:12px;width:140px;height:140px}
+    #local-status{min-height:20px;font-size:13px;color:#6ee7b7}
+    @media(max-width:800px){#contact-sheet{grid-template-columns:repeat(3,minmax(0,1fr))}body{padding:16px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+  <h1>Novo · galería de estados</h1>
+  <p>Motor original, identidad Novo. Demostración aislada: sin cuenta, archivos privados ni conexiones externas.</p>
+  <div class="controls">
+    <label>Movimiento <select id="motion"><option value="normal">Normal</option><option value="reduced">Reducido</option></select></label>
+    <label>Superficie <select id="surface"><option value="dark">Oscura</option><option value="light">Clara</option></select></label>
+    <button id="play" type="button">Animar vista interactiva</button>
+  </div>
+  <section id="contact-sheet" aria-label="11 estados, 7 expresiones y tamaños"></section>
+  <h2>Interacción</h2>
+  <div class="controls"><label>Estado <select id="state"></select></label><label>Expresión <select id="emote"></select></label><button id="squash">Toque</button><button id="roll">Giro</button><button id="slap">Golpe</button></div>
+  <canvas id="interactive" width="140" height="140" aria-label="Novo interactivo"></canvas>
+  <h2>Saludo original</h2>
+  <div class="controls"><label>Tiempo <input id="greeting-time" type="range" min="0" max="6" value="2" step="0.0166666667"><output id="greeting-time-value"></output></label><label>Interrumpir a 1,6 s <input id="interrupt" type="checkbox"></label></div>
+  <div class="sequence"><canvas id="greeting" width="640" height="150" aria-label="Saludo Novo"></canvas></div>
+  <h2>Archivo de demostración</h2>
+  <div class="controls"><label>Tiempo tras entrar <input id="upload-time" type="range" min="0" max="6" value="2.73" step="0.0166666667"><output id="upload-time-value"></output></label><label>Hover de 30 s <input id="long-hover" type="checkbox"></label></div>
+  <div class="sequence" id="upload-stage"></div><p id="local-status" role="status"></p>
+  <script type="module" src="/src/dev/novo-state-gallery.ts"></script>
+</body>
+</html>
