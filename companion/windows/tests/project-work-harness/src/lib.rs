@@ -203,6 +203,18 @@ mod tests {
             fs::read_to_string(prepared.path.parent().unwrap().join("prepared.patch")).unwrap();
         assert!(patch.contains("next=2"));
         assert!(!patch.contains("FIXTURE"));
+        workspace::release_clone(&root.join("artifacts"), &prepared).unwrap();
+        assert!(!prepared.path.exists());
+        assert!(prepared
+            .path
+            .parent()
+            .unwrap()
+            .join("prepared.patch")
+            .is_file());
+        assert_eq!(
+            fs::read_to_string(source.join("app.ts")).unwrap(),
+            "user dirty checkout\n"
+        );
         // Leave the tiny uniquely named fixture available for inspection.
     }
 }

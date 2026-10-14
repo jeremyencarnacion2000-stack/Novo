@@ -1,7 +1,8 @@
 import {z} from 'zod'
 
 const privateText=/(?:https?:\/\/|\bwww\.|(?:^|\s)[a-z]:[\\/]|\\\\|\/(?:users|home|private|etc)\/|\b(?:api[_ -]?key|access[_ -]?token|password|secret|bearer|token)\s*[:=]|[\u0000-\u001f\u007f])/i
-export const safeAssistantText=(max:number)=>z.string().trim().min(1).max(max).refine(value=>!privateText.test(value),'unsafe_text')
+const rawCredential=/\b(?:sk-(?:proj-|svcacct-)?[a-z0-9_-]{16,}|gh[pousr]_[a-z0-9]{16,}|github_pat_[a-z0-9_]{16,}|AKIA[A-Z0-9]{16})\b/i
+export const safeAssistantText=(max:number)=>z.string().trim().min(1).max(max).refine(value=>!privateText.test(value)&&!rawCredential.test(value),'unsafe_text')
 export const assistantId=z.string().min(1).max(128).regex(/^[a-z0-9_.:-]+$/i)
 export const assistantRepository=z.string().max(201).regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i).transform(value=>value.toLowerCase())
 const count=z.number().int().min(0).max(1_000_000)

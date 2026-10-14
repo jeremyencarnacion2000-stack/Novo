@@ -1,6 +1,7 @@
 /** @jest-environment node */
 jest.mock('@/lib/prisma',()=>({prisma:{novoSignalSourcePreference:{findMany:jest.fn()},ambientReconciliationClaim:{findUnique:jest.fn(),create:jest.fn(),updateMany:jest.fn(),findMany:jest.fn()},userSettings:{findUnique:jest.fn()},integrationAccount:{findMany:jest.fn()},projectAssistantSource:{updateMany:jest.fn()},user:{findMany:jest.fn()},$transaction:undefined}}))
 jest.mock('../reconcile',()=>({reconcileNovoProjectMemories:jest.fn(async()=>({changed:0,tracked:1}))}))
+jest.mock('../work-triggers',()=>({dispatchDelegationTriggers:jest.fn(),pruneOperationalWorkDetails:jest.fn()}))
 jest.mock('../memory',()=>({readProjectAssistantRecords:jest.fn(),toAssistantMemoryView:jest.fn(()=>({tracked:true})),recordProjectObservations:jest.fn()}))
 jest.mock('@/lib/companion/github',()=>({fetchGitHubDeveloperContext:jest.fn()}))
 jest.mock('@/lib/companion/vercel',()=>({fetchVercelProjects:jest.fn(),fetchVercelDeployments:jest.fn(),readVercelProjectSelection:jest.fn(()=>({projects:[]}))}))

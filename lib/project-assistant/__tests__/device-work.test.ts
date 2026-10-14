@@ -1,5 +1,5 @@
 /** @jest-environment node */
-jest.mock('@/lib/prisma',()=>({prisma:{$transaction:jest.fn(),$executeRaw:jest.fn(),companionDevice:{findFirst:jest.fn(),updateMany:jest.fn()},projectAssistantMemory:{findFirst:jest.fn()},projectAssistantSource:{findFirst:jest.fn()},novoSignalSourcePreference:{findFirst:jest.fn()},projectDelegation:{findFirst:jest.fn()},projectWork:{findFirst:jest.fn(),updateMany:jest.fn(),count:jest.fn()},projectWorkEvent:{findFirst:jest.fn(),create:jest.fn()}}}))
+jest.mock('@/lib/prisma',()=>({prisma:{$transaction:jest.fn(),$executeRaw:jest.fn(),userSettings:{findUnique:jest.fn()},companionDevice:{findFirst:jest.fn(),updateMany:jest.fn()},projectAssistantMemory:{findFirst:jest.fn()},projectAssistantSource:{findFirst:jest.fn()},novoSignalSourcePreference:{findFirst:jest.fn()},projectDelegation:{findFirst:jest.fn()},projectWork:{findFirst:jest.fn(),updateMany:jest.fn(),count:jest.fn()},projectWorkEvent:{findFirst:jest.fn(),create:jest.fn()}}}))
 import {prisma} from '@/lib/prisma'
 import {claimDeviceWork,requireWorkStep,reportDeviceWork,reconcileDeviceWork} from '../device-work'
 import {workFingerprint} from '../work-fingerprint'
@@ -8,6 +8,7 @@ const actor={userId:'owner',clientId:'client',grantId:'grant',scopes:new Set(['d
 let job:any,events:any[],serial:Promise<unknown>
 beforeEach(()=>{
   jest.clearAllMocks();events=[];serial=Promise.resolve()
+  db.userSettings.findUnique.mockResolvedValue(null)
   db.$transaction.mockImplementation((work:any)=>{const next=serial.then(()=>work(db));serial=next.catch(()=>{});return next})
   job={id:'j1',userId:'owner',memoryId:'m1',projectKey:'p1',delegationId:'r1',ruleVersion:1,deviceId,workspaceId,capability:'project.diagnose',objective:'Diagnosticar proyecto',phase:'waiting_device',revision:1,mode:'manual',sequence:0,leaseVersion:0,scope:{memoryId:'m1',deviceId,workspaceId,verification:[],timeoutSeconds:600}}
   db.companionDevice.findFirst.mockResolvedValue({id:'device',deviceId,clientId:'client',grantId:'grant',revokedAt:null})
@@ -72,4 +73,15 @@ test('an expired execution is reconciled from its saved terminal receipt without
   expect((await reconcileDeviceWork(actor,'j1',receipt)).phase).toBe('failed')
   expect(job.leaseVersion).toBe(1)
   await expect(reconcileDeviceWork(actor,'j1',{...receipt,executionId:deviceId})).rejects.toMatchObject({code:'execution_conflict'})
+})
+test('an automatic job cannot continue after global tracking is paused',async()=>{
+  const claim=await claimDeviceWork(actor,deviceId,['project.diagnose'])
+  job.mode='automatic';db.userSettings.findUnique.mockResolvedValue({settings:{ambientTwinPaused:true}})
+  await expect(requireWorkStep(actor,'j1',claim!.leaseToken)).rejects.toMatchObject({code:'tracking_paused'})
+})
+test('an automatic claim rechecks its failure evidence before consuming the daily start',async()=>{
+  job.mode='automatic';job.trigger={kind:'ci_failure',sourceKey:'owner/novo',evidenceKey:'old_failure',observedAt:new Date().toISOString()}
+  db.projectAssistantSource.findFirst.mockImplementation(async({where}:any)=>where.kind==='folder'?{facts:{workspaceId},availability:'available'}:{kind:'github',sourceKey:'owner/novo',title:'Novo',repository:'owner/novo',observedAt:new Date(),availability:'available',facts:{openPullRequests:0,ci:{passed:1,failed:0,pending:0},commit:'a'.repeat(40),failedCheckIds:[]}})
+  expect(await claimDeviceWork(actor,deviceId,['project.diagnose'])).toBeNull()
+  expect(job.phase).toBe('cancelled');expect(job.reasonCode).toBe('trigger_no_longer_current');expect(job.startedAt).toBeUndefined()
 })

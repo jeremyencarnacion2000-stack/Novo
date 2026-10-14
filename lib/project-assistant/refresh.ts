@@ -6,6 +6,7 @@ import {fetchVercelProjects,fetchVercelDeployments,readVercelProjectSelection} f
 import {projectObservationSchema,ProjectAssistantError,type ProjectObservation} from './contracts'
 import {readProjectAssistantRecords,toAssistantMemoryView,recordProjectObservations} from './memory'
 import {reconcileNovoProjectMemories} from './reconcile'
+import {dispatchDelegationTriggers,pruneOperationalWorkDetails} from './work-triggers'
 
 const claimKey='project-assistant:refresh'
 const interval=15*60_000
@@ -75,6 +76,8 @@ export async function refreshProjectAssistantForUser(userId:string,options:{minI
       for(const target of failedTargets)if(target.keys.length)await tx.projectAssistantSource.updateMany({where:{userId,kind:target.kind,sourceKey:{in:target.keys}},data:{lastAttemptAt:new Date(),availability:'unavailable'}})
     })
     await reconcileNovoProjectMemories(userId)
+    await dispatchDelegationTriggers(userId)
+    await pruneOperationalWorkDetails(userId)
     await finish('completed')
     return {status:'refreshed' as const,observed:observations.length,unavailable:failedTargets.reduce((sum,target)=>sum+target.keys.length,0)}
   }catch(error){await finish('failed').catch(()=>undefined);throw error}

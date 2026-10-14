@@ -382,3 +382,37 @@ pub fn manifest(
     .map_err(|_| "execution_failed")?;
     Ok((paths, hash))
 }
+
+/// Remove only this private generated clone; the prepared patch/result survive.
+pub fn release_clone(root: &Path, prepared: &Prepared) -> Result<(), String> {
+    if uuid::Uuid::parse_str(&prepared.artifact_id).is_err() {
+        return Err("workspace_not_authorized".into());
+    }
+    let root = root
+        .canonicalize()
+        .map_err(|_| "workspace_not_authorized")?;
+    let expected = root.join(&prepared.artifact_id).join("workspace");
+    let actual = prepared
+        .path
+        .canonicalize()
+        .map_err(|_| "workspace_not_authorized")?;
+    if !actual.starts_with(&root)
+        || actual
+            != expected
+                .canonicalize()
+                .map_err(|_| "workspace_not_authorized")?
+        || fs::symlink_metadata(&expected)
+            .map_err(|_| "workspace_not_authorized")?
+            .file_type()
+            .is_symlink()
+    {
+        return Err("workspace_not_authorized".into());
+    }
+    if prepared.dependencies.is_some() {
+        let link = expected.join("node_modules");
+        if link.exists() {
+            fs::remove_dir(link).map_err(|_| "execution_failed")?
+        }
+    }
+    fs::remove_dir_all(&expected).map_err(|_| "execution_failed".into())
+}

@@ -15,7 +15,7 @@ export type EnqueueWorkInput=z.infer<typeof enqueueWorkSchema>
 export type ProjectWorkPhase=z.infer<typeof workPhaseSchema>
 export const ACTIVE_WORK_PHASES=['pending','running','awaiting_confirmation','waiting_device','uncertain']
 export const TERMINAL_WORK_PHASES=['completed','failed','cancelled']
-export const relativeWorkPathSchema=z.string().min(1).max(240).refine(value=>!value.startsWith('/')&&!/[\\:\u0000-\u001f\u007f]/.test(value)&&!value.split('/').some(part=>part==='..'||part==='.'||!part||part==='.git'||/^\.env(?:\.|$)/i.test(part)),'invalid_artifact_path')
+export const relativeWorkPathSchema=z.string().min(1).max(240).refine(value=>!value.startsWith('/')&&!/[\\:\u0000-\u001f\u007f]/.test(value)&&!value.split('/').some(part=>!part||['..','.','.git','.codex','.agents','.claude','.npmrc','.netrc','auth.json','credentials.json','.mcp.json'].includes(part.toLowerCase())||/^\.env/i.test(part)),'invalid_artifact_path')
 export const workResultSchema=z.object({executionId:z.string().uuid(),sessionId:assistantId,baseCommit:z.string().regex(/^[a-f0-9]{40,64}$/i),artifactId:z.string().uuid(),diffHash:z.string().regex(/^[a-f0-9]{64}$/i),changedPaths:z.array(relativeWorkPathSchema).max(100),summary:safeAssistantText(480),verification:z.object({status:z.enum(['passed','failed','not_run']),checks:z.array(z.object({kind:z.literal('npm_script'),script:z.string().max(80).regex(/^[a-z0-9_.:-]+$/i),exitCode:z.number().int(),evidenceId:assistantId}).strict()).max(4)}).strict()}).strict()
 export type WorkResult=z.infer<typeof workResultSchema>
 export const workReportEventSchema=z.discriminatedUnion('type',[

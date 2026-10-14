@@ -4,8 +4,11 @@ import {prisma} from '@/lib/prisma'
 import {withProviderSyncLock} from '@/lib/provider-sync-lock'
 import type {CompanionOAuthPrincipal} from '@/lib/companion/auth'
 import {ProjectAssistantError} from './contracts'
-import {frozenWorkScopeSchema,workReportSchema,workReceiptSchema,deviceWorkCapabilitiesSchema,ownerDayStart,TERMINAL_WORK_PHASES,type WorkReport} from './work-contracts'
+import {frozenWorkScopeSchema,workReportSchema,workReceiptSchema,deviceWorkCapabilitiesSchema,automaticTriggerEvidenceSchema,ownerDayStart,TERMINAL_WORK_PHASES,type WorkReport} from './work-contracts'
 import {workFingerprint} from './work-fingerprint'
+import {acceptVerifiedWorkResult} from './work-results'
+import {requireAutomaticTracking} from './work-permissions'
+import {projectTriggerEvidence} from './trigger-evidence'
 
 const leaseMs=90_000
 type Actor=CompanionOAuthPrincipal&{deviceId?:string}
@@ -20,6 +23,7 @@ async function requireBoundActor(tx:Prisma.TransactionClient,actor:Actor,deviceI
   if(!device)throw new ProjectAssistantError(403,'device_permission_required')
 }
 async function requireCurrentRule(tx:Prisma.TransactionClient,userId:string,job:ProjectWork){
+  if(job.mode==='automatic')await requireAutomaticTracking(tx,userId,job.memoryId,job.trigger)
   const rule=await tx.projectDelegation.findFirst({where:{id:job.delegationId,userId}})
   if(!rule||!rule.enabled||rule.version!==job.ruleVersion||rule.deviceId!==job.deviceId||rule.workspaceId!==job.workspaceId||!rule.capabilities.includes(job.capability))throw new ProjectAssistantError(403,'delegation_changed')
   const scope=frozenWorkScopeSchema.safeParse(job.scope)
@@ -51,6 +55,13 @@ export async function claimDeviceWork(actor:Actor,deviceId:string,capabilities:u
     const job=await tx.projectWork.findFirst({where:{userId:actor.userId,deviceId,phase:{in:['pending','waiting_device']},capability:{in:parsed.data}},orderBy:{createdAt:'asc'}})
     if(!job)return null
     const {rule,scope}=await requireCurrentRule(tx,actor.userId,job)
+    if(job.mode==='automatic'){
+      const trigger=automaticTriggerEvidenceSchema.safeParse(job.trigger)
+      const source=trigger.success?await tx.projectAssistantSource.findFirst({where:{userId:actor.userId,memoryId:job.memoryId,sourceKey:trigger.data.sourceKey,availability:'available'}}):null
+      if(!trigger.success||!source||!projectTriggerEvidence(source,now).some(evidence=>evidence.kind===trigger.data.kind&&evidence.evidenceKey===trigger.data.evidenceKey)){
+        await tx.projectWork.updateMany({where:{id:job.id,userId:actor.userId,revision:job.revision,phase:{in:['pending','waiting_device']}},data:{phase:'cancelled',reasonCode:'trigger_no_longer_current',finishedAt:now,revision:{increment:1}}});return null
+      }
+    }
     if(job.mode==='automatic'&&(await tx.projectWork.count({where:{userId:actor.userId,projectKey:job.projectKey,mode:'automatic',startedAt:{gte:ownerDayStart(now,rule.timezone)}}}))>=rule.dailyLimit)throw new ProjectAssistantError(409,'daily_limit_reached')
     const leaseToken=randomUUID(),leaseExpiresAt=new Date(now.getTime()+leaseMs)
     const won=await tx.projectWork.updateMany({where:{id:job.id,userId:actor.userId,revision:job.revision,phase:{in:['pending','waiting_device']}},data:{phase:'running',startedAt:now,leaseTokenHash:workFingerprint(leaseToken),leaseVersion:{increment:1},leaseExpiresAt,revision:{increment:1}}})
@@ -93,8 +104,7 @@ export async function reportDeviceWork(actor:Actor,id:string,input:unknown){
       data.executionId=event.executionId;data.baseCommit=event.baseCommit
     }else if(event.type==='result'){
       if(job.executionId!==event.result.executionId||job.baseCommit!==event.result.baseCommit)throw new ProjectAssistantError(409,'execution_conflict')
-      // The verification gate in work-results consumes this typed evidence.
-      data.result=event.result as Prisma.InputJsonValue;data.reasonCode='verification_pending'
+      Object.assign(data,await acceptVerifiedWorkResult(tx,actor.userId,job,event.result))
     }else if(event.type==='failed'){data.phase='failed';data.reasonCode=event.reason;data.finishedAt=new Date();data.leaseExpiresAt=null}
     await tx.projectWorkEvent.create({data:{userId:actor.userId,jobId:id,sequence:report.sequence,kind:event.type,fingerprint,summary:event.type==='progress'?event.summary:event.type==='failed'?event.reason:event.type}})
     const changed=await tx.projectWork.updateMany({where:{id,userId:actor.userId,leaseVersion:job.leaseVersion,sequence:job.sequence,revision:job.revision,phase:job.phase},data})
@@ -122,7 +132,7 @@ export async function reconcileDeviceWork(actor:Actor,id:string,input:unknown){
     const finishedAt=new Date(receipt.finishedAt)
     if(!job.leaseExpiresAt||finishedAt>job.leaseExpiresAt||finishedAt.getTime()>Date.now()+120000||job.startedAt&&finishedAt.getTime()<job.startedAt.getTime()-120000)throw new ProjectAssistantError(409,'receipt_outside_lease')
     const data:Prisma.ProjectWorkUpdateManyMutationInput={revision:{increment:1},sequence:{increment:1},finishedAt}
-    if(receipt.outcome.type==='failed'){data.phase='failed';data.reasonCode=receipt.outcome.reason}else{data.result=receipt.outcome.result as Prisma.InputJsonValue;data.reasonCode='verification_pending'}
+    if(receipt.outcome.type==='failed'){data.phase='failed';data.reasonCode=receipt.outcome.reason}else{Object.assign(data,await acceptVerifiedWorkResult(tx,actor.userId,job,receipt.outcome.result,finishedAt))}
     await tx.projectWorkEvent.create({data:{userId:actor.userId,jobId:id,sequence:job.sequence+1,kind:'execution_reconciled',summary:receipt.outcome.type,fingerprint}})
     const updated=await tx.projectWork.updateMany({where:{id,userId:actor.userId,phase:'uncertain',revision:job.revision,leaseVersion:job.leaseVersion},data})
     if(!updated.count)throw new ProjectAssistantError(409,'revision_conflict')

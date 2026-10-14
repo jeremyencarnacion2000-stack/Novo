@@ -5,6 +5,7 @@ import {ProjectAssistantError} from './contracts'
 import {delegationInputSchema,type DelegationInput} from './work-contracts'
 
 export async function requireDelegationBinding(tx:Prisma.TransactionClient,userId:string,input:Pick<DelegationInput,'memoryId'|'deviceId'|'workspaceId'>){
+  if(await tx.novoSignalSourcePreference.findFirst({where:{userId,source:{in:['project_assistant','work_context']},excludedAt:{not:null}},select:{id:true}}))throw new ProjectAssistantError(403,'context_permission_required')
   const memory=await tx.projectAssistantMemory.findFirst({where:{id:input.memoryId,userId,clearedAt:null},select:{id:true,projectId:true}})
   if(!memory)throw new ProjectAssistantError(404,'memory_not_found')
   const device=await tx.companionDevice.findFirst({where:{userId,deviceId:input.deviceId,revokedAt:null,scopes:{hasEvery:['device:work:read','device:work:execute']}},select:{id:true,deviceId:true}})

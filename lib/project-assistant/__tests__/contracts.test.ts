@@ -27,3 +27,6 @@ test('provider observations accept only factual service fields',()=>{
   expect(projectObservationSchema.safeParse({...github,facts:{...github.facts,commands:['git push']}}).success).toBe(false)
   expect(projectObservationSchema.safeParse({kind:'vercel',sourceKey:'prj_1',title:'Novo',vercelProjectId:'prj_1',observedAt:at,facts:{deploymentId:'dpl_1',state:'ERROR',createdAt:at}}).success).toBe(true)
 })
+test('raw credential formats are rejected even without a token label',()=>{
+  for(const value of ['sk-proj-'+ 'x'.repeat(32),'ghp_'+ 'a'.repeat(36),'github_pat_'+ 'A'.repeat(40)])expect(projectMemoryPatchSchema.safeParse({revision:1,correction:value}).success).toBe(false)
+})

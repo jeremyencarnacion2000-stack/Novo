@@ -338,6 +338,12 @@ async fn execute(
         serde_json::to_vec(&result).map_err(|_| "receipt_missing")?,
     )
     .map_err(|_| "receipt_missing")?;
+    let clone = prepared.clone();
+    // Essential review artifacts are already saved outside the disposable copy.
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        workspace::release_clone(&root().join("artifacts"), &clone)
+    })
+    .await;
     Ok(result)
 }
 pub fn start(app: AppHandle) {

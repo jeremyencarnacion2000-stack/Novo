@@ -1,5 +1,5 @@
 /** @jest-environment node */
-jest.mock('@/lib/prisma',()=>({prisma:{$transaction:jest.fn(),$executeRaw:jest.fn(),projectAssistantMemory:{findFirst:jest.fn()},projectAssistantSource:{findFirst:jest.fn()},companionDevice:{findFirst:jest.fn()},projectDelegation:{findFirst:jest.fn(),create:jest.fn(),updateMany:jest.fn()},projectWork:{findFirst:jest.fn(),create:jest.fn(),count:jest.fn(),updateMany:jest.fn()},userSettings:{findUnique:jest.fn()},projectWorkEvent:{create:jest.fn()}}}))
+jest.mock('@/lib/prisma',()=>({prisma:{$transaction:jest.fn(),$executeRaw:jest.fn(),novoSignalSourcePreference:{findFirst:jest.fn()},projectAssistantMemory:{findFirst:jest.fn()},projectAssistantSource:{findFirst:jest.fn()},companionDevice:{findFirst:jest.fn()},projectDelegation:{findFirst:jest.fn(),create:jest.fn(),updateMany:jest.fn()},projectWork:{findFirst:jest.fn(),create:jest.fn(),count:jest.fn(),updateMany:jest.fn()},userSettings:{findUnique:jest.fn()},projectWorkEvent:{create:jest.fn()}}}))
 import {prisma} from '@/lib/prisma'
 import {saveDelegation} from '../delegations'
 import {enqueueProjectWork,cancelProjectWork} from '../jobs'
@@ -10,6 +10,7 @@ const rule=()=>({id:'r1',userId:'owner',version:1,...input})
 const request={memoryId:'m1',capability:'project.diagnose',objective:'Revisar el fallo de integración',mode:'manual',requestId:workspaceId}
 beforeEach(()=>{
   jest.clearAllMocks();db.$transaction.mockImplementation((work:any)=>work(db));db.userSettings.findUnique.mockResolvedValue(null)
+  db.novoSignalSourcePreference.findFirst.mockResolvedValue(null)
   db.projectAssistantMemory.findFirst.mockResolvedValue({id:'m1',userId:'owner',projectId:'p1',clearedAt:null,trackingMode:'on'})
   db.projectAssistantSource.findFirst.mockResolvedValue({userId:'owner',memoryId:'m1',deviceId,kind:'folder',sourceKey:`${deviceId}:${workspaceId}`,availability:'available',facts:{workspaceId}})
   db.companionDevice.findFirst.mockResolvedValue({userId:'owner',deviceId,revokedAt:null,scopes:['device:work:execute','device:work:read']})
@@ -87,4 +88,9 @@ test('cancellation is owned, durable and does not pretend that a running effect 
   expect(db.projectWork.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({userId:'owner',revision:2}),data:expect.objectContaining({phase:'cancelled',revision:{increment:1}})}))
   db.projectWork.findFirst.mockResolvedValue(null)
   await expect(cancelProjectWork('other','j1',2)).rejects.toMatchObject({code:'work_not_found'})
+})
+test('source exclusion prevents a new explicit job even when the old binding exists',async()=>{
+  db.novoSignalSourcePreference.findFirst.mockResolvedValue({source:'work_context',excludedAt:new Date()})
+  await expect(enqueueProjectWork('owner',request)).rejects.toMatchObject({code:'context_permission_required'})
+  expect(db.projectWork.create).not.toHaveBeenCalled()
 })
