@@ -4,6 +4,9 @@ import { resolve } from "node:path";
 // Novo synthesizes its own sound palette; no reserved upstream media is bundled.
 export default defineConfig({
   plugins: [],
+  // This standalone app uses plain CSS. Supplying an inline empty PostCSS
+  // config prevents Vite from inheriting the web app's root Tailwind config.
+  css: { postcss: { plugins: [] } },
   clearScreen: false,
   server: {
     port: 1420,
