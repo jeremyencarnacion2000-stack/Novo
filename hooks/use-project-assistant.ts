@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react'
 export type ProjectWorkRecord={
   id:string;memoryId:string;deviceId:string;workspaceId:string;capability:string;objective:string
   phase:string;revision:number;sequence:number;mode:string;reasonCode:string|null;result:unknown;decision:unknown
-  createdAt:string;updatedAt:string;startedAt:string|null;finishedAt:string|null
+  createdAt:string;updatedAt:string;startedAt:string|null;finishedAt:string|null;resultStale?:boolean
 }
 export type ProjectWorkDelegation={id:string;memoryId:string;deviceId:string;workspaceId:string;enabled:boolean;version:number;capabilities:string[];triggers:string[];dailyLimit:number;timezone:string;verification:unknown[];timeoutSeconds:number}
 export type ProjectWorkDevice={id:string;name:string;capabilities:string[];lastSeenAt:string|null;canExecute:boolean}
@@ -18,6 +18,9 @@ const url='/api/project-assistant/work'
 const successDelay=20_000
 const maximumFailureDelay=90_000
 type Listener=()=>void
+export class ProjectAssistantMutationError extends Error {
+  constructor(readonly code:string,message:string){super(message);this.name='ProjectAssistantMutationError'}
+}
 type Store={snapshot:ProjectAssistantSnapshot;listeners:Set<Listener>;controller:AbortController|null;timer:ReturnType<typeof setTimeout>|null;inFlight:Promise<void>|null;failures:number;generation:number;visibility:()=>void}
 const stores=new Map<string,Store>()
 
@@ -80,7 +83,13 @@ function requestId(){
 }
 async function mutate(current:Store,path:string,init:RequestInit){
   const response=await fetch(path,{...init,headers:{'Content-Type':'application/json',...init.headers}})
-  if(!response.ok)throw new Error(response.status===401?'Inicia sesión para guardar cambios.':response.status===409?'El trabajo cambió. Actualiza la vista e inténtalo de nuevo.':'No se pudo guardar el cambio.')
+  if(!response.ok){
+    let code=''
+    try{const payload=await response.json() as {error?:unknown};if(typeof payload.error==='string')code=payload.error}catch{}
+    if(response.status===409){const olderRequest=current.inFlight;if(olderRequest)await olderRequest;await load(current)}
+    const message=code==='result_stale'?'Este resultado quedó desactualizado. Solicita uno nuevo para revisar una acción vigente.':response.status===401?'Inicia sesión para guardar cambios.':response.status===409?'El trabajo cambió. Actualizamos el estado; revisa la nueva versión antes de intentarlo.':'No se pudo guardar el cambio.'
+    throw new ProjectAssistantMutationError(code||String(response.status),message)
+  }
   const olderRequest=current.inFlight
   if(olderRequest)await olderRequest
   await load(current)

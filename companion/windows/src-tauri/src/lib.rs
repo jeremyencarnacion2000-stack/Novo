@@ -722,6 +722,8 @@ pub fn run() {
             context_folders::companion_context_folders_remove,
             context_folders::companion_context_search,
             project_work::project_work_runtimes,
+            project_work::project_work_artifacts,
+            project_work::project_work_open_artifact,
             companion_minimize,
             companion_panel_open,
             boot,

@@ -9,7 +9,7 @@ import {ProjectWorkCard} from './work-card'
 export function ProjectWorkLink(){
   const assistant=useProjectAssistant()
   const active=assistant.work.filter(work=>['pending','waiting_device','running','awaiting_confirmation','uncertain'].includes(work.phase)).length
-  return <Link href="/activity" aria-label={active?`Trabajos de Novo: ${active} pendientes`:'Ver trabajos de Novo'} title="Ver actividad de Novo" className="relative inline-flex size-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white">
+  return <Link href="/activity" aria-label={active?`Trabajos de Novo: ${active} ${active===1?'pendiente':'pendientes'}`:'Ver trabajos de Novo'} title="Ver actividad de Novo" className="relative inline-flex size-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white">
     <ListTodo className="size-4" aria-hidden="true"/>{active>0&&<span aria-hidden="true" className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-4 text-primary-foreground">{active>9?'9+':active}</span>}
   </Link>
 }

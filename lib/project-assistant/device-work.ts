@@ -14,7 +14,9 @@ const leaseMs=90_000
 type Actor=CompanionOAuthPrincipal&{deviceId?:string}
 export function projectWorkView(row:ProjectWork){
   const expired=['running','awaiting_confirmation'].includes(row.phase)&&Boolean(row.leaseExpiresAt&&row.leaseExpiresAt<=new Date())
-  return {id:row.id,memoryId:row.memoryId,deviceId:row.deviceId,workspaceId:row.workspaceId,capability:row.capability,objective:row.objective,phase:expired?'uncertain':row.phase,revision:row.revision,sequence:row.sequence,mode:row.mode,reasonCode:expired?'lease_expired':row.reasonCode,result:row.result,decision:row.decision,createdAt:row.createdAt?.toISOString(),updatedAt:row.updatedAt?.toISOString(),startedAt:row.startedAt?.toISOString()??null,finishedAt:row.finishedAt?.toISOString()??null}
+  const now=Date.now(),finishedAt=row.finishedAt?.getTime()
+  const resultStale=row.phase==='completed'&&row.decision===null&&Boolean(row.result)&&(!finishedAt||finishedAt>now+2*60*1000||now-finishedAt>24*60*60*1000)
+  return {id:row.id,memoryId:row.memoryId,deviceId:row.deviceId,workspaceId:row.workspaceId,capability:row.capability,objective:row.objective,phase:expired?'uncertain':row.phase,revision:row.revision,sequence:row.sequence,mode:row.mode,reasonCode:expired?'lease_expired':row.reasonCode,result:row.result,decision:row.decision,resultStale,createdAt:row.createdAt?.toISOString(),updatedAt:row.updatedAt?.toISOString(),startedAt:row.startedAt?.toISOString()??null,finishedAt:row.finishedAt?.toISOString()??null}
 }
 async function requireBoundActor(tx:Prisma.TransactionClient,actor:Actor,deviceId:string){
   if(actor.deviceId&&actor.deviceId!==deviceId)throw new ProjectAssistantError(403,'device_authorization_mismatch')

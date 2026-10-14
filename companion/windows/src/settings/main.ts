@@ -19,6 +19,7 @@ import {
 import { h, clear } from "../views/dom";
 import { agentsSection } from "./agents";
 import { novoChatSection } from "./novo-chat";
+import {projectWorkArtifactsSection} from './project-work-artifacts';
 import {mountNovoAccount} from '../novo-main';
 import {settingsNavigation,settingsSection,type SettingsSection} from './navigation';
 import {novoSettingsHeader} from './header';
@@ -1321,7 +1322,7 @@ async function render() {
   const advanced=h('details',{class:'settings-advanced'},h('summary',{text:t("Advanced providers and models")}),
     apiSection(hasKey),chatProvidersSection(chatKeys,keyChanged),localSection(customKey));
   assistantPreferences=novoChatSection(settings,save);
-  navigation.panels.assistant.append(assistantPreferences.el,advanced);
+  navigation.panels.assistant.append(assistantPreferences.el,projectWorkArtifactsSection(),advanced);
   navigation.panels.connections.append(
     integrationsSection(present),
     claudeSection(status),

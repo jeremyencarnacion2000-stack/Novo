@@ -2,7 +2,7 @@
 
 import {useState,type FormEvent} from 'react'
 import {Button} from '@/components/ui/button'
-import {useProjectAssistant,type ProjectWorkDevice, type ProjectWorkRecord} from '@/hooks/use-project-assistant'
+import {ProjectAssistantMutationError,useProjectAssistant,type ProjectWorkDevice, type ProjectWorkRecord} from '@/hooks/use-project-assistant'
 
 type ActionDraft=
   | {kind:'task.create';title:string;category:'Training'|'Study'|'Personal'|'Work';priority:'low'|'medium'|'high';dueDate?:string}
@@ -15,6 +15,40 @@ const active=new Set(['pending','waiting_device','running'])
 
 function record(value:unknown):Record<string,unknown>|null{return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null}
 function pendingDecision(value:unknown):StoredDecision|null{const parsed=record(value);return parsed?.state==='pending'?parsed as StoredDecision:null}
+function dateOnly(value:string){const parts=value.split('-').map(Number);if(parts.length!==3||parts.some(part=>!Number.isInteger(part)))return value;const date=new Date(Date.UTC(parts[0],parts[1]-1,parts[2],12));return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat('es',{dateStyle:'long',timeZone:'UTC'}).format(date)}
+function dateTime(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat('es',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC',timeZoneName:'short'}).format(date)}
+function priorityName(value:string){return value==='high'?'Alta':value==='low'?'Baja':'Media'}
+function operationDescription(operation:ActionDraft|undefined){
+  if(!operation)return null
+  if(operation.kind==='task.create')return <>
+    <h6 className="font-medium">Crear tarea</h6>
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      <dt className="text-muted-foreground">Título</dt><dd className="break-words">{operation.title}</dd>
+      <dt className="text-muted-foreground">Categoría</dt><dd>{operation.category}</dd>
+      <dt className="text-muted-foreground">Prioridad</dt><dd>{priorityName(operation.priority)}</dd>
+      {operation.dueDate&&<><dt className="text-muted-foreground">Fecha límite</dt><dd><time dateTime={operation.dueDate}>{dateOnly(operation.dueDate)}</time></dd></>}
+    </dl>
+  </>
+  if(operation.kind==='note.create')return <>
+    <h6 className="font-medium">Guardar nota</h6>
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      <dt className="text-muted-foreground">Tipo</dt><dd>{({note:'Nota',idea:'Idea',task:'Tarea',reminder:'Recordatorio'} as const)[operation.noteType]}</dd>
+      <dt className="text-muted-foreground">Contenido</dt><dd className="whitespace-pre-wrap break-words">{operation.content}</dd>
+      <dt className="text-muted-foreground">Etiquetas</dt><dd className="break-words">{operation.tags.length?operation.tags.join(', '):'Ninguna'}</dd>
+    </dl>
+  </>
+  return <>
+    <h6 className="font-medium">Añadir al calendario de Novo</h6>
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      <dt className="text-muted-foreground">Título</dt><dd className="break-words">{operation.title}</dd>
+      <dt className="text-muted-foreground">Descripción</dt><dd className="whitespace-pre-wrap break-words">{operation.description||'Sin descripción'}</dd>
+      <dt className="text-muted-foreground">Empieza</dt><dd><time dateTime={operation.start}>{dateTime(operation.start)}</time></dd>
+      <dt className="text-muted-foreground">Termina</dt><dd><time dateTime={operation.end}>{dateTime(operation.end)}</time></dd>
+      <dt className="text-muted-foreground">Duración</dt><dd>{operation.allDay?'Todo el día':'Con horario'}</dd>
+      <dt className="col-span-2 mt-1 text-xs text-muted-foreground">Horarios mostrados en UTC.</dt>
+    </dl>
+  </>
+}
 function safeResult(value:unknown):{summary?:string;artifactId?:string;baseCommit?:string;changedPaths:string[];verification?:{status:string;checks:{script:string;exitCode:number}[]}}{
   const parsed=record(value),verification=record(parsed?.verification)
   const checks=Array.isArray(verification?.checks)?verification.checks.flatMap(value=>{const check=record(value);return typeof check?.script==='string'&&typeof check.exitCode==='number'?[{script:check.script,exitCode:check.exitCode}]:[]}):[]
@@ -29,14 +63,15 @@ function safeResult(value:unknown):{summary?:string;artifactId?:string;baseCommi
 
 export function ProjectWorkCard({work,devices}:{work:ProjectWorkRecord;devices:ProjectWorkDevice[]}){
   const assistant=useProjectAssistant()
-  const [kind,setKind]=useState<ActionDraft['kind']>('task.create'),[title,setTitle]=useState(work.objective.slice(0,120)),[category,setCategory]=useState<'Training'|'Study'|'Personal'|'Work'>('Work'),[priority,setPriority]=useState<'low'|'medium'|'high'>('medium'),[dueDate,setDueDate]=useState(''),[content,setContent]=useState(''),[tags,setTags]=useState(''),[noteType,setNoteType]=useState<'note'|'idea'|'task'|'reminder'>('note'),[description,setDescription]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[allDay,setAllDay]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
-  const result=safeResult(work.result),decision=pendingDecision(work.decision),decisionState=record(work.decision),operationResult=record(decisionState?.operationResult),device=devices.find(item=>item.id===work.deviceId)
+  const [kind,setKind]=useState<ActionDraft['kind']>('task.create'),[title,setTitle]=useState(work.objective.slice(0,120)),[category,setCategory]=useState<'Training'|'Study'|'Personal'|'Work'>('Work'),[priority,setPriority]=useState<'low'|'medium'|'high'>('medium'),[dueDate,setDueDate]=useState(''),[content,setContent]=useState(''),[tags,setTags]=useState(''),[noteType,setNoteType]=useState<'note'|'idea'|'task'|'reminder'>('note'),[description,setDescription]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[allDay,setAllDay]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[staleAfterConflict,setStaleAfterConflict]=useState(false),[freshRequested,setFreshRequested]=useState(false)
+  const result=safeResult(work.result),decision=staleAfterConflict?null:pendingDecision(work.decision),decisionState=record(work.decision),operationResult=record(decisionState?.operationResult),device=devices.find(item=>item.id===work.deviceId)
   const resultKind=record(work.result)?.verification&&record(record(work.result)?.verification)?.status
-  const canPropose=work.phase==='completed'&&!work.decision&&Boolean(work.result)
+  const expired=decisionState?.state==='expired',staleResult=work.resultStale===true||staleAfterConflict
+  const canPropose=work.phase==='completed'&&!work.decision&&Boolean(work.result)&&!staleResult
   async function send(action:()=>Promise<void>){
     setBusy(true);setError('');setNotice('')
-    try{await action();setNotice('Estado de Novo actualizado.')}
-    catch(failure){setError(failure instanceof Error?failure.message:'No se pudo conectar con Novo. Conservamos esta tarea para que puedas reintentarlo.')}
+    try{await action();setNotice('Estado de Novo actualizado.');return true}
+    catch(failure){setError(failure instanceof Error?failure.message:'No se pudo conectar con Novo. Conservamos esta tarea para que puedas reintentarlo.');if(failure instanceof ProjectAssistantMutationError&&failure.code==='result_stale')setStaleAfterConflict(true);return false}
     finally{setBusy(false)}
   }
   function operation():ActionDraft|null{
@@ -52,6 +87,7 @@ export function ProjectWorkCard({work,devices}:{work:ProjectWorkRecord;devices:P
     if(!decision?.requestId||!decision.fingerprint)return
     void send(()=>assistant.decideAction(work.id,{revision:work.revision,requestId:decision.requestId!,fingerprint:decision.fingerprint!,decision:value}))
   }
+  async function requestFreshResult(){if(await send(()=>assistant.enqueue({memoryId:work.memoryId,capability:work.capability,objective:work.objective})))setFreshRequested(true)}
   const contentId=`work-action-content-${work.id}`
   return <article aria-label={`Trabajo de Novo: ${work.objective}`} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -66,16 +102,17 @@ export function ProjectWorkCard({work,devices}:{work:ProjectWorkRecord;devices:P
       {result.changedPaths.length>0&&<><p className="mt-2 text-xs text-muted-foreground">Archivos de la propuesta ({result.changedPaths.length}). Los archivos originales siguen intactos.</p><ul className="mt-1 space-y-1">{result.changedPaths.slice(0,12).map(path=><li key={path} className="break-all font-mono text-xs">{path}</li>)}</ul>{result.changedPaths.length>12&&<p className="mt-1 text-xs text-muted-foreground">Y {result.changedPaths.length-12} archivos más.</p>}</>}
       {result.verification&&<div className="mt-3 text-xs"><p className="font-medium">Comprobaciones: {result.verification.status==='passed'?'correctas':result.verification.status==='failed'?'con errores':'no ejecutadas'}</p>{result.verification.checks.map((check,index)=><p key={`${check.script}:${index}`} className="mt-1 break-all text-muted-foreground">{check.script}: {check.exitCode===0?'correcto':`código ${check.exitCode}`}</p>)}</div>}
       {result.baseCommit&&<p className="mt-3 text-xs text-muted-foreground">Punto de partida: <code>{result.baseCommit.slice(0,12)}</code></p>}
-      {result.artifactId&&<p className="mt-2 text-xs text-muted-foreground">Referencia del artefacto local en {device?.name??'el PC que ejecutó el trabajo'}: <code className="break-all">{result.artifactId}</code>. El parche permanece en ese Companion; esta vista conserva el resumen y el historial.</p>}
+      {result.artifactId&&work.capability.endsWith('prepare_fix')&&<div className="mt-3 rounded-lg bg-muted/50 p-3 text-xs"><p className="font-medium">Abrir la propuesta en Novo Companion</p><p className="mt-1 text-muted-foreground">En {device?.name??'el PC que ejecutó el trabajo'}, ve a Ajustes → Asistente → Propuestas locales y busca esta referencia:</p><code className="mt-2 block break-all">{result.artifactId}</code><p className="mt-1 text-muted-foreground">El Companion conserva la copia privada en ese PC; el proyecto original no se modifica.</p></div>}
+      {result.artifactId&&!work.capability.endsWith('prepare_fix')&&<div className="mt-3 rounded-lg bg-muted/50 p-3 text-xs"><p className="font-medium">Referencia local del diagnóstico</p><code className="mt-2 block break-all">{result.artifactId}</code><p className="mt-1 text-muted-foreground">El diagnóstico se conserva en {device?.name??'el PC que ejecutó el trabajo'}; no incluye una propuesta de código para abrir.</p></div>}
     </details>}
     {decisionState?.state==='applied'&&<p role="status" className="mt-3 text-sm">La acción aprobada se guardó en Novo.{operationResult?.kind==='task'?' Puedes verla en Tareas.':operationResult?.kind==='note'?' Puedes verla en Notas.':operationResult?.kind==='calendar_event'?' Puedes verla en el Calendario.':''}</p>}
     {decisionState?.state==='denied'&&<p className="mt-3 text-sm text-muted-foreground">Rechazaste la acción; no se modificaron tus datos.</p>}
-    {decisionState?.state==='expired'&&<p className="mt-3 text-sm text-muted-foreground">La revisión venció. Vuelve a preparar la acción desde un resultado reciente.</p>}
+    {(expired||staleResult)&&<div className="mt-3 space-y-2"><p className="text-sm text-muted-foreground">{expired?'La autorización venció y ya no se puede usar. Solicita un resultado nuevo para revisar una acción actualizada.':'El resultado quedó desactualizado y no se puede aprobar. Solicita uno nuevo para revisar una acción vigente.'}</p><Button variant="outline" size="sm" disabled={busy||freshRequested} onClick={()=>void requestFreshResult()}>{freshRequested?'Nueva ejecución solicitada':busy?'Solicitando…':'Volver a ejecutar en el PC autorizado'}</Button></div>}
     {work.phase==='completed'&&work.capability.endsWith('prepare_fix')&&<p className="mt-2 text-xs text-muted-foreground">La propuesta fue preparada, no publicada. Revisa el cambio en el PC que la ejecutó.</p>}
     {work.reasonCode&&work.phase!=='completed'&&<p className="mt-2 text-sm text-muted-foreground">Motivo: {work.reasonCode.replaceAll('_',' ')}</p>}
     <p className="mt-3 text-xs text-muted-foreground">Última actualización: {new Date(work.updatedAt).toLocaleString('es')} · secuencia {work.sequence}</p>
     {decision&&<section aria-label="Acción pendiente de aprobación" className="mt-4 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-      <div><h5 className="font-medium">Revisa esta acción de Novo</h5><p className="mt-1 text-sm">{decision.operation?.kind==='task.create'&&`Crear tarea: ${decision.operation.title}`}{decision.operation?.kind==='note.create'&&`Guardar nota: ${decision.operation.content}`}{decision.operation?.kind==='calendar.create'&&`Añadir al calendario: ${decision.operation.title}`}</p><p className="mt-1 text-xs text-muted-foreground">Solo se guardará exactamente esta acción. La autorización vence en 24 horas.</p></div>
+      <div><h5 className="font-medium">Revisa todos los datos antes de aprobar</h5><div className="mt-2">{operationDescription(decision.operation)}</div><p className="mt-2 text-xs text-muted-foreground">Solo se guardará exactamente esta acción. La autorización vence en 24 horas.</p></div>
       <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>decide('confirm')}>Confirmar y guardar</Button><Button variant="outline" disabled={busy} onClick={()=>decide('deny')}>Rechazar</Button></div>
     </section>}
     {canPropose&&<details className="mt-4 border-t border-border pt-3"><summary className="w-fit cursor-pointer py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Preparar una acción en Novo</summary>

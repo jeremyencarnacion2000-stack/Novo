@@ -29,6 +29,17 @@ test('cancelling uses the persisted revision then refreshes the shared record',a
   expect(fetchMock).toHaveBeenNthCalledWith(2,'/api/project-assistant/work/job-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:3})})
 })
 
+test('a stale write conflict reloads canonical work before showing the error',async()=>{
+  fetchMock.mockResolvedValueOnce({ok:true,status:200,json:async()=>({work:[work],delegations:[],devices:[],workspaces:[]})})
+  fetchMock.mockResolvedValueOnce({ok:false,status:409,json:async()=>({error:'revision_conflict'})})
+  fetchMock.mockResolvedValueOnce({ok:true,status:200,json:async()=>({work:[{...work,phase:'completed',revision:4}],delegations:[],devices:[],workspaces:[]})})
+  function Controls(){const state=useProjectAssistant();return <><output aria-label="phase">{state.work[0]?.phase}</output><button onClick={()=>void state.cancel('job-1',3).catch(()=>{})}>Cancel job</button></>}
+  render(<Controls/>);await screen.findByText('running')
+  screen.getByRole('button',{name:'Cancel job'}).click()
+  await waitFor(()=>expect(screen.getByLabelText('phase')).toHaveTextContent('completed'))
+  expect(fetchMock).toHaveBeenCalledTimes(3)
+})
+
 test('cached work never crosses to a different signed-in account',async()=>{
   const userA={...work,objective:'Privado de A'},userB={...work,id:'job-b',objective:'Privado de B'}
   fetchMock.mockResolvedValueOnce({ok:true,status:200,json:async()=>({work:[userA],delegations:[],devices:[],workspaces:[]})})

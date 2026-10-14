@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -36,6 +37,184 @@ struct Availability {
     views: Vec<RuntimeView>,
 }
 static RUNTIME: Mutex<Option<Availability>> = Mutex::new(None);
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalArtifactView {
+    id: String,
+    summary: String,
+    base_commit: Option<String>,
+    changed_paths: Vec<String>,
+    verification_status: Option<String>,
+    modified_at: Option<String>,
+    workspace_ready: bool,
+    patch_ready: bool,
+}
+
+fn artifacts_root() -> PathBuf {
+    root().join("artifacts")
+}
+
+fn artifact_directory(root: &std::path::Path, id: uuid::Uuid) -> Result<PathBuf, String> {
+    let root = root.canonicalize().map_err(|_| "artifact_unavailable")?;
+    let expected = root.join(id.to_string());
+    let directory = expected
+        .canonicalize()
+        .map_err(|_| "artifact_unavailable")?;
+    if directory != expected || !directory.is_dir() {
+        return Err("artifact_unavailable".into());
+    }
+    Ok(directory)
+}
+
+fn artifact_child(directory: &std::path::Path, name: &str) -> Option<PathBuf> {
+    let expected = directory.join(name);
+    let actual = expected.canonicalize().ok()?;
+    if actual != expected {
+        return None;
+    }
+    let metadata = fs::symlink_metadata(&expected).ok()?;
+    if metadata.file_type().is_symlink() {
+        return None;
+    }
+    Some(actual)
+}
+
+fn persist_artifact_result(receipt: &Receipt, result: &Value) -> Result<(), String> {
+    let id = result["artifactId"].as_str().ok_or("receipt_missing")?;
+    let parsed = uuid::Uuid::parse_str(id).map_err(|_| "receipt_missing")?;
+    let directory = artifact_directory(&artifacts_root(), parsed).map_err(|_| "receipt_missing")?;
+    let result_path = directory.join("result.json");
+    match fs::symlink_metadata(&result_path) {
+        Ok(metadata) if !metadata.file_type().is_symlink() => {
+            if artifact_child(&directory, "result.json").is_none() {
+                return Err("receipt_missing".into());
+            }
+        }
+        Ok(_) => return Err("receipt_missing".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err("receipt_missing".into()),
+    }
+    fs::write(
+        result_path,
+        serde_json::to_vec(&json!({"ownerId":receipt.user_id,"result":result}))
+            .map_err(|_| "receipt_missing")?,
+    )
+    .map_err(|_| "receipt_missing".into())
+}
+
+fn stored_artifact(path: &std::path::Path) -> Option<(Option<String>, Value)> {
+    let metadata = fs::metadata(path).ok()?;
+    if metadata.len() > 256 * 1024 {
+        return None;
+    }
+    let stored: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
+    if let Some(result) = stored.get("result") {
+        Some((stored.get("ownerId")?.as_str().map(str::to_owned), result.clone()))
+    } else {
+        Some((None, stored))
+    }
+}
+
+fn artifact_owner(
+    result: &Value,
+    explicit_owner: Option<String>,
+    receipts: &[Receipt],
+) -> Option<String> {
+    explicit_owner.or_else(|| {
+        let execution = result.get("executionId")?.as_str()?;
+        receipts
+            .iter()
+            .into_iter()
+            .find(|receipt| receipt.execution_id == execution)
+            .map(|receipt| receipt.user_id.clone())
+    })
+}
+
+async fn authorized_local_owner(app: &AppHandle) -> Result<String, String> {
+    let shared = app.state::<crate::Shared>();
+    if !shared
+        .settings
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .novo_local_connections
+    {
+        return Err("local_connections_disabled".into());
+    }
+    let authorization = crate::novo_account::verify_account(&shared)
+        .await
+        .map_err(|error| error.code)?;
+    if !authorization.device.as_ref().is_some_and(|device| {
+        device.scopes.iter().any(|scope| scope == "device:work:read")
+            || device.scopes.iter().any(|scope| scope == "device:work:execute")
+    }) {
+        return Err("permission_required".into());
+    }
+    Ok(authorization.user.id)
+}
+
+#[tauri::command]
+pub async fn project_work_artifacts(app: AppHandle) -> Result<Vec<LocalArtifactView>, String> {
+    let owner = authorized_local_owner(&app).await?;
+    let root = artifacts_root();
+    if !root.exists() { return Ok(Vec::new()); }
+    let receipts = transport::saved();
+    let mut artifacts = Vec::new();
+    for entry in fs::read_dir(&root)
+        .map_err(|_| "artifact_unavailable")?
+        .filter_map(Result::ok)
+        .take(500)
+    {
+        let Some(id) = entry.file_name().to_str().map(str::to_owned) else { continue };
+        let Ok(parsed_id) = uuid::Uuid::parse_str(&id) else { continue };
+        let Ok(directory) = artifact_directory(&root, parsed_id) else { continue };
+        let Some(result_path) = artifact_child(&directory, "result.json") else { continue };
+        let Some((stored_owner, result)) = stored_artifact(&result_path) else { continue };
+        let artifact_owner = artifact_owner(&result, stored_owner, &receipts);
+        if artifact_owner.as_deref() != Some(owner.as_str()) { continue; }
+        let changed_paths = result.get("changedPaths").and_then(Value::as_array).into_iter().flatten()
+            .filter_map(Value::as_str)
+            .filter(|path| path.len() <= 240 && !path.starts_with('/') && !path.contains("..") && !path.contains('\\') && !path.contains(':') && !path.chars().any(char::is_control))
+            .take(100).map(str::to_owned).collect();
+        let base_commit = result.get("baseCommit").and_then(Value::as_str)
+            .filter(|value| (40..=64).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .map(str::to_owned);
+        let verification_status = result.get("verification").and_then(|value| value.get("status"))
+            .and_then(Value::as_str).filter(|status| ["passed", "failed", "not_run"].contains(status)).map(str::to_owned);
+        let summary = result.get("summary").and_then(Value::as_str).unwrap_or("Propuesta de proyecto")
+            .chars().take(500).collect();
+        let workspace_ready = artifact_child(&directory, "workspace").is_some_and(|path| path.is_dir());
+        let patch_ready = artifact_child(&directory, "prepared.patch")
+            .and_then(|path| fs::metadata(path).ok())
+            .is_some_and(|metadata| metadata.is_file() && metadata.len() > 0 && metadata.len() <= 5 * 1024 * 1024);
+        let modified_at = fs::metadata(&result_path).ok().and_then(|metadata| metadata.modified().ok())
+            .map(|modified| chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339());
+        artifacts.push(LocalArtifactView {
+            id: parsed_id.to_string(), summary, base_commit, changed_paths, verification_status, modified_at, workspace_ready, patch_ready,
+        });
+    }
+    artifacts.sort_by(|left, right| right.modified_at.cmp(&left.modified_at));
+    Ok(artifacts)
+}
+
+#[tauri::command]
+pub async fn project_work_open_artifact(app: AppHandle, artifact_id: String) -> Result<(), String> {
+    let owner = authorized_local_owner(&app).await?;
+    let parsed_id = uuid::Uuid::parse_str(&artifact_id).map_err(|_| "artifact_unavailable")?;
+    let directory = artifact_directory(&artifacts_root(), parsed_id)?;
+    let result_path = artifact_child(&directory, "result.json").ok_or("artifact_unavailable")?;
+    let (stored_owner, result) = stored_artifact(&result_path).ok_or("artifact_unavailable")?;
+    let receipts = transport::saved();
+    let artifact_owner = artifact_owner(&result, stored_owner, &receipts);
+    if artifact_owner.as_deref() != Some(owner.as_str()) { return Err("artifact_unavailable".into()); }
+    let has_workspace = artifact_child(&directory, "workspace").is_some_and(|path| path.is_dir());
+    let has_patch = artifact_child(&directory, "prepared.patch")
+        .and_then(|path| fs::metadata(path).ok())
+        .is_some_and(|metadata| metadata.is_file() && metadata.len() > 0 && metadata.len() <= 5 * 1024 * 1024);
+    if !has_workspace && !has_patch { return Err("artifact_unavailable".into()); }
+    crate::platform::reveal_folder(&directory.to_string_lossy());
+    Ok(())
+}
 fn available() -> Availability {
     let mut cache = RUNTIME
         .lock()
@@ -291,10 +470,12 @@ async fn execute(
         let claim = receipt.claim.clone();
         let execution = receipt.execution_id.clone();
         let base = receipt.base.clone();
-        return guarded(app, access, receipt, move |_| {
+        let result = guarded(app, access, receipt, move |_| {
             diagnosis(&claim, &execution, &base)
         })
-        .await;
+        .await?;
+        persist_artifact_result(receipt, &result)?;
+        return Ok(result);
     }
     let runtime = runtime.ok_or("runtime_unavailable")?;
     if receipt.claim.capability != "codex.prepare_fix" {
@@ -329,15 +510,7 @@ async fn execute(
     })
     .await?;
     let result = json!({"executionId":receipt.execution_id,"sessionId":session,"baseCommit":prepared.base,"artifactId":prepared.artifact_id,"diffHash":hash,"changedPaths":paths,"summary":"Preparé una propuesta en una copia privada del proyecto. Revisa el resultado y las comprobaciones antes de aplicarla.","verification":verification});
-    fs::write(
-        prepared
-            .path
-            .parent()
-            .ok_or("receipt_missing")?
-            .join("result.json"),
-        serde_json::to_vec(&result).map_err(|_| "receipt_missing")?,
-    )
-    .map_err(|_| "receipt_missing")?;
+    persist_artifact_result(receipt, &result)?;
     let clone = prepared.clone();
     // Essential review artifacts are already saved outside the disposable copy.
     let _ = tauri::async_runtime::spawn_blocking(move || {
@@ -440,4 +613,52 @@ pub fn start(app: AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod artifact_path_tests {
+    use super::{artifact_child, artifact_directory};
+    use std::{fs, path::PathBuf};
+    use uuid::Uuid;
+
+    fn test_root() -> PathBuf {
+        let path = std::env::temp_dir().join(format!("novo-artifact-path-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&path).expect("create isolated test root");
+        path
+    }
+
+    #[test]
+    fn artifact_directory_must_match_the_requested_id() {
+        let root = test_root();
+        let id = Uuid::new_v4();
+        let expected = root.join(id.to_string());
+        fs::create_dir_all(&expected).expect("create expected artifact");
+
+        assert_eq!(artifact_directory(&root, id).unwrap(), expected.canonicalize().unwrap());
+        assert!(artifact_directory(&root, Uuid::new_v4()).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn artifact_child_accepts_only_a_direct_non_symlink_child() {
+        let root = test_root();
+        let directory = root.join(Uuid::new_v4().to_string());
+        let sibling = root.join(Uuid::new_v4().to_string());
+        fs::create_dir_all(&directory).unwrap();
+        fs::create_dir_all(&sibling).unwrap();
+        fs::write(directory.join("prepared.patch"), b"diff").unwrap();
+        assert!(artifact_child(&directory.canonicalize().unwrap(), "prepared.patch").is_some());
+
+        let target = sibling.join("prepared.patch");
+        let link = directory.join("linked.patch");
+        fs::write(&target, b"foreign artifact").unwrap();
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_file(&target, &link);
+        #[cfg(unix)]
+        let linked = std::os::unix::fs::symlink(&target, &link);
+        if linked.is_ok() {
+            assert!(artifact_child(&directory.canonicalize().unwrap(), "linked.patch").is_none());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
 }
