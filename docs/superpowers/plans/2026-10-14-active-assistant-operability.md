@@ -39,13 +39,14 @@
 
 ### Task 2: Use the supported Windows sandbox fallback
 
-**Files:** `companion/windows/src-tauri/src/project_work/codex.rs`, `companion/windows/src-tauri/src/project_work/mod.rs`, `companion/windows/src-tauri/Cargo.toml`
+**Files:** `companion/windows/src-tauri/src/project_work/codex.rs`, `companion/windows/src-tauri/src/project_work/mod.rs`, `companion/windows/src-tauri/Cargo.toml`, `companion/windows/package.json`, `companion/windows/package-lock.json`, `companion/windows/Cargo.lock`, `companion/windows/src-tauri/tauri.conf.json`
 
 - [x] Add a Rust unit test asserting the Codex permission arguments choose the supported Windows `elevated` fallback, deny secrets and environment files, and keep network disabled.
 - [ ] Run the test and confirm it fails while the arguments still select MXC.
 - [x] Change the per-run Codex setting from `mxc` to `elevated`; retain the exact workspace/read-only probe and all denied-path rules.
 - [ ] Run the sandbox probe on Windows; verify the workspace write succeeds, a neighboring path is unreadable, and read-only dependency links cannot be written.
 - [ ] Verify Codex is reported available only when the probe passes and Claude remains unavailable without an installed, safely contained CLI.
+- [ ] Publish the passing 0.2.9 Windows installers as a new GitHub release; do not overwrite the already-published 0.2.8 release.
 
 ### Task 3: Add approved GitHub and Vercel actions
 
@@ -67,6 +68,6 @@
 
 ## Verification ledger
 
-- The last observed production refresh workflow run is successful `workflow_dispatch` run [38629955211](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/38629955211). As of 2026-10-14 22:51 UTC, no post-reactivation `schedule` run had appeared; the 22:52 UTC candidate was still pending.
+- The last observed production refresh workflow run is successful `workflow_dispatch` run [38629955211](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/38629955211). As of 2026-10-14 22:55 UTC, no post-reactivation `schedule` run had appeared; the 22:52 UTC candidate had passed without a receipt. Continue observing the next interval.
 - The Windows Companion installer has not been rebuilt or published from this change yet. Windows CI must pass before release.
 - Local `npm run build` and local Windows native builds were intentionally avoided due to prior disk pressure and host saturation; Vercel and GitHub CI will provide those checks.
