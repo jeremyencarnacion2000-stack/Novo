@@ -28,11 +28,22 @@ export async function GET() {
         return NextResponse.json({
             connected: false,
             hasScope: false,
+            state: 'not_connected',
             message: 'Google account not connected to Novo',
         });
     }
 
-    return NextResponse.json({ connected: true, hasScope: true });
+    try {
+        await gmailService.checkAccessForUser(session.user.id);
+        return NextResponse.json({ connected: true, hasScope: true, state: 'connected' });
+    } catch (error) {
+        console.error('[Gmail] Connection check failed.');
+        return NextResponse.json({
+            connected: true,
+            hasScope: true,
+            state: isGmailReauthorizationError(error) ? 'reauthorization_required' : 'unavailable',
+        });
+    }
 }
 
 // ── POST — List Unread ───────────────────────────────────────────────────────

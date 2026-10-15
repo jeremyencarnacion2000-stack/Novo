@@ -35,7 +35,12 @@ function BrandIcon({ icon: Icon, color }: { icon: IconType; color?: string }) {
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
-type ConnectorStatus = 'connected' | 'available' | 'soon' | 'pending'
+type ConnectorStatus = 'connected' | 'available' | 'soon' | 'pending' | 'reauthorization_required' | 'unavailable'
+type GmailConnectionStatus = {
+  connected: boolean
+  hasScope: boolean
+  state?: 'connected' | 'not_connected' | 'reauthorization_required' | 'unavailable'
+}
 
 interface Connector {
   id: string
@@ -118,6 +123,22 @@ function StatusPill({ status }: { status: ConnectorStatus }) {
       <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
         Activación pendiente
+      </span>
+    )
+  }
+  if (status === 'reauthorization_required') {
+    return (
+      <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
+        Autorizar Gmail
+      </span>
+    )
+  }
+  if (status === 'unavailable') {
+    return (
+      <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
+        Sin verificar
       </span>
     )
   }
@@ -275,7 +296,7 @@ export function ConnectorsClient() {
   const [calendarSyncing, setCalendarSyncing] = useState(false)
 
   // ── Gmail state ──────────────────────────────────────────────────────────
-  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; hasScope: boolean } | null>(null)
+  const [gmailStatus, setGmailStatus] = useState<GmailConnectionStatus | null>(null)
   const [gmailLoading, setGmailLoading] = useState(false)
   const [unreadEmails, setUnreadEmails] = useState<{ id?: string | null; subject: string; from: string; snippet?: string | null }[] | null>(null)
 
@@ -504,7 +525,7 @@ export function ConnectorsClient() {
       load('/api/integration/slack', { connected: false }, setSlackStatus),
       load('/api/integration/drive', { connected: false, hasScope: false }, setDriveStatus),
       load('/api/integration/calendar', { connected: false, hasScope: false }, setCalendarStatus),
-      load('/api/integration/gmail', { connected: false, hasScope: false }, setGmailStatus),
+      load('/api/integration/gmail', { connected: false, hasScope: false, state: 'not_connected' }, setGmailStatus),
       load('/api/integration/github', { connected: false }, setGithubStatus),
       load('/api/integration/status', { google: false, spotify: false }, setGrantStatus),
     ])
@@ -512,6 +533,10 @@ export function ConnectorsClient() {
 
     return () => controller.abort()
   }, [session?.user?.id])
+
+  useEffect(() => {
+    if (gmailStatus && gmailStatus.state !== 'connected') setUnreadEmails(null)
+  }, [gmailStatus])
 
   // ── Notion helpers (verbatim) ───────────────────────────────────────────────
   const handleNotionConnect = () => { window.location.href = '/api/integration/notion/connect' }
@@ -743,8 +768,22 @@ export function ConnectorsClient() {
         body: JSON.stringify({ action: 'list_unread' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch unread emails')
+      if (!res.ok) {
+        if (data.code === 'GMAIL_REAUTH_REQUIRED') {
+          setGmailStatus((current) => current
+            ? { ...current, state: 'reauthorization_required' }
+            : { connected: true, hasScope: true, state: 'reauthorization_required' })
+          setUnreadEmails(null)
+        } else if (data.code === 'GMAIL_UNAVAILABLE') {
+          setGmailStatus((current) => current
+            ? { ...current, state: 'unavailable' }
+            : { connected: true, hasScope: true, state: 'unavailable' })
+          setUnreadEmails(null)
+        }
+        throw new Error(data.error || 'Failed to fetch unread emails')
+      }
       setUnreadEmails(data.emails ?? [])
+      setGmailStatus((current) => current ? { ...current, state: 'connected' } : current)
     } catch (err: any) {
       toast({ title: 'No se pudieron cargar los correos', description: err.message, variant: 'destructive' })
     } finally {
@@ -827,11 +866,11 @@ export function ConnectorsClient() {
     { name: 'Todoist', connected: !!todoistStatus?.connected },
     { name: 'Slack', connected: !!slackStatus?.connected },
     { name: 'Google Calendar', connected: !!calendarStatus?.connected && !!calendarStatus?.hasScope },
-    { name: 'Gmail', connected: !!gmailStatus?.connected && !!gmailStatus?.hasScope },
+    { name: 'Gmail', connected: !!gmailStatus?.connected && !!gmailStatus?.hasScope && gmailStatus.state === 'connected' },
     { name: 'GitHub', connected: !!githubStatus?.connected },
   ]
   const activeLearningSources = learningSources.filter(source => source.connected)
-  const googleContextReady = !!calendarStatus?.connected && !!calendarStatus?.hasScope && !!gmailStatus?.connected && !!gmailStatus?.hasScope
+  const googleContextReady = !!calendarStatus?.connected && !!calendarStatus?.hasScope && !!gmailStatus?.connected && !!gmailStatus?.hasScope && gmailStatus.state === 'connected'
   const taskContextReady = !!todoistStatus?.connected || !!notionStatus?.connected
   const setupCompleted = Number(googleContextReady) + Number(taskContextReady)
   const setupCopy = language === 'es'
@@ -952,7 +991,11 @@ export function ConnectorsClient() {
           'El Twin puede enviar correos en tu nombre cuando se lo pidas en el chat',
         ],
         icon: <BrandIcon icon={SiGmail} color="#EA4335" />,
-        status: (gmailStatus?.connected && gmailStatus?.hasScope) ? 'connected' : 'available',
+        status: gmailStatus?.state === 'reauthorization_required'
+          ? 'reauthorization_required'
+          : gmailStatus?.state === 'unavailable'
+            ? 'unavailable'
+            : (gmailStatus?.connected && gmailStatus?.hasScope && gmailStatus.state === 'connected') ? 'connected' : 'available',
       },
       {
         id: 'slack',
@@ -1469,7 +1512,7 @@ function ConnectorDetail({
   calendarStatus: { connected: boolean; hasScope: boolean } | null
   calendarSyncing: boolean
   onCalendarSync: () => void
-  gmailStatus: { connected: boolean; hasScope: boolean } | null
+  gmailStatus: GmailConnectionStatus | null
   gmailLoading: boolean
   unreadEmails: { id?: string | null; subject: string; from: string; snippet?: string | null }[] | null
   onGmailListUnread: () => void
@@ -1827,26 +1870,38 @@ function ConnectorDetail({
       {connector.id === 'gmail' && (
         gmailStatus?.connected && gmailStatus?.hasScope ? (
           <div className="flex flex-col gap-3">
+            {gmailStatus.state === 'reauthorization_required' && (
+              <p role="status" className="rounded-xl border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-200/85">
+                Google conserva el permiso de Gmail, pero rechazó la credencial guardada. Autoriza Gmail de nuevo para recuperar la lectura.
+              </p>
+            )}
+            {gmailStatus.state === 'unavailable' && (
+              <p role="status" className="rounded-xl border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-xs leading-relaxed text-amber-200/85">
+                No se pudo comprobar Gmail ahora. Prueba de nuevo más tarde; esto no significa que debas autorizarlo otra vez.
+              </p>
+            )}
             <button
               onClick={onGmailListUnread}
-              disabled={gmailLoading}
+              disabled={gmailLoading || gmailStatus.state === 'reauthorization_required'}
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all text-red-300 disabled:opacity-50"
             >
               <RefreshCw className={cn('w-4 h-4', gmailLoading && 'animate-spin')} />
               {gmailLoading ? 'Cargando...' : 'Ver no leídos'}
             </button>
-            <button
-              type="button"
-              onClick={() => signIn('google', { callbackUrl: '/connectors?reconnect=gmail' }, {
-                scope: 'openid profile email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
-                access_type: 'offline',
-                prompt: 'consent',
-                include_granted_scopes: 'false',
-              })}
-              className="text-xs font-semibold text-foreground/45 underline underline-offset-4 transition-colors hover:text-foreground/75"
-            >
-              Volver a autorizar Gmail
-            </button>
+            {gmailStatus.state !== 'unavailable' && (
+              <button
+                type="button"
+                onClick={() => signIn('google', { callbackUrl: '/connectors?reconnect=gmail' }, {
+                  scope: 'openid profile email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
+                  access_type: 'offline',
+                  prompt: 'consent',
+                  include_granted_scopes: 'false',
+                })}
+                className="text-xs font-semibold text-foreground/45 underline underline-offset-4 transition-colors hover:text-foreground/75"
+              >
+                {gmailStatus.state === 'reauthorization_required' ? 'Autorizar Gmail de nuevo' : 'Volver a autorizar Gmail'}
+              </button>
+            )}
             {unreadEmails && (
               unreadEmails.length === 0 ? (
                 <p className="text-xs text-foreground/35 text-center py-2">No tienes correos sin leer.</p>

@@ -7,7 +7,7 @@ import { startOfDay, endOfDay } from 'date-fns';
 import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
 import { buildTwinContextSummary, type TwinContextSummary } from '@/lib/cognitive/twin-context';
 import { getContextSource, NOVO_CONTEXT_SOURCE, type ContextSource } from '@/lib/ai/source-attribution';
-import { getGmailContextForUser, type GmailContext } from '@/lib/ai/gmail-context';
+import { getGmailContextForUser, shouldIncludeGmailSignal, type GmailContext } from '@/lib/ai/gmail-context';
 import { providerSignalFreshness, type ProviderSignalFreshness } from '@/lib/cognitive/provider-signal-freshness';
 
 const BLOCKED_PROVIDER_STATES = new Set(['disconnected', 'revoked', 'reauth_required', 'error']);
@@ -204,6 +204,10 @@ export async function buildUserContext(userId: string, options?: {
         const twinContext = options?.twinMode && twin ? await buildTwinContextSummary(userId) : null;
         const externalSignals = externalSignalRows
             .filter((item) => !excludedSignalSources.has(item.source))
+            .filter((item) => item.source !== 'gmail' || shouldIncludeGmailSignal(
+                options?.includeGmail === true,
+                providerSignalFreshness(item.observedAt, now),
+            ))
             .map((item) => ({
                 source: item.source,
                 signalType: item.signalType,
@@ -221,6 +225,10 @@ export async function buildUserContext(userId: string, options?: {
             observedAt: currentWorkContextRow.observedAt.toISOString(),
             expiresAt: currentWorkContextRow.expiresAt.toISOString(),
         }] : [];
+        const contextActiveSignal = options?.includeGmail
+            && activeSignal?.platform === 'gmail'
+            ? null
+            : activeSignal;
 
         const combinedTasks = [
             ...tasksList,
@@ -245,7 +253,7 @@ export async function buildUserContext(userId: string, options?: {
         };
         checklistItems.forEach((item) => addSource(item.source));
         todayEvents.forEach((event: any) => addSource(event.source));
-        addSource((activeSignal as any)?.metadata?.source);
+        addSource((contextActiveSignal as any)?.metadata?.source);
         if (mailbox?.status === 'available') addSource('gmail');
         externalSignals.forEach((signal) => addSource(signal.source));
         if (currentWorkContexts.length) addSource('work_context');
@@ -282,7 +290,7 @@ export async function buildUserContext(userId: string, options?: {
                 theme: settings?.theme || 'system',
                 compactMode: settings?.compactMode || false,
             },
-            activeSignal,
+            activeSignal: contextActiveSignal,
             twinContext,
             currentPlan: currentPlan ? { id: currentPlan.id, recommendation: currentPlan.actions[0] ? { id: currentPlan.actions[0].id, taskId: currentPlan.actions[0].taskId, title: currentPlan.actions[0].title, status: currentPlan.actions[0].status } : undefined } : null,
             recentOutcomes: recentOutcomes.map((outcome) => ({ id: outcome.id, type: outcome.type, taskId: outcome.recommendedAction?.taskId ?? null, createdAt: outcome.createdAt.toISOString() })),
