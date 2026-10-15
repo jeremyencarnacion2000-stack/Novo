@@ -1,7 +1,7 @@
 name: Novo project refresh
 on:
   schedule:
-    - cron: '10,25,40,55 * * * *'
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
 permissions: {}
 concurrency:
