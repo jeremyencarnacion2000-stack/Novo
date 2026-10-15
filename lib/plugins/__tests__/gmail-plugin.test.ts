@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 jest.mock('@/lib/google-account', () => ({ findGoogleAccountForScopes: jest.fn() }))
-jest.mock('@/lib/google', () => ({ gmailService: { listUnreadForUser: jest.fn() } }))
+jest.mock('@/lib/google', () => ({ gmailService: { getUnreadCountForUser: jest.fn() } }))
 jest.mock('@/lib/cognitive/signal-ledger', () => ({ upsertNovoSignals: jest.fn() }))
 jest.mock('@/lib/cognitive/get-or-create-twin', () => ({ getOrCreateTwin: jest.fn() }))
 jest.mock('@/lib/cognitive/platform-signals', () => ({ persistNewPlatformSignals: jest.fn() }))
@@ -18,25 +18,22 @@ describe('Gmail ambient plugin', () => {
 
   it('persists only a minimal aggregate inbox observation for the Twin', async () => {
     ;(findGoogleAccountForScopes as jest.Mock).mockResolvedValue({ id: 'google-grant' })
-    ;(gmailService.listUnreadForUser as jest.Mock).mockResolvedValue([
-      { id: 'mail-1', subject: 'Private subject', from: 'private@example.test' },
-      { id: 'mail-2', subject: 'Another private subject', from: 'another@example.test' },
-    ])
+    ;(gmailService.getUnreadCountForUser as jest.Mock).mockResolvedValue(53)
 
-    await expect(syncGmailPlugin('user-1')).resolves.toMatchObject({ unreadCount: 2, signalsEmitted: 1 })
+    await expect(syncGmailPlugin('user-1')).resolves.toMatchObject({ unreadCount: 53, unreadCountIsEstimate: true, signalsEmitted: 1 })
     expect(upsertNovoSignals).toHaveBeenCalledWith('user-1', [expect.objectContaining({
       source: 'gmail',
       sourceRef: 'inbox',
       signalType: 'unread_observed',
-      label: 'Gmail inbox observed: 2 unread messages',
+      label: 'Gmail inbox observed: about 53 unread messages',
       reliability: 'direct',
     })])
-    expect(JSON.stringify((upsertNovoSignals as jest.Mock).mock.calls[0][1])).not.toContain('Private subject')
+    expect(JSON.stringify((upsertNovoSignals as jest.Mock).mock.calls[0][1])).not.toContain('subject')
   })
 
   it('marks an expired or under-scoped Google grant for reauthorization', async () => {
     ;(findGoogleAccountForScopes as jest.Mock).mockResolvedValue({ id: 'google-grant' })
-    ;(gmailService.listUnreadForUser as jest.Mock).mockRejectedValue(new Error('insufficient permissions'))
+    ;(gmailService.getUnreadCountForUser as jest.Mock).mockRejectedValue(new Error('insufficient permissions'))
     ;(isGmailReauthorizationError as jest.Mock).mockReturnValue(true)
 
     await expect(syncGmailPlugin('user-1')).resolves.toMatchObject({ error: 'reauthorization_required', signalsEmitted: 0 })

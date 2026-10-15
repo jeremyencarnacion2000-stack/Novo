@@ -12,8 +12,8 @@ export function evaluateGmailThresholds(unreadCount: number): PlatformSignal[] {
   if (unreadCount > UNREAD_OVERLOAD_THRESHOLD) {
     return [{
       type: 'gmail_inbox_overload',
-      headline: `${unreadCount} correos sin leer`,
-      detail: 'Tu bandeja de entrada está sobrecargada — considera un bloque dedicado para procesarla.',
+      headline: `Aprox. ${unreadCount} correos sin leer`,
+      detail: 'Google estima esta cantidad; considera reservar un bloque para procesar la bandeja.',
       severity: 'warning',
     }];
   }

@@ -237,8 +237,8 @@ export async function GET(req: NextRequest) {
       try {
         const googleAccount = await findGoogleAccountForScopes(userId, ['gmail.readonly']);
         if (googleAccount) {
-          const unread = await gmailService.listUnreadForUser(userId, 50);
-          const gmailThresholdSignals = evaluateGmailThresholds(unread.length);
+          const unreadCount = await gmailService.getUnreadCountForUser(userId);
+          const gmailThresholdSignals = evaluateGmailThresholds(unreadCount);
           await persistNewPlatformSignals(twinRecord.id, userId, gmailThresholdSignals);
         }
       } catch {

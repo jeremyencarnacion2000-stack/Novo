@@ -4,7 +4,8 @@ import { findGoogleAccountForScopes } from '@/lib/google-account'
 import { isGmailReauthorizationError } from '@/lib/ai/gmail-context'
 
 export interface GmailSyncResult {
-  unreadCount: number
+  unreadCount?: number
+  unreadCountIsEstimate?: boolean
   signalsEmitted: number
   error?: 'not_connected' | 'unavailable' | 'reauthorization_required'
 }
@@ -16,24 +17,23 @@ export interface GmailSyncResult {
  */
 export async function syncGmailPlugin(userId: string, options: { signal?: AbortSignal } = {}): Promise<GmailSyncResult> {
   const account = await findGoogleAccountForScopes(userId, ['gmail.readonly'])
-  if (!account) return { unreadCount: 0, signalsEmitted: 0, error: 'not_connected' }
+  if (!account) return { signalsEmitted: 0, error: 'not_connected' }
 
   try {
-    const unread = await gmailService.listUnreadForUser(userId, 50, options.signal)
+    const unreadCount = await gmailService.getUnreadCountForUser(userId, options.signal)
     const now = new Date()
     await upsertNovoSignals(userId, [{
       source: 'gmail',
       sourceRef: 'inbox',
       signalType: 'unread_observed',
-      label: `Gmail inbox observed: ${unread.length} unread messages`,
+      label: `Gmail inbox observed: about ${unreadCount} unread messages`,
       observedAt: now,
       reliability: 'direct',
     }])
 
-    return { unreadCount: unread.length, signalsEmitted: 1 }
+    return { unreadCount, unreadCountIsEstimate: true, signalsEmitted: 1 }
   } catch (error) {
     return {
-      unreadCount: 0,
       signalsEmitted: 0,
       error: isGmailReauthorizationError(error) ? 'reauthorization_required' : 'unavailable',
     }

@@ -10,7 +10,7 @@ describe('evaluateGmailThresholds', () => {
     const signals = evaluateGmailThresholds(47)
     expect(signals).toHaveLength(1)
     expect(signals[0].type).toBe('gmail_inbox_overload')
-    expect(signals[0].headline).toContain('47')
+    expect(signals[0].headline).toBe('Aprox. 47 correos sin leer')
     expect(signals[0].severity).toBe('warning')
   })
 })

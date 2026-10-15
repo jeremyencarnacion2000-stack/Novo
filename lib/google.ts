@@ -110,21 +110,45 @@ export const gmailService = {
 
     listUnread: async (maxResults = 5) => {
         const auth = await getGoogleAuthClient(['gmail.readonly']);
-        return listUnreadWithAuth(auth, maxResults);
+        return listMessagesWithAuth(auth, maxResults, 'is:unread');
     },
 
     /** Read a user's mailbox from their persisted OAuth grant, never a browser session. */
     listUnreadForUser: async (userId: string, maxResults = 5, signal?: AbortSignal) => {
         const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
-        return listUnreadWithAuth(auth, maxResults, signal);
+        return listMessagesWithAuth(auth, maxResults, 'is:unread', signal);
+    },
+
+    /** Recent inbox headers for chat questions about recent or important email. */
+    listRecentForUser: async (userId: string, maxResults = 8, signal?: AbortSignal) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        return listMessagesWithAuth(auth, maxResults, 'in:inbox newer_than:30d', signal);
+    },
+
+    /** Google-provided estimate used for Twin summaries; does not fetch message headers. */
+    getUnreadCountForUser: async (userId: string, signal?: AbortSignal) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.messages.list({
+            userId: 'me',
+            q: 'is:unread',
+            maxResults: 1,
+        }, { signal });
+        return Math.max(0, Math.trunc(res.data.resultSizeEstimate ?? 0));
+    },
+
+    /** Validates the stored grant with a metadata-free, read-only Gmail request. */
+    checkAccessForUser: async (userId: string) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        await gmail.users.messages.list({ userId: 'me', maxResults: 1 });
     },
 };
 
-async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, maxResults: number, signal?: AbortSignal) {
+async function listMessagesWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, maxResults: number, query: string, signal?: AbortSignal) {
         const gmail = google.gmail({ version: 'v1', auth });
-        // Novo only needs a compact inbox signal (subject, sender and the
-        // provider snippet). Never fetch full message bodies for context or
-        // background sync, and cap the provider request to keep latency and
+        // Novo only needs compact message metadata. Never fetch full message
+        // bodies for context, and cap the provider request to keep latency and
         // prompt size bounded even if a caller passes an unexpected value.
         const boundedMaxResults = Number.isFinite(maxResults)
             ? Math.min(Math.max(Math.trunc(maxResults), 1), 50)
@@ -132,7 +156,7 @@ async function listUnreadWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthC
 
         const res = await gmail.users.messages.list({
             userId: 'me',
-            q: 'is:unread',
+            q: query,
             maxResults: boundedMaxResults,
         }, { signal });
 
