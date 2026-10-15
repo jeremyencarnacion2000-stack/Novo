@@ -153,6 +153,13 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
     const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
     const [voiceState, setVoiceState] = React.useState<'idle' | 'listening' | 'speaking' | 'thinking' | 'connecting' | 'error'>('idle');
     const [voiceStream, setVoiceStream] = React.useState<MediaStream | null>(null);
+    const isAssistantProcessing = isLoading || voiceState === 'thinking';
+    // The published 0.3.0 types omit the docs' `processing` prop, so use its
+    // per-frame level getter to keep a subtle traveling wave while Novo works.
+    const processingBeamLevel = React.useCallback(
+        () => isAssistantProcessing ? 0.36 + Math.sin(performance.now() / 520) * 0.08 : 0,
+        [isAssistantProcessing],
+    );
 
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -328,7 +335,8 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         className="block w-full"
                         type="default"
                         stream={voiceStream ?? undefined}
-                        processing={isLoading || voiceState === 'thinking'}
+                        level={processingBeamLevel}
+                        active={Boolean(voiceStream) || isAssistantProcessing}
                         colorVariant="colorful"
                         theme="auto"
                     >
