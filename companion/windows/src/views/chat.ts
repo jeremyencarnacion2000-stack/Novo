@@ -330,7 +330,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       const message=kind==="unavailable"?t(N_("Speech recognition is not available on this device.")):kind==="permission"?t(N_("Microphone access was denied. Allow it in your device settings.")):kind==="no-speech"?t(N_("No speech was detected. Try again.")):t(N_("Voice dictation failed. Try again."));
       voiceStatus.textContent=t(message);voiceStatus.hidden=false;voiceStatus.dataset.error='true';onHeightChange();
     },
-  });
+  }, undefined, "es-BO");
   const controller=new NovoChatController({...Bridge,contextSearch:async query=>{
     const context=await Bridge.contextSearch(query);
     if(State.settings.novoLocalConnections){
