@@ -185,6 +185,11 @@ function emitVoiceState(state: 'listening' | 'thinking' | 'idle') {
   window.dispatchEvent(new CustomEvent('gemini-live-state-change', { detail: { state } }))
 }
 
+function emitVoiceStream(stream: MediaStream | null) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('novo:voice-stream-change', { detail: { stream } }))
+}
+
 export function VoiceCommandHub({ compact = false, className = '', headless = false }: VoiceCommandHubProps) {
   const { bioState } = useCognitiveEngine()
 
@@ -212,6 +217,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       setLastResult(null)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+      emitVoiceStream(stream)
 
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
       chunksRef.current = []
@@ -222,6 +228,8 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
 
       recorder.onstop = async () => {
         streamRef.current?.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+        emitVoiceStream(null)
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
 
         if (blob.size < 1000) {
@@ -307,6 +315,9 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       setRecording(true)
       emitVoiceState('listening')
     } catch (err: any) {
+      streamRef.current?.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+      emitVoiceStream(null)
       setError(err?.message ?? 'Microphone access denied.')
       emitVoiceState('idle')
     }
