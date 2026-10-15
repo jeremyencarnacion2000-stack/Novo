@@ -2810,6 +2810,9 @@
   .grid-cols-\[82px_1fr\] {
     grid-template-columns: 82px 1fr;
   }
+  .grid-cols-\[auto_1fr\] {
+    grid-template-columns: auto 1fr;
+  }
   .grid-rows-7 {
     grid-template-rows: repeat(7, minmax(0, 1fr));
   }
@@ -3036,6 +3039,9 @@
   }
   .gap-x-2 {
     column-gap: calc(var(--spacing) * 2);
+  }
+  .gap-x-3 {
+    column-gap: calc(var(--spacing) * 3);
   }
   .gap-x-4 {
     column-gap: calc(var(--spacing) * 4);

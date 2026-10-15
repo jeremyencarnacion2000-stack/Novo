@@ -1027,7 +1027,7 @@ model NovoSignalLedger {
   id              String   @id @default(cuid())
   userId          String
   fingerprint     String
-  source          String   // checkin|goal|task|calendar|outcome
+  source          String   // checkin|goal|task|calendar|outcome|device|integration|codex
   sourceRef       String?
   signalType      String
   label           String

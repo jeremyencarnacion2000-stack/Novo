@@ -6,6 +6,7 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     integrationAccount: { findUnique: jest.fn() },
     novoSignalSourcePreference: { findMany: jest.fn() },
+    novoSignalLedger: { findFirst: jest.fn() },
   },
 }))
 jest.mock('@/lib/mcp/auth', () => ({ validateMcpBearerToken: jest.fn() }))
@@ -47,6 +48,7 @@ describe('GET /api/companion/developer-context', () => {
       return Promise.resolve({ accessToken: 'encrypted-vercel-secret', metadata: { teamId: 'team_1', projects: [{ id: 'prj_1', name: 'novo-web' }], selectedProjectIds: ['prj_1'] } })
     })
     ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([])
+    ;(prisma.novoSignalLedger.findFirst as jest.Mock).mockResolvedValue({ label: 'Tarea de Codex · novo-web: Fix the Twin context bridge', observedAt: new Date('2026-10-14T10:00:00.000Z') })
     ;(fetchGitHubDeveloperContext as jest.Mock).mockResolvedValue([{ repository: 'acme/private-app', openPullRequests: 1, requestedReviewers: 1, latestReviewState: 'approved', ci: { passed: 1, failed: 0, pending: 0 } }])
     ;(fetchVercelDeployments as jest.Mock).mockResolvedValue([{ id: 'dep_1', projectId: 'prj_1', projectName: 'novo-web', state: 'READY', createdAt: '2026-10-08T10:00:00Z', url: 'https://novo-web.example' }])
   })
@@ -70,6 +72,7 @@ describe('GET /api/companion/developer-context', () => {
     expect(result.status).toBe(200)
     expect(body.github.repositories[0]).toMatchObject({ repository: 'acme/private-app', latestReviewState: 'approved' })
     expect(body.vercel.deployments[0]).toMatchObject({ id: 'dep_1', state: 'READY' })
+    expect(body.codex).toMatchObject({ connected: true, sourceExcluded: false, latestSignal: { label: 'Tarea de Codex · novo-web: Fix the Twin context bridge' } })
     expect(JSON.stringify(body)).not.toMatch(/github-secret|encrypted-vercel-secret|vercel-token/)
     expect(prisma.integrationAccount.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId_provider: { userId: 'owner-1', provider: 'github' } } }))
     expect(decryptIntegrationCredential).toHaveBeenCalledWith('encrypted-vercel-secret', { userId: 'owner-1', provider: 'vercel' })
@@ -100,14 +103,16 @@ describe('GET /api/companion/developer-context', () => {
   })
 
   it('does not contact a provider whose signal source the owner excluded', async () => {
-    ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{ source: 'github' }])
+    ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{ source: 'github' }, { source: 'codex' }])
 
     const result = await GET(request('device-token') as never)
     const body = await result.json()
 
     expect(result.status).toBe(200)
     expect(body.github).toEqual({ connected: true, sourceExcluded: true, repositories: [] })
+    expect(body.codex).toEqual({ connected: false, sourceExcluded: true, latestSignal: null })
     expect(fetchGitHubDeveloperContext).not.toHaveBeenCalled()
+    expect(prisma.novoSignalLedger.findFirst).not.toHaveBeenCalled()
   })
 
   it('rejects a revoked companion before reading credentials or contacting providers', async () => {

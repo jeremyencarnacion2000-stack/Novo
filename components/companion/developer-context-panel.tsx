@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Github, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react'
+import { Code2, ExternalLink, Github, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
 type Project = { id: string; name: string; selected?: boolean }
@@ -15,68 +15,74 @@ type GithubRepo = {
   ci: { passed: number; failed: number; pending: number }
 }
 type Deployment = { id: string; projectId: string; projectName: string; state: string; createdAt: string; url: string | null }
+type CodexContext = { connected: boolean; sourceExcluded: boolean; latestSignal: { label: string; observedAt: string } | null }
 type DeveloperContext = {
   github: { connected: boolean; sourceExcluded: boolean; repositories: GithubRepo[]; error?: string }
   vercel: { connected: boolean; sourceExcluded: boolean; projects: Project[]; deployments: Deployment[]; error?: string }
+  codex: CodexContext
 }
 type Locale = 'es' | 'en' | 'fr' | 'de'
 
 const COPY: Record<Locale, Record<string, string>> = {
   es: {
-    title: 'Fuentes de desarrollo', description: 'Consulta resúmenes de GitHub y despliegues Vercel. No se descargan diffs, mensajes de commits ni títulos de PR.',
+    title: 'Fuentes de desarrollo', description: 'Consulta resúmenes de GitHub y despliegues Vercel, además del estado breve de Codex en este PC.',
     loading: 'Cargando fuentes autorizadas…', refresh: 'Actualizar contexto', github: 'GitHub', vercel: 'Vercel', connectGithub: 'Conectar GitHub',
     notConnected: 'No hay una conexión disponible para esta cuenta.', excluded: 'Fuente excluida: Novo no la consulta ni la muestra.', noRepos: 'No hay repositorios recientes disponibles.', noDeployments: 'Selecciona proyectos para ver su estado de despliegue.',
     excludeSource: 'Excluir fuente', restoreSource: 'Restaurar fuente',
     prs: 'PR abiertos', requested: 'revisiones solicitadas', review: 'última revisión', checks: 'CI', passed: 'correctos', failed: 'fallidos', pending: 'pendientes',
     connectHeading: 'Conecta tu cuenta', token: 'Token personal de Vercel', team: 'ID de equipo (opcional)', connectVercel: 'Conectar Vercel', disconnect: 'Desconectar',
     selectProjects: 'Proyectos que Novo puede consultar', saveSelection: 'Guardar selección', saving: 'Guardando…', selected: 'seleccionado',
-    preview: 'Previsualizar contexto', privacy: 'La vista previa solo contiene nombres de repositorios/proyectos, contadores de PR, estado resumido de revisión/CI y estado de despliegue.',
+    preview: 'Previsualizar contexto', privacy: 'Codex comparte solo el nombre del proyecto y un resumen breve de tarea/resultado. Conversaciones completas, código, rutas y salidas de herramientas permanecen en tu PC.',
     previewTitle: 'Vista previa para el Twin', emptyPreview: 'No hay contexto disponible de fuentes conectadas.', copy: 'Copiar contexto y pedir propuesta', copied: 'Petición copiada', proposalPrompt: 'Propón tres próximos pasos; no ejecutes cambios.', openTwin: 'Abrir el Twin', close: 'Cerrar', retry: 'Intentar de nuevo',
     authRequired: 'La conexión necesita autorización de nuevo.', permission: 'El token no tiene permiso de lectura suficiente.', rateLimit: 'El proveedor limitó las consultas temporalmente.', unavailable: 'La fuente no está disponible ahora.', requestFailed: 'No se pudo completar la solicitud.',
     reviewApproved: 'aprobada', reviewChanges: 'cambios solicitados', reviewCommented: 'comentarios', reviewPending: 'pendiente', reviewNone: 'sin actividad reciente',
     sourceReadOnly: 'Lectura únicamente; el Companion no fusiona cambios ni despliega.',
+    codex: 'Codex en este PC', codexWaiting: 'Los hooks están instalados, pero Codex aún no los ha aprobado o no se ha iniciado una sesión nueva.', codexConnected: 'Novo ya recibe contexto breve de Codex desde Companion.', codexEmpty: 'Todavía no llegó una tarea de Codex.',
   },
   en: {
-    title: 'Development sources', description: 'Review GitHub summaries and Vercel deployments. Diffs, commit messages, and PR titles are not fetched.',
+    title: 'Development sources', description: 'Review GitHub and Vercel summaries alongside the brief Codex status from this PC.',
     loading: 'Loading authorised sources…', refresh: 'Refresh context', github: 'GitHub', vercel: 'Vercel', connectGithub: 'Connect GitHub',
     notConnected: 'No connection is available for this account.', excluded: 'Source excluded: Novo will not query or display it.', noRepos: 'No recent repositories are available.', noDeployments: 'Select projects to view deployment status.',
     excludeSource: 'Exclude source', restoreSource: 'Restore source',
     prs: 'Open PRs', requested: 'review requests', review: 'latest review', checks: 'CI', passed: 'passed', failed: 'failed', pending: 'pending',
     connectHeading: 'Connect your account', token: 'Vercel personal token', team: 'Team ID (optional)', connectVercel: 'Connect Vercel', disconnect: 'Disconnect',
     selectProjects: 'Projects Novo can read', saveSelection: 'Save selection', saving: 'Saving…', selected: 'selected',
-    preview: 'Preview context', privacy: 'The preview contains only repository/project names, PR counts, review/CI status counts, and deployment state.',
+    preview: 'Preview context', privacy: 'Codex shares only the project name and a brief task/result summary. Full conversations, code, paths, and tool output stay on your PC.',
     previewTitle: 'Twin context preview', emptyPreview: 'No context is available from connected sources.', copy: 'Copy context and request a proposal', copied: 'Request copied', proposalPrompt: 'Suggest three next steps; do not execute changes.', openTwin: 'Open the Twin', close: 'Close', retry: 'Try again',
     authRequired: 'The connection needs authorisation again.', permission: 'The token does not have sufficient read permission.', rateLimit: 'The provider temporarily limited requests.', unavailable: 'The source is unavailable right now.', requestFailed: 'The request could not be completed.',
     reviewApproved: 'approved', reviewChanges: 'changes requested', reviewCommented: 'commented', reviewPending: 'pending', reviewNone: 'no recent review',
     sourceReadOnly: 'Read-only; the Companion does not merge changes or deploy.',
+    codex: 'Codex on this PC', codexWaiting: 'The hooks are installed, but Codex has not approved them or started a new session yet.', codexConnected: 'Novo is receiving brief Codex context from the Companion.', codexEmpty: 'No Codex task has arrived yet.',
   },
   fr: {
-    title: 'Sources de développement', description: 'Consultez les résumés GitHub et les déploiements Vercel. Aucun diff, message de commit ou titre de PR n’est récupéré.',
+    title: 'Sources de développement', description: 'Consultez les résumés GitHub et Vercel ainsi que le bref état de Codex sur ce PC.',
     loading: 'Chargement des sources autorisées…', refresh: 'Actualiser le contexte', github: 'GitHub', vercel: 'Vercel', connectGithub: 'Connecter GitHub',
     notConnected: 'Aucune connexion n’est disponible pour ce compte.', excluded: 'Source exclue : Novo ne la consulte ni ne l’affiche.', noRepos: 'Aucun dépôt récent disponible.', noDeployments: 'Sélectionnez des projets pour voir leur état de déploiement.',
     excludeSource: 'Exclure la source', restoreSource: 'Restaurer la source',
     prs: 'PR ouvertes', requested: 'demandes de revue', review: 'dernière revue', checks: 'CI', passed: 'réussies', failed: 'échouées', pending: 'en attente',
     connectHeading: 'Connectez votre compte', token: 'Jeton personnel Vercel', team: 'ID d’équipe (facultatif)', connectVercel: 'Connecter Vercel', disconnect: 'Déconnecter',
     selectProjects: 'Projets que Novo peut consulter', saveSelection: 'Enregistrer la sélection', saving: 'Enregistrement…', selected: 'sélectionné',
-    preview: 'Prévisualiser le contexte', privacy: 'L’aperçu contient uniquement les noms, les compteurs de PR, l’état résumé des revues/CI et l’état des déploiements.',
+    preview: 'Prévisualiser le contexte', privacy: 'Codex partage uniquement le nom du projet et un bref résumé de tâche/résultat. Les conversations, le code, les chemins et les sorties d’outils restent sur ce PC.',
     previewTitle: 'Aperçu du contexte du Jumeau', emptyPreview: 'Aucun contexte de source connectée disponible.', copy: 'Copier le contexte et demander une proposition', copied: 'Demande copiée', proposalPrompt: 'Propose trois prochaines étapes ; n’exécute aucun changement.', openTwin: 'Ouvrir le Jumeau', close: 'Fermer', retry: 'Réessayer',
     authRequired: 'La connexion doit être autorisée à nouveau.', permission: 'Le jeton ne dispose pas des permissions de lecture suffisantes.', rateLimit: 'Le fournisseur limite temporairement les requêtes.', unavailable: 'La source est indisponible pour le moment.', requestFailed: 'La requête n’a pas abouti.',
     reviewApproved: 'approuvée', reviewChanges: 'changements demandés', reviewCommented: 'commentée', reviewPending: 'en attente', reviewNone: 'aucune revue récente',
     sourceReadOnly: 'Lecture seule ; le Compagnon ne fusionne ni ne redéploie.',
+    codex: 'Codex sur ce PC', codexWaiting: 'Les hooks sont installés, mais Codex ne les a pas encore approuvés ou n’a pas démarré de nouvelle session.', codexConnected: 'Novo reçoit déjà un bref contexte Codex du Compagnon.', codexEmpty: 'Aucune tâche Codex n’est encore arrivée.',
   },
   de: {
-    title: 'Entwicklungsquellen', description: 'GitHub-Zusammenfassungen und Vercel-Deployments ansehen. Diffs, Commit-Nachrichten und PR-Titel werden nicht abgerufen.',
+    title: 'Entwicklungsquellen', description: 'GitHub- und Vercel-Zusammenfassungen sowie den kurzen Codex-Status dieses PCs ansehen.',
     loading: 'Autorisierte Quellen werden geladen…', refresh: 'Kontext aktualisieren', github: 'GitHub', vercel: 'Vercel', connectGithub: 'GitHub verbinden',
     notConnected: 'Für dieses Konto ist keine Verbindung verfügbar.', excluded: 'Quelle ausgeschlossen: Novo fragt sie nicht ab und zeigt sie nicht an.', noRepos: 'Keine aktuellen Repositories verfügbar.', noDeployments: 'Projekte auswählen, um den Deployment-Status zu sehen.',
     excludeSource: 'Quelle ausschließen', restoreSource: 'Quelle wiederherstellen',
     prs: 'Offene PRs', requested: 'Review-Anfragen', review: 'letztes Review', checks: 'CI', passed: 'erfolgreich', failed: 'fehlgeschlagen', pending: 'ausstehend',
     connectHeading: 'Konto verbinden', token: 'Persönlicher Vercel-Token', team: 'Team-ID (optional)', connectVercel: 'Vercel verbinden', disconnect: 'Trennen',
     selectProjects: 'Projekte, die Novo lesen darf', saveSelection: 'Auswahl speichern', saving: 'Speichern…', selected: 'ausgewählt',
-    preview: 'Kontextvorschau', privacy: 'Die Vorschau enthält nur Repository-/Projektnamen, PR-Zahlen, Review-/CI-Status und Deployment-Status.',
+    preview: 'Kontextvorschau', privacy: 'Codex teilt nur den Projektnamen und eine kurze Aufgaben-/Ergebniszusammenfassung. Gespräche, Code, Pfade und Werkzeugausgaben bleiben auf deinem PC.',
     previewTitle: 'Twin-Kontextvorschau', emptyPreview: 'Kein Kontext verbundener Quellen verfügbar.', copy: 'Kontext kopieren und Vorschlag anfordern', copied: 'Anfrage kopiert', proposalPrompt: 'Schlage drei nächste Schritte vor; führe keine Änderungen aus.', openTwin: 'Twin öffnen', close: 'Schließen', retry: 'Erneut versuchen',
     authRequired: 'Die Verbindung muss erneut autorisiert werden.', permission: 'Der Token hat nicht genügend Leseberechtigungen.', rateLimit: 'Der Anbieter begrenzt Anfragen vorübergehend.', unavailable: 'Die Quelle ist derzeit nicht verfügbar.', requestFailed: 'Die Anfrage konnte nicht abgeschlossen werden.',
     reviewApproved: 'genehmigt', reviewChanges: 'Änderungen angefordert', reviewCommented: 'kommentiert', reviewPending: 'ausstehend', reviewNone: 'keine aktuelle Review',
     sourceReadOnly: 'Nur lesend; der Companion führt keine Merges oder Deployments aus.',
+    codex: 'Codex auf diesem PC', codexWaiting: 'Die Hooks sind installiert, aber Codex hat sie noch nicht bestätigt oder eine neue Sitzung gestartet.', codexConnected: 'Novo erhält bereits kurze Codex-Kontexte vom Companion.', codexEmpty: 'Noch keine Codex-Aufgabe eingegangen.',
   },
 }
 
@@ -111,7 +117,7 @@ export function DeveloperContextPanel() {
       ])
       if (!connectionResponse.ok || !contextResponse.ok) throw new Error('request_failed')
       const [connectionPayload, contextPayload] = await Promise.all([connectionResponse.json(), contextResponse.json()]) as [VercelConnection, DeveloperContext]
-      if (!Array.isArray(connectionPayload.projects) || !contextPayload.github || !contextPayload.vercel) throw new Error('invalid_response')
+      if (!Array.isArray(connectionPayload.projects) || !contextPayload.github || !contextPayload.vercel || !contextPayload.codex) throw new Error('invalid_response')
       setConnection(connectionPayload)
       setSelectedProjectIds(connectionPayload.selectedProjectIds ?? [])
       setContext(contextPayload)
@@ -135,6 +141,9 @@ export function DeveloperContextPanel() {
     }
     for (const deployment of context?.vercel.deployments ?? []) {
       lines.push(`Vercel ${deployment.projectName}: despliegue ${deployment.state}.`)
+    }
+    if (context?.codex.connected && !context.codex.sourceExcluded && context.codex.latestSignal?.label) {
+      lines.push(context.codex.latestSignal.label)
     }
     return lines.join('\n')
   }, [context])
@@ -202,9 +211,9 @@ export function DeveloperContextPanel() {
     }
   }
 
-  async function toggleSource(source: 'github' | 'vercel') {
+  async function toggleSource(source: 'github' | 'vercel' | 'codex') {
     const entry = context?.[source]
-    if (!entry?.connected) return
+    if (!entry || (source !== 'codex' && !entry.connected)) return
     const excluded = entry.sourceExcluded
     setBusy(true)
     setError(null)
@@ -217,7 +226,8 @@ export function DeveloperContextPanel() {
       setContext((current) => {
         if (!current) return current
         if (source === 'github') return { ...current, github: { ...current.github, sourceExcluded: !excluded, repositories: excluded ? current.github.repositories : [] } }
-        return { ...current, vercel: { ...current.vercel, sourceExcluded: !excluded, deployments: excluded ? current.vercel.deployments : [] } }
+        if (source === 'vercel') return { ...current, vercel: { ...current.vercel, sourceExcluded: !excluded, deployments: excluded ? current.vercel.deployments : [] } }
+        return { ...current, codex: { ...current.codex, sourceExcluded: !excluded, latestSignal: excluded ? current.codex.latestSignal : null } }
       })
       if (excluded) await load()
     } catch {
@@ -278,6 +288,17 @@ export function DeveloperContextPanel() {
               {context?.vercel.error && <p className="mt-3 text-xs text-amber-200">{safeProviderError(context.vercel.error, copy)}</p>}
               {context?.vercel.sourceExcluded ? <p className="mt-3 text-xs text-foreground/45">{copy.excluded}</p> : context?.vercel.deployments.length ? <ul className="mt-3 divide-y divide-foreground/[0.06]">{context.vercel.deployments.map((deployment) => <li key={deployment.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="text-foreground/65">{deployment.projectName}</span><span className="flex items-center gap-2 font-medium text-foreground/75">{deployment.state}{deployment.url && <a href={deployment.url} target="_blank" rel="noreferrer" aria-label={`${copy.vercel} ${deployment.projectName}`} className="text-primary"><ExternalLink className="size-3.5" /></a>}</span></li>)}</ul> : <p className="mt-3 text-xs text-foreground/45">{copy.noDeployments}</p>}
             </>}
+        </article>
+
+        <article className="rounded-2xl border border-foreground/[0.07] bg-background/20 p-4">
+          <div className="flex items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-sm font-semibold text-foreground/80"><Code2 className="size-4" />{copy.codex}</h3>{context?.codex.connected && !context.codex.sourceExcluded && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/[0.08] px-2 py-1 text-[10px] text-emerald-400"><ShieldCheck className="size-3" />{copy.sourceReadOnly}</span>}</div>
+          {context?.codex.sourceExcluded
+            ? <div className="mt-4"><p className="text-xs leading-5 text-foreground/45">{copy.excluded}</p><button type="button" onClick={() => void toggleSource('codex')} disabled={busy} className="mt-3 min-h-9 rounded-full border border-foreground/10 px-3 text-[11px] text-foreground/55 disabled:opacity-50">{copy.restoreSource} {copy.codex}</button></div>
+            : <div className="mt-4"><p className="text-xs leading-5 text-foreground/50">{context?.codex.connected ? copy.codexConnected : copy.codexWaiting}</p>{context?.codex.connected && context.codex.latestSignal
+              ? <p className="mt-3 rounded-xl border border-foreground/[0.06] bg-foreground/[0.025] p-3 text-xs leading-5 text-foreground/70">{context.codex.latestSignal.label}</p>
+              : <p className="mt-3 text-[11px] text-foreground/40">{copy.codexEmpty}</p>}
+              <button type="button" onClick={() => void toggleSource('codex')} disabled={busy} className="mt-3 min-h-9 rounded-full border border-foreground/10 px-3 text-[11px] text-foreground/55 disabled:opacity-50">{copy.excludeSource} {copy.codex}</button>
+            </div>}
         </article>
       </div>}
 

@@ -2,6 +2,36 @@
 import '@testing-library/jest-dom';
 import fetch from 'node-fetch';
 
+// voice-glow reads the user's color-scheme preference when its wrapper mounts.
+// JSDOM does not provide matchMedia, so mirror the browser API in unit tests.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: jest.fn().mockImplementation((media: string) => ({
+      matches: false,
+      media,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+}
+
+// JSDOM has no canvas implementation; the voice beam treats a null 2D
+// context as unsupported, so return that directly instead of logging JSDOM's
+// "not implemented" warning during unrelated chat tests.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    writable: true,
+    value: jest.fn().mockReturnValue(null),
+  });
+}
+
 // Jest's jsdom environment does not consistently expose the platform fetch
 // constructors, so keep this compatibility shim scoped to the dev-only test
 // setup. The application bundle still uses the native Next/Node fetch.
