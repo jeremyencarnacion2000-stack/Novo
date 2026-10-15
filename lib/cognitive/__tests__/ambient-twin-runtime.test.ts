@@ -96,3 +96,20 @@ it('does not let derived ambient bookkeeping change its own context fingerprint'
   expect(first.contextFingerprint).toBe(second.contextFingerprint)
   expect(first.sources).toContain('gmail')
 })
+
+it('does not let an excluded Codex source influence the ambient Twin fingerprint', async () => {
+  const { prisma } = jest.requireMock('@/lib/prisma') as { prisma: Record<string, Record<string, jest.Mock>> }
+  const gmailSignal = { id: 'gmail-1', source: 'gmail', signalType: 'unread_observed', label: '2 unread', observedAt: new Date() }
+  const codexSignal = { id: 'codex-1', source: 'codex', signalType: 'codex_task', label: 'Private Codex task', observedAt: new Date() }
+  prisma.novoSignalSourcePreference.findMany.mockResolvedValue([{ source: 'codex', excludedAt: new Date() }])
+  prisma.novoSignalLedger.findMany.mockResolvedValue([gmailSignal, codexSignal])
+
+  const excluded = await readAmbientTwinState('user-1')
+
+  prisma.novoSignalSourcePreference.findMany.mockResolvedValue([])
+  prisma.novoSignalLedger.findMany.mockResolvedValue([gmailSignal])
+  const withoutCodex = await readAmbientTwinState('user-1')
+
+  expect(excluded.sources).not.toContain('codex')
+  expect(excluded.contextFingerprint).toBe(withoutCodex.contextFingerprint)
+})

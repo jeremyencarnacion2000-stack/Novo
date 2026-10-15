@@ -29,6 +29,7 @@ export type BotStateName =
   | "idle"
   | "working"
   | "thinking"
+  | "listening"
   | "searching"
   | "approval"
   | "question"
@@ -180,6 +181,8 @@ export function botGlowColor(s: BotStateName): string {
     case "error":
       return "#F4505E";
     case "finished":
+      return "#34D399";
+    case "listening":
       return "#34D399";
     case "ratelimit":
       return "#F59E0B";

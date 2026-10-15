@@ -3394,6 +3394,94 @@
    "pt-BR": "Configurações do Novo…",
    "ru": "Настройки Novo…",
    "id": "Pengaturan Novo…"
+  },
+  "Start dictation": {
+   "zh-Hans": "开始听写",
+   "hi": "डिक्टेशन शुरू करें",
+   "es": "Empezar dictado",
+   "ar": "بدء الإملاء",
+   "fr": "Commencer la dictée",
+   "bn": "ডিক্টেশন শুরু করুন",
+   "pt-BR": "Iniciar ditado",
+   "ru": "Начать диктовку",
+   "id": "Mulai dikte"
+  },
+  "Stop dictation": {
+   "zh-Hans": "停止听写",
+   "hi": "डिक्टेशन रोकें",
+   "es": "Detener dictado",
+   "ar": "إيقاف الإملاء",
+   "fr": "Arrêter la dictée",
+   "bn": "ডিক্টেশন বন্ধ করুন",
+   "pt-BR": "Parar ditado",
+   "ru": "Остановить диктовку",
+   "id": "Hentikan dikte"
+  },
+  "Listening… press the microphone button again to stop": {
+   "zh-Hans": "正在聆听…再次按下麦克风按钮即可停止",
+   "hi": "सुन रहा है… रोकने के लिए माइक्रोफ़ोन बटन फिर दबाएँ",
+   "es": "Escuchando… pulsa otra vez el botón del micrófono para detener",
+   "ar": "جارٍ الاستماع… اضغط زر الميكروفون مجددًا للإيقاف",
+   "fr": "Écoute en cours… appuyez à nouveau sur le bouton du micro pour arrêter",
+   "bn": "শুনছি… থামাতে মাইক্রোফোন বোতামে আবার চাপুন",
+   "pt-BR": "Ouvindo… pressione o botão do microfone novamente para parar",
+   "ru": "Слушаю… нажмите кнопку микрофона ещё раз, чтобы остановить",
+   "id": "Mendengarkan… tekan tombol mikrofon lagi untuk berhenti"
+  },
+  "Speech recognition is not available on this device.": {
+   "zh-Hans": "此设备不支持语音识别。",
+   "hi": "इस डिवाइस पर वाक् पहचान उपलब्ध नहीं है।",
+   "es": "El reconocimiento de voz no está disponible en este dispositivo.",
+   "ar": "التعرّف على الكلام غير متاح على هذا الجهاز.",
+   "fr": "La reconnaissance vocale n’est pas disponible sur cet appareil.",
+   "bn": "এই ডিভাইসে বক্তৃতা শনাক্তকরণ উপলভ্য নয়।",
+   "pt-BR": "O reconhecimento de fala não está disponível neste dispositivo.",
+   "ru": "Распознавание речи недоступно на этом устройстве.",
+   "id": "Pengenalan suara tidak tersedia di perangkat ini."
+  },
+  "Microphone access was denied. Allow it in your device settings.": {
+   "zh-Hans": "麦克风访问被拒绝。请在设备设置中允许访问。",
+   "hi": "माइक्रोफ़ोन की अनुमति नहीं मिली। डिवाइस सेटिंग में इसे अनुमति दें।",
+   "es": "Se denegó el acceso al micrófono. Permítelo en la configuración del dispositivo.",
+   "ar": "تم رفض الوصول إلى الميكروفون. اسمح به من إعدادات الجهاز.",
+   "fr": "L’accès au micro a été refusé. Autorisez-le dans les réglages de l’appareil.",
+   "bn": "মাইক্রোফোনে প্রবেশাধিকার দেওয়া হয়নি। ডিভাইস সেটিংসে অনুমতি দিন।",
+   "pt-BR": "O acesso ao microfone foi negado. Permita-o nas configurações do dispositivo.",
+   "ru": "Доступ к микрофону запрещён. Разрешите его в настройках устройства.",
+   "id": "Akses mikrofon ditolak. Izinkan di setelan perangkat Anda."
+  },
+  "No speech was detected. Try again.": {
+   "zh-Hans": "没有检测到语音。请重试。",
+   "hi": "कोई आवाज़ नहीं मिली। फिर कोशिश करें।",
+   "es": "No se detectó voz. Inténtalo de nuevo.",
+   "ar": "لم يتم اكتشاف كلام. حاول مرة أخرى.",
+   "fr": "Aucune parole détectée. Réessayez.",
+   "bn": "কোনো কথা শনাক্ত হয়নি। আবার চেষ্টা করুন।",
+   "pt-BR": "Nenhuma fala foi detectada. Tente novamente.",
+   "ru": "Речь не обнаружена. Попробуйте ещё раз.",
+   "id": "Tidak ada ucapan yang terdeteksi. Coba lagi."
+  },
+  "Voice dictation failed. Try again.": {
+   "zh-Hans": "语音听写失败。请重试。",
+   "hi": "वॉइस डिक्टेशन विफल हुआ। फिर कोशिश करें।",
+   "es": "Falló el dictado por voz. Inténtalo de nuevo.",
+   "ar": "تعذّر الإملاء الصوتي. حاول مرة أخرى.",
+   "fr": "La dictée vocale a échoué. Réessayez.",
+   "bn": "ভয়েস ডিক্টেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+   "pt-BR": "O ditado por voz falhou. Tente novamente.",
+   "ru": "Голосовой ввод не сработал. Попробуйте ещё раз.",
+   "id": "Dikte suara gagal. Coba lagi."
+  },
+  "The speech service may process audio outside Novo. Novo receives only the text you send.": {
+   "zh-Hans": "语音服务可能会在 Novo 之外处理音频。Novo 只会收到你发送的文字。",
+   "hi": "वाक् सेवा ऑडियो को Novo के बाहर प्रोसेस कर सकती है। Novo को केवल आपके भेजे हुए शब्द मिलते हैं।",
+   "es": "El servicio de voz puede procesar el audio fuera de Novo. Novo solo recibe el texto que envías.",
+   "ar": "قد تعالج خدمة التعرّف الصوت خارج Novo. لا يتلقى Novo إلا النص الذي ترسله.",
+   "fr": "Le service vocal peut traiter l’audio en dehors de Novo. Novo ne reçoit que le texte que vous envoyez.",
+   "bn": "ভয়েস পরিষেবা Novo-এর বাইরে অডিও প্রক্রিয়া করতে পারে। Novo শুধু আপনার পাঠানো লেখাই পায়।",
+   "pt-BR": "O serviço de voz pode processar o áudio fora do Novo. O Novo recebe apenas o texto que você enviar.",
+   "ru": "Сервис распознавания может обрабатывать аудио вне Novo. Novo получает только отправленный вами текст.",
+   "id": "Layanan suara dapat memproses audio di luar Novo. Novo hanya menerima teks yang Anda kirim."
   }
  }
 }

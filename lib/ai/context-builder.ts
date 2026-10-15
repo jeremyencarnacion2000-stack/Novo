@@ -106,7 +106,8 @@ export async function buildUserContext(userId: string, options?: {
         const excludedSignalSources = new Set(signalSourcePreferences.map((item) => item.source));
         const integrationSources = [...(integrations ? ['gmail','notion','todoist','slack','calendar'] : []),
             ...(development ? ['github','vercel'] : [])].filter(source => !excludedSignalSources.has(source));
-        const signalSources = [...integrationSources, ...(deviceActivityRead && !excludedSignalSources.has('device') ? ['device'] : [])];
+        const codexContextRead = (development || currentWorkContext) && !excludedSignalSources.has('codex');
+        const signalSources = [...integrationSources, ...(codexContextRead ? ['codex'] : []), ...(deviceActivityRead && !excludedSignalSources.has('device') ? ['device'] : [])];
         const checklistSources = integrationSources.filter(source => source === 'notion' || source === 'todoist');
         const calendarSources = [...(personal ? ['novo','project','school','routine','habit','business','holidays'] : []),
             ...(integrationSources.includes('calendar') ? ['google'] : []), ...(checklistSources.length === 2 ? ['checklist'] : [])];

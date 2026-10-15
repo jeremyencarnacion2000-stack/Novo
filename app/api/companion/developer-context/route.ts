@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         select: { accessToken: true, metadata: true },
       }),
       prisma.novoSignalSourcePreference.findMany({
-        where: { userId: auth.userId, source: { in: ['github', 'vercel'] }, excludedAt: { not: null } },
+        where: { userId: auth.userId, source: { in: ['github', 'vercel', 'codex'] }, excludedAt: { not: null } },
         select: { source: true },
       }),
     ])
@@ -67,6 +67,17 @@ export async function GET(request: NextRequest) {
     const excludedSources = new Set((preferences ?? []).map((item: { source: string }) => item.source))
     const githubExcluded = excludedSources.has('github')
     const vercelExcluded = excludedSources.has('vercel')
+    const codexExcluded = excludedSources.has('codex')
+    const latestCodexSignal = codexExcluded ? null : await prisma.novoSignalLedger.findFirst({
+      where: {
+        userId: auth.userId,
+        source: 'codex',
+        excludedAt: null,
+        observedAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { observedAt: 'desc' },
+      select: { label: true, observedAt: true },
+    })
 
     const githubResult: ProviderView<GitHubDeveloperRepositorySummary> = !github?.accessToken
       ? { connected: false, sourceExcluded: githubExcluded, repositories: [] }
@@ -98,7 +109,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ github: githubResult, vercel: vercelResult }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({
+      github: githubResult,
+      vercel: vercelResult,
+      codex: {
+        connected: Boolean(latestCodexSignal),
+        sourceExcluded: codexExcluded,
+        latestSignal: latestCodexSignal ? {
+          label: latestCodexSignal.label,
+          observedAt: latestCodexSignal.observedAt.toISOString(),
+        } : null,
+      },
+    }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof CompanionError) return companionErrorResponse(error)
     console.error('[companion/developer-context GET] Context lookup failed.')

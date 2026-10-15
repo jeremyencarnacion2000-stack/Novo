@@ -4,6 +4,7 @@ mod agent_hooks;
 mod agents;
 mod chat;
 mod companion;
+mod codex_context;
 mod novo_account;
 mod novo_chat;
 mod claude;

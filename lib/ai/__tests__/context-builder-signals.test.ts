@@ -82,4 +82,26 @@ describe('buildUserContext provider signal bridge', () => {
       expect.objectContaining({ provider: 'notion', status: 'connected' }),
     ]))
   })
+
+  it('includes Codex session summaries only when development or current-work context is authorized', async () => {
+    ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([])
+    ;(prisma.novoSignalLedger.findMany as jest.Mock).mockResolvedValue([
+      { source: 'codex', signalType: 'codex_task', label: 'Codex task · novo-web · Fix the Twin context bridge', observedAt: new Date('2026-10-14T10:00:00.000Z'), reliability: 'direct' },
+    ])
+
+    const denied = await buildUserContext('user-1', { contextAccess: { personal: false, integrations: false, development: false, currentWorkContext: false, deviceActivityRead: false } })
+    expect(denied.structured.externalSignals).toEqual([])
+    expect(prisma.novoSignalLedger.findMany).not.toHaveBeenCalled()
+
+    const allowed = await buildUserContext('user-1', { contextAccess: { personal: false, integrations: false, development: false, currentWorkContext: true, deviceActivityRead: false } })
+    expect(allowed.structured.externalSignals).toEqual([
+      expect.objectContaining({ source: 'codex', signalType: 'codex_task', label: 'Codex task · novo-web · Fix the Twin context bridge' }),
+    ])
+    expect(allowed.structured.sources).toEqual(expect.arrayContaining([expect.objectContaining({ provider: 'codex' })]))
+
+    ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{ source: 'codex' }])
+    const excluded = await buildUserContext('user-1', { contextAccess: { personal: false, integrations: false, development: false, currentWorkContext: true, deviceActivityRead: false } })
+    expect(excluded.structured.externalSignals).toEqual([])
+    expect(excluded.structured.sources).not.toEqual(expect.arrayContaining([expect.objectContaining({ provider: 'codex' })]))
+  })
 })

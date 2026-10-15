@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "coucou-hook"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "libc",
  "serde_json",
@@ -2341,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "novo-companion"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "chrono",
  "gtk",

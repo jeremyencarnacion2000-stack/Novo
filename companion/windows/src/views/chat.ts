@@ -18,6 +18,7 @@ import { State, type ChatMessage } from "../core/state";
 import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 import { NovoChatController } from '../core/novo-chat';
+import { SpeechDictation } from "../core/speech-dictation";
 
 const STRINGS = {
   placeholderFirst: N_("Ask me anything…"),
@@ -29,6 +30,7 @@ const STRINGS = {
   noKey: N_("No API key — add it in Settings."),
   openSettings: N_("Open Settings"),
 };
+const VOICE_LABELS = { start: N_("Start dictation"), stop: N_("Stop dictation") };
 
 let nextId = 1;
 
@@ -290,6 +292,7 @@ function buildPicker(onChange: () => void): Picker {
 
 /** Default island conversation: only the signed-in Novo account and server history. */
 export function buildPrompt(onHeightChange: () => void): ViewHost {
+  let dictation: SpeechDictation | null = null;
   const conversations=buildChoiceMenu('novo-conversations',t('Conversación de Novo'),value=>void controller.selectConversation(value),open=>{body.classList.toggle('history-open',open);});
   const settingsButton=h('button',{type:'button',class:'novo-chat-settings','aria-label':tl('Configuración del chat'),title:tl('Configuración del chat'),onclick:()=>void Bridge.openSettingsWindow('assistant')},svg(ICONS.gear,12));
   const connect=h('button',{type:'button',class:'novo-chat-link',text:tl('Conectar'),onclick:()=>void Bridge.openNovo()});
@@ -297,15 +300,37 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const chip=h('div',{class:'novo-unshared-file'});
   const log=h('div',{class:'chat-log','aria-label':tl('Mensajes de la cuenta')});
   const error=h('div',{class:'novo-chat-error',role:'status','aria-live':'polite'});
+  const voiceStatus=h('div',{class:'novo-voice-status',role:'status','aria-live':'polite',hidden:true});
   const input=h('input',{class:'chat-input',type:'text',maxlength:12000,'aria-label':tl('Mensaje para Novo'),placeholder:tl('Habla con Novo…')});
   const send=h('button',{class:'send-btn','aria-label':tl('Enviar mensaje')},svg(ICONS.arrowUp,11));
+  const voiceButton=h("button",{type:"button",class:"novo-voice-button","aria-label":tl(VOICE_LABELS.start),title:tl("The speech service may process audio outside Novo. Novo receives only the text you send."),"aria-description":tl("The speech service may process audio outside Novo. Novo receives only the text you send.")},svg(ICONS.mic,14,{stroke:1.8}));
   const cancel=h('button',{class:'novo-chat-link',text:tl('Cancelar respuesta'),onclick:()=>void controller.cancel()});
-  const bar=h('div',{class:'chat-bar'},input,cancel,send);
-  const body=h('div',{class:'chat-body novo-chat-body'},header,chip,log,error,bar);
+  const bar=h('div',{class:'chat-bar'},input,cancel,voiceButton,send);
+  const body=h('div',{class:'chat-body novo-chat-body'},header,chip,log,error,voiceStatus,bar);
   const el=h('div',{class:'view'},h('div',{class:'card wash chat-card'},body));
   (el.querySelector('.card') as HTMLElement).style.setProperty('--wash','rgba(99,102,241,0.5)');
   let renderedConversation:unknown=null;let renderedPending='';let renderedActive:string|null=null;
   let live:HTMLElement|null=null;let disposed=false;
+  dictation=new SpeechDictation({
+    transcript(text){input.value=text;send.disabled=!controller.canSend||Boolean(dictation?.isListening);},
+    listening(active){
+      body.classList.toggle('voice-listening',active);
+      voiceButton.classList.toggle('listening',active);
+      voiceButton.setAttribute("aria-label",t(active?VOICE_LABELS.stop:VOICE_LABELS.start));
+      voiceButton.replaceChildren(svg(active?ICONS.stop:ICONS.mic,active?11:14,{stroke:1.8}));
+      voiceStatus.textContent=active?t("Listening… press the microphone button again to stop"):"";
+      voiceStatus.hidden=!active&&!voiceStatus.dataset.error;
+      if(active)delete voiceStatus.dataset.error;
+      State.stateOverride=active?"listening":null;
+      State.notify();
+      send.disabled=!controller.canSend||active;
+      onHeightChange();
+    },
+    error(kind){
+      const message=kind==="unavailable"?t(N_("Speech recognition is not available on this device.")):kind==="permission"?t(N_("Microphone access was denied. Allow it in your device settings.")):kind==="no-speech"?t(N_("No speech was detected. Try again.")):t(N_("Voice dictation failed. Try again."));
+      voiceStatus.textContent=t(message);voiceStatus.hidden=false;voiceStatus.dataset.error='true';onHeightChange();
+    },
+  });
   const controller=new NovoChatController({...Bridge,contextSearch:async query=>{
     const context=await Bridge.contextSearch(query);
     if(State.settings.novoLocalConnections){
@@ -322,7 +347,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     const state=controller.state;const busy=state.activeRequestId!==null;
     connect.hidden=state.account?.state==='connected'||state.phase==='loading';
     conversations.setOptions([{value:'',label:t('Nueva conversación')},...state.conversations.map(c=>({value:c.id,label:c.title}))],state.conversation?.id??'',busy||state.phase==='loading');
-    send.disabled=!controller.canSend;input.disabled=busy;cancel.hidden=!busy;
+    send.disabled=!controller.canSend||Boolean(dictation?.isListening);input.disabled=busy;cancel.hidden=!busy;voiceButton.disabled=busy;
     error.textContent=state.error?.message??(state.phase==='loading'?'Verificando cuenta…':'');
     error.hidden=!error.textContent;
     if(renderedConversation!==state.conversation||renderedPending!==state.pendingMessage||renderedActive!==state.activeRequestId){
@@ -339,20 +364,26 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     }
     if(state.liveText){if(!live){log.querySelector('.typing')?.parentElement?.remove();live=h('div',{class:'reply'});log.append(h('div',{class:'chat-row'},live));}renderMarkdown(live,state.liveText);}
     log.scrollTop=log.scrollHeight;
-    State.stateOverride=busy?'thinking':null;State.notify();
+    State.stateOverride=dictation?.isListening?'listening':busy?'thinking':null;State.notify();
     syncFile();
   }
   function syncFile(){const name=State.droppedFile?.name??'';chip.textContent=name?`${name} · archivo local, no compartido`:'';chip.hidden=!name;}
-  async function submit(){if(!input.value.trim()||!controller.canSend)return;const text=input.value;
+  async function submit(){if(dictation?.isListening){dictation.stop();return;}if(!input.value.trim()||!controller.canSend)return;const text=input.value;
     const model=controller.state.models.find(m=>m.id===State.settings.novoChatModel)??controller.state.models.find(m=>m.id==='auto')??controller.state.models[0];
     if(!model)return;
     const twinMode=Boolean(State.settings.novoTwinMode&&model.allowsTwinMode&&controller.state.account?.authorization?.capabilities.twinRead);
     const sending=controller.send(text,model.id,twinMode);input.value='';Sound.play('send');await sending;
     if(!disposed){if(controller.state.error)Sound.play('error');else Sound.play('finish');input.focus();}}
   send.addEventListener('click',()=>void submit());
-  input.addEventListener('input',()=>{send.disabled=!controller.canSend;});
-  input.addEventListener('keydown',event=>{const key=(event as KeyboardEvent).key;if(key==='Enter'){event.preventDefault();void submit();}event.stopPropagation();});
-  const stop=()=>{if(disposed)return;disposed=true;controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
+  voiceButton.addEventListener('click',()=>{
+    if(dictation?.isListening){dictation.stop();return;}
+    voiceStatus.hidden=true;delete voiceStatus.dataset.error;
+    dictation?.start(input.value);
+  });
+  conversations.el.addEventListener('click',()=>dictation?.cancel());
+  input.addEventListener('input',()=>{send.disabled=!controller.canSend||Boolean(dictation?.isListening);});
+  input.addEventListener('keydown',event=>{const key=(event as KeyboardEvent).key;if(key==='Escape'&&dictation?.isListening){event.preventDefault();dictation.cancel();voiceStatus.hidden=true;delete voiceStatus.dataset.error;}else if(key==='Enter'){event.preventDefault();void submit();}event.stopPropagation();});
+  const stop=()=>{if(disposed)return;disposed=true;dictation?.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
   window.addEventListener('beforeunload',stop);
   void controller.loadAccount();
   return {el,sync:syncFile,focus:()=>input.focus(),dispose:stop};

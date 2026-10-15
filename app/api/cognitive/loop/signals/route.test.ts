@@ -30,4 +30,17 @@ describe('POST /api/cognitive/loop/signals source preferences', () => {
       create: expect.objectContaining({ userId: 'owner-1', source: 'github' }),
     }))
   })
+
+  it('lets the signed-in owner exclude Codex session summaries from Twin context', async () => {
+    const response = await POST(new Request('http://localhost/api/cognitive/loop/signals', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'exclude_source', source: 'codex', reason: 'pause Codex context sharing' }),
+    }) as never)
+
+    expect(response.status).toBe(200)
+    expect(prisma.novoSignalSourcePreference.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_source: { userId: 'owner-1', source: 'codex' } },
+      create: expect.objectContaining({ userId: 'owner-1', source: 'codex' }),
+    }))
+  })
 })
