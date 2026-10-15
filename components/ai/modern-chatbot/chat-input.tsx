@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Send, Loader2, Camera, Image, FileText, X, Plus, Wrench, Check, Mic, Lock, Sparkles, Plug } from 'lucide-react';
+import { VoiceBeam } from 'voice-glow';
 import { useChatbot } from './context';
 import { useToast } from '@/hooks/use-toast';
 import { GlowingOrb, type OrbState } from './glowing-orb';
@@ -151,6 +152,14 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
     const [webSearchEnabled, setWebSearchEnabled] = React.useState(false);
     const [attachedFiles, setAttachedFiles] = React.useState<File[]>([]);
     const [voiceState, setVoiceState] = React.useState<'idle' | 'listening' | 'speaking' | 'thinking' | 'connecting' | 'error'>('idle');
+    const [voiceStream, setVoiceStream] = React.useState<MediaStream | null>(null);
+    const isAssistantProcessing = isLoading || voiceState === 'thinking';
+    // The published 0.3.0 types omit the docs' `processing` prop, so use its
+    // per-frame level getter to keep a subtle traveling wave while Novo works.
+    const processingBeamLevel = React.useCallback(
+        () => isAssistantProcessing ? 0.36 + Math.sin(performance.now() / 520) * 0.08 : 0,
+        [isAssistantProcessing],
+    );
 
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -169,6 +178,16 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                 window.removeEventListener('gemini-live-state-change', handleStateChange);
             };
         }
+    }, []);
+
+    React.useEffect(() => {
+        const handleVoiceStreamChange = (event: Event) => {
+            const stream = (event as CustomEvent<{ stream?: MediaStream | null }>).detail?.stream;
+            setVoiceStream(stream ?? null);
+        };
+
+        window.addEventListener('novo:voice-stream-change', handleVoiceStreamChange);
+        return () => window.removeEventListener('novo:voice-stream-change', handleVoiceStreamChange);
     }, []);
 
     // Auto-resize textarea
@@ -312,7 +331,16 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                         row — mirrors a plain minimal input bar (a "+", the
                         placeholder, one action button) instead of stacking
                         every control in view at once. */}
-                    <div className="flex items-end gap-1 pl-1.5 pr-1.5 py-1.5 rounded-[28px] bg-popover/85 shadow-[0_8px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+                    <VoiceBeam
+                        className="block w-full"
+                        type="default"
+                        stream={voiceStream ?? undefined}
+                        level={processingBeamLevel}
+                        active={Boolean(voiceStream) || isAssistantProcessing}
+                        colorVariant="colorful"
+                        theme="auto"
+                    >
+                        <div className="flex items-end gap-1 pl-1.5 pr-1.5 py-1.5 rounded-[28px] bg-popover/85 shadow-[0_8px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
                         <button
                             type="button"
                             onClick={() => setShowMenu(!showMenu)}
@@ -366,7 +394,8 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                 <Send className="w-3.5 h-3.5 text-black fill-current stroke-[2.5]" />
                             )}
                         </button>
-                    </div>
+                        </div>
+                    </VoiceBeam>
 
                     {/* "+" menu: on mobile a real bottom-sheet (drag handle,
                         slides up from the viewport edge) — on desktop that
