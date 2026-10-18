@@ -30,7 +30,7 @@ import {
 import { FaSlack } from 'react-icons/fa6';
 import { NovoSkeleton } from "@/components/ui/NovoSkeleton";
 import { NovoEmptyState } from "@/components/ui/NovoEmptyState";
-import { motion, useMotionValue } from 'framer-motion';
+import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useQuickCapture } from '@/lib/quick-capture-context';
 import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy';
@@ -40,6 +40,7 @@ import { PomodoroDetachMorph } from '@/components/command-center-liquid-morph';
 import { PomodoroWidget } from '@/components/pomodoro-widget';
 import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 import { eventBus } from '@/lib/events/event-bus';
+import { LiquidNotification } from '@/components/ui/liquid-notification';
 import type { CurrentTrack } from '@/lib/player-store';
 
 // ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
@@ -131,19 +132,20 @@ function NotificationContent({
   };
 
   return (
-    <div className="w-full h-full p-3.5 flex flex-col justify-between overflow-visible relative bg-black/95 border border-white/10 backdrop-blur-3xl rounded-l-[30px] rounded-r-none shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)]">
-      <div aria-hidden="true" className="absolute -right-3 top-1/2 h-12 w-4 -translate-y-1/2 rounded-l-[18px] border-y border-l border-white/10 bg-black/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
+    <div className="w-full p-4 flex flex-col gap-2 relative bg-[rgba(10,18,24,0.96)] text-white rounded-[28px]">
       {/* Top Header Row — iOS Dynamic Island style dot indicator + category tag */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", dotColor)} />
           <span className={cn("text-[9px] font-mono font-bold tracking-widest uppercase opacity-90", tagColor)}>
-            TWIN SIGNAL
+            Novo · Twin
           </span>
         </div>
         <button
+          type="button"
+          aria-label="Cerrar aviso del Twin"
           onClick={onDismiss}
-          className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+          className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
           <X className="w-3 h-3" />
         </button>
@@ -155,10 +157,10 @@ function NotificationContent({
           {renderIcon()}
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="text-[13px] font-bold text-white tracking-tight leading-tight truncate">
+          <h4 className="text-[13px] font-bold text-white tracking-tight leading-tight">
             {cleanTitle}
           </h4>
-          <p className="text-[10px] text-white/70 font-normal leading-snug line-clamp-2 mt-0.5">
+          <p className="text-xs text-white/70 font-normal leading-relaxed mt-1">
             {notification.description}
           </p>
         </div>
@@ -1228,14 +1230,18 @@ const ContextHubComponent = () => {
   const motionMode = useNovoMotionPolicy();
   const hubMorph = useSharedSurfaceMorph({
     surfaceRef: hubSurfaceRef,
-    state: hubState,
+    state: hubState === 'notification' ? 'capsule' : hubState,
     enabled: !pomodoroMorphing,
+    motionMode,
   });
   useEffect(() => {
     const height = pomodoroOpen || pomodoroMorphing ? hubMorph.stageSize.height : hubMorph.shape.height;
     if (pomodoroMorphing) return;
-    y.set(Math.max(12, Math.min(y.get(), windowHeight - height - 12)));
-  }, [hubState, windowHeight, hubMorph.stageSize.height, hubMorph.shape.height, pomodoroOpen, pomodoroMorphing, y]);
+    const target = Math.max(12, Math.min(y.get(), windowHeight - height - 12));
+    if (motionMode !== 'full') { y.set(target); return; }
+    const flight = animate(y, target, { type: 'spring', stiffness: 260, damping: 30 });
+    return () => flight.stop();
+  }, [hubState, windowHeight, hubMorph.stageSize.height, hubMorph.shape.height, pomodoroOpen, pomodoroMorphing, motionMode, y]);
 
   useEffect(() => {
     if (hubState !== 'expanded' || pomodoroOpen || pomodoroMorphing) return;
@@ -1500,7 +1506,7 @@ const ContextHubComponent = () => {
           className="pointer-events-none"
           style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
         />
-        {(hubState === 'idle' || hubState === 'capsule') && (
+        {(hubState === 'idle' || hubState === 'capsule' || hubState === 'notification') && (
           <motion.button
             ref={triggerRef}
             type="button"
@@ -1517,15 +1523,18 @@ const ContextHubComponent = () => {
           inert={pomodoroMorphing}
           className="absolute right-0 top-0 overflow-hidden z-[2]"
           style={{
-            ...hubMorph.contentStyle,
-            pointerEvents: hubState === 'expanded' || hubState === 'notification' ? 'auto' : 'none',
+            width: hubMorph.stageSize.width,
+            height: hubMorph.stageSize.height,
+            pointerEvents: hubState === 'expanded' ? 'auto' : 'none',
           }}
         >
+          <AnimatePresence initial={false}>
           {hubState === 'idle' && (
             <motion.div
               key="idle"
               data-hub-motion-panel
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute right-0 top-0 flex items-center justify-center"
+              style={{ width: 12, height: 72 }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -1534,11 +1543,12 @@ const ContextHubComponent = () => {
               <GripVertical className="w-3 h-3 text-white/50" strokeWidth={1.5} />
             </motion.div>
           )}
-          {hubState === 'capsule' && (
+          {(hubState === 'capsule' || hubState === 'notification') && (
             <motion.div
               key="capsule"
               data-hub-motion-panel
-              className="absolute inset-0"
+              className="absolute right-0 top-0"
+              style={{ width: SHARED_SURFACE_SHAPES.capsule.width, height: SHARED_SURFACE_SHAPES.capsule.height }}
               initial={{ opacity: 0, y: 7 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
@@ -1552,37 +1562,20 @@ const ContextHubComponent = () => {
               />
             </motion.div>
           )}
-          {hubState === 'notification' && activeNotification && (
-            <motion.div
-              key="notification"
-              data-hub-motion-panel
-              className="absolute inset-0"
-              initial={{ opacity: 0, x: 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={motionMode === 'full' ? HUB_CONTENT_SPRING : { duration: 0 }}
-            >
-              <NotificationContent
-                notification={activeNotification}
-                onDismiss={() => {
-                  setCognitiveAlert(false);
-                  setHubState('capsule');
-                }}
-              />
-            </motion.div>
-          )}
+          </AnimatePresence>
           {(
             <motion.div
               key="expanded"
               data-hub-motion-panel
               aria-hidden={hubState !== 'expanded'}
               inert={hubState !== 'expanded'}
-              className="absolute inset-0"
-              style={{ visibility: hubState === 'expanded' ? 'visible' : 'hidden' }}
-              initial={{ opacity: 0, x: 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 12 }}
-              transition={motionMode === 'full' ? HUB_CONTENT_SPRING : { duration: 0 }}
+              className="absolute right-0 top-0"
+              style={{ width: hubMorph.stageSize.width, height: hubMorph.stageSize.height, visibility: hubState === 'expanded' ? 'visible' : undefined }}
+              initial={{ opacity: 0, x: 12 }}
+              animate={hubState === 'expanded'
+                ? { opacity: 1, x: 0, visibility: 'visible' }
+                : { opacity: 0, x: 12, transitionEnd: { visibility: 'hidden' } }}
+              transition={motionMode === 'full' ? { ...HUB_CONTENT_SPRING, opacity: { duration: 0.2, delay: hubState === 'expanded' ? 0.12 : 0 } } : { duration: 0 }}
             >
               <ExpandedContent
                 onCollapse={collapseHub}
@@ -1596,6 +1589,23 @@ const ContextHubComponent = () => {
           )}
         </div>
       </motion.div>
+      <LiquidNotification
+        noticeKey={hubState === 'notification' && activeNotification ? `${activeNotification.title}:${activeNotification.description}` : null}
+        sourceRef={hubSurfaceRef}
+        sourcePosition={y}
+        side="left"
+        urgent={activeNotification?.severity === 'critical'}
+        onDismiss={() => { setCognitiveAlert(false); setHubState('capsule'); }}
+        onPresented={() => {
+          if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+          notificationTimerRef.current = setTimeout(() => {
+            setCognitiveAlert(false);
+            setHubState(current => current === 'notification' ? 'capsule' : current);
+          }, 6000);
+        }}
+      >
+        {activeNotification && <NotificationContent notification={activeNotification} onDismiss={() => { setCognitiveAlert(false); setHubState('capsule'); }} />}
+      </LiquidNotification>
       <PomodoroWidget
         ref={pomodoroRef}
         open={pomodoroOpen}

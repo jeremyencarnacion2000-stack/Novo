@@ -12,11 +12,13 @@ import {
   useTransform,
   useAnimation,
 } from 'framer-motion'
-import { sileo, subscribeSileoBell, type BellToast } from '@/lib/sileo-bell'
+import { sileo, subscribeSileoBell, markSileoBellPresented, type BellToast } from '@/lib/sileo-bell'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { appleLiquidMotion } from '@/lib/design-tokens'
+import { LiquidNotification } from '@/components/ui/liquid-notification'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type NotificationType =
@@ -300,12 +302,13 @@ export function NotificationCenter() {
   const [prevUnread, setPrevUnread] = useState(0)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const bellControls = useAnimation()
+  const motionMode = useNovoMotionPolicy()
 
   const unreadCount = notifications.filter(n => !n.read).length
 
   // Bell bounce when new unread arrives
   useEffect(() => {
-    if (unreadCount > prevUnread) {
+    if (unreadCount > prevUnread && motionMode === 'full') {
       bellControls.start({
         rotate: [0, -18, 16, -12, 8, -4, 0],
         transition: { duration: 0.65, ease: 'easeInOut' },
@@ -323,14 +326,14 @@ export function NotificationCenter() {
   useEffect(() => {
     return subscribeSileoBell(toast => {
       setSileoToast(toast)
-      if (toast) {
+      if (toast && motionMode === 'full') {
         bellControls.start({
           rotate: [0, -14, 12, -8, 4, 0],
           transition: { duration: 0.5, ease: 'easeInOut' },
         })
       }
     })
-  }, [])
+  }, [bellControls, motionMode])
 
   const sileoColor =
     sileoToast?.type === 'success' ? '#34d399'
@@ -356,6 +359,8 @@ export function NotificationCenter() {
   // notification list or unread count.
   useEffect(() => {
     setNotifications([])
+    sileo.clear()
+    setSileoToast(null)
     setIsOpen(false)
     setPrevUnread(0)
     cachedNotificationsRef.current = []
@@ -510,12 +515,11 @@ export function NotificationCenter() {
         if (nextOpen) loadNotifications()
       }}
     >
-      {/* ── Bell Button — two physical phases: idle pill ↔ Sileo HUD ──── */}
+      {/* The bell stays available while its notice detaches and returns. */}
       <motion.button
         ref={buttonRef as any}
         data-flip-from="notifications"
-        layout
-        transition={{ ...appleLiquidMotion.pressTransition, layout: { type: 'spring', stiffness: 400, damping: 30 } }}
+        transition={appleLiquidMotion.pressTransition}
         onClick={() => {
           setIsOpen(prev => !prev)
           if (!isOpen) loadNotifications()
@@ -524,11 +528,7 @@ export function NotificationCenter() {
         aria-label="Notifications"
         whileHover={{ scale: appleLiquidMotion.hoverScale }}
         whileTap={{ scale: appleLiquidMotion.pressScale }}
-        className={
-          sileoToast
-            ? "fixed top-4 right-3 sm:right-6 z-[200] h-11 max-w-[min(360px,calc(100vw-1.5rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
-            : "fixed top-4 right-3 sm:right-6 z-[200] size-9 rounded-full flex items-center justify-center shadow-lg"
-        }
+        className="fixed top-4 right-3 sm:right-6 z-[200] size-9 rounded-full flex items-center justify-center shadow-lg"
         style={{ isolation: 'isolate' }}
       >
         {/* Liquid glass background overlay */}
@@ -545,51 +545,13 @@ export function NotificationCenter() {
         />
 
         {/* Icon above glass — morphs to the toast's icon during Sileo phase */}
-        <motion.div layout="position" animate={bellControls} className="relative z-10 shrink-0">
+        <motion.div animate={bellControls} className="relative z-10 shrink-0">
           <AnimatedSVGIcon
             state={sileoToast ? sileoIconState : 'notification'}
             size={18}
             color={sileoColor}
           />
         </motion.div>
-
-        {/* Sileo HUD content — title + description reveal inside the capsule */}
-        <AnimatePresence mode="popLayout">
-          {sileoToast && (
-            <motion.div
-              key={sileoToast.id}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0, transition: { delay: 0.14, duration: 0.25 } }}
-              exit={{ opacity: 0, x: 6, transition: { duration: 0.12 } }}
-              className="relative z-10 flex items-center gap-2.5 min-w-0"
-            >
-              <div className="flex flex-col items-start min-w-0 text-left">
-                <span className="text-[11px] font-semibold text-foreground/90 truncate max-w-[230px] leading-tight">
-                  {sileoToast.title}
-                </span>
-                {sileoToast.description && (
-                  <span className="text-[9px] text-foreground/45 truncate max-w-[230px] leading-tight mt-0.5">
-                    {sileoToast.description}
-                  </span>
-                )}
-              </div>
-              {sileoToast.button && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    sileoToast.button!.onClick()
-                    sileo.dismiss(sileoToast.id)
-                  }}
-                  className="shrink-0 px-2.5 py-1 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground/85 text-[9px] font-semibold transition-colors cursor-pointer"
-                >
-                  {sileoToast.button.title}
-                </span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Badge */}
         <AnimatePresence>
@@ -607,6 +569,26 @@ export function NotificationCenter() {
           )}
         </AnimatePresence>
       </motion.button>
+
+      <LiquidNotification key={notificationStorageKey} noticeKey={sileoToast?.id ?? null} sourceRef={buttonRef} onDismiss={() => sileo.dismiss(sileoToast?.id)} onPresented={() => { if (sileoToast) markSileoBellPresented(sileoToast.id) }} urgent={sileoToast?.type === 'error'}>
+        {sileoToast && (
+          <div className="flex items-start gap-3 p-4">
+            <div className="mt-1 shrink-0 rounded-full bg-foreground/5 p-2">
+              <AnimatedSVGIcon state={sileoIconState} size={20} color={sileoColor} />
+            </div>
+            <div className="min-w-0 flex-1 py-1">
+              <p className="text-sm font-semibold leading-snug">{sileoToast.title}</p>
+              {sileoToast.description && <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{sileoToast.description}</div>}
+              {sileoToast.button && (
+                <button type="button" onClick={() => { sileoToast.button!.onClick(); sileo.dismiss(sileoToast.id) }} className="mt-3 min-h-9 rounded-full bg-foreground/10 px-4 text-xs font-medium transition-colors hover:bg-foreground/15">
+                  {sileoToast.button.title}
+                </button>
+              )}
+            </div>
+            <button type="button" aria-label="Cerrar aviso" onClick={() => sileo.dismiss(sileoToast.id)} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10"><X className="size-4" /></button>
+          </div>
+        )}
+      </LiquidNotification>
 
           <DialogContent
             motionPreset="anchored"

@@ -18,6 +18,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* One anchored response for menus, selects and small floating surfaces. Radix
+   keeps closed content mounted until the exit animation finishes. */
+.novo-fluid-floating {
+  --novo-float-x: 0px;
+  --novo-float-y: -6px;
+  animation: novo-fluid-arrive 380ms cubic-bezier(.16, 1, .3, 1) both;
+}
+.novo-fluid-floating[data-side='top'] { --novo-float-y: 6px; }
+.novo-fluid-floating[data-side='left'] { --novo-float-x: 6px; --novo-float-y: 0px; }
+.novo-fluid-floating[data-side='right'] { --novo-float-x: -6px; --novo-float-y: 0px; }
+.novo-fluid-floating[data-state='closed'] {
+  animation: novo-fluid-return 180ms cubic-bezier(.4, 0, .7, .2) both;
+  pointer-events: none;
+}
+@keyframes novo-fluid-arrive {
+  from { opacity: 0; transform: translate3d(var(--novo-float-x), var(--novo-float-y), 0) scale(.96); }
+  72% { opacity: 1; transform: translate3d(0, 0, 0) scale(1.003); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes novo-fluid-return {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(var(--novo-float-x), var(--novo-float-y), 0) scale(.98); }
+}
+.novo-liquid-notice { color: var(--background); }
+.novo-liquid-notice[data-liquid-notice-origin='left'] { color: rgb(10, 18, 24); }
+.novo-liquid-notice-card { max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; }
+:root[data-novo-motion='reduced'] .novo-fluid-floating { animation-name: novo-fluid-fade; animation-duration: 160ms; }
+:root[data-novo-motion='reduced'] .novo-fluid-floating[data-state='closed'] { animation-direction: reverse; }
+:root[data-novo-motion='off'] .novo-fluid-floating { animation: none; }
+@keyframes novo-fluid-fade { from { opacity: 0; } to { opacity: 1; } }
+
 /* Ambient surface inspired by the reference: a restrained, slowly drifting
    color field plus dither noise. It lives inside the app viewport instead of
    on body so custom wallpapers and public pages remain independent. */

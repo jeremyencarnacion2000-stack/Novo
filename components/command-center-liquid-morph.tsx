@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { MotionValue } from 'framer-motion'
 import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
+import { liquidNeckProfile } from '@/lib/liquid-notification'
 
 /**
  * Physical, reversible progress driver ported from command-center-liquid-nav
@@ -196,7 +197,7 @@ export function CommandCenterLiquidMorph({
       const progress = clamp(rawProgress)
       const { source: sourceRect, rail: railRect, fab: fabRect, target: targetRect, close, glyph } = geometry
       const approach = smoothstep(...LIQUID_MORPH_CONFIG.phases.approach, progress)
-      const neck = smoothstep(...LIQUID_MORPH_CONFIG.phases.neck, progress)
+      const neck = liquidNeckProfile(progress / 0.82)
       const absorb = smoothstep(...LIQUID_MORPH_CONFIG.phases.absorb, progress)
       const expand = smoothstep(...LIQUID_MORPH_CONFIG.phases.expand, progress)
       const reveal = smoothstep(...LIQUID_MORPH_CONFIG.phases.content, progress)
@@ -448,7 +449,7 @@ export function PomodoroDetachMorph({
 
       const progress = clamp(rawProgress)
       const approach = smoothstep(...LIQUID_MORPH_CONFIG.phases.approach, progress)
-      const neck = smoothstep(...LIQUID_MORPH_CONFIG.phases.neck, progress)
+      const neck = liquidNeckProfile(progress / 0.82)
       const absorb = smoothstep(...LIQUID_MORPH_CONFIG.phases.absorb, progress)
       const expand = smoothstep(...LIQUID_MORPH_CONFIG.phases.expand, progress)
       const reveal = smoothstep(...LIQUID_MORPH_CONFIG.phases.content, progress)
