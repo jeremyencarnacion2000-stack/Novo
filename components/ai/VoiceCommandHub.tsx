@@ -204,6 +204,38 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const generationRef = useRef(0)
+  const requestingRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  const cancelRecording = useCallback((updateUI = true) => {
+    generationRef.current += 1
+    requestingRef.current = false
+    const recorder = mediaRecorderRef.current
+    mediaRecorderRef.current = null
+    if (recorder) {
+      recorder.onstop = null
+      recorder.ondataavailable = null
+      if (recorder.state !== 'inactive') { try { recorder.stop() } catch { /* Already stopping. */ } }
+    }
+    streamRef.current?.getTracks().forEach(track => track.stop())
+    streamRef.current = null
+    chunksRef.current = []
+    emitVoiceStream(null)
+    emitVoiceState('idle')
+    if (updateUI && mountedRef.current) { setRecording(false); setProcessing(false) }
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    const cancel = () => cancelRecording()
+    window.addEventListener('novo:voice-cancel', cancel)
+    return () => {
+      mountedRef.current = false
+      window.removeEventListener('novo:voice-cancel', cancel)
+      cancelRecording(false)
+    }
+  }, [cancelRecording])
 
   const phase = bioState?.phase ?? 'LINEAR_EXECUTION'
   const phaseConfig = PHASE_CONFIG[phase]
@@ -212,10 +244,16 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   // ── Recording logic ──────────────────────────────────────────────────────
 
   const startRecording = useCallback(async () => {
+    if (requestingRef.current || mediaRecorderRef.current || processing) return
+    requestingRef.current = true
+    const generation = ++generationRef.current
+    const current = () => mountedRef.current && generationRef.current === generation
     try {
       setError(null)
       setLastResult(null)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!current()) { stream.getTracks().forEach(track => track.stop()); return }
+      requestingRef.current = false
       streamRef.current = stream
       emitVoiceStream(stream)
 
@@ -223,11 +261,13 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       chunksRef.current = []
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+        if (current() && e.data.size > 0) chunksRef.current.push(e.data)
       }
 
       recorder.onstop = async () => {
-        streamRef.current?.getTracks().forEach(t => t.stop())
+        stream.getTracks().forEach(t => t.stop())
+        if (!current()) return
+        mediaRecorderRef.current = null
         streamRef.current = null
         emitVoiceStream(null)
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
@@ -235,6 +275,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         if (blob.size < 1000) {
           setError('No audio detected. Hold the button while speaking.')
           setProcessing(false)
+          emitVoiceState('idle')
           return
         }
 
@@ -242,6 +283,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         emitVoiceState('thinking')
         try {
           const text = await whisperAPI.transcribeAudio(blob)
+          if (!current()) return
           setLastTranscript(text)
 
           if (!text.trim()) {
@@ -259,6 +301,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
           }
 
           const result = await executeVoiceCommand(text, bioState)
+          if (!current()) return
           setLastResult(result)
 
           setHistory(prev => [
@@ -303,10 +346,9 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
             detail: { text, result, phase: bioState?.phase }
           }))
         } catch (err: any) {
-          setError(err?.message ?? 'Transcription failed. Check your microphone.')
+          if (current()) setError('No pudimos procesar el audio. Revisa el micrófono e inténtalo de nuevo.')
         } finally {
-          setProcessing(false)
-          emitVoiceState('idle')
+          if (current()) { setProcessing(false); emitVoiceState('idle') }
         }
       }
 
@@ -315,20 +357,43 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       setRecording(true)
       emitVoiceState('listening')
     } catch (err: any) {
+      if (!current()) return
+      requestingRef.current = false
       streamRef.current?.getTracks().forEach(track => track.stop())
       streamRef.current = null
       emitVoiceStream(null)
-      setError(err?.message ?? 'Microphone access denied.')
+      setError('No se pudo abrir el micrófono. Revisa el permiso e inténtalo de nuevo.')
       emitVoiceState('idle')
     }
-  }, [bioState])
+  }, [bioState, processing])
 
   const stopRecording = useCallback(() => {
+    // Releasing before a permission prompt resolves must never start a
+    // recording afterward with no visible gesture holding it open.
+    if (requestingRef.current) { cancelRecording(); return }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
     setRecording(false)
-  }, [])
+  }, [cancelRecording])
+
+  const holdControls = {
+    'aria-label': 'Mantén pulsado para hablar',
+    style: { touchAction: 'none' } as React.CSSProperties,
+    onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      void startRecording()
+    },
+    onPointerUp: stopRecording,
+    onPointerCancel: () => cancelRecording(),
+    onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) { event.preventDefault(); void startRecording() }
+    },
+    onKeyUp: (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); stopRecording() }
+    },
+  }
 
   // The fullscreen /ai composer predates this hub and emits the legacy event
   // name. Keep one recorder implementation by routing that event here rather
@@ -336,7 +401,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   useEffect(() => {
     if (!headless) return
     const toggle = () => {
-      if (recording) stopRecording()
+      if (recording || requestingRef.current) stopRecording()
       else if (!processing) void startRecording()
     }
     window.addEventListener('toggle-gemini-live', toggle)
@@ -352,7 +417,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && recording) {
+      if (e.code === 'Space' && (recording || requestingRef.current)) {
         e.preventDefault()
         stopRecording()
       }
@@ -372,10 +437,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   if (compact) {
     return (
       <motion.button
-        onMouseDown={startRecording}
-        onMouseUp={stopRecording}
-        onTouchStart={startRecording}
-        onTouchEnd={stopRecording}
+        {...holdControls}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.94 }}
         className={`
@@ -420,10 +482,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       <div className="flex flex-col items-center gap-5">
         {/* Record button */}
         <motion.button
-          onMouseDown={startRecording}
-          onMouseUp={stopRecording}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
+          {...holdControls}
           animate={
             recording
               ? { scale: [1, 1.04, 1], transition: { repeat: Infinity, duration: 1.2 } }

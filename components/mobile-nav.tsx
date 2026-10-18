@@ -10,9 +10,10 @@ import { appleLiquidMotion, springConfig } from '@/lib/design-tokens'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRef } from 'react'
 import { CommandCenterLiquidMorph } from '@/components/command-center-liquid-morph'
+import { rememberNavigationOrigin } from '@/lib/navigation-origin'
 
 export function MobileNav() {
     const router = useRouter()
@@ -20,7 +21,8 @@ export function MobileNav() {
     const { t } = useTranslation()
     const { activeOverlay, closeOverlay, openOverlay, suppressSecondary } = useMobileOverlay()
     const drawerOpen = activeOverlay === 'navigation'
-    const [drawerMounted, setDrawerMounted] = useState(false)
+    const [drawerMounted, setDrawerMounted] = useState(drawerOpen)
+    const afterExitRef = useRef<(() => void) | null>(null)
     const liquidSourceRef = useRef<HTMLDivElement>(null)
     const liquidRailRef = useRef<HTMLDivElement>(null)
     const liquidFabRef = useRef<HTMLButtonElement>(null)
@@ -29,25 +31,28 @@ export function MobileNav() {
         ? (drawerOpen ? 'opening' : 'closing')
         : 'rest'
 
-    // The dialog portal can finish its focus-restoration callback after a
-    // reversed spring. Keep the physical exit visible, but always release the
-    // real navbar afterwards so its buttons cannot remain inert.
-    useEffect(() => {
-        if (!drawerMounted || drawerOpen) return
-        const release = window.setTimeout(() => setDrawerMounted(false), 780)
-        return () => window.clearTimeout(release)
-    }, [drawerMounted, drawerOpen])
+    const handleExitComplete = () => {
+        setDrawerMounted(false)
+        const next = afterExitRef.current
+        afterExitRef.current = null
+        if (next) window.requestAnimationFrame(next)
+    }
 
     const handleCloseDrawer = (options?: { historyAction?: 'back' | 'replace' | 'none' }) =>
         closeOverlay(options)
     const handleOpenVoice = () => {
-        setDrawerMounted(false)
-        openOverlay('voice')
+        afterExitRef.current = () => openOverlay('voice')
+        handleCloseDrawer()
+    }
+    const handleOpenSearch = () => {
+        afterExitRef.current = () => window.dispatchEvent(new CustomEvent('open-command-palette'))
+        handleCloseDrawer()
     }
     const handleFabClick = () => {
         navigator.vibrate?.(10)
         if (drawerOpen) handleCloseDrawer()
         else {
+            afterExitRef.current = null
             setDrawerMounted(true)
             openOverlay('navigation')
         }
@@ -69,7 +74,7 @@ export function MobileNav() {
 
     // When the software keyboard or a different modal/sheet owns the mobile
     // surface, remove every background navigation target from the a11y tree.
-    if (suppressSecondary && activeOverlay !== 'navigation') return null
+    if (suppressSecondary && activeOverlay !== 'navigation' && !drawerMounted) return null
 
     return (
         <>
@@ -114,6 +119,7 @@ export function MobileNav() {
                                     type="matrix"
                                     values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -8"
                                 />
+                                <feComponentTransfer><feFuncA type="linear" slope="0.18" /></feComponentTransfer>
                             </filter>
                         </defs>
                     </svg>
@@ -125,7 +131,7 @@ export function MobileNav() {
                         ref={liquidRailRef}
                         data-testid="mobile-nav-rail"
                         className={cn(
-                            "relative z-10 isolate flex items-center gap-1 rounded-full pointer-events-auto p-1 novo-mobile-nav-shell",
+                            "relative z-10 flex items-center gap-1 rounded-full pointer-events-auto p-1 novo-mobile-nav-shell",
                             isCompactPath ? "px-3 py-1.5" : "px-2 py-2"
                         )}
                     >
@@ -134,7 +140,7 @@ export function MobileNav() {
                             data-testid="mobile-nav-rail-glass"
                             preset="navigation"
                             refractive
-                            refractiveActive={!drawerMounted}
+                            refractiveActive
                             refractivePriority="ambient"
                             webComponent
                             backgroundColor="rgba(255,255,255,0.055)"
@@ -153,8 +159,9 @@ export function MobileNav() {
                                         data-testid={drawerMounted ? undefined : 'mobile-primary-target'}
                                         aria-label={item.label}
                                         aria-current={active ? 'page' : undefined}
-                                        onClick={() => {
+                                        onClick={(event) => {
                                             navigator.vibrate?.(10)
+                                            rememberNavigationOrigin(event.currentTarget, item.path)
                                             router.push(item.path)
                                         }}
                                         className={cn(
@@ -209,21 +216,19 @@ export function MobileNav() {
                         </LayoutGroup>
                     </div>
 
-                    <motion.button
+                    <button
                         ref={liquidFabRef}
                         onClick={handleFabClick}
                         data-testid={drawerMounted ? undefined : 'mobile-primary-target'}
                         aria-label={drawerOpen ? "Close menu" : "Open menu"}
-                        className="novo-mobile-nav-fab relative z-10 isolate flex min-h-[44px] min-w-[44px] min-h-[48px] min-w-[48px] items-center justify-center overflow-hidden rounded-full pointer-events-auto"
-                        whileTap={{ scale: appleLiquidMotion.pressScale }}
-                        transition={appleLiquidMotion.pressTransition}
+                        className="novo-mobile-nav-fab relative z-10 flex min-h-[48px] min-w-[48px] items-center justify-center overflow-hidden rounded-full pointer-events-auto"
                     >
                         <GlassSurface
                             aria-hidden
                             data-testid="mobile-nav-plus-glass"
                             preset="navigation"
                             refractive
-                            refractiveActive={!drawerMounted}
+                            refractiveActive
                             refractivePriority="interactive"
                             webComponent
                             backgroundColor="rgba(255,255,255,0.055)"
@@ -243,7 +248,7 @@ export function MobileNav() {
                                 strokeWidth={2.25}
                             />
                         </div>
-                    </motion.button>
+                    </button>
                 </div>
             </nav>
 
@@ -254,7 +259,10 @@ export function MobileNav() {
                     <MobileSectionDrawer
                         open={drawerOpen}
                         onClose={handleCloseDrawer}
+                        onExitComplete={handleExitComplete}
+                        anchorRef={liquidFabRef}
                         onOpenVoice={handleOpenVoice}
+                        onOpenSearch={handleOpenSearch}
                     />
                     <CommandCenterLiquidMorph
                         active={drawerOpen}

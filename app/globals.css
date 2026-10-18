@@ -298,15 +298,62 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 ::view-transition-old(root) {
-  animation: novo-appearance-out 180ms ease-out both;
+  animation: none;
 }
 
 ::view-transition-new(root) {
+  animation: none;
+}
+
+html[data-appearance-transition]::view-transition-old(root) {
+  animation: novo-appearance-out 180ms ease-out both;
+}
+
+html[data-appearance-transition]::view-transition-new(root) {
   animation: novo-appearance-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes novo-appearance-out { to { opacity: 0; } }
 @keyframes novo-appearance-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+
+/* One route snapshot, never the persistent navigation or a second React tree.
+   The contour deforms; the live page and its glass keep their natural layout. */
+::view-transition { pointer-events: none; }
+::view-transition-group(.novo-route-liquid),
+::view-transition-group(.novo-route-fade) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.novo-route-liquid) {
+  transform-origin: var(--novo-route-origin, 50% 92%);
+  animation: novo-route-release 140ms ease-out both;
+}
+::view-transition-new(.novo-route-liquid) {
+  transform-origin: var(--novo-route-origin, 50% 92%);
+  animation: novo-route-drop 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes novo-route-release {
+  to { opacity: 0; transform: scale(0.988, 0.98); clip-path: inset(0 round 32px); }
+}
+@keyframes novo-route-drop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.978, 0.985);
+    clip-path: inset(0.5% 0.8% 1.2% round 44px 44px 30px 30px);
+  }
+  58% { opacity: 1; transform: translateY(0) scale(1.002, 0.999); clip-path: inset(0 round 18px); }
+  to { opacity: 1; transform: none; clip-path: inset(0 round 0); }
+}
+::view-transition-old(.novo-route-fade) { animation: novo-appearance-out 100ms linear both; }
+::view-transition-new(.novo-route-fade) { animation: novo-route-fade-in 120ms linear both; }
+@keyframes novo-route-fade-in { from { opacity: 0; } to { opacity: 1; } }
+:root[data-novo-motion='off']::view-transition-group(*),
+:root[data-novo-motion='off']::view-transition-old(*),
+:root[data-novo-motion='off']::view-transition-new(*) { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.novo-route-liquid) { animation: novo-appearance-out 100ms linear both; }
+  ::view-transition-new(.novo-route-liquid) { animation: novo-route-fade-in 120ms linear both; }
+}
 
 :root[data-novo-motion='reduced'] html[data-appearance-transition] body.has-bg-image::before,
 :root[data-novo-motion='reduced'] ::view-transition-old(root),
@@ -1998,42 +2045,29 @@ html:not(.dark) .cognitive-page .liquid-glass-premium {
   color: var(--foreground);
 }
 
-/* Cognitive dashboard field: one calm emerald/teal focal plane, inspired by
-   Stepbro's money dashboard. The noise stays low-contrast and never competes
-   with operational labels or chart data. */
+/* The Center belongs to the same wallpaper and neutral surfaces as Novo. */
 .cognitive-page {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 70% 80% at 52% 8%, rgba(20, 184, 166, 0.10), transparent 68%),
-    linear-gradient(180deg, color-mix(in srgb, var(--background) 92%, #06351f 8%), var(--background));
+  background: transparent;
 }
 
-.cognitive-page::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.12;
-  mix-blend-mode: soft-light;
-  background-image: var(--glass-noise);
-  background-size: 180px 180px;
-}
-
-.cognitive-page > * { position: relative; z-index: 1; }
-
-.dark .cognitive-page {
-  background:
-    radial-gradient(ellipse 72% 78% at 50% 5%, rgba(16, 185, 129, 0.14), transparent 67%),
-    radial-gradient(ellipse 54% 56% at 92% 96%, rgba(20, 184, 166, 0.08), transparent 72%),
-    linear-gradient(180deg, #06140c, #030805 88%);
-}
-
-.cognitive-shell {
-  backdrop-filter: var(--novo-context-backdrop-filter);
-  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
+/* Narrow screens keep the same selectable contexts in a readable sequence;
+   a free-positioned graph cannot keep long labels apart at phone widths. */
+@media (max-width: 1023px) {
+  [data-context-map] { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  [data-context-map] > svg,
+  [data-context-decoration] { display: none; }
+  [data-context-node],
+  [data-context-anchor],
+  [data-context-action] {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    transform: none !important;
+    translate: none !important;
+  }
 }
 
 .cognitive-chart {
@@ -2074,6 +2108,23 @@ html:not(.dark) .cognitive-chart {
 [data-slot="sheet-content"] {
   will-change: transform, opacity;
   transform: translateZ(0);
+}
+
+/* This panel's empty optical shell owns the flight. Promoting/fading/clipping
+   a dialog ancestor would create a backdrop root and flatten the same lens
+   that stays transparent in the navigation rail. */
+[data-slot='dialog-content'][data-liquid-morph-panel] {
+  will-change: auto;
+  transform: none;
+  isolation: auto;
+  clip-path: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-liquid-morph-panel] > [data-modal-drag-handle] { display: none; }
+[data-liquid-panel-material] {
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(0,0,0,.12);
 }
 
 @layer utilities {
@@ -3318,8 +3369,10 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
     opacity: 0;
     border: 1px solid rgba(255, 255, 255, 0.86);
     border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.40));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(255, 255, 255, 0.20), 0 10px 26px rgba(76, 55, 39, 0.10);
+    /* Opaque alpha feeds the goo threshold; the SVG applies the .18 tint
+       afterward so the bridge cannot be erased by its own input gate. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.75));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
     transform: translate3d(0, -50%, 0) scale(0.58, 0.72);
     transform-origin: center;
     filter: url('#novo-mobile-nav-liquid-merge');

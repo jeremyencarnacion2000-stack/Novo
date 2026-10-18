@@ -4,6 +4,7 @@ import { useEffect, useId, useLayoutEffect, useRef, type RefObject } from 'react
 import type { MotionValue } from 'framer-motion'
 import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 import { liquidNeckProfile } from '@/lib/liquid-notification'
+import { NAV_MORPH_REST_EVENT } from '@/lib/mobile-nav-motion'
 
 /**
  * Physical, reversible progress driver ported from command-center-liquid-nav
@@ -74,7 +75,7 @@ export class LiquidMorphSpring {
     // The lab uses substeps so a dropped mobile frame cannot destabilise the spring.
     const steps = Math.max(1, Math.ceil(elapsed / (1 / 120)))
     const dt = elapsed / steps
-    const response = this.target > this.value
+    const response = this.target === 1
       ? LIQUID_MORPH_CONFIG.spring.openResponse
       : LIQUID_MORPH_CONFIG.spring.closeResponse
     const omega = (2 * Math.PI) / response
@@ -139,10 +140,14 @@ export function CommandCenterLiquidMorph({
   const motionMode = useNovoMotionPolicy()
   const springRef = useRef<LiquidMorphSpring | null>(null)
   const logicalTargetRef = useRef(active)
+  const modeRef = useRef(motionMode)
+  logicalTargetRef.current = active
+  modeRef.current = motionMode
 
   useEffect(() => {
-    logicalTargetRef.current = active
-    if (motionMode === 'full') springRef.current?.setTarget(active ? 1 : 0)
+    document.querySelector('[data-liquid-morph-panel]')?.removeAttribute('data-liquid-morph-settled')
+    const hiddenOnDesktop = !active && window.matchMedia?.('(min-width: 768px)').matches
+    if (motionMode === 'full' && !hiddenOnDesktop) springRef.current?.setTarget(active ? 1 : 0)
     else springRef.current?.setImmediate(active ? 1 : 0)
   }, [active, motionMode])
 
@@ -156,33 +161,66 @@ export function CommandCenterLiquidMorph({
 
     let geometry: Geometry | null = null
     let panel: HTMLElement | null = null
+    let material: HTMLElement | null = null
     let content: HTMLElement | null = null
     let closeButton: HTMLElement | null = null
-    let bridge: HTMLElement | null = source.querySelector('[data-liquid-merge-geometry]')
+    let handle: HTMLElement | null = null
+    const bridge = source.querySelector<HTMLElement>('[data-liquid-merge-geometry]')
     let observer: ResizeObserver | null = null
     let observedPanel: HTMLElement | null = null
+    let contentTop = 0
+    let portalObserver: MutationObserver | null = null
+    const flightGlyph = plusGlyph?.cloneNode(true) as SVGSVGElement | undefined
+    if (flightGlyph) {
+      flightGlyph.removeAttribute('data-shared-item')
+      flightGlyph.setAttribute('aria-hidden', 'true')
+      flightGlyph.dataset.liquidNavGlyph = 'true'
+      Object.assign(flightGlyph.style, {
+        position: 'fixed', pointerEvents: 'none', zIndex: '5002', margin: '0',
+        visibility: 'hidden', color: getComputedStyle(plusGlyph!).color,
+      })
+      document.body.appendChild(flightGlyph)
+    }
 
     const measure = () => {
       panel = document.querySelector<HTMLElement>('[data-liquid-morph-panel]')
       if (!panel) return
+      // Read the undeformed endpoints. A transform must never become the next
+      // measurement's origin after a resize or a late portal commit.
+      const saved = [rail, fab, plusGlyph, closeButton, content].filter(Boolean).map(element => {
+        const node = element as HTMLElement | SVGSVGElement
+        const transform = node.style.transform
+        node.style.transform = 'none'
+        return { node, transform }
+      })
       const sourceRect = toRect(source.getBoundingClientRect())
       const railRect = toRect(rail.getBoundingClientRect())
       const fabRect = toRect(fab.getBoundingClientRect())
       const targetRect = toRect(panel.getBoundingClientRect())
-      if (!sourceRect.width || !targetRect.width || !targetRect.height) return
       closeButton = panel.querySelector<HTMLElement>('[data-slot="dialog-close"]')
       content = panel.querySelector<HTMLElement>('[data-modal-content]')
+      material = panel.querySelector<HTMLElement>('[data-liquid-panel-material]')
+      handle = panel.querySelector<HTMLElement>('[data-liquid-panel-handle]')
+      const closeRect = closeButton ? toRect(closeButton.getBoundingClientRect()) : null
+      const glyphRect = plusGlyph ? toRect(plusGlyph.getBoundingClientRect()) : null
+      contentTop = content ? content.getBoundingClientRect().top - targetRect.top : 0
+      saved.forEach(({ node, transform }) => { node.style.transform = transform })
+      portalObserver?.disconnect()
+      if (!sourceRect.width || !targetRect.width || !targetRect.height) return
       geometry = {
         source: sourceRect,
         rail: railRect,
         fab: fabRect,
         target: targetRect,
-        close: closeButton ? toRect(closeButton.getBoundingClientRect()) : null,
-        glyph: plusGlyph ? toRect(plusGlyph.getBoundingClientRect()) : null,
+        close: closeRect,
+        glyph: glyphRect,
       }
       if (observedPanel !== panel) {
         observer?.disconnect()
-        observer = new ResizeObserver(measure)
+        observer = new ResizeObserver(() => {
+          measure()
+          render(spring.value, spring.velocity)
+        })
         observer.observe(source)
         observer.observe(rail)
         observer.observe(fab)
@@ -203,22 +241,16 @@ export function CommandCenterLiquidMorph({
       const reveal = smoothstep(...LIQUID_MORPH_CONFIG.phases.content, progress)
       const energy = Math.min(1, Math.abs(velocity) / 4.2)
 
-      const startTop = sourceRect.top - targetRect.top
-      const startRight = targetRect.right - sourceRect.right
-      const startBottom = targetRect.bottom - sourceRect.bottom
-      const startLeft = sourceRect.left - targetRect.left
-      const clip = {
-        top: lerp(startTop, 0, expand),
-        right: lerp(startRight, 0, expand),
-        bottom: lerp(startBottom, 0, expand),
-        left: lerp(startLeft, 0, expand),
-        radius: lerp(Math.min(sourceRect.height / 2, sourceRect.width / 2), 28, expand) - (1 - progress) * energy * LIQUID_MORPH_CONFIG.deformation,
-      }
-      const clipPath = `inset(${clip.top.toFixed(2)}px ${clip.right.toFixed(2)}px ${clip.bottom.toFixed(2)}px ${clip.left.toFixed(2)}px round ${Math.max(2, clip.radius).toFixed(2)}px)`
+      const width = lerp(sourceRect.width, targetRect.width, expand)
+      const height = lerp(sourceRect.height, targetRect.height, expand)
+      const x = lerp(sourceRect.left - targetRect.left, 0, expand)
+      const y = lerp(sourceRect.top - targetRect.top, 0, expand)
+      const scaleX = width / targetRect.width
+      const scaleY = height / targetRect.height
+      const radius = lerp(sourceRect.height / 2, 28, expand)
 
       // Source material stays visible through approach/neck. Only after the
       // common surface exists does it get absorbed by the panel material.
-      source.style.opacity = '1'
       rail.style.opacity = String(1 - smoothstep(0.38, 0.64, progress))
       rail.style.transformOrigin = '100% 50%'
       const railBulge = 1 + 0.1028 * neck * (1 - smoothstep(0.35, 0.5, progress))
@@ -243,30 +275,61 @@ export function CommandCenterLiquidMorph({
         bridge.style.transform = `translate3d(0,-50%,0) scaleY(${(1 - energy * 0.05).toFixed(3)})`
       }
 
-      panel.style.opacity = String(smoothstep(0.28, 0.58, progress))
-      panel.style.clipPath = clipPath
-      ;(panel.style as CSSStyleDeclaration & { webkitClipPath: string }).webkitClipPath = clipPath
-      panel.style.willChange = 'clip-path, opacity'
+      // The optical shell is a sibling of the fading content. No opacity,
+      // clip-path or will-change:opacity ancestor can flatten its backdrop.
+      // Only this empty material is stretched; page labels stay at full size.
+      if (material) {
+        material.style.visibility = progress < 0.40 ? 'hidden' : 'visible'
+        material.style.transformOrigin = '0 0'
+        material.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0) scale(${scaleX.toFixed(4)},${scaleY.toFixed(4)})`
+        material.style.borderRadius = `${(radius / scaleX).toFixed(2)}px / ${(radius / scaleY).toFixed(2)}px`
+        material.style.willChange = progress > 0 && progress < 1 ? 'transform' : 'auto'
+      }
       if (content) {
         content.style.opacity = String(reveal)
         content.style.transform = `translate3d(0,${lerp(9, 0, reveal).toFixed(2)}px,0)`
-        content.style.willChange = 'transform, opacity'
+        // Clip only the readable layer to the growing contour. The optical
+        // sibling continues sampling the wallpaper outside this text mask.
+        content.style.clipPath = `inset(${Math.max(0, y - contentTop).toFixed(2)}px ${Math.max(0, targetRect.width - x - width).toFixed(2)}px 0 ${Math.max(0, x).toFixed(2)}px round 12px)`
+        content.style.willChange = progress === 1 && velocity === 0 ? 'auto' : 'transform, opacity'
+        content.style.pointerEvents = logicalTargetRef.current && reveal > 0.85 ? '' : 'none'
       }
+      if (handle) handle.style.opacity = String(reveal)
       if (closeButton) {
         closeButton.style.opacity = String(reveal)
         closeButton.style.transform = `translate3d(0,${lerp(5, 0, reveal).toFixed(2)}px,0)`
       }
-      if (plusGlyph && close && glyph) {
+      if (plusGlyph && flightGlyph && close && glyph) {
         const flight = smoothstep(0.28, 0.72, progress)
         const dx = close.left + close.width / 2 - (glyph.left + glyph.width / 2)
         const dy = close.top + close.height / 2 - (glyph.top + glyph.height / 2)
-        plusGlyph.style.transformOrigin = '50% 50%'
-        plusGlyph.style.transform = `translate3d(${(dx * flight).toFixed(2)}px,${(dy * flight).toFixed(2)}px,0) rotate(${(45 * flight).toFixed(2)}deg)`
-        plusGlyph.style.willChange = 'transform'
+        // A portal glyph uses viewport coordinates, independent of the FAB's
+        // simultaneous squash and translation.
+        plusGlyph.style.visibility = progress > 0 ? 'hidden' : ''
+        Object.assign(flightGlyph.style, {
+          left: `${glyph.left}px`, top: `${glyph.top}px`,
+          width: `${glyph.width}px`, height: `${glyph.height}px`,
+          visibility: progress > 0 && progress < 0.88 ? 'visible' : 'hidden',
+          opacity: String(1 - smoothstep(0.72, 0.88, progress)),
+          transform: `translate3d(${(dx * flight).toFixed(2)}px,${(dy * flight).toFixed(2)}px,0) rotate(${(45 * flight).toFixed(2)}deg)`,
+        })
       }
     }
 
-    const spring = new LiquidMorphSpring(render)
+    const spring = new LiquidMorphSpring(render, (target) => {
+      if (target !== (logicalTargetRef.current ? 1 : 0)) return
+      if (!panel) measure()
+      if (target === 1) {
+        clearStyles(material, content, closeButton)
+        if (material) material.style.borderRadius = ''
+        panel?.setAttribute('data-liquid-morph-settled', 'open')
+      } else {
+        clearStyles(rail, fab)
+        if (plusGlyph) plusGlyph.style.visibility = ''
+        panel?.setAttribute('data-liquid-morph-settled', 'closed')
+        panel?.dispatchEvent(new Event(NAV_MORPH_REST_EVENT))
+      }
+    })
     springRef.current = spring
     // Write the compact first frame before the portaled Dialog is painted.
     // This is what makes the panel feel born from the rail rather than
@@ -275,25 +338,31 @@ export function CommandCenterLiquidMorph({
     render(spring.value, spring.velocity)
     // Radix portals can commit one turn after the + handler. Observe only
     // child-list changes so the first measured geometry is never skipped.
-    const portalObserver = new MutationObserver(() => {
-      const previousPanel = panel
+    portalObserver = new MutationObserver(() => {
       measure()
-      if (panel && panel !== previousPanel) render(spring.value, spring.velocity)
+      if (panel) render(spring.value, spring.velocity)
     })
-    portalObserver.observe(document.body, { childList: true, subtree: true })
+    if (!panel) portalObserver.observe(document.body, { childList: true, subtree: true })
     const timeout = window.setTimeout(measure, 0)
-    if (motionMode === 'full') spring.setTarget(logicalTargetRef.current ? 1 : 0)
+    const remeasure = () => { measure(); render(spring.value, spring.velocity) }
+    window.addEventListener('resize', remeasure)
+    window.visualViewport?.addEventListener('resize', remeasure)
+    if (modeRef.current === 'full') spring.setTarget(logicalTargetRef.current ? 1 : 0)
     else spring.setImmediate(logicalTargetRef.current ? 1 : 0)
 
     return () => {
       window.clearTimeout(timeout)
       spring.destroy()
-      portalObserver.disconnect()
+      portalObserver?.disconnect()
+      window.removeEventListener('resize', remeasure)
+      window.visualViewport?.removeEventListener('resize', remeasure)
       if (springRef.current === spring) springRef.current = null
       observer?.disconnect()
-      clearStyles(source, rail, fab, plusGlyph, bridge, panel, content, closeButton)
+      clearStyles(rail, fab, bridge, material, content, closeButton)
+      if (plusGlyph) plusGlyph.style.visibility = ''
+      flightGlyph?.remove()
     }
-  }, [mounted, motionMode, sourceRef, railRef, fabRef, plusGlyphRef])
+  }, [mounted, sourceRef, railRef, fabRef, plusGlyphRef])
 
   return null
 }

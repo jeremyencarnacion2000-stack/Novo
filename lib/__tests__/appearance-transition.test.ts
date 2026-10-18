@@ -4,6 +4,21 @@ describe('runAppearanceTransition', () => {
   afterEach(() => {
     Reflect.deleteProperty(document, 'startViewTransition')
     delete document.documentElement.dataset.novoMotion
+    delete document.documentElement.dataset.appearanceTransition
+  })
+
+  it('keeps the native appearance marker until its own transition finishes', async () => {
+    let finish!: () => void
+    const finished = new Promise<void>(resolve => { finish = resolve })
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: (update: () => void) => { update(); return { finished } },
+    })
+    runAppearanceTransition(jest.fn())
+    expect(document.documentElement).toHaveAttribute('data-appearance-transition', 'true')
+    finish()
+    await finished
+    expect(document.documentElement).not.toHaveAttribute('data-appearance-transition')
   })
 
   it('uses the browser view transition so theme and wallpaper changes share one visual handoff', () => {

@@ -299,6 +299,7 @@ function DialogContent({
     contextualRect,
   })
   useSharedDialogMotion({
+    surfaceRef,
     motionId: flipId ?? '',
     enabled: isIntegratedFlipModal && Boolean(surfaceElement),
     registerController: motionContext?.registerController,
