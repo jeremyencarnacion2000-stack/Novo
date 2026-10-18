@@ -3,11 +3,8 @@
 /**
  * ContextHub.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Premium Apple-Level Spatial Interface Component for Novo Heritage.
- *
- * Implements high-end glassmorphic physics, thin-line vector clock weights,
- * monospaced typography hierarchy, sculpted buttons, breathing radial aura
- * gradients, and real sunken card depth styling.
+ * Lateral Hub for focus, quick capture and audio. One restrained glass material
+ * and one reversible geometry controller keep its states visually connected.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -18,10 +15,9 @@ import { useSettings } from '@/lib/settings-context';
 import { useFocus, useFocusControls } from '@/lib/focus-context';
 import { useScrollContainer } from '@/lib/scroll-container-context';
 import { useCognitiveState, useCognitiveDispatch } from '@/lib/cognitive-context';
-import type { CognitivePhase } from '@/lib/cognitive-engine';
 import {
-  Play, Pause, SkipForward, SkipBack, Plus, Timer, Waves,
-  Sun, Moon, Music, CloudSun, Cloud, CloudRain, Zap,
+  Play, Pause, SkipForward, SkipBack, Plus, Waves,
+  Sun, Moon, Music, Clock3, Zap,
   Brain, X, GripVertical, ArrowRight, Target, Coffee, FileText, Mic, Sparkles
 } from 'lucide-react';
 import {
@@ -34,7 +30,7 @@ import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion'
 import { cn } from '@/lib/utils';
 import { useQuickCapture } from '@/lib/quick-capture-context';
 import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy';
-import { GlassSurface } from '@/components/ui/GlassSurface';
+import { HubGlassMaterial } from '@/components/ui/hub-glass-material';
 import { SHARED_SURFACE_SHAPES, useSharedSurfaceMorph } from '@/hooks/use-shared-surface-morph';
 import { PomodoroDetachMorph } from '@/components/command-center-liquid-morph';
 import { PomodoroWidget } from '@/components/pomodoro-widget';
@@ -43,18 +39,9 @@ import { eventBus } from '@/lib/events/event-bus';
 import { LiquidNotification } from '@/components/ui/liquid-notification';
 import type { CurrentTrack } from '@/lib/player-store';
 
-// ─── Cognitive phase accent colors (High HSL precision) ──────────────────────
-const PHASE_COLOR: Record<CognitivePhase, string> = {
-  PEAK_FOCUS:       '#818cf8', // light indigo
-  LINEAR_EXECUTION: '#34d399', // light emerald
-  SYNAPTIC_FATIGUE: '#fb923c', // light amber
-  REDUCED_CAPACITY_MODE: '#f59e0b', // warm amber
-};
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 type HubState = 'idle' | 'capsule' | 'expanded' | 'notification';
 type HubTab = 'focus' | 'audio' | 'settings';
-type WeatherIcon = 'sun' | 'cloud-sun' | 'cloud' | 'cloud-rain' | 'zap';
 
 const HUB_TABS: readonly HubTab[] = ['focus', 'audio', 'settings'];
 
@@ -91,203 +78,30 @@ export function emitTwinNotification(payload: TwinNotificationPayload) {
   }
 }
 
-function NotificationContent({
-  notification,
-  onDismiss,
-}: {
-  notification: TwinNotificationPayload;
-  onDismiss: () => void;
-}) {
+function NotificationContent({ notification, onDismiss }: { notification: TwinNotificationPayload; onDismiss: () => void }) {
   const router = useRouter();
-
-  // Strip any legacy generic emojis from title to enforce NOVO vector icon design system
-  const cleanTitle = notification.title
-    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-    .trim();
-
-  const isCritical = notification.severity === 'critical';
-  const isWarning = notification.severity === 'warning';
-
-  const dotColor = isCritical ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-emerald-400';
-  const tagColor = isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-indigo-400';
-
-  const iconContainerClass = isCritical
-    ? 'bg-red-500/15 border-red-500/30 text-red-400'
-    : isWarning
-    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-    : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400';
-
-  const renderIcon = () => {
-    if (notification.platform === 'notion') return <SiNotion className="w-3.5 h-3.5 text-white" />;
-    if (notification.platform === 'todoist') return <SiTodoist className="w-3.5 h-3.5 text-red-400" />;
-    if (notification.platform === 'slack') return <FaSlack className="w-3.5 h-3.5 text-emerald-400" />;
-    if (notification.platform === 'gmail') return <SiGmail className="w-3.5 h-3.5 text-red-400" />;
-    if (notification.platform === 'calendar') return <SiGooglecalendar className="w-3.5 h-3.5 text-blue-400" />;
-
-    if (cleanTitle.toLowerCase().includes('fatiga')) return <Coffee className="w-3.5 h-3.5 text-amber-400" />;
-    if (cleanTitle.toLowerCase().includes('foco') || cleanTitle.toLowerCase().includes('focus')) return <Target className="w-3.5 h-3.5 text-indigo-400" />;
-    if (cleanTitle.toLowerCase().includes('capacidad') || cleanTitle.toLowerCase().includes('reducida')) return <Zap className="w-3.5 h-3.5 text-red-400" />;
-
-    return <Brain className="w-3.5 h-3.5 text-indigo-400" />;
-  };
-
-  return (
-    <div className="w-full p-4 flex flex-col gap-2 relative bg-[rgba(10,18,24,0.96)] text-white rounded-[28px]">
-      {/* Top Header Row — iOS Dynamic Island style dot indicator + category tag */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", dotColor)} />
-          <span className={cn("text-[9px] font-mono font-bold tracking-widest uppercase opacity-90", tagColor)}>
-            Novo · Twin
-          </span>
-        </div>
-        <button
-          type="button"
-          aria-label="Cerrar aviso del Twin"
-          onClick={onDismiss}
-          className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-        >
-          <X className="w-3 h-3" />
-        </button>
+  const cleanTitle = notification.title.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+  const iconClass = "h-4 w-4 text-white/80";
+  const icon = notification.platform === 'notion' ? <SiNotion className={iconClass} />
+    : notification.platform === 'todoist' ? <SiTodoist className={iconClass} />
+    : notification.platform === 'slack' ? <FaSlack className={iconClass} />
+    : notification.platform === 'gmail' ? <SiGmail className={iconClass} />
+    : notification.platform === 'calendar' ? <SiGooglecalendar className={iconClass} />
+    : <Brain className={iconClass} strokeWidth={1.5} />;
+  return <div className="novo-hub-notice-body relative overflow-hidden rounded-[28px] text-white">
+    <HubGlassMaterial priority="interactive" />
+    <div className="relative z-[1] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-medium text-white/75">Novo · Twin</span>
+        <button type="button" aria-label="Cerrar aviso del Twin" onClick={onDismiss} className="grid h-9 w-9 place-items-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"><X aria-hidden="true" className="h-4 w-4" /></button>
       </div>
-
-      {/* Main Content Row */}
-      <div className="flex items-center gap-3 my-0.5 min-w-0">
-        <div className={cn("w-8 h-8 rounded-full border flex items-center justify-center flex-shrink-0 shadow-inner", iconContainerClass)}>
-          {renderIcon()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h4 className="text-[13px] font-bold text-white tracking-tight leading-tight">
-            {cleanTitle}
-          </h4>
-          <p className="text-xs text-white/70 font-normal leading-relaxed mt-1">
-            {notification.description}
-          </p>
-        </div>
+      <div className="mt-1 flex items-start gap-3">
+        <span aria-hidden="true" className="mt-0.5 shrink-0">{icon}</span>
+        <div className="min-w-0"><h4 className="text-[14px] font-medium leading-snug">{cleanTitle}</h4><p className="mt-1 text-[12px] leading-relaxed text-white/80">{notification.description}</p></div>
       </div>
-
-      {/* Action Footer */}
-      {notification.actionLabel && (
-        <div className="flex justify-end pt-0.5">
-          <button
-            onClick={() => {
-              if (notification.actionUrl?.startsWith('/') && !notification.actionUrl.startsWith('//')) {
-                router.push(notification.actionUrl);
-              }
-              onDismiss();
-            }}
-            className="px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/15 text-[10px] font-semibold text-white transition-all shadow-sm flex items-center gap-1 cursor-pointer active:scale-95"
-          >
-            <span>{notification.actionLabel}</span>
-            <ArrowRight className="w-3 h-3 text-white/80" />
-          </button>
-        </div>
-      )}
+      {notification.actionLabel && <div className="mt-3 flex justify-end"><button type="button" onClick={() => { if (notification.actionUrl?.startsWith('/') && !notification.actionUrl.startsWith('//')) router.push(notification.actionUrl); onDismiss(); }} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-white/12 px-4 text-[12px] font-medium transition-colors hover:bg-white/18">{notification.actionLabel}<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" /></button></div>}
     </div>
-  );
-}
-
-// ─── Weather icon map (Thin-Line Custom SVGs with stroke-width: 1.2) ──────────
-function getWeatherIcon(type: WeatherIcon) {
-  const strokeCls = "w-4 h-4 stroke-[1.2]";
-  switch (type) {
-    case 'sun':
-      return <Sun className={cn(strokeCls, "text-amber-300/80")} strokeWidth={1.2} />;
-    case 'cloud-sun':
-      return <CloudSun className={cn(strokeCls, "text-zinc-400")} strokeWidth={1.2} />;
-    case 'cloud':
-      return <Cloud className={cn(strokeCls, "text-zinc-500")} strokeWidth={1.2} />;
-    case 'cloud-rain':
-      return <CloudRain className={cn(strokeCls, "text-blue-400/80")} strokeWidth={1.2} />;
-    case 'zap':
-      return <Zap className={cn(strokeCls, "text-yellow-400/80")} strokeWidth={1.2} />;
-  }
-}
-
-/**
- * Returns a contextual icon based on the hour of the day.
- *
- * ⚠️  This is NOT real weather data — it's a time-of-day simulation.
- * To show real weather, replace this with a call to a weather API
- * (e.g. Open-Meteo, OpenWeatherMap) and store the result in state.
- */
-function getContextualWeather(hour: number): WeatherIcon {
-  if (hour >= 6 && hour < 12) return 'cloud-sun';
-  if (hour >= 12 && hour < 17) return 'sun';
-  if (hour >= 17 && hour < 20) return 'cloud-sun';
-  return 'cloud';
-}
-
-// ─── Analog Clock SVG (Ultra-thin lines & elegant aesthetic with cognitive capacity outer ring) ─────────────────
-function AnalogClock({ time, attentionScore }: { time: Date | null; attentionScore: number }) {
-  const secDeg = time ? (time.getSeconds() / 60) * 360 : 0;
-  const minDeg = time ? (time.getMinutes() / 60) * 360 + (time.getSeconds() / 60) * 6 : 0;
-  const hrDeg = time ? ((time.getHours() % 12) / 12) * 360 + (time.getMinutes() / 60) * 30 : 0;
-
-  // Outer ring parameters
-  const radius = 21;
-  const circumference = 2 * Math.PI * radius; // ~131.95
-  const strokeDashoffset = circumference - (attentionScore / 100) * circumference;
-
-  // Fluid transition color: emerald (#4ADE80) if high capacity, amber/orange (#FBBF24) if fatigue/moderate
-  const strokeColor = attentionScore > 50 ? '#4ADE80' : '#FBBF24';
-
-  return (
-    <svg viewBox="0 0 44 44" className="w-10 h-10" strokeLinecap="round">
-      {/* Background track circle */}
-      <circle cx="22" cy="22" r="21" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.8" />
-
-      {/* Dynamic Cognitive Capacity Outer Arc */}
-      <circle
-        cx="22"
-        cy="22"
-        r="21"
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="1.2"
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
-        transform="rotate(-90 22 22)"
-        opacity={0.8}
-        className="transition-all duration-1000 ease-in-out"
-        style={{ transitionProperty: 'stroke-dashoffset, stroke' }}
-      />
-
-      <circle cx="22" cy="22" r="19.5" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.6" />
-      {[...Array(12)].map((_, i) => {
-        const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
-        const r = 16.5;
-        const x1 = 22 + r * Math.cos(angle);
-        const y1 = 22 + r * Math.sin(angle);
-        const x2 = 22 + (r - (i % 3 === 0 ? 2.5 : 1.5)) * Math.cos(angle);
-        const y2 = 22 + (r - (i % 3 === 0 ? 2.5 : 1.5)) * Math.sin(angle);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,0.15)" strokeWidth={i % 3 === 0 ? 0.7 : 0.4} />;
-      })}
-      {/* Hour hand */}
-      <line
-        x1="22" y1="22"
-        x2={22 + 8 * Math.sin((hrDeg * Math.PI) / 180)}
-        y2={22 - 8 * Math.cos((hrDeg * Math.PI) / 180)}
-        stroke="rgba(255,255,255,0.9)" strokeWidth="1.0"
-      />
-      {/* Minute hand */}
-      <line
-        x1="22" y1="22"
-        x2={22 + 12 * Math.sin((minDeg * Math.PI) / 180)}
-        y2={22 - 12 * Math.cos((minDeg * Math.PI) / 180)}
-        stroke="rgba(255,255,255,0.5)" strokeWidth="0.7"
-      />
-      {/* Second hand */}
-      <line
-        x1="22" y1="22"
-        x2={22 + 14 * Math.sin((secDeg * Math.PI) / 180)}
-        y2={22 - 14 * Math.cos((secDeg * Math.PI) / 180)}
-        stroke="#818cf8" strokeWidth="0.4"
-        style={{ transition: 'all 0.15s linear' }}
-      />
-      <circle cx="22" cy="22" r="1.0" fill="#818cf8" />
-    </svg>
-  );
+  </div>;
 }
 
 // ─── YouTube Playlist Panel (Sculpted glassmorphism tabs & breathing graphics) ───
@@ -355,7 +169,7 @@ function PlaylistPanel() {
       {/* Now Playing Bar — triggers lazy YouTube API load on first interaction */}
       {currentTrack && (
         <div
-          className="flex items-center gap-2.5 bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner rounded-2xl p-2.5"
+          className="novo-hub-track-row flex items-center gap-2.5"
         >
           {currentTrack.image && (
             <img src={currentTrack.image} className="w-9 h-9 rounded-xl object-cover flex-shrink-0 opacity-80" alt="" />
@@ -398,7 +212,7 @@ function PlaylistPanel() {
       )}
 
       {/* Tab Switcher — startTransition keeps INP < 50ms by yielding to browser before re-render */}
-      <div className="flex bg-black/30 rounded-xl p-1 border border-white/5 shadow-inner gap-0.5">
+      <div className="novo-hub-audio-tabs flex gap-1">
         {(['playlists', 'liked'] as const).map(tab => (
           <button
             key={tab}
@@ -569,14 +383,12 @@ function AmbientControls() {
   };
 
   return (
-    <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-2.5 shadow-inner">
+    <div className="novo-hub-ambient">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[9px] font-black tracking-[0.16em] uppercase text-white/80 flex items-center gap-1.5">
-          <Waves className="w-3.5 h-3.5 text-indigo-300" strokeWidth={1.4} /> Ambiente
+        <p className="novo-hub-section-title flex items-center gap-1.5">
+          <Waves className="w-3.5 h-3.5 text-white/70" strokeWidth={1.4} /> Ambiente
         </p>
-        <div className="flex h-4 items-end gap-[2px]" aria-hidden="true">
-          {[0, 1, 2, 3].map((bar) => <span key={bar} className={cn('w-px rounded-full bg-indigo-300/80', activePreset ? 'animate-pulse' : 'opacity-30')} style={{ height: `${5 + (bar % 3) * 3}px`, animationDelay: `${bar * 90}ms` }} />)}
-        </div>
+        <span className="text-[11px] text-white/60">{activePreset ? "En reproducción" : ""}</span>
       </div>
       <div className="grid grid-cols-3 gap-1">
         {(['lluvia', 'blanco', 'cafetería'] as AmbientPreset[]).map((preset) => (
@@ -585,7 +397,7 @@ function AmbientControls() {
             onClick={() => toggleAmbient(preset)}
             aria-pressed={activePreset === preset}
             aria-label={`${activePreset === preset ? 'Detener' : 'Activar'} sonido de ${preset}`}
-            className={cn('min-h-11 rounded-xl px-1.5 py-1.5 text-[9px] font-semibold capitalize transition-[background,color,transform] duration-150 active:scale-[0.97] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70', activePreset === preset ? 'bg-indigo-400/20 text-indigo-100 border border-indigo-300/25' : 'bg-black/20 text-white/80 hover:bg-white/[0.07] hover:text-white border border-transparent')}
+            className={cn('min-h-11 rounded-xl px-1.5 py-1.5 text-[9px] font-semibold capitalize transition-[background,color,transform] duration-150 active:scale-[0.97] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70', activePreset === preset ? 'bg-white/12 text-white border border-white/15' : 'bg-black/20 text-white/80 hover:bg-white/[0.07] hover:text-white border border-transparent')}
           >
             {preset}
           </button>
@@ -596,87 +408,24 @@ function AmbientControls() {
   );
 }
 
-function ClockSection({
-  attentionScore,
-  showDetails = false,
-  children
-}: {
-  attentionScore: number;
-  showDetails?: boolean;
-  children?: React.ReactNode;
-}) {
+function ClockSection({ showDetails = false }: { showDetails?: boolean }) {
   const [time, setTime] = useState<Date | null>(null);
-
   useEffect(() => {
-    let disposed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const clearTimer = () => {
-      if (!timer) return;
-      clearTimeout(timer);
-      timer = null;
-    };
-
-    const schedule = () => {
-      if (disposed || document.visibilityState === 'hidden') return;
+    const update = () => {
+      if (document.visibilityState === 'hidden') return;
       setTime(new Date());
-      // Align updates to the second boundary and avoid background wakeups.
-      const delay = Math.max(120, 1000 - (Date.now() % 1000));
-      timer = setTimeout(schedule, delay);
+      timer = setTimeout(update, 60000 - (Date.now() % 60000));
     };
-
-    const onVisibility = () => {
-      clearTimer();
-      if (document.visibilityState === 'visible') schedule();
-    };
-
-    onVisibility();
+    const onVisibility = () => { if (timer) clearTimeout(timer); update(); };
+    update();
     document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      disposed = true;
-      clearTimer();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
+    return () => { if (timer) clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); };
   }, []);
-
-  if (!time) {
-    return (
-      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white/5 rounded-full" />
-    );
-  }
-
-  const formattedTime = time.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const weatherIcon = getContextualWeather(time.getHours());
-
-  if (showDetails) {
-    return (
-      <div className="flex items-center gap-2.5">
-        <div className="scale-[0.72] origin-center opacity-80">
-          <AnalogClock time={time} attentionScore={attentionScore} />
-        </div>
-        <div>
-          <p className="text-[11px] font-bold text-white/95 leading-none">{formattedTime}</p>
-          <p className="text-[9px] text-zinc-300/75 font-mono tracking-tight mt-1 flex items-center gap-1.5">
-            {getWeatherIcon(weatherIcon)}
-            <span>{time.toLocaleDateString('es-BO', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-          </p>
-          {children}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="flex-shrink-0 flex items-center justify-center scale-[0.72] origin-center opacity-90">
-        <AnalogClock time={time} attentionScore={attentionScore} />
-      </div>
-
-      <p className="text-[10px] font-mono font-semibold text-white/80 tracking-tight leading-none">{formattedTime}</p>
-
-      {getWeatherIcon(weatherIcon)}
-    </>
-  );
+  return <div className={showDetails ? 'novo-hub-clock-details' : 'novo-hub-clock'}>
+    <span className="tabular-nums">{time?.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hour12: false }) ?? '—:—'}</span>
+    {showDetails && <span className="novo-hub-date">{time?.toLocaleDateString('es-BO', { weekday: 'short', day: 'numeric', month: 'short' }) ?? ' '}</span>}
+  </div>;
 }
 
 // ─── Capsule Content Sub-component ──────────────────────────────────────────
@@ -691,74 +440,22 @@ function CapsuleContent({
   focusToggleEnabled: boolean;
   onFocusActionPointerChange: (hovered: boolean) => void;
 }) {
-  const { bioState } = useCognitiveState();
   const { isActive: focusTimerActive, toggleTimer } = useFocusControls();
   const isPlaying = usePlayerStore((state) => state.isPlaying);
-  const reduceMotion = useNovoMotionPolicy() !== 'full';
   return (
-    <div className="flex flex-col items-center justify-between py-3 px-1 w-full h-full">
-      <ClockSection attentionScore={bioState.attentionScore} showDetails={false} />
-
-      {cognitiveAlert ? (
-        <motion.div
-          className="w-7 h-7 rounded-full border border-indigo-400/35 bg-indigo-400/10 flex items-center justify-center shadow-[0_0_14px_rgba(129,140,248,0.28)]"
-          animate={reduceMotion ? { scale: 1, opacity: 1 } : { scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-          aria-label="Alerta del Gemelo Cognitivo"
-        >
-          <Brain className="w-3.5 h-3.5 text-indigo-200" strokeWidth={1.5} />
-        </motion.div>
-      ) : focusTimerActive ? (
-        <div className="flex flex-col items-center gap-1 text-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.9)]" />
-          <FocusTimeText className="text-[8px] font-mono font-bold tabular-nums tracking-tight" />
-        </div>
-      ) : isPlaying || ambientAudioActive ? (
-        <div className="h-6 flex items-center gap-[2px]" aria-label="Audio activo">
-          {[0, 1, 2].map((bar) => (
-            <motion.span
-              key={bar}
-              className="w-[2px] rounded-full bg-indigo-300"
-              animate={reduceMotion ? { height: `${5 + bar * 1.5}px` } : { height: ['5px', `${10 + bar * 3}px`, '5px'] }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.55 + bar * 0.12, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="px-2 py-1 rounded-full text-[7px] font-bold tracking-[0.13em] uppercase bg-white/[0.06] text-white/75 border border-white/[0.08] flex-shrink-0 text-center leading-none">
-          En reposo
-        </div>
-      )}
-
-      {focusToggleEnabled && (
-        <button
-          type="button"
-          data-hub-direct-action
-          aria-label={focusTimerActive ? 'Pausar temporizador' : 'Iniciar temporizador'}
-          aria-pressed={focusTimerActive}
-          title={focusTimerActive ? 'Pausar temporizador' : 'Iniciar temporizador'}
-          onPointerEnter={() => onFocusActionPointerChange(true)}
-          onPointerLeave={() => onFocusActionPointerChange(false)}
-          onClick={(event) => { event.stopPropagation(); toggleTimer(); }}
-          className={cn(
-            'pointer-events-auto relative z-[3] grid h-11 w-11 shrink-0 place-items-center rounded-[17px] border transition-[background,color,transform,border-color] duration-150 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/55',
-            focusTimerActive
-              ? 'border-emerald-300/25 bg-emerald-300/15 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.18)]'
-              : 'border-white/10 bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white',
-          )}
-        >
-          {focusTimerActive ? <Pause aria-hidden="true" className="h-4 w-4" /> : <Play aria-hidden="true" className="ml-0.5 h-4 w-4" />}
-        </button>
-      )}
-
-      {cognitiveAlert && (
-        <motion.div
-          className="absolute inset-0 pointer-events-none"
-          style={{ border: `1.5px solid ${PHASE_COLOR[bioState.phase]}50` }}
-          animate={reduceMotion ? { opacity: 1 } : { opacity: [1, 0, 1, 0] }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 1.2, repeat: 2 }}
-        />
-      )}
+    <div className="novo-hub-capsule flex h-full w-full flex-col items-center justify-between px-1 py-4">
+      <div className="flex flex-col items-center gap-2 text-white/80"><Clock3 aria-hidden="true" className="h-4 w-4" strokeWidth={1.4} /><ClockSection /></div>
+      <div className="flex flex-col items-center gap-1.5 text-white/70" aria-label={cognitiveAlert ? 'Alerta del Gemelo Cognitivo' : focusTimerActive ? 'Foco activo' : isPlaying || ambientAudioActive ? 'Audio activo' : 'En reposo'}>
+        <span aria-hidden="true" className={cn('h-1 w-1 rounded-full', cognitiveAlert ? 'bg-amber-200' : 'bg-white/50')} />
+        {focusTimerActive ? <FocusTimeText className="text-[10px] tabular-nums" /> : <span className="text-[9px]">{isPlaying || ambientAudioActive ? 'Audio' : 'Listo'}</span>}
+      </div>
+      {focusToggleEnabled && <button type="button" data-hub-direct-action
+        aria-label={focusTimerActive ? 'Pausar temporizador' : 'Iniciar temporizador'} aria-pressed={focusTimerActive}
+        onPointerEnter={() => onFocusActionPointerChange(true)} onPointerLeave={() => onFocusActionPointerChange(false)}
+        onClick={(event) => { event.stopPropagation(); toggleTimer(); }}
+        className="novo-hub-compact-play pointer-events-auto relative z-[3] grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/60">
+        {focusTimerActive ? <Pause aria-hidden="true" className="h-4 w-4" /> : <Play aria-hidden="true" className="ml-0.5 h-4 w-4" />}
+      </button>}
     </div>
   );
 }
@@ -778,15 +475,16 @@ function FocusSessionControl({ onOpen }: { onOpen: (keyboardActivated: boolean) 
 
   return (
     <>
-      <p className="mt-0.5 text-[10px] text-white/70">{isModified ? <><FocusTimeText /> restantes</> : 'Elige una tarea y comienza cuando estés listo'}</p>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="novo-hub-session-controls flex flex-wrap items-center justify-between gap-2">
+      <div className="novo-hub-timer tabular-nums"><FocusTimeText /></div>
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={(event) => {
             if (!isActive) toggleTimer();
             onOpen(event.detail === 0);
           }}
-          className="min-h-11 shrink-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition-[background,transform] duration-150 hover:bg-white/[0.16] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          className="novo-hub-primary min-h-11 shrink-0 rounded-full px-5 py-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
         >
           {isActive ? 'Abrir' : 'Iniciar'}
         </button>
@@ -800,6 +498,8 @@ function FocusSessionControl({ onOpen }: { onOpen: (keyboardActivated: boolean) 
           </button>
         )}
       </div>
+      </div>
+      <p className="novo-hub-focus-hint">{isModified ? 'Tu sesión está en curso' : 'Elige una tarea y comienza cuando estés listo'}</p>
     </>
   );
 }
@@ -858,48 +558,19 @@ function ExpandedContent({
     finally { savingRef.current = false; setSavingCapture(false); }
   };
   return (
-    <div id="novo-hub-panel" role="region" aria-label="Hub de Novo" className="w-full h-full p-4 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-2 pt-1 pb-2.5 border-b border-white/[0.06] mb-2.5 flex-shrink-0">
-        <ClockSection attentionScore={bioState.attentionScore} showDetails={true}>
-          {/* Cognitive telemetry progress */}
-          <div className="flex items-center gap-1.5 mt-2">
-            <Brain className="w-2.5 h-2.5" style={{ color: PHASE_COLOR[bioState.phase] }} />
-            <div
-              role="progressbar"
-              aria-label="Nivel de atención"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={bioState.attentionScore}
-              className="flex-1 h-1 bg-white/15 rounded-full overflow-hidden w-16"
-            >
-              <div
-                aria-hidden="true"
-                className="h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
-                style={{
-                  width: `${bioState.attentionScore}%`,
-                  background: `linear-gradient(90deg, ${PHASE_COLOR[bioState.phase]}, ${PHASE_COLOR[bioState.phase]}88)`,
-                }}
-              />
-            </div>
-            <span className="text-[8px] font-mono tracking-tighter text-zinc-400 tabular-nums">
-              {bioState.attentionScore}%
-            </span>
-          </div>
-        </ClockSection>
-        <button
-          type="button"
-          aria-label="Contraer Hub"
-          aria-expanded="true"
-          onClick={onCollapse}
-          className="grid h-11 w-11 place-items-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-        >
-          <X aria-hidden="true" className="w-3.5 h-3.5" />
-        </button>
+    <div id="novo-hub-panel" role="region" aria-label="Hub de Novo" className="novo-hub-panel w-full h-full flex flex-col overflow-hidden">
+      <div className="novo-hub-header">
+        <div><p className="novo-hub-brand">Novo</p><p className="novo-hub-subtitle">Atención {bioState.attentionScore}%</p>
+          <div role="progressbar" aria-label="Nivel de atención" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bioState.attentionScore} className="sr-only" />
+        </div>
+        <div className="flex items-center gap-2"><ClockSection showDetails />
+          <button type="button" aria-label="Contraer Hub" aria-expanded="true" onClick={onCollapse}
+            className="novo-hub-icon-button grid h-11 w-11 place-items-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"><X aria-hidden="true" className="h-4 w-4" /></button>
+        </div>
       </div>
 
       {bioState.phase === 'REDUCED_CAPACITY_MODE' && (
-        <div className={cn('mx-2 mb-2 p-2.5 rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-300 flex items-center justify-between gap-2 shadow-[0_8px_20px_rgba(245,158,11,0.15)] flex-shrink-0', !reducedMotion && 'animate-pulse')}>
+        <div className="novo-hub-pause-hint flex shrink-0 items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Zap className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.2} />
             <div className="min-w-0">
@@ -918,7 +589,7 @@ function ExpandedContent({
 
       {/* Tab bar — panels overlap briefly instead of waiting for an empty
           exit frame, so tab changes read as one continuous fluid surface. */}
-      <div role="tablist" aria-label="Herramientas del Hub" className="grid grid-cols-3 mx-2 mb-3 rounded-[14px] bg-black/45 p-1 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(0,0,0,0.55)]">
+      <div role="tablist" aria-label="Herramientas del Hub" className="novo-hub-tabs grid grid-cols-3">
         {HUB_TABS.map(tab => (
           <button
             key={tab}
@@ -938,10 +609,10 @@ function ExpandedContent({
               document.getElementById(`hub-tab-${next}`)?.focus();
             }}
             className={cn(
-              'min-h-11 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-[10px] transition-[background,color,box-shadow,transform] duration-150 active:scale-[0.97] motion-reduce:transition-none',
+              'novo-hub-tab relative min-h-11 text-[13px] font-medium transition-colors duration-150 motion-reduce:transition-none',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
               activeTab === tab
-                ? 'bg-white/[0.12] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_1px_2px_rgba(0,0,0,0.2)]'
+                ? 'text-white'
                 : 'text-white/65 hover:text-white/90'
             )}
           >
@@ -951,23 +622,22 @@ function ExpandedContent({
       </div>
 
       {/* Tab contents */}
-      <div className="relative flex-1 min-h-0 px-2 pb-2 overflow-hidden">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
           {activeTab === 'focus' ? (
             <motion.div
               key="focus"
               role="tabpanel" id="hub-panel-focus" aria-labelledby="hub-tab-focus"
               data-hub-motion-panel
-              className="absolute inset-x-2 top-0 bottom-2 flex flex-col gap-3 overflow-y-auto" data-lenis-prevent
+              className="novo-hub-focus absolute inset-x-0 top-0 bottom-0 flex flex-col overflow-y-auto" data-lenis-prevent
               initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
               transition={reducedMotion ? { duration: 0 } : HUB_TAB_SPRING}
             >
-              <div ref={pomodoroSourceRef} data-pomodoro-source className="rounded-[20px] border border-emerald-400/15 bg-emerald-400/[0.055] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+              <div ref={pomodoroSourceRef} data-pomodoro-source className="novo-hub-focus-session">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200/85 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> Temporizador de foco</p>
-                    <p className="mt-1 text-sm font-semibold text-white truncate">{activeTask?.text ?? 'Sin tarea seleccionada'}</p>
+                    <p className="novo-hub-task-title">{activeTask?.text ?? 'Sin tarea seleccionada'}</p>
                     {tasks.some(task => !task.completed) && <select aria-label="Tarea de foco" value={selectedTaskId ?? ''} onChange={event => setSelectedTaskId(event.target.value || null)} className="mt-1 w-full min-h-11 rounded-lg bg-slate-900 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
                       <option value="">Sin tarea seleccionada</option>
                       {tasks.filter(task => !task.completed).map(task => <option key={task.id} value={task.id}>{task.text}</option>)}
@@ -976,42 +646,39 @@ function ExpandedContent({
                   </div>
                 </div>
               </div>
-              <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-2.5">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/75">Captura rápida</p>
+              <div className="novo-hub-capture">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="novo-hub-section-title">Captura rápida</p>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={openQuickNote}
                       aria-label="Nueva nota"
-                      className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-white/10 px-2 text-[9px] font-semibold text-white/90 transition-colors hover:bg-white/15 hover:text-white active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      className="novo-hub-capture-action inline-flex h-11 w-11 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                     >
-                      <FileText aria-hidden="true" className="h-3 w-3" />
-                      Nota
+                      <FileText aria-hidden="true" className="h-3 w-3" /><span className="sr-only">Nota</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => window.dispatchEvent(new CustomEvent('toggle-voice-command-hub'))}
                       aria-label="Abrir comandos de voz"
-                      className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-white/10 px-2 text-[9px] font-semibold text-white/90 transition-colors hover:bg-white/15 hover:text-white active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      className="novo-hub-capture-action inline-flex h-11 w-11 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                     >
-                      <Mic aria-hidden="true" className="h-3 w-3" />
-                      Voz
+                      <Mic aria-hidden="true" className="h-3 w-3" /><span className="sr-only">Voz</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => { onCollapse(); router.push('/ai'); }}
                       aria-label="Abrir asistente Novo"
-                      className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-white/10 px-2 text-[9px] font-semibold text-white/90 transition-colors hover:bg-white/15 hover:text-white active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      className="novo-hub-capture-action inline-flex h-11 w-11 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                     >
-                      <Sparkles aria-hidden="true" className="h-3 w-3" />
-                      Asistente
+                      <Sparkles aria-hidden="true" className="h-3 w-3" /><span className="sr-only">Asistente</span>
                     </button>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <input aria-label="Nueva tarea" disabled={savingCapture} value={quickCapture} onChange={(event) => setQuickCapture(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submitQuickCapture(); } }} placeholder="Añadir tarea…" className="min-w-0 flex-1 min-h-11 bg-transparent text-xs text-white placeholder:text-white/55 focus-visible:outline-white" />
-                  <button type="button" disabled={savingCapture || !quickCapture.trim()} onClick={() => void submitQuickCapture()} aria-label={savingCapture ? 'Guardando tarea' : 'Guardar captura rápida'} className="w-11 h-11 shrink-0 rounded-lg bg-white/10 hover:bg-white/18 text-white flex items-center justify-center disabled:opacity-40 transition-[background,transform] duration-150 active:scale-[0.97]"><Plus className="w-3.5 h-3.5" /></button>
+                  <input aria-label="Nueva tarea" disabled={savingCapture} value={quickCapture} onChange={(event) => setQuickCapture(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submitQuickCapture(); } }} placeholder="Añadir tarea…" className="novo-hub-capture-input min-w-0 flex-1 min-h-11 bg-transparent text-[13px] text-white placeholder:text-white/60 focus-visible:outline-none" />
+                  <button type="button" disabled={savingCapture || !quickCapture.trim()} onClick={() => void submitQuickCapture()} aria-label={savingCapture ? 'Guardando tarea' : 'Guardar captura rápida'} className="w-11 h-11 shrink-0 rounded-full bg-white/10 hover:bg-white/18 text-white flex items-center justify-center disabled:opacity-40 transition-colors duration-150"><Plus className="w-3.5 h-3.5" /></button>
                 </div>
                 {captureStatus && <p role="status" className="mt-1 text-[10px] text-white/80">{captureStatus}</p>}
               </div>
@@ -1021,7 +688,7 @@ function ExpandedContent({
               key="audio"
               role="tabpanel" id="hub-panel-audio" aria-labelledby="hub-tab-audio"
               data-hub-motion-panel
-              className="absolute inset-x-2 top-0 bottom-2 overflow-y-auto" data-lenis-prevent
+              className="novo-hub-audio absolute inset-x-0 top-0 bottom-0 overflow-y-auto" data-lenis-prevent
               initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
@@ -1034,16 +701,16 @@ function ExpandedContent({
               key="controls"
               role="tabpanel" id="hub-panel-settings" aria-labelledby="hub-tab-settings"
               data-hub-motion-panel
-              className="absolute inset-x-2 top-0 bottom-2 flex flex-col gap-3 overflow-y-auto" data-lenis-prevent
+              className="novo-hub-settings absolute inset-x-0 top-0 bottom-0 flex flex-col gap-3 overflow-y-auto" data-lenis-prevent
               initial={{ opacity: 0, x: tabDirection * 12, scale: 0.988 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: tabDirection * -8, scale: 0.992 }}
               transition={reducedMotion ? { duration: 0 } : HUB_TAB_SPRING}
             >
               {/* Dimness slider — controls backgroundDimness in settings */}
-              <div className="p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
+              <div className="novo-hub-setting p-1">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] font-bold text-white/90 flex items-center gap-1.5 uppercase tracking-wider">
+                  <p className="text-[13px] font-medium text-white/90 flex items-center gap-1.5">
                     <Sun className="w-3.5 h-3.5 text-zinc-300" strokeWidth={1.2} /> Atenuación
                   </p>
                   <span className="text-[9px] font-mono text-zinc-500">{settings.backgroundDimness}%</span>
@@ -1057,19 +724,19 @@ function ExpandedContent({
                     type="range" min={0} max={80} value={settings.backgroundDimness}
                     onChange={e => updateSettings({ backgroundDimness: Number(e.target.value) })}
                     aria-label="Atenuación global"
-                    className="absolute left-0 top-1/2 h-11 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent accent-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    className="absolute left-0 top-1/2 h-11 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                   />
                 </div>
               </div>
-              <label className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/5 text-xs text-white/90">
+              <label className="novo-hub-setting flex items-center justify-between gap-3 text-[13px] text-white/90">
                 Animaciones
-                <input type="checkbox" checked={settings.showAnimations} onChange={event => updateSettings({ showAnimations: event.target.checked })} className="h-5 w-5 accent-indigo-300" />
+                <input type="checkbox" checked={settings.showAnimations} onChange={event => updateSettings({ showAnimations: event.target.checked })} className="h-5 w-5 accent-white" />
               </label>
 
               {/* Theme selector — toggles light/dark via settings context */}
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 shadow-inner">
+              <div className="flex items-center justify-between novo-hub-setting p-1">
                 <div>
-                  <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">Apariencia</p>
+                  <p className="text-[13px] font-medium text-white/90">Apariencia</p>
                   <p className="text-[9px] text-white/65 mt-0.5 font-medium">{settings.theme === 'dark' ? 'Modo oscuro' : 'Modo claro'}</p>
                 </div>
                 <div className="flex gap-1.5 bg-black/30 p-1 rounded-xl border border-white/5">
@@ -1111,10 +778,10 @@ const ContextHubComponent = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [cognitiveAlert, setCognitiveAlert] = useState(false);
   const [ambientAudioActive, setAmbientAudioActive] = useState(() => ambientAudio !== null);
-  const [dopaminePulse, setDopaminePulse] = useState(false);
+  const [feedbackActive, setFeedbackActive] = useState(false);
   const [activeNotification, setActiveNotification] = useState<TwinNotificationPayload | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dopamineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1350,11 +1017,11 @@ const ContextHubComponent = () => {
   // Event handlers — pulse hub on actions, let sileo handle the notification toast
   useEffect(() => {
     const pulse = () => {
-      setDopaminePulse(true);
-      if (dopamineTimerRef.current) clearTimeout(dopamineTimerRef.current);
-      dopamineTimerRef.current = setTimeout(() => {
-        setDopaminePulse(false);
-        dopamineTimerRef.current = null;
+      setFeedbackActive(true);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => {
+        setFeedbackActive(false);
+        feedbackTimerRef.current = null;
       }, 1200);
     };
 
@@ -1415,9 +1082,9 @@ const ContextHubComponent = () => {
       window.removeEventListener('cognitive:notification', handleNotification);
       window.removeEventListener('cognitive:navigation-warning', onNavWarn);
       if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-      if (dopamineTimerRef.current) clearTimeout(dopamineTimerRef.current);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
       if (routineTimerRef.current) clearTimeout(routineTimerRef.current);
-      dopamineTimerRef.current = null;
+      feedbackTimerRef.current = null;
       routineTimerRef.current = null;
     };
   }, [logHabit]);
@@ -1460,15 +1127,15 @@ const ContextHubComponent = () => {
         }}
         data-hub-state={hubState}
         className={cn(
-          "context-hub-layer pointer-events-auto select-none relative z-[2] overflow-visible border transition-colors duration-300",
+          "context-hub-layer novo-hub-shell pointer-events-auto select-none relative z-[2] overflow-visible border transition-colors duration-300",
           hubState === 'idle'
             ? 'bg-transparent border-white/5 cursor-pointer'
             : hubState === 'capsule' && cognitiveAlert
-              ? 'bg-transparent border-indigo-500/40 cursor-pointer'
+              ? 'bg-transparent border-white/20 cursor-pointer'
               : hubState === 'capsule'
                 ? 'bg-transparent border-white/10 hover:border-white/20 cursor-pointer'
                 : 'border-white/10 bg-transparent cursor-default',
-          (hubState === 'capsule' || hubState === 'expanded') && dopaminePulse && 'animate-dopamine-pulse',
+          feedbackActive && 'novo-hub-feedback',
         )}
         // Keep the optical host in normal flow so Chromium can sample the
         // wallpaper behind the delivered displacement lens.
@@ -1478,13 +1145,7 @@ const ContextHubComponent = () => {
           height: hubMorph.stageSize.height,
           borderRadius: hubMorph.surfaceRadius,
           opacity: 1,
-          boxShadow: hubState === 'idle'
-            ? '0 0 0 rgba(0,0,0,0)'
-            : hubState === 'expanded'
-              ? '-24px 32px 72px rgba(0,0,0,0.78), inset 0 0 24px rgba(255,255,255,0.025), inset 0 1px 0 rgba(255,255,255,0.09)'
-              : hubState === 'notification'
-                ? '-18px 18px 48px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.10)'
-                : '-10px 16px 48px rgba(0,0,0,0.62)',
+          boxShadow: hubState === 'idle' ? 'none' : '-8px 16px 42px rgba(0,0,0,0.3)',
         }}
         onMouseEnter={() => {
           setIsHovered(true);
@@ -1493,19 +1154,7 @@ const ContextHubComponent = () => {
         onMouseLeave={() => { hoverSuppressedRef.current = false; setIsHovered(false); }}
         title={hubState === 'idle' ? 'Novo Context Hub' : undefined}
       >
-        <GlassSurface
-          data-hub-glass
-          aria-hidden
-          preset="panel"
-          refractive
-          radius={hubMorph.surfaceRadius}
-          refractivePriority="critical"
-          refractiveActive
-          backgroundColor="rgba(7, 13, 24, 0.58)"
-          elevation={hubState === 'expanded' ? 'high' : 'medium'}
-          className="pointer-events-none"
-          style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
-        />
+        <HubGlassMaterial radius={hubMorph.surfaceRadius} />
         {(hubState === 'idle' || hubState === 'capsule' || hubState === 'notification') && (
           <motion.button
             ref={triggerRef}

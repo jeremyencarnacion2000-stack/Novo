@@ -53,3 +53,25 @@ errors were recorded. The service worker cache advances to `novo-v12`.
 The local full TypeScript check exhausted a 2GB heap. Production compilation and
 type checking run in the Vercel preview before integration. A local cache cleanup
 was blocked by automatic policy review, so no build cache was removed.
+
+## Hub visual restructuring
+
+The user supplied Siri / Dynamic Island material references and explicitly chose
+to retain the lateral position and compact shape. The Hub, detached Pomodoro and
+Twin notices share a single low-alpha optical lens, a black-to-clear tint and a
+static rim light. The global backdrop on the lens host is disabled locally so
+it does not isolate the SVG refraction from the real page. Novo's explicit
+reduce-glass setting and high-contrast mode retain an opaque alternative.
+
+The analog clock, simulated weather, pulsing decorative highlights, colored
+focus card and nested capture/settings/audio plates are removed. A minute-based
+digital clock, quiet attention value, flat tabs and one timer/task group set the
+hierarchy. Capture retains its draft/retry/idempotency flow and the original
+note, voice and assistant actions. No provider or action contracts change.
+
+Desktop and 320px browser checks with a bright background show the gradient and
+refractive lower edge. The default focus panel has matching client/scroll height
+(253px on desktop), with no horizontal overflow or console errors. Settings
+controls remain accessible. A second read-only review found no functional,
+accessibility or ownership blockers. Impeccable's mechanical scan returned no
+findings.
