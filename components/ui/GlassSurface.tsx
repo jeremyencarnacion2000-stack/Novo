@@ -285,11 +285,15 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       }
       let lastGeometry = ''
       const syncGeometry = () => {
-        const rect = host.getBoundingClientRect()
-        if (rect.width <= 0 || rect.height <= 0) return
-        const width = String(Math.max(1, Math.ceil(rect.width)))
-        const height = String(Math.max(1, Math.ceil(rect.height)))
-        const radiusValue = String(Math.min(radius, rect.width / 2, rect.height / 2))
+        // A morph transforms the optical shell on the compositor. Its map
+        // must describe the untransformed layout, otherwise a lens mounted
+        // mid-flight freezes at that frame's squashed viewport dimensions.
+        const layoutWidth = host.offsetWidth
+        const layoutHeight = host.offsetHeight
+        if (layoutWidth <= 0 || layoutHeight <= 0) return
+        const width = String(layoutWidth)
+        const height = String(layoutHeight)
+        const radiusValue = String(Math.min(radius, layoutWidth / 2, layoutHeight / 2))
         const background = backgroundColor && backgroundColor !== 'transparent'
           ? backgroundColor
           : 'rgba(255,255,255,0.10)'

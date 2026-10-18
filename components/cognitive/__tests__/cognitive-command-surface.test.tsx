@@ -118,6 +118,44 @@ describe('CognitiveCommandSurface', () => {
     expect(screen.getByRole('heading', { name: 'Detalle del contexto' })).toBeInTheDocument()
   })
 
+  it('keeps inspection available on tablets below the lateral inspector breakpoint', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 900 })
+    const user = userEvent.setup()
+    render(<CognitiveCommandSurface />)
+    await screen.findAllByText('Resolver el pago')
+    await user.click(screen.getByRole('button', { name: 'Pago pendiente checkout' }))
+    await user.click(screen.getByRole('button', { name: 'Inspect' }))
+    expect(screen.getByRole('heading', { name: 'Detalle del contexto' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Corregir esta señal' }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Corrige la comprensión de Novo' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveAttribute('maxLength', '180')
+    ;(global.fetch as jest.Mock).mockResolvedValue(new Response(JSON.stringify({}), { status: 500 }))
+    await user.click(screen.getByRole('button', { name: 'Guardar corrección' }))
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('No se pudo guardar.'))
+  })
+
+  it('explains the Pro entitlement instead of offering an endless retry', async () => {
+    ;(global.fetch as jest.Mock).mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify({}), { status: url.startsWith('/api/cognitive/graph') ? 403 : 200 })))
+    render(<CognitiveCommandSurface />)
+    expect(await screen.findByRole('heading', { name: 'El mapa avanzado está en Novo Pro' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver Novo Pro' })).toHaveAttribute('href', '/settings?tab=billing')
+    expect(screen.queryByRole('button', { name: 'Intentar de nuevo' })).not.toBeInTheDocument()
+  })
+
+  it('provides a sign-in recovery when the server session has expired', async () => {
+    ;(global.fetch as jest.Mock).mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify({}), { status: url.startsWith('/api/cognitive/graph') ? 401 : 200 })))
+    render(<CognitiveCommandSurface />)
+    expect(await screen.findByRole('link', { name: 'Volver a iniciar sesión' })).toHaveAttribute('href', '/auth/signin?callbackUrl=%2Fcognitive')
+  })
+
+  it('shows a retryable network error without provider internals', async () => {
+    ;(global.fetch as jest.Mock).mockRejectedValue(new Error('private provider failure'))
+    render(<CognitiveCommandSurface />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar el Centro Cognitivo')
+    expect(screen.queryByText('private provider failure')).not.toBeInTheDocument()
+  })
+
   it('replaces the field with a human-readable evidence dossier for Why', async () => {
     const user = userEvent.setup()
     render(<CognitiveCommandSurface />)

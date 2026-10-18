@@ -53,10 +53,11 @@ function ContextNode({ context, selected, muted, onSelect }: { context: TwinGrap
       type="button"
       data-testid={`twin-context-node-${context.node.id}`}
       data-semantic-role={context.role}
+      data-context-node
       onClick={onSelect}
       style={{ left: `${context.position.x}%`, top: `${context.position.y}%` }}
       className={cn(
-        'novo-motion-context-node absolute z-10 w-[min(42vw,12.5rem)] text-left',
+        'novo-motion-context-node absolute z-10 w-[min(13%,10rem)] text-left',
         placement(context.position),
         'transition-[left,top,opacity,transform] duration-500 ease-[cubic-bezier(0.2,0,0,1)]',
         muted ? 'scale-[.94] opacity-45' : 'opacity-100',
@@ -70,7 +71,7 @@ function ContextNode({ context, selected, muted, onSelect }: { context: TwinGrap
         <span className="flex items-start gap-2">
           <SemanticMark role={context.role} />
           <span className="min-w-0">
-            <span className="block truncate text-xs font-semibold text-foreground">{context.node.label}</span>
+            <span className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">{context.node.label}</span>
             <span className="mt-0.5 block truncate text-[10px] text-foreground/55">{ROLE_LABELS[context.role]}{context.relatedCount > 1 ? ` · ${context.relatedCount} relaciones` : ''}</span>
           </span>
         </span>
@@ -118,8 +119,8 @@ export function TwinContextField({ snapshot, selectedId, mode, onSelectNode, onW
 
   return (
     <section data-testid="twin-context-field" aria-label="Campo de contexto actual del Twin" className="overflow-hidden rounded-[24px] border border-foreground/10 bg-foreground/[0.018]">
-      <div className="relative min-h-[27rem] overflow-hidden p-4 sm:min-h-[30rem] sm:p-6">
-        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_48%,color-mix(in_srgb,var(--primary)_11%,transparent),transparent_50%)]" />
+      <div data-context-map className="relative min-h-[27rem] overflow-hidden p-4 sm:min-h-[26rem] sm:p-6">
+        <div data-context-decoration aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_48%,color-mix(in_srgb,var(--primary)_11%,transparent),transparent_50%)]" />
         <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
           {focus ? (
             <>
@@ -135,6 +136,7 @@ export function TwinContextField({ snapshot, selectedId, mode, onSelectNode, onW
         {!focus && (
           <div
             data-testid="twin-context-anchor"
+            data-context-anchor
             style={{ left: `${view.anchor.position.x}%`, top: `${view.anchor.position.y}%` }}
             className="absolute z-10 w-[10rem] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border border-primary/35 bg-background/90 px-4 py-3 text-center shadow-[0_20px_42px_-30px_rgba(0,0,0,.8)]"
           >
@@ -148,12 +150,15 @@ export function TwinContextField({ snapshot, selectedId, mode, onSelectNode, onW
           <ContextNode key={context.node.id} context={context} selected={context.node.id === selectedId} muted={!!focus && focus.remote.some((item) => item.node.id === context.node.id)} onSelect={() => onSelectNode(context.node.id)} />
         ))}
 
+      </div>
+
         {view.recommendation && (
           <button
             type="button"
             onClick={onPrimaryAction}
             data-testid="twin-recommended-action"
-            className="absolute bottom-4 left-1/2 z-20 flex w-[min(calc(100%-2rem),24rem)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-primary/35 bg-background/92 px-3.5 py-3 text-left shadow-[0_18px_34px_-28px_rgba(0,0,0,.8)] transition-colors hover:bg-background"
+            data-context-action
+            className="relative mx-4 mb-4 flex items-center gap-3 rounded-2xl border border-primary/25 bg-background/70 px-3.5 py-3 text-left transition-colors hover:bg-background sm:mx-6"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><ArrowUpRight className="size-4" /></span>
             <span className="min-w-0 flex-1">
@@ -162,8 +167,6 @@ export function TwinContextField({ snapshot, selectedId, mode, onSelectNode, onW
             </span>
           </button>
         )}
-      </div>
-
       <div data-testid="twin-context-rail" className="flex flex-wrap items-center justify-between gap-4 border-t border-foreground/10 px-4 py-4 sm:px-5">
         <div className="min-w-0">
           {selected ? (

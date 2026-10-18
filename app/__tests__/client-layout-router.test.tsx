@@ -1,6 +1,8 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import ClientLayoutRouter from '@/app/client-layout-router'
+import { useMobileOverlay } from '@/components/mobile-overlay-provider'
+import userEvent from '@testing-library/user-event'
 
 let pathname = '/'
 
@@ -15,6 +17,21 @@ jest.mock('next/dynamic', () => () => {
 })
 
 describe('ClientLayoutRouter public-route isolation', () => {
+  it('provides working mobile navigation in Cognitive and preserves it across shell changes', async () => {
+    function OverlayProbe() {
+      const { activeOverlay, openOverlay } = useMobileOverlay()
+      return <button onClick={() => openOverlay('navigation')}>{activeOverlay}</button>
+    }
+    pathname = '/cognitive'
+    const user = userEvent.setup()
+    const view = render(<ClientLayoutRouter><OverlayProbe /></ClientLayoutRouter>)
+    await user.click(screen.getByRole('button', { name: 'none' }))
+    expect(screen.getByRole('button', { name: 'navigation' })).toBeInTheDocument()
+    pathname = '/today'
+    view.rerender(<ClientLayoutRouter><OverlayProbe /></ClientLayoutRouter>)
+    expect(screen.getByRole('button', { name: 'navigation' })).toBeInTheDocument()
+  })
+
   it('renders the landing directly without mounting the authenticated application shell', () => {
     pathname = '/landing'
 

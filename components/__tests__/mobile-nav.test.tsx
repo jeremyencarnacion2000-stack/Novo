@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MobileNav } from '../mobile-nav'
@@ -76,6 +76,12 @@ function renderMobileNav() {
       <MobileNav />
     </MobileOverlayProvider>,
   )
+}
+
+function finishNavigationFlight() {
+  act(() => {
+    document.querySelector('[data-liquid-morph-panel]')?.dispatchEvent(new Event('novo:nav-morph-rest'))
+  })
 }
 
 describe('MobileNav', () => {
@@ -253,6 +259,8 @@ describe('MobileNav', () => {
 
     await user.click(closeButton)
 
+    finishNavigationFlight()
+
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
   })
 
@@ -303,7 +311,37 @@ describe('MobileNav', () => {
     await user.click(screen.getByTestId('workspace-backdrop'))
     expect(nav).toHaveAttribute('inert')
 
+    finishNavigationFlight()
+
     await waitFor(() => expect(nav).not.toHaveAttribute('inert'))
+  })
+
+  it('keeps both lenses alive through the flight and releases presence from the spring', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const panel = screen.getByRole('dialog', { name: 'Workspace menu' })
+    expect(screen.getByTestId('mobile-nav-rail-glass')).toHaveAttribute('data-glass-active', 'true')
+    expect(screen.getByTestId('mobile-nav-plus-glass')).toHaveAttribute('data-glass-active', 'true')
+    expect(panel.querySelector('[data-liquid-panel-material]')).not.toBeNull()
+    await user.click(within(panel).getByRole('button', { name: 'Close menu' }))
+    expect(screen.getByTestId('workspace-panel-glass-surface')).toHaveAttribute('data-glass-active', 'true')
+    expect(panel).toBeInTheDocument()
+    finishNavigationFlight()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('navigation')).not.toHaveAttribute('inert')
+  })
+
+  it('can reopen during the return without an old completion closing the new panel', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByTestId('workspace-backdrop'))
+    // The source stays inert for real users until rest; this simulates a
+    // programmatic reversal while its spring is already returning.
+    fireEvent.click(document.querySelector('[data-testid="mobile-nav-plus-glass"]')!.parentElement!)
+    finishNavigationFlight()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('does not promote Workout as a critical quick action', () => {

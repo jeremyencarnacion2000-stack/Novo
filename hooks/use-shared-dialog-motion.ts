@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 import { modalFlip } from '@/lib/modal-flip'
 import type { NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
 import type { ModalOrigin } from '@/lib/liquid-modal-motion'
+import { waitForNavigationRest } from '@/lib/mobile-nav-motion'
 
 /**
  * Bridges the new Dialog `motionId` API to the shared-element flight engine.
@@ -16,19 +17,21 @@ export function useSharedDialogMotion({
   enabled,
   registerController,
   originRef,
+  surfaceRef,
 }: {
   motionId: string
   enabled: boolean
   registerController?: (controller: NativeDialogMotionController | null) => void
   originRef?: React.RefObject<ModalOrigin>
+  surfaceRef?: React.RefObject<HTMLDivElement | null>
 }) {
   const isLiquidNav = motionId === 'mobile-nav-panel'
-  const exitTimer = useRef<number | null>(null)
+  const cancelNavExit = useRef<(() => void) | null>(null)
   const open = useCallback(() => {
     if (!motionId) return
     if (isLiquidNav) {
-      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
-      exitTimer.current = null
+      cancelNavExit.current?.()
+      cancelNavExit.current = null
       return
     }
     modalFlip.setOrigin(motionId, originRef?.current)
@@ -37,13 +40,10 @@ export function useSharedDialogMotion({
 
   const close = useCallback((onComplete: () => void) => {
     if (isLiquidNav) {
-      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
+      cancelNavExit.current?.()
       // CommandCenterLiquidMorph owns the rail, + and panel geometry. Keep
       // the portal present through its return; never start a second animator.
-      exitTimer.current = window.setTimeout(() => {
-        exitTimer.current = null
-        onComplete()
-      }, 760)
+      cancelNavExit.current = waitForNavigationRest(surfaceRef?.current ?? null, onComplete)
       return
     }
     if (!motionId) {
@@ -51,7 +51,7 @@ export function useSharedDialogMotion({
       return
     }
     modalFlip.untoggle(motionId, onComplete)
-  }, [isLiquidNav, motionId])
+  }, [isLiquidNav, motionId, surfaceRef])
 
   useLayoutEffect(() => {
     if (!enabled || !motionId) return
@@ -70,8 +70,8 @@ export function useSharedDialogMotion({
 
     return () => {
       cancelled = true
-      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current)
-      exitTimer.current = null
+      cancelNavExit.current?.()
+      cancelNavExit.current = null
       if (!isLiquidNav) modalFlip.cancel(motionId)
       registerController?.(null)
     }

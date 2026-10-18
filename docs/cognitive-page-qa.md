@@ -1,5 +1,32 @@
 # Cognitive page QA baseline
 
+## Current architecture — 2026-10-18
+
+- `/cognitive` uses `CognitiveClientLayout`, a lean authenticated shell with the
+  common wallpaper, responsive sidebar, mobile navigation and one scroll region.
+- Authenticated users retain navigation while the Twin syncs. A failed sync is
+  not treated as proof that onboarding is required. Unauthenticated content is
+  still withheld and redirects back through sign-in.
+- Settings, command search and voice mount on demand. Voice cancellation stops
+  tracks and ignores late permission/transcription results when closed/unmounted.
+- The graph keeps its Pro entitlement. A 403 explains the plan and links to the
+  real billing settings; a 401 offers sign-in; request errors offer retry.
+- Mobile contexts use a readable sequence; the desktop graph stays bounded.
+  Lenses scroll, context lists expand, and phone/tablet inspection and correction
+  share one sheet above the navigation. The actual operating plan opens inline.
+- Regression coverage includes session/loading/failure, entitlement, tablet
+  inspection, correction, utilities, microphone cancellation, route presence,
+  scroll registration, motion preferences and layout-sized optical maps.
+- Browser review uses synthetic context, with no real account writes. The mobile
+  field fits the viewport, its nodes have no residual translate, the scroller
+  reserves 160px plus safe area, and navigation remains available. These fixtures
+  do not prove provider availability or a real user's authenticated data.
+
+## Historical verification notes
+
+The entries below describe older implementations and deployments, not the
+current layout or production alias.
+
 ## Estado actual
 
 - Route: `/cognitive`.

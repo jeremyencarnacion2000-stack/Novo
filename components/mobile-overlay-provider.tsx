@@ -125,7 +125,11 @@ export function MobileOverlayProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     const media = window.matchMedia?.('(max-width: 767px)')
-    const update = () => setIsMobileViewport(window.innerWidth <= 767)
+    const update = () => {
+      const mobile = window.innerWidth <= 767
+      setIsMobileViewport(mobile)
+      if (!mobile && activeOverlayRef.current === 'navigation') closeOverlay()
+    }
     update()
     media?.addEventListener?.('change', update)
     window.addEventListener('resize', update)
@@ -133,7 +137,7 @@ export function MobileOverlayProvider({ children }: { children: React.ReactNode 
       media?.removeEventListener?.('change', update)
       window.removeEventListener('resize', update)
     }
-  }, [])
+  }, [closeOverlay])
 
   const value = useMemo<MobileOverlayContextValue>(() => ({
     activeOverlay,
