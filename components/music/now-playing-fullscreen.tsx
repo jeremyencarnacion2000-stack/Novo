@@ -7,6 +7,7 @@ import { usePlayerStore } from '@/lib/player-store'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { useLastModalValue } from '@/hooks/use-last-modal-value'
 
 interface NowPlayingFullscreenProps {
     open: boolean
@@ -29,19 +30,20 @@ function formatTime(ms: number) {
  */
 export function NowPlayingFullscreen({ open, onClose, onOpenQueue }: NowPlayingFullscreenProps) {
     const {
-        currentTrack, isPlaying, isReady, progress,
+        currentTrack: liveTrack, isPlaying, isReady, progress,
         togglePlayPause, nextTrack, previousTrack, seekTo,
         isShuffle, toggleShuffle, repeatMode, toggleRepeat,
         toggleLike, likedTracks,
     } = usePlayerStore()
 
+    const currentTrack = useLastModalValue(liveTrack)
     if (!currentTrack) return null
 
     const duration = currentTrack.duration_ms || 0
     const isLiked = likedTracks.includes(currentTrack.id)
 
     return (
-        <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+        <Sheet open={open && Boolean(liveTrack)} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
             <SheetContent
                 side="bottom"
                 showCloseButton={false}

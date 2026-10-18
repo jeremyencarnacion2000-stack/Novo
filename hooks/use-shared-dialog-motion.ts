@@ -3,6 +3,7 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { modalFlip } from '@/lib/modal-flip'
 import type { NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
+import type { ModalOrigin } from '@/lib/liquid-modal-motion'
 
 /**
  * Bridges the new Dialog `motionId` API to the shared-element flight engine.
@@ -14,10 +15,12 @@ export function useSharedDialogMotion({
   motionId,
   enabled,
   registerController,
+  originRef,
 }: {
   motionId: string
   enabled: boolean
   registerController?: (controller: NativeDialogMotionController | null) => void
+  originRef?: React.RefObject<ModalOrigin>
 }) {
   const isLiquidNav = motionId === 'mobile-nav-panel'
   const exitTimer = useRef<number | null>(null)
@@ -28,8 +31,9 @@ export function useSharedDialogMotion({
       exitTimer.current = null
       return
     }
+    modalFlip.setOrigin(motionId, originRef?.current)
     modalFlip.toggle(motionId)
-  }, [isLiquidNav, motionId])
+  }, [isLiquidNav, motionId, originRef])
 
   const close = useCallback((onComplete: () => void) => {
     if (isLiquidNav) {

@@ -7,9 +7,12 @@ import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 import { useNativeDialogMotion, type NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
+import { readModalOrigin, rememberModalOrigin, restoreModalOriginFocus } from '@/lib/modal-origin'
+import type { ModalOrigin } from '@/lib/liquid-modal-motion'
 
 const SheetMotionContext = React.createContext<{
   registerController: (controller: NativeDialogMotionController | null) => void
+  originRef: React.RefObject<ModalOrigin>
 } | null>(null)
 
 function MobileSheetDragHandle({ side }: { side: string }) {
@@ -24,56 +27,72 @@ function MobileSheetDragHandle({ side }: { side: string }) {
   )
 }
 
-function Sheet({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+function Sheet({ open, defaultOpen, onOpenChange, onExitComplete, ...props }: React.ComponentProps<typeof SheetPrimitive.Root> & { onExitComplete?: () => void }) {
   const [present, setPresent] = React.useState(open ?? defaultOpen ?? false)
   const controllerRef = React.useRef<NativeDialogMotionController | null>(null)
   const previousOpenRef = React.useRef(open)
+  const closingRef = React.useRef(false)
+  const exitCompleteRef = React.useRef(onExitComplete)
+  exitCompleteRef.current = onExitComplete
+  const originRef = React.useRef(readModalOrigin())
+  const retainedChildren = React.useRef(props.children)
+  if (open !== false || !present) retainedChildren.current = props.children
   const registerController = React.useCallback((controller: NativeDialogMotionController | null) => {
     controllerRef.current = controller
   }, [])
-  const finishClose = React.useCallback((notify: boolean) => {
+  const finishClose = React.useCallback(() => {
+    if (closingRef.current) return
+    closingRef.current = true
     const complete = () => {
+      closingRef.current = false
       setPresent(false)
-      if (notify) onOpenChange?.(false)
+      exitCompleteRef.current?.()
     }
     const controller = controllerRef.current
     if (controller) controller.close(complete)
     else complete()
-  }, [onOpenChange])
+  }, [])
 
   React.useLayoutEffect(() => {
     if (open === undefined) return
     const wasOpen = previousOpenRef.current
     previousOpenRef.current = open
     if (open) {
+      closingRef.current = false
+      if (wasOpen === false && !present) originRef.current = readModalOrigin()
       if (!present) setPresent(true)
       else if (wasOpen === false) controllerRef.current?.open()
     } else if (wasOpen === true && present) {
-      finishClose(false)
+      finishClose()
     }
   }, [finishClose, open, present])
 
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
     if (nextOpen) {
+      closingRef.current = false
+      if (!present) originRef.current = readModalOrigin()
       setPresent(true)
       onOpenChange?.(true)
     } else {
-      finishClose(true)
+      if (!closingRef.current) { onOpenChange?.(false); finishClose() }
     }
-  }, [finishClose, onOpenChange])
+  }, [finishClose, onOpenChange, present])
 
-  const context = React.useMemo(() => ({ registerController }), [registerController])
+  const context = React.useMemo(() => ({ registerController, originRef }), [registerController])
   return (
     <SheetMotionContext.Provider value={context}>
-      <SheetPrimitive.Root {...props} data-slot="sheet" open={present} onOpenChange={handleOpenChange} />
+      <SheetPrimitive.Root {...props} data-slot="sheet" open={present} onOpenChange={handleOpenChange}>{retainedChildren.current}</SheetPrimitive.Root>
     </SheetMotionContext.Provider>
   )
 }
 
 function SheetTrigger({
+  onPointerDown, onClick,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props}
+    onPointerDown={(event) => { rememberModalOrigin(event.currentTarget); onPointerDown?.(event) }}
+    onClick={(event) => { rememberModalOrigin(event.currentTarget); onClick?.(event) }} />
 }
 
 function SheetClose({
@@ -111,6 +130,8 @@ function SheetContent({
   showCloseButton = true,
   overlayClassName,
   overlayProps,
+  onCloseAutoFocus,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
@@ -120,24 +141,30 @@ function SheetContent({
   overlayProps?: React.ComponentProps<typeof SheetPrimitive.Overlay> & Record<string, unknown>
 }) {
   const surfaceRef = React.useRef<HTMLDivElement | null>(null)
+  const [surfaceElement, setSurfaceElement] = React.useState<HTMLDivElement | null>(null)
   const overlayRef = React.useRef<HTMLDivElement | null>(null)
+  React.useImperativeHandle(forwardedRef, () => surfaceRef.current as HTMLDivElement)
   const motionContext = React.useContext(SheetMotionContext)
   const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    element: surfaceElement,
     enabled: side === 'bottom',
     onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="sheet-close"]')?.click(),
   })
   const setSurfaceRef = React.useCallback((node: HTMLDivElement | null) => {
     surfaceRef.current = node
+    setSurfaceElement(node)
     dragSurfaceRef.current = node
   }, [dragSurfaceRef])
 
   useNativeDialogMotion({
     surfaceRef,
+    surfaceElement,
     overlayRef,
     preset: 'sheet',
     sheetSide: side,
     enabled: true,
     registerController: motionContext?.registerController,
+    originRef: motionContext?.originRef,
   })
 
   return (
@@ -146,6 +173,7 @@ function SheetContent({
       <SheetPrimitive.Content
         ref={setSurfaceRef}
         data-slot="sheet-content"
+        aria-describedby={undefined}
         className={cn(
           // Keep the sheet itself as the scroll boundary. Without an internal
           // overflow region, long app forms (especially on mobile) extend
@@ -163,6 +191,7 @@ function SheetContent({
           className,
         )}
         {...props}
+        onCloseAutoFocus={(event) => { onCloseAutoFocus?.(event); restoreModalOriginFocus(event, motionContext?.originRef.current.element) }}
       >
         <MobileSheetDragHandle side={side} />
         {children}

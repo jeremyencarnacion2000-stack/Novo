@@ -1,5 +1,6 @@
 'use client'
 
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Code2, ExternalLink, Github, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react'
@@ -307,15 +308,15 @@ export function DeveloperContextPanel() {
         <button type="button" disabled={!preview || loading} onClick={() => { setCopied(false); setPreviewOpen(true) }} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 text-xs font-semibold text-primary disabled:opacity-40"><Upload className="size-3.5" />{copy.preview}</button>
       </div>
 
-      {previewOpen && <div role="dialog" aria-modal="true" aria-labelledby="developer-context-preview-title" className="fixed inset-0 z-[100] grid place-items-center bg-black/65 p-4" onKeyDown={(event) => { if (event.key === 'Escape') setPreviewOpen(false) }}>
-        <div className="w-full max-w-lg rounded-3xl border border-foreground/10 bg-background p-5 shadow-2xl md:p-7">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/75">{copy.preview}</p><h3 id="developer-context-preview-title" className="mt-2 text-lg font-semibold text-foreground">{copy.previewTitle}</h3></div><button type="button" aria-label={copy.close} onClick={() => setPreviewOpen(false)} className="grid size-9 place-items-center rounded-full border border-foreground/10 text-foreground/50 hover:bg-foreground/[0.05]"><X className="size-4" /></button></div>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent showCloseButton={false} aria-labelledby="developer-context-preview-title" className="max-w-lg rounded-3xl border-foreground/10 bg-background p-5 shadow-2xl md:p-7">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/75">{copy.preview}</p><DialogTitle id="developer-context-preview-title" className="mt-2 text-lg font-semibold text-foreground">{copy.previewTitle}</DialogTitle></div><button type="button" aria-label={copy.close} onClick={() => setPreviewOpen(false)} className="grid size-9 place-items-center rounded-full border border-foreground/10 text-foreground/50 hover:bg-foreground/[0.05]"><X className="size-4" /></button></div>
           <p className="mt-4 whitespace-pre-wrap rounded-2xl border border-foreground/[0.07] bg-foreground/[0.025] p-4 text-xs leading-6 text-foreground/70">{preview || copy.emptyPreview}</p>
           <p className="mt-3 text-xs font-medium text-foreground/65">{copy.proposalPrompt}</p>
           <p className="mt-3 text-[11px] leading-5 text-foreground/40">{copy.privacy}</p>
           <div className="mt-5 flex flex-wrap gap-2"><button type="button" disabled={!preview} onClick={() => void copyPreview()} className="min-h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50">{copied ? copy.copied : copy.copy}</button>{copied && <Link href="/cognitive" className="inline-flex min-h-10 items-center rounded-full border border-foreground/10 px-4 text-xs font-semibold text-foreground/70">{copy.openTwin}</Link>}<button type="button" onClick={() => setPreviewOpen(false)} className="min-h-10 rounded-full border border-foreground/10 px-4 text-xs text-foreground/55">{copy.close}</button></div>
-        </div>
-      </div>}
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

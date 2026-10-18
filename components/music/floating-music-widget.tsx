@@ -93,7 +93,8 @@ const FloatingMusicWidgetComponent = () => {
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (suppressSecondary) return null;
+  const fullscreen = fullscreenMounted ? <NowPlayingFullscreen open={fullscreenOpen && isMusicPage && isOpen && Boolean(currentTrack) && !suppressSecondary} onClose={() => setFullscreenOpen(false)} /> : null;
+  if (suppressSecondary) return fullscreen;
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -109,7 +110,7 @@ const FloatingMusicWidgetComponent = () => {
   if (isMusicPage && isOpen && currentTrack) {
     return (
       <>
-      {fullscreenMounted && <NowPlayingFullscreen open={fullscreenOpen} onClose={() => setFullscreenOpen(false)} />}
+      {fullscreen}
       <div
         // Below `md`, components/mobile-nav.tsx floats its own pill+FAB at
         // `bottom-4` — stacking this player above it (not sharing the same
@@ -204,7 +205,7 @@ const FloatingMusicWidgetComponent = () => {
   }
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+    <>{fullscreen}<div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
       <AnimatePresence>
         {rewardParticles.map((p) => (
           <motion.div
@@ -223,7 +224,7 @@ const FloatingMusicWidgetComponent = () => {
           />
         ))}
       </AnimatePresence>
-    </div>
+    </div></>
   );
 };
 
