@@ -45,9 +45,10 @@
 .novo-liquid-notice[data-liquid-notice-origin='left'] { color: rgb(10, 18, 24); }
 .novo-liquid-notice-card { max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; }
 :root[data-novo-motion='reduced'] .novo-fluid-floating { animation-name: novo-fluid-fade; animation-duration: 160ms; }
-:root[data-novo-motion='reduced'] .novo-fluid-floating[data-state='closed'] { animation-direction: reverse; }
+:root[data-novo-motion='reduced'] .novo-fluid-floating[data-state='closed'] { animation-name: novo-fluid-fade-return; }
 :root[data-novo-motion='off'] .novo-fluid-floating { animation: none; }
 @keyframes novo-fluid-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes novo-fluid-fade-return { from { opacity: 1; } to { opacity: 0; } }
 
 /* Ambient surface inspired by the reference: a restrained, slowly drifting
    color field plus dither noise. It lives inside the app viewport instead of
