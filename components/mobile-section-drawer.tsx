@@ -16,6 +16,7 @@ import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { GlassSurface } from '@/components/ui/GlassSurface'
+import { NavigationIndicator } from '@/components/ui/navigation-indicator'
 import { rememberNavigationOrigin } from '@/lib/navigation-origin'
 
 interface MobileSectionDrawerProps {
@@ -125,10 +126,10 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                         refractivePriority="interactive"
                         refractiveActive
                         webComponent
-                        // This is deliberately the same optical material as
-                        // the rail and + control. The contour changes during
-                        // the handoff; the glass identity does not.
-                        backgroundColor="rgba(255,255,255,0.055)"
+                        // The same regular material becomes more substantial
+                        // as it expands, protecting text over busy content.
+                        navigationMaterial="panel"
+                        blur={3}
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[32px]"
                         style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
@@ -157,7 +158,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                     >
                         {sections.map((section) => (
                             <div key={section.title} className="mb-3 last:mb-1">
-                                <p className="mb-1 pl-1 text-[8px] font-semibold uppercase tracking-[0.24em] text-foreground/30">
+                                <p className="novo-nav-label mb-1 pl-1 text-[10px] font-medium tracking-wide">
                                     {section.title}
                                 </p>
                                 <div className="grid grid-cols-4 gap-1.5">
@@ -174,31 +175,19 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                                                 className={cn(
                                                     "novo-nav-glass-control relative flex min-h-[54px] flex-col items-center gap-1 rounded-[16px] px-1 py-2 transition-all duration-200 active:scale-95",
                                                     active
-                                                        ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-                                                        : "bg-foreground/[0.02] text-foreground/35 hover:bg-foreground/[0.04] hover:text-foreground/50"
+                                                        ? "novo-nav-label-active"
+                                                        : "novo-nav-label"
                                                 )}
                                                 data-active={active}
+                                                aria-current={active ? 'page' : undefined}
                                             >
+                                                {active && <NavigationIndicator />}
                                                 <div className={cn(
                                                     "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
                                                     active
                                                         ? "bg-primary/15"
                                                         : "bg-foreground/[0.03]"
                                                 )}>
-                                                    {active && (
-                                                        <GlassSurface
-                                                            aria-hidden
-                                                            data-testid="workspace-active-glass-indicator"
-                                                            preset="navigation"
-                                                            refractive
-                                                            refractivePriority="interactive"
-                                                            webComponent
-                                                            backgroundColor="rgba(255,255,255,0.055)"
-                                                            elevation="low"
-                                                            className="pointer-events-none absolute inset-0 h-full w-full rounded-2xl"
-                                                            style={{ position: 'absolute', inset: 0, borderRadius: 'inherit' }}
-                                                        />
-                                                    )}
                                                     <Icon
                                                         data-shared-item={item.sharedId}
                                                         className="relative z-10 h-4 w-4"
@@ -206,8 +195,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                                                     />
                                                 </div>
                                                 <span className={cn(
-                                                    "text-[9px] font-medium tracking-tight",
-                                                    active ? "opacity-90" : "opacity-55"
+                                                    "relative z-10 text-[11px] font-medium tracking-tight"
                                                 )}>
                                                     {item.title}
                                                 </span>

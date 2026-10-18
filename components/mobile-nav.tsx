@@ -6,8 +6,9 @@ import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
 import { motion, LayoutGroup } from 'framer-motion'
-import { appleLiquidMotion, springConfig } from '@/lib/design-tokens'
+import { appleLiquidMotion } from '@/lib/design-tokens'
 import { GlassSurface } from '@/components/ui/GlassSurface'
+import { NavigationIndicator } from '@/components/ui/navigation-indicator'
 import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 import { useState } from 'react'
@@ -143,7 +144,7 @@ export function MobileNav() {
                             refractiveActive
                             refractivePriority="ambient"
                             webComponent
-                            backgroundColor="rgba(255,255,255,0.055)"
+                            navigationMaterial="bar"
                             elevation="low"
                             className="pointer-events-none absolute inset-0 z-0 h-full w-full"
                             style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
@@ -166,7 +167,7 @@ export function MobileNav() {
                                         }}
                                         className={cn(
                                             "relative z-10 flex items-center justify-center rounded-full transition-colors min-w-[44px] min-h-[44px] h-[44px] novo-nav-glass-control",
-                                            active ? "text-foreground" : "text-foreground/65",
+                                            active ? "novo-nav-label-active" : "novo-nav-label",
                                             active && "px-4"
                                         )}
                                         data-active={active}
@@ -175,24 +176,7 @@ export function MobileNav() {
                                         layout
                                     >
                                         {active && (
-                                            <motion.div
-                                                layoutId="mobile-nav-pill"
-                                                className="absolute inset-0"
-                                                transition={springConfig.smooth}
-                                            >
-                                                <GlassSurface
-                                                    preset="navigation"
-                                                    refractive
-                                                    refractiveActive={!drawerMounted}
-                                                    depth={6}
-                                                    chromaticAberration={3.5}
-                                                    refractivePriority="interactive"
-                                                    webComponent
-                                                    backgroundColor="rgba(255,255,255,0.1)"
-                                                    elevation="low"
-                                                    className="h-full w-full"
-                                                />
-                                            </motion.div>
+                                            <NavigationIndicator layoutId="mobile-nav-pill" />
                                         )}
                                         <Icon
                                             data-shared-item={item.sharedId}
@@ -231,7 +215,7 @@ export function MobileNav() {
                             refractiveActive
                             refractivePriority="interactive"
                             webComponent
-                            backgroundColor="rgba(255,255,255,0.055)"
+                            navigationMaterial="bar"
                             elevation="low"
                             className="pointer-events-none absolute inset-0 z-0 h-full w-full"
                             style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
@@ -244,7 +228,7 @@ export function MobileNav() {
                             <Plus
                                 ref={liquidPlusGlyphRef}
                                 data-shared-item="mobile-nav-close"
-                                className="h-5 w-5 text-foreground"
+                                className="h-5 w-5 novo-nav-label-active"
                                 strokeWidth={2.25}
                             />
                         </div>

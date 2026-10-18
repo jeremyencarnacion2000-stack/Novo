@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import {
   Brain, Sparkles, LayoutDashboard, Settings, Bot, Globe, Shield, Crown, KeyRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Tab } from './settings-shared'
 import { useTranslation } from '@/lib/i18n'
+import { LayoutGroup } from 'framer-motion'
+import { NavigationIndicator } from '@/components/ui/navigation-indicator'
 
 // ─── Tab section components ──────────────────────────────────────────────────
 import { SettingsTwin } from './settings-twin'
@@ -41,6 +43,7 @@ const TAB_LABELS = {
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 export function SettingsControlCenter() {
+  const navigationId = useId()
   const { language } = useTranslation()
   const locale = language === 'es' || language === 'fr' || language === 'de' ? language : 'en'
   const labels = {
@@ -72,24 +75,28 @@ export function SettingsControlCenter() {
         className="novo-settings-nav flex overflow-x-auto gap-1 p-1 rounded-2xl sticky top-0 z-20 md:flex-col md:overflow-visible md:gap-1.5 md:p-2 md:rounded-[26px] md:w-full"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
+        <LayoutGroup id={navigationId}>
         {TABS.map(tab => {
           const Icon = tab.icon
           return (
             <button
               key={tab.id}
+              aria-pressed={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'shrink-0 flex items-center justify-center md:justify-start gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition-all duration-300 whitespace-nowrap md:w-full',
+                'relative shrink-0 flex min-h-11 items-center justify-center md:justify-start gap-2 py-2 px-3 rounded-xl text-xs font-medium transition-colors whitespace-nowrap md:w-full focus-visible:outline-2 focus-visible:outline-offset-2',
                 activeTab === tab.id
-                  ? 'bg-primary/15 text-primary border border-primary/25 shadow-[0_2px_12px_rgba(var(--primary-rgb),0.12)]'
-                  : 'text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.02]',
+                  ? 'novo-nav-label-active'
+                  : 'novo-nav-label hover:bg-foreground/[0.04]',
               )}
             >
-              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{labels[tab.id]}</span>
+              {activeTab === tab.id && <NavigationIndicator layoutId="settings-nav-pill" />}
+              <Icon className="relative z-10 w-4 h-4 flex-shrink-0" />
+              <span className="relative z-10">{labels[tab.id]}</span>
             </button>
           )
         })}
+        </LayoutGroup>
       </div>
 
       {/* ─── Tab Content ──────────────────────────────────────────────── */}

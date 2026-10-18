@@ -1880,101 +1880,6 @@ html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
   box-shadow: var(--novo-focus-box-shadow);
 }
 
-/* Navigation controls use the same material language as the Pomodoro lens,
-   but with a deliberately lighter treatment. The rail itself and the active
-   route carry the real displacement surface; inactive controls only reveal a
-   small refractive edge on hover/focus so the shell remains calm and fast. */
-@layer components {
-  .novo-nav-glass-control,
-  .novo-sidebar-nav-button {
-    --novo-nav-aberration: 0.2;
-    isolation: isolate;
-    overflow: hidden;
-    border-color: transparent !important;
-    background: transparent !important;
-    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
-    transition:
-      background-color 180ms ease,
-      box-shadow 220ms ease,
-      color 180ms ease,
-      transform 220ms var(--novo-spring);
-  }
-
-  .novo-nav-glass-control::before,
-  .novo-sidebar-nav-button::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    z-index: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: 0;
-    background:
-      linear-gradient(110deg,
-        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
-        transparent 23%,
-        transparent 76%,
-        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
-    filter: blur(0.6px);
-    mix-blend-mode: screen;
-    transition: opacity 180ms ease;
-  }
-
-  .novo-nav-glass-control:hover,
-  .novo-nav-glass-control:focus-visible,
-  .novo-sidebar-nav-button:hover,
-  .novo-sidebar-nav-button:focus-visible {
-    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
-    backdrop-filter: var(--novo-context-backdrop-filter);
-    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      0 3px 14px rgba(0, 0, 0, 0.08);
-  }
-
-  .novo-nav-glass-control:hover::before,
-  .novo-nav-glass-control:focus-visible::before,
-  .novo-sidebar-nav-button:hover::before,
-  .novo-sidebar-nav-button:focus-visible::before {
-    opacity: 0.55;
-  }
-
-  /* The active route is already backed by GlassSurface. Keep its button
-     transparent so two full-strength lenses never fight each other. */
-  .novo-nav-glass-control[data-active='true'],
-  .novo-sidebar-nav-button[data-active='true'] {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  .novo-nav-glass-control[data-active='true']::before,
-  .novo-sidebar-nav-button[data-active='true']::before {
-    opacity: 0;
-  }
-
-  /* In the expanded mobile menu, keep the selected destination legible while
-     the small optical marker remains the only refractive child lens. */
-  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
-    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    isolation: auto;
-  }
-
-  .novo-mobile-nav-shell {
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
-  }
-
-  .novo-mobile-nav-fab {
-    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
-  }
-
-  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-nav-glass-control,
-  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-sidebar-nav-button {
-    transition: opacity 160ms ease;
-  }
-}
-
 /* Sidebar depth balance -----------------------------------------------------
    The floating shell, its active navigation lens and the footer card were
    each painting an elevation shadow. On warm wallpapers those shadows merged
@@ -2016,11 +1921,8 @@ html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
   border-color: transparent !important;
 }
 
-/* Do not silently disable the configured liquid material because an operating
-   system reports reduced transparency. That media preference was disabling the
-   only refraction layer on desktop while the Appearance sliders still showed
-   non-zero values. A user may explicitly opt into the fallback via this data
-   attribute; otherwise the app's own material settings remain authoritative. */
+/* Content surfaces follow the app's material settings. Navigation has its own
+   accessible contrast treatment below, including reduced-transparency modes. */
 html[data-accessibility-reduce-glass='true'] [data-glass-refractive] {
   filter: none !important;
   backdrop-filter: none !important;
@@ -3280,80 +3182,25 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 @layer components {
   .novo-nav-glass-control,
   .novo-sidebar-nav-button {
-    --novo-nav-aberration: 0.2;
     isolation: isolate;
     overflow: hidden;
     border-color: transparent !important;
     background: transparent !important;
-    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
-    transition:
-      background-color 180ms ease,
-      box-shadow 220ms ease,
-      color 180ms ease,
-      transform 220ms var(--novo-spring);
+    box-shadow: none;
+    transition: background-color 160ms ease, color 160ms ease;
   }
-
-  .novo-nav-glass-control::before,
-  .novo-sidebar-nav-button::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    z-index: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: 0;
-    background:
-      linear-gradient(110deg,
-        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
-        transparent 23%,
-        transparent 76%,
-        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
-    filter: blur(0.6px);
-    mix-blend-mode: screen;
-    transition: opacity 180ms ease;
-  }
-
   .novo-nav-glass-control:hover,
-  .novo-nav-glass-control:focus-visible,
-  .novo-sidebar-nav-button:hover,
-  .novo-sidebar-nav-button:focus-visible {
-    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
-    backdrop-filter: var(--novo-context-backdrop-filter);
-    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      0 3px 14px rgba(0, 0, 0, 0.08);
+  .novo-sidebar-nav-button:hover {
+    background: var(--novo-navigation-hover) !important;
   }
-
-  .novo-nav-glass-control:hover::before,
-  .novo-nav-glass-control:focus-visible::before,
-  .novo-sidebar-nav-button:hover::before,
-  .novo-sidebar-nav-button:focus-visible::before {
-    opacity: 0.55;
+  .novo-nav-glass-control:focus-visible,
+  .novo-sidebar-nav-button:focus-visible {
+    outline: 2px solid var(--novo-navigation-foreground);
+    outline-offset: -3px;
   }
   .novo-nav-glass-control[data-active='true'],
   .novo-sidebar-nav-button[data-active='true'] {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  .novo-nav-glass-control[data-active='true']::before,
-  .novo-sidebar-nav-button[data-active='true']::before {
-    opacity: 0;
-  }
-  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
-    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    isolation: auto;
-  }
-
-  .novo-mobile-nav-shell {
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
-  }
-
-  .novo-mobile-nav-fab {
-    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
+    background: transparent !important;
   }
   .novo-mobile-nav-panel--compact {
     bottom: var(--novo-mobile-nav-panel-bottom) !important;
@@ -3455,4 +3302,99 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 }
 [data-liquid-morph-controller].modal-flip-source-active {
   opacity: 1 !important;
+}
+
+/* Regular navigation glass: one optical plane, a predictable local tint and
+   inexpensive selection overlays. No pixel sampling or per-item filters. */
+:root {
+  --novo-navigation-tint: rgba(248, 250, 249, .84);
+  --novo-navigation-panel-tint: rgba(248, 250, 249, .93);
+  --novo-navigation-solid: #f8faf9;
+  --novo-navigation-foreground: #17211c;
+  --novo-navigation-secondary: #3d4842;
+  --novo-navigation-hover: rgba(23, 33, 28, .055);
+  --novo-navigation-selection: rgba(23, 33, 28, .09);
+  --novo-navigation-rim: rgba(255, 255, 255, .7);
+  --novo-navigation-blur: 12px;
+}
+.dark {
+  --novo-navigation-tint: rgba(20, 26, 23, .88);
+  --novo-navigation-panel-tint: rgba(20, 26, 23, .94);
+  --novo-navigation-solid: #141a17;
+  --novo-navigation-foreground: #f3f7f5;
+  --novo-navigation-secondary: #c5d0ca;
+  --novo-navigation-hover: rgba(243, 247, 245, .07);
+  --novo-navigation-selection: rgba(243, 247, 245, .13);
+  --novo-navigation-rim: rgba(255, 255, 255, .19);
+}
+.novo-navigation-glass {
+  --glass-element-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06);
+}
+.novo-navigation-glass[data-navigation-material='panel'] {
+  --novo-navigation-tint: var(--novo-navigation-panel-tint);
+  --novo-navigation-blur: 16px;
+}
+.novo-navigation-glass > [data-glass-backdrop] {
+  border: 0 !important;
+  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06) !important;
+}
+.novo-navigation-glass > [data-glass-sheen] { display: none; }
+.novo-nav-selection {
+  border-radius: inherit;
+  background: var(--novo-navigation-selection);
+  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), 0 2px 5px rgba(0,0,0,.05);
+  transition: background-color 120ms ease;
+}
+button:active > .novo-nav-selection,
+a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navigation-selection), var(--novo-navigation-foreground) 5%); }
+.novo-nav-label { color: var(--novo-navigation-secondary); }
+.novo-nav-label-active { color: var(--novo-navigation-foreground); }
+/* Theme tint changes immediately. Foreground must follow in the same frame,
+   rather than fading pale text across an already-light navigation surface. */
+.novo-nav-label, .novo-nav-label-active,
+.novo-mobile-nav-panel .novo-nav-glass-control, .novo-settings-nav button {
+  transition-property: background-color, box-shadow;
+}
+.novo-mobile-nav-panel .novo-nav-glass-control { color: var(--novo-navigation-secondary); }
+.novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] { color: var(--novo-navigation-foreground); }
+.novo-mobile-nav-panel .novo-nav-glass-control:has(> svg) { min-height: 44px; }
+.novo-mobile-nav-panel .novo-nav-glass-control > div { background: transparent; transition: none; }
+[data-slot='sidebar-inner'], .novo-settings-nav {
+  background: var(--novo-navigation-tint) !important;
+  backdrop-filter: blur(var(--novo-navigation-blur)) saturate(135%);
+  -webkit-backdrop-filter: blur(var(--novo-navigation-blur)) saturate(135%);
+  color: var(--novo-navigation-foreground);
+}
+.novo-settings-nav::before { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .novo-navigation-glass, [data-slot='sidebar-inner'], .novo-settings-nav {
+    --novo-navigation-tint: var(--novo-navigation-solid);
+    --novo-navigation-panel-tint: var(--novo-navigation-solid);
+    --novo-navigation-blur: 0px;
+  }
+  .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
+}
+html[data-accessibility-reduce-glass='true'] .novo-navigation-glass,
+html[data-accessibility-reduce-glass='true'] [data-slot='sidebar-inner'],
+html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
+  --novo-navigation-tint: var(--novo-navigation-solid);
+  --novo-navigation-panel-tint: var(--novo-navigation-solid);
+  --novo-navigation-blur: 0px;
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  :root {
+    --novo-navigation-foreground: CanvasText;
+    --novo-navigation-secondary: CanvasText;
+  }
+  .novo-navigation-glass, [data-slot='sidebar-inner'], .novo-settings-nav {
+    --novo-navigation-tint: Canvas;
+    --novo-navigation-panel-tint: Canvas;
+    --novo-navigation-foreground: CanvasText;
+    --novo-navigation-secondary: CanvasText;
+    --novo-navigation-blur: 0px;
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  .novo-nav-selection { outline: 2px solid currentColor; outline-offset: -2px; }
+  .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
 }

@@ -66,6 +66,7 @@ jest.mock('@/components/ui/GlassSurface', () => ({
       data-glass-preset={props.preset}
       data-glass-priority={props.refractivePriority}
       data-glass-active={props.refractiveActive === false ? 'false' : 'true'}
+      data-navigation-material={props.navigationMaterial}
     />
   ),
 }))
@@ -264,18 +265,17 @@ describe('MobileNav', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
   })
 
-  it('uses the navigation liquid-glass treatment for the active workspace item', async () => {
+  it('uses a thin selection overlay instead of nesting another lens in the panel', async () => {
     pathname = '/calendar'
     const user = userEvent.setup()
     renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
-    const activityLens = screen.getByTestId('workspace-active-glass-indicator')
-    expect(activityLens).toHaveAttribute('data-glass-refractive', 'true')
-    expect(activityLens).toHaveAttribute('data-glass-preset', 'navigation')
-    expect(activityLens).toHaveAttribute('data-glass-priority', 'interactive')
-    expect(activityLens).toHaveAttribute('data-glass-active', 'true')
+    const selected = screen.getByRole('button', { name: 'Calendar' })
+    expect(selected).toHaveAttribute('aria-current', 'page')
+    expect(selected.querySelector('[data-nav-selection]')).not.toBeNull()
+    expect(selected.querySelector('[data-glass-refractive]')).toBeNull()
   })
 
   it('uses the navigation liquid-glass surface and control language across the open panel', async () => {
@@ -297,7 +297,16 @@ describe('MobileNav', () => {
     expect(panelGlass).toHaveAttribute('data-glass-active', 'true')
     expect(activeDestination).toHaveClass('novo-nav-glass-control')
     expect(activeDestination).toHaveAttribute('data-active', 'true')
-    expect(screen.getByTestId('workspace-active-glass-indicator').closest('.isolate')).toBeNull()
+    expect(panelGlass).toHaveAttribute('data-navigation-material', 'panel')
+    expect(screen.getByTestId('mobile-nav-rail-glass')).toHaveAttribute('data-navigation-material', 'bar')
+  })
+
+  it('shares a selection overlay and current-page semantics on desktop', () => {
+    pathname = '/cognitive'
+    render(<SidebarProvider><AppSidebar /></SidebarProvider>)
+    const current = screen.getByRole('link', { name: 'Cognitivo' })
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).not.toBeNull()
   })
 
   it('keeps background navigation inert until the drawer exit finishes', async () => {
