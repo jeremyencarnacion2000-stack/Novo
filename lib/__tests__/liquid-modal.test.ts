@@ -1,4 +1,4 @@
-import { buildLiquidModalGeometry, getLiquidModalBounds, resolveLiquidModalSource } from '@/lib/liquid-modal'
+import { buildLiquidModalGeometry, getLiquidModalBounds, LIQUID_MODAL, resolveLiquidModalSource } from '@/lib/liquid-modal'
 
 const target = { left: 300, top: 180, width: 420, height: 360 }
 const source = { left: 30, top: 50, width: 100, height: 44 }
@@ -20,6 +20,11 @@ describe('liquid modal geometry', () => {
       expect(frame.width).toBeGreaterThan(0)
       expect(frame.height).toBeGreaterThan(0)
     }
+  })
+
+  it('reveals the content before the shared surface finishes opening and uses the same spring both ways', () => {
+    expect(buildLiquidModalGeometry(0.6, source, target, 16, 28).reveal).toBeGreaterThan(0)
+    expect(LIQUID_MODAL.closeResponse).toBe(LIQUID_MODAL.response)
   })
 
   it('uses a local bloom when there is no real visible source', () => {

@@ -1,6 +1,6 @@
 import { liquidNeckProfile, type LiquidRect } from '@/lib/liquid-notification'
 
-export const LIQUID_MODAL = { response: 0.5, closeResponse: 0.42, damping: 0.9, padding: 24, dropSize: 52 } as const
+export const LIQUID_MODAL = { response: 0.45, closeResponse: 0.45, damping: 0.9, padding: 24, dropSize: 52 } as const
 export const modalClamp = (n: number) => Math.max(0, Math.min(1, n))
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
 export const modalSegment = (p: number, from: number, to: number) => {
@@ -34,5 +34,5 @@ export function buildLiquidModalGeometry(progress: number, source: LiquidRect, t
   const centerY = mix(source.top + source.height / 2, target.top + target.height / 2, travel)
   return { left: centerX - width / 2, top: centerY - height / 2, width, height,
     radius: Math.min(width / 2, height / 2, mix(mix(sourceRadius, drop / 2, compact), targetRadius, expand)),
-    neck, reveal: modalSegment(p, 0.68, 0.96) }
+    neck, reveal: modalSegment(p, 0.54, 0.9) }
 }
