@@ -105,6 +105,9 @@ cristal siguiera presente. Esa solución queda sustituida.
   no se atribuye una garantía universal de 4,5:1 a una superficie transparente.
 - Se suavizan la distorsión y la separación cromática de navegación, manteniendo
   la refracción visible y el resorte compartido existente.
+- En el Hub, la preferencia de más contraste refuerza el ribete y conserva el
+  gradiente óptico; la opción explícita de reducir cristal mantiene el relleno
+  sólido. Una regresión adicional cubre esta regla heredada.
 - La prueba de regresión reprodujo la pérdida de lente bajo las preferencias de
   Windows antes de corregirla. El navegador confirma `osReduced: true`, lente
   SVG activa y panel transparente; también confirma el cierre y ausencia de
@@ -112,3 +115,5 @@ cristal siguiera presente. Esa solución queda sustituida.
 - Verificación de la corrección: 58 pruebas aprobadas y ESLint sin incidencias.
   La máquina local requirió repetir la suite con `--testTimeout=20000` tras un
   timeout de 5 segundos; no se modificaron las esperas ni aserciones del producto.
+- Tras cubrir también el contraste del Hub: 59 pruebas aprobadas en las mismas
+  ocho suites y ESLint del archivo de prueba sin incidencias.
