@@ -300,7 +300,7 @@ export function AppSidebar() {
                             return (
                               <SidebarMenuItem key={item.title} className="relative rounded-full">
                                 {isActive && selectedSection === section.title && (
-                                  <NavigationIndicator layoutId="desktop-nav-pill" className="rounded-full" />
+                                  <NavigationIndicator layoutId="desktop-nav-pill" className="rounded-full" refractive />
                                 )}
                                 <motion.div
                                   whileHover={{ scale: 1.015 }}

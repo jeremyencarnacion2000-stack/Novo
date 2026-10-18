@@ -3307,38 +3307,41 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 /* Regular navigation glass: one optical plane, a predictable local tint and
    inexpensive selection overlays. No pixel sampling or per-item filters. */
 :root {
-  --novo-navigation-tint: rgba(248, 250, 249, .84);
-  --novo-navigation-panel-tint: rgba(248, 250, 249, .93);
+  --novo-navigation-tint: rgba(255, 255, 255, .055);
+  --novo-navigation-panel-tint: rgba(255, 255, 255, .18);
   --novo-navigation-solid: #f8faf9;
   --novo-navigation-foreground: #17211c;
   --novo-navigation-secondary: #3d4842;
   --novo-navigation-hover: rgba(23, 33, 28, .055);
   --novo-navigation-selection: rgba(23, 33, 28, .09);
   --novo-navigation-rim: rgba(255, 255, 255, .7);
-  --novo-navigation-blur: 12px;
+  --novo-navigation-blur: 4px;
+  --novo-navigation-text-shadow: 0 1px 2px rgba(255,255,255,.96), 0 0 1px rgba(255,255,255,.9);
+  --novo-navigation-icon-shadow: 0 1px 1px rgba(255,255,255,.85);
 }
 .dark {
-  --novo-navigation-tint: rgba(20, 26, 23, .88);
-  --novo-navigation-panel-tint: rgba(20, 26, 23, .94);
+  --novo-navigation-tint: rgba(255, 255, 255, .055);
+  --novo-navigation-panel-tint: rgba(5, 12, 8, .18);
   --novo-navigation-solid: #141a17;
   --novo-navigation-foreground: #f3f7f5;
-  --novo-navigation-secondary: #c5d0ca;
+  --novo-navigation-secondary: #e4ebe7;
   --novo-navigation-hover: rgba(243, 247, 245, .07);
   --novo-navigation-selection: rgba(243, 247, 245, .13);
-  --novo-navigation-rim: rgba(255, 255, 255, .19);
+  --novo-navigation-rim: rgba(255, 255, 255, .34);
+  --novo-navigation-text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 1px rgba(0,0,0,.95);
+  --novo-navigation-icon-shadow: 0 1px 1px rgba(0,0,0,.85);
 }
 .novo-navigation-glass {
   --glass-element-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06);
 }
 .novo-navigation-glass[data-navigation-material='panel'] {
   --novo-navigation-tint: var(--novo-navigation-panel-tint);
-  --novo-navigation-blur: 16px;
+  --novo-navigation-blur: 5px;
 }
 .novo-navigation-glass > [data-glass-backdrop] {
   border: 0 !important;
   box-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06) !important;
 }
-.novo-navigation-glass > [data-glass-sheen] { display: none; }
 .novo-nav-selection {
   border-radius: inherit;
   background: var(--novo-navigation-selection);
@@ -3360,20 +3363,12 @@ a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navig
 .novo-mobile-nav-panel .novo-nav-glass-control:has(> svg) { min-height: 44px; }
 .novo-mobile-nav-panel .novo-nav-glass-control > div { background: transparent; transition: none; }
 [data-slot='sidebar-inner'], .novo-settings-nav {
-  background: var(--novo-navigation-tint) !important;
-  backdrop-filter: blur(var(--novo-navigation-blur)) saturate(135%);
-  -webkit-backdrop-filter: blur(var(--novo-navigation-blur)) saturate(135%);
+  background: var(--novo-context-background) !important;
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
   color: var(--novo-navigation-foreground);
 }
 .novo-settings-nav::before { display: none; }
-@media (prefers-reduced-transparency: reduce) {
-  .novo-navigation-glass, [data-slot='sidebar-inner'], .novo-settings-nav {
-    --novo-navigation-tint: var(--novo-navigation-solid);
-    --novo-navigation-panel-tint: var(--novo-navigation-solid);
-    --novo-navigation-blur: 0px;
-  }
-  .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
-}
 html[data-accessibility-reduce-glass='true'] .novo-navigation-glass,
 html[data-accessibility-reduce-glass='true'] [data-slot='sidebar-inner'],
 html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
@@ -3381,7 +3376,13 @@ html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
   --novo-navigation-panel-tint: var(--novo-navigation-solid);
   --novo-navigation-blur: 0px;
 }
-@media (prefers-contrast: more), (forced-colors: active) {
+html[data-accessibility-reduce-glass='true'] [data-slot='sidebar-inner'],
+html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
+  background: var(--novo-navigation-solid) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@media (forced-colors: active) {
   :root {
     --novo-navigation-foreground: CanvasText;
     --novo-navigation-secondary: CanvasText;
@@ -3396,5 +3397,31 @@ html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
     outline-offset: -1px;
   }
   .novo-nav-selection { outline: 2px solid currentColor; outline-offset: -2px; }
+  [data-slot='sidebar-inner'], .novo-settings-nav { background: Canvas !important; backdrop-filter: none; }
   .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
+}
+
+/* Optical restoration: foreground protection stays on glyphs, never over the
+   whole lens. The browser can still sample and bend the page underneath. */
+.novo-nav-label, .novo-nav-label-active,
+.novo-mobile-nav-panel .novo-nav-glass-control {
+  text-shadow: var(--novo-navigation-text-shadow);
+}
+.novo-nav-label svg, .novo-nav-label-active svg,
+svg.novo-nav-label, svg.novo-nav-label-active,
+.novo-mobile-nav-panel .novo-nav-glass-control svg {
+  filter: drop-shadow(var(--novo-navigation-icon-shadow));
+}
+.novo-nav-selection[data-selection-refractive='true'] { background: transparent; box-shadow: none; }
+.novo-nav-glass-control[data-active='true'] { isolation: auto; }
+@media (prefers-contrast: more) {
+  .novo-nav-selection { outline: 1px solid currentColor; outline-offset: -1px; }
+}
+@media (forced-colors: active) {
+  [data-slot='sidebar-inner'], .novo-settings-nav { -webkit-backdrop-filter: none; }
+  .novo-nav-label, .novo-nav-label-active,
+  .novo-mobile-nav-panel .novo-nav-glass-control { text-shadow: none; }
+  .novo-nav-label svg, .novo-nav-label-active svg,
+  svg.novo-nav-label, svg.novo-nav-label-active,
+  .novo-mobile-nav-panel .novo-nav-glass-control svg { filter: none; }
 }
