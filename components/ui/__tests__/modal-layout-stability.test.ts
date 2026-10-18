@@ -8,7 +8,7 @@ describe('modal layout stability', () => {
   it('ties readable content to the same droplet progress as its chrome', () => {
     const source = readSource('lib/liquid-modal-motion.ts')
     expect(source).toContain('surface.style.opacity = String(g.reveal)')
-    expect(readSource('lib/liquid-modal.ts')).toContain('reveal: modalSegment(p, 0.68, 0.96)')
+    expect(readSource('lib/liquid-modal.ts')).toContain('reveal: modalSegment(p, 0.54, 0.9)')
   })
 
   it('centers large flip dialogs unless a small dialog explicitly opts into anchoring', () => {
