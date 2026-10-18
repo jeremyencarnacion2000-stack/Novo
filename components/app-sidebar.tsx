@@ -47,12 +47,13 @@ import { cn } from '@/lib/utils'
 import { springConfig } from '@/lib/design-tokens'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { NavigationIndicator } from '@/components/ui/navigation-indicator'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 
 import { useTranslation } from '@/lib/i18n'
 import { useSettings } from '@/lib/settings-context'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { SmoothScrollProvider } from '@/components/smooth-scroll-provider'
 import { useRef } from 'react'
 
@@ -224,6 +225,14 @@ export function AppSidebar() {
     if (isMobile) setOpenMobile(false)
   }
 
+  // Pinned destinations can also appear in their original group. Only one
+  // instance owns the travelling selection; duplicate links keep their state.
+  const selectedSection = navigation.find(section => section.items.some(item => (
+    item.href.includes('#')
+      ? pathname === '/today' && typeof window !== 'undefined' && window.location.hash === '#actividad'
+      : pathname === item.href || pathname === item.href + '/'
+  )))?.title
+
   return (
     <Sidebar
       collapsible="icon"
@@ -232,7 +241,7 @@ export function AppSidebar() {
         "border-0 bg-transparent shadow-none transition-[width,transform] duration-300",
         "md:!h-[calc(100vh-2rem)] md:!m-4",
         "is-mobile:!h-full is-mobile:!m-0",
-        "[&>[data-sidebar=sidebar]]:!bg-transparent [&>[data-sidebar=sidebar]]:!border-0 [&>[data-sidebar=sidebar]]:!shadow-none",
+        "[&>[data-sidebar=sidebar]]:!border-0 [&>[data-sidebar=sidebar]]:!shadow-none",
         isMobile ? "w-[280px]" : ""
       )}
       onMouseEnter={handleMouseEnter}
@@ -263,6 +272,7 @@ export function AppSidebar() {
         </SidebarHeader>
 
         <SmoothScrollProvider scrollRef={sidebarContentRef}>
+          <LayoutGroup id="desktop-navigation">
           <SidebarContent ref={sidebarContentRef} className={cn("py-2 transition-all duration-300", state === 'collapsed' ? "!px-0" : "px-3")}>
             {navigation.map((section) => (
               <Collapsible key={section.title} defaultOpen className="group/collapsible">
@@ -288,23 +298,9 @@ export function AppSidebar() {
                               ? pathname === '/today' && typeof window !== 'undefined' && window.location.hash === '#actividad'
                               : pathname === item.href || pathname === item.href + '/'
                             return (
-                              <SidebarMenuItem key={item.title} className="relative">
-                                {isActive && (
-                                  <GlassSurface
-                                    preset="navigation"
-                                    refractive
-                                    refractivePriority="interactive"
-                                    backgroundColor="transparent"
-                                    elevation="low"
-                                    aria-hidden
-                                    className="pointer-events-none"
-                                    style={{
-                                      position: 'absolute',
-                                      inset: '-3px -4px',
-                                      zIndex: 1,
-                                      borderRadius: '9999px',
-                                    }}
-                                  />
+                              <SidebarMenuItem key={item.title} className="relative rounded-full">
+                                {isActive && selectedSection === section.title && (
+                                  <NavigationIndicator layoutId="desktop-nav-pill" className="rounded-full" />
                                 )}
                                 <motion.div
                                   whileHover={{ scale: 1.015 }}
@@ -324,10 +320,10 @@ export function AppSidebar() {
                                       : "text-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                                   )}
                                 >
-                                  <Link href={item.href} onClick={handleLinkClick} aria-label={item.title} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
-                                    <item.icon className={cn("h-5 w-5 shrink-0 relative z-10 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-foreground/40")} />
+                                  <Link href={item.href} onClick={handleLinkClick} aria-label={item.title} aria-current={isActive ? 'page' : undefined} className={cn("flex items-center gap-3 relative", state === 'collapsed' && "justify-center")}>
+                                    <item.icon className={cn("h-5 w-5 shrink-0 relative z-10 transition-transform group-hover:scale-110", isActive ? "novo-nav-label-active" : "novo-nav-label")} />
                                     {state === 'expanded' && (
-                                      <span className={cn("text-sm tracking-tight relative z-10", isActive ? "font-semibold text-foreground" : "font-medium text-foreground/60")}>
+                                      <span className={cn("text-sm tracking-tight relative z-10", isActive ? "font-semibold novo-nav-label-active" : "font-medium novo-nav-label")}>
                                         {item.title}
                                       </span>
                                     )}
@@ -345,6 +341,7 @@ export function AppSidebar() {
               </Collapsible>
             ))}
           </SidebarContent>
+          </LayoutGroup>
         </SmoothScrollProvider>
 
 
