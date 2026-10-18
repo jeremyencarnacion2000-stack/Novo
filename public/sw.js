@@ -3,7 +3,7 @@
 // Bump these on every deploy that changes caching behavior — the activate
 // handler below only clears caches whose name doesn't match, so reusing a
 // name across deploys means old entries never get invalidated.
-const CACHE_NAME = "novo-v16";
+const CACHE_NAME = "novo-v17";
 
 // Only cache assets that are guaranteed to exist as static files.
 // NOTE: Next.js hashes CSS/JS at build time — never list hashed assets here.

@@ -99,7 +99,7 @@
 .novo-liquid-notice[data-liquid-notice-origin='left'] { color:#080808; }
 .novo-liquid-notice[data-liquid-notice-origin='left'] .novo-liquid-notice-card { background:transparent; border-color:transparent; }
 .novo-hub-notice-body .novo-hub-material-tint { background:linear-gradient(180deg, rgba(0,0,0,.96), rgba(0,0,0,.76) 66%, rgba(8,8,9,.62)); }
-@media (prefers-contrast:more) { .novo-hub-material-tint { background:rgba(0,0,0,.96); } .novo-hub-material-rim { border-color:rgba(255,255,255,.5); } }
+@media (prefers-contrast:more) { .novo-hub-material-rim { border-color:rgba(255,255,255,.5); } }
 html[data-accessibility-reduce-glass='true'] .novo-hub-material-tint { background:rgba(0,0,0,.96); }
 
 /* Ambient surface inspired by the reference: a restrained, slowly drifting

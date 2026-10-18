@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const css = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
-  .split('/* Regular navigation glass:')[1]
+const stylesheet = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
+const css = stylesheet.split('/* Regular navigation glass:')[1]
 const themeBlocks = [css.match(/:root\s*\{([^}]+)\}/)![1], css.match(/\.dark\s*\{([^}]+)\}/)![1]]
 const token = (block: string, name: string) => block.match(new RegExp(`--novo-navigation-${name}:\\s*([^;]+);`))![1]
 
@@ -24,5 +24,12 @@ describe('visible navigation glass contract', () => {
     expect(css).toContain('background: var(--novo-context-background) !important')
     expect(css).not.toContain('@media (prefers-reduced-transparency: reduce)')
     expect(css).not.toContain('@media (prefers-contrast: more), (forced-colors: active)')
+  })
+
+  it('preserves the Hub optical gradient when the OS requests more contrast', () => {
+    const hubContrast = stylesheet.match(/@media \(prefers-contrast:\s*more\) \{[^\n]+/)![0]
+    expect(hubContrast).toContain('.novo-hub-material-rim')
+    expect(hubContrast).not.toContain('.novo-hub-material-tint')
+    expect(stylesheet).toContain("html[data-accessibility-reduce-glass='true'] .novo-hub-material-tint")
   })
 })
