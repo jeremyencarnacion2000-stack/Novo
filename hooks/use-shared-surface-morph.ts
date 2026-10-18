@@ -2,7 +2,8 @@
 
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { Tracked } from '@/lib/hub-surface-motion'
-import { getNovoMotionModeFromDOM } from '@/hooks/use-novo-motion-policy'
+import { getNovoMotionModeFromDOM, type NovoMotionMode } from '@/hooks/use-novo-motion-policy'
+import { LIQUID_SURFACE } from '@/lib/liquid-notification'
 import {
   SHARED_SURFACE_CLOSE_EASE as SHARED_SURFACE_CLOSE_EASE_BASE,
   SHARED_SURFACE_OPEN_EASE as SHARED_SURFACE_OPEN_EASE_BASE,
@@ -61,10 +62,12 @@ export function useSharedSurfaceMorph({
   surfaceRef,
   state,
   enabled = true,
+  motionMode,
 }: {
   surfaceRef: RefObject<HTMLElement | null>
   state: SharedSurfaceMorphState
   enabled?: boolean
+  motionMode?: NovoMotionMode
 }) {
   const [stageSize, setStageSize] = useState(clampStageSize)
   const previousStateRef = useRef<SharedSurfaceMorphState>(state)
@@ -95,13 +98,13 @@ export function useSharedSurfaceMorph({
     }
     const previous = previousStateRef.current
     const shape = resolveShape(state, stageSize)
-    const radius = Math.min(stableSurfaceRadius(), shape.width / 2, shape.height / 2)
-    const mode = getNovoMotionModeFromDOM()
+    const radius = Math.min(shape.radius, shape.width / 2, shape.height / 2)
+    const mode = motionMode ?? getNovoMotionModeFromDOM()
     if (!trackedRef.current || !enabledRef.current) {
       trackedRef.current = {
         width: new Tracked(parseFloat(surface.style.width) || shape.width),
         height: new Tracked(parseFloat(surface.style.height) || shape.height),
-        radius: new Tracked(parseFloat(surface.style.borderRadius) || radius),
+        radius: new Tracked(Math.min(parseFloat(surface.style.borderRadius) || radius, (parseFloat(surface.style.width) || shape.width) / 2)),
       }
     }
     enabledRef.current = true
@@ -118,7 +121,7 @@ export function useSharedSurfaceMorph({
       surface.style.height = `${Math.max(1, tracked.height.value)}px`
       surface.style.borderRadius = `${Math.max(0, tracked.radius.value)}px`
     }
-    if (mode !== 'full' || previous === state) {
+    if (mode !== 'full' || (previous === state && !tracked.width.animating && !tracked.height.animating)) {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
       frameRef.current = null
       tracked.width.jump(shape.width)
@@ -128,16 +131,11 @@ export function useSharedSurfaceMorph({
       surface.style.willChange = 'auto'
     } else {
       const shrinking = shape.width * shape.height < tracked.width.value * tracked.height.value
-      if (shrinking) {
-        const now = performance.now()
-        tracked.width.curveTowards(shape.width, 340, now)
-        tracked.height.curveTowards(shape.height, 340, now)
-        tracked.radius.curveTowards(radius, 340, now)
-      } else {
-        tracked.width.springTo(shape.width, 0.5, 0.72)
-        tracked.height.springTo(shape.height, 0.5, 0.72)
-        tracked.radius.springTo(radius, 0.5, 0.72)
-      }
+      const response = shrinking ? LIQUID_SURFACE.closeResponse : LIQUID_SURFACE.openResponse
+      const damping = shrinking ? 0.9 : LIQUID_SURFACE.damping
+      tracked.width.springTo(shape.width, response, damping)
+      tracked.height.springTo(shape.height, response, damping)
+      tracked.radius.springTo(radius, response, damping)
       // Reuse the live driver on reversal; no dimensions jump to a target frame.
       if (frameRef.current === null) {
         let last = performance.now()
@@ -160,7 +158,7 @@ export function useSharedSurfaceMorph({
       surface.style.willChange = 'width, height'
     }
     previousStateRef.current = state
-  }, [enabled, stageSize, state, surfaceRef])
+  }, [enabled, stageSize, state, surfaceRef, motionMode])
 
   useLayoutEffect(() => () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
