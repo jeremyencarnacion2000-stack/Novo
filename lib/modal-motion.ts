@@ -146,7 +146,7 @@ function getBridgeMaterialSource(source: HTMLElement) {
     ?? source
 }
 
-function copyBridgeMaterial(skin: HTMLElement, source: HTMLElement) {
+export function copyBridgeMaterial(skin: HTMLElement, source: HTMLElement) {
   const materialSource = getBridgeMaterialSource(source)
   const styles = getComputedStyle(materialSource)
   const inlineStyles = materialSource.style as CSSStyleDeclaration & {

@@ -1,5 +1,6 @@
 'use client'
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import { useState } from 'react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,7 +59,7 @@ export function NoteCard({ note, onChange }: NoteCardProps) {
     }
 
     const deleteNote = async () => {
-        if (!confirm('Are you sure you want to delete this note?')) return
+        if (!await confirmNovo('Are you sure you want to delete this note?')) return
 
         setLoading(true)
         try {

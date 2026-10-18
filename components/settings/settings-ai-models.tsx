@@ -1,5 +1,6 @@
 'use client'
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Label } from '@/components/ui/label'
@@ -102,7 +103,7 @@ export function SettingsAiModels() {
   }
 
   const handleDeleteModel = async (modelId: string, modelName: string) => {
-    if (!confirm(`Are you sure you want to delete the model "${modelName}"?`)) return
+    if (!await confirmNovo(`Are you sure you want to delete the model "${modelName}"?`)) return
 
     try {
       await aiModelManager.deleteModel(modelId)

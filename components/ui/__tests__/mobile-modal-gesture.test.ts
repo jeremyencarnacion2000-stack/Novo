@@ -9,6 +9,7 @@ describe('mobile dialog dismissal gesture', () => {
 
     expect(source).toContain('data-modal-drag-handle')
     expect(source).toContain('touch-none')
+    expect(source).toContain('element: surfaceElement')
     expect(source).not.toContain('pt-3 pb-2 -mt-3 -mx-4 select-none pointer-events-none')
   })
 })

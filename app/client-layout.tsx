@@ -28,6 +28,8 @@ import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 import { useSettings } from '@/lib/settings-context'
 import { LiquidGlassWebComponentLoader } from '@/components/liquid-glass/web-component-loader'
 import { usePlayerStore } from '@/lib/player-store'
+import { trackModalOrigins } from '@/lib/modal-origin'
+import { ConfirmationProvider } from '@/components/ui/confirmation-provider'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -69,10 +71,11 @@ function CognitiveThemeSyncer() {
 function AppMotionSettings({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings()
   const mode = useNovoMotionPolicy(settings.showAnimations)
+  useEffect(trackModalOrigins, [])
 
   return (
     <MotionConfig reducedMotion={mode === 'full' ? 'never' : 'always'}>
-      {children}
+      <ConfirmationProvider>{children}</ConfirmationProvider>
     </MotionConfig>
   )
 }
@@ -161,6 +164,8 @@ function RoutePlayerBoundary({ children }: { children: React.ReactNode }) {
 function RouteQuickCapture() {
   const pathname = usePathname()
   const { isOpen, onOpen, onClose } = useQuickCapture()
+  const [loaded, setLoaded] = useState(isOpen)
+  useEffect(() => { if (isOpen) setLoaded(true) }, [isOpen])
 
   useEffect(() => {
     if (pathname?.startsWith('/cognitive')) return
@@ -178,7 +183,7 @@ function RouteQuickCapture() {
 
   // Keep the global shortcut responsive, but defer the full notes dialog and
   // its motion/form code until a real user action opens it.
-  if (pathname?.startsWith('/cognitive') || !isOpen) return null
+  if (pathname?.startsWith('/cognitive') || (!loaded && !isOpen)) return null
   return <QuickCapture />
 }
 // ─── Auth wrapper ────────────────────────────────────────────────────────────

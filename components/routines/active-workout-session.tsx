@@ -26,6 +26,9 @@ interface ActiveWorkoutSessionProps {
 
 export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWorkoutSessionProps) {
     const { toast } = useToast()
+    const [exitReason, setExitReason] = useState<"complete" | "cancel" | null>(null)
+    const exitReasonRef = useRef<"complete" | "cancel" | null>(null)
+    const requestExit = (reason: "complete" | "cancel") => { exitReasonRef.current = reason; setExitReason(reason) }
     const [activeDayId, setActiveDayId] = useState<string>(
         routine.days && routine.days.length > 0 ? routine.days[0].id : ''
     )
@@ -205,7 +208,7 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
             title: "Workout Completed!",
             description: `Great job! You finished in ${formatTime(elapsedTime)}.`,
         })
-        onComplete()
+        requestExit("complete")
     }
 
     // Smart Day Detection: Select the day that matches today's weekday
@@ -233,7 +236,7 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
     const activeDay = routine.days.find(d => d.id === activeDayId) || routine.days[0]
 
     return (
-        <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onCancel() }}>
+        <Dialog open={!exitReason} onOpenChange={(nextOpen) => { if (!nextOpen) requestExit("cancel") }} onExitComplete={() => { if (exitReasonRef.current === "complete") onComplete(); else if (exitReasonRef.current === "cancel") onCancel() }}>
             <DialogContent
                 motionPreset="fullscreen"
                 showCloseButton={false}
@@ -248,7 +251,7 @@ export function ActiveWorkoutSession({ routine, onComplete, onCancel }: ActiveWo
             {/* Header Layer */}
             <div className="absolute top-0 left-0 right-0 h-16 bg-black/60 border-b border-white/10 z-[100] flex items-center justify-between px-4 sm:px-6 backdrop-blur-md">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={onCancel} className="hover:bg-white/10 rounded-full text-muted-foreground hover:text-white">
+                    <Button variant="ghost" size="icon" onClick={() => requestExit("cancel")} className="hover:bg-white/10 rounded-full text-muted-foreground hover:text-white">
                         <X className="h-5 w-5" />
                     </Button>
                     <div className="flex flex-col">

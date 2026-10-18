@@ -172,8 +172,9 @@ export function ResultBlock({ success, output, metadata, onRetry }: ResultBlockP
             </div>
 
             {/* Inline Document Viewer */}
-            {showPreview && metadata?.content && (
+            {metadata?.content && (
                 <DocumentViewer
+                    open={showPreview}
                     content={metadata.content}
                     mimeType={metadata.mimeType || 'text/plain'}
                     filename={metadata.filename || 'document'}

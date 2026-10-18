@@ -1,5 +1,7 @@
 'use client'
 
+import { useLastModalValue } from '@/hooks/use-last-modal-value'
+import { confirmNovo } from '@/lib/confirm-modal'
 import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -22,7 +24,8 @@ interface BookDetailsDialogProps {
     onUpdate: () => void
 }
 
-export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetailsDialogProps) {
+export function BookDetailsDialog({ book: selectedBook, isOpen, onClose, onUpdate }: BookDetailsDialogProps) {
+    const book = useLastModalValue(selectedBook)
     const [currentPage, setCurrentPage] = useState(0)
     const [status, setStatus] = useState<BookStatus>('to-read')
     const [rating, setRating] = useState(0)
@@ -98,7 +101,7 @@ export function BookDetailsDialog({ book, isOpen, onClose, onUpdate }: BookDetai
     }
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this book from your library?')) return
+        if (!await confirmNovo('Are you sure you want to delete this book from your library?')) return
 
         setIsDeleting(true)
         try {

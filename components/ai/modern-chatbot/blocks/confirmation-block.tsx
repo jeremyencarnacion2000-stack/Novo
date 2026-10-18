@@ -14,6 +14,7 @@ interface ConfirmationBlockProps {
 
 export function ConfirmationBlock({ onConfirm, onCancel, status, action }: ConfirmationBlockProps) {
     const [reviewOpen, setReviewOpen] = useState(false);
+    const approvedAfterExit = React.useRef(false);
     const { language } = useTranslation();
     const consentCopy = getConsentCopy(language);
     const renderActionDetails = () => {
@@ -265,7 +266,9 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                     {consentCopy.cancel}
                 </button>
             </div>
-            <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+            <Dialog open={reviewOpen} onOpenChange={setReviewOpen} onExitComplete={() => {
+                if (approvedAfterExit.current) { approvedAfterExit.current = false; onConfirm(); }
+            }}>
                 <DialogContent className="max-w-md border-white/[0.12] bg-[#111116]/95 p-0 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.9)] backdrop-blur-3xl">
                     <div className="border-b border-white/[0.08] px-6 pb-5 pt-6">
                         <div className="mb-4 flex size-10 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-400/10 text-amber-200">
@@ -285,7 +288,7 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                     </div>
                     <DialogFooter className="border-t border-white/[0.08] bg-black/10 px-6 py-4 sm:justify-between">
                         <button onClick={() => setReviewOpen(false)} className="h-10 rounded-xl px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white">{consentCopy.back}</button>
-                        <button onClick={() => { setReviewOpen(false); onConfirm(); }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black transition-[transform,background] duration-150 hover:bg-white/90 active:scale-[0.97]">
+                        <button onClick={() => { approvedAfterExit.current = true; setReviewOpen(false); }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black transition-[transform,background] duration-150 hover:bg-white/90 active:scale-[0.97]">
                             <Check className="size-4" />{consentCopy.approve}
                         </button>
                     </DialogFooter>

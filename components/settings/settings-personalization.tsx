@@ -1,5 +1,6 @@
 'use client'
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import { useState, useRef } from 'react'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -410,8 +411,8 @@ export function SettingsPersonalization() {
           <div className="flex justify-end pt-2">
             <Button
               variant="outline"
-              onClick={() => {
-                if (confirm('Are you sure you want to reset appearance settings?')) {
+              onClick={async () => {
+                if (await confirmNovo('Are you sure you want to reset appearance settings?')) {
                   resetSettings()
                   toast({
                     title: 'Settings Reset',

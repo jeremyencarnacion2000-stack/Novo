@@ -153,7 +153,7 @@ describe('native modal motion unification', () => {
     expect(calendar).toContain('<Sheet open={showMobileSidebar}')
     expect(calendar).not.toContain("showMobileSidebar ? 'fixed inset-0")
 
-    expect(player).toContain('<Sheet open={open}')
+    expect(player).toContain('<Sheet open={open && Boolean(liveTrack)}')
     expect(player).not.toContain('<AnimatePresence>')
     expect(workout).toContain('motionPreset="fullscreen"')
     expect(workout).not.toContain('initial={{ opacity: 0, y: \'100%\'')

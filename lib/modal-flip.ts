@@ -9,13 +9,13 @@ import {
   isTextFlightElement,
 } from './flying-clone'
 import {
-  createModalChromeBridge,
   getSharedSurfaceMorphEase,
   isElementVisibleForSharedMotion,
   MODAL_CUSTOM_EASE,
   MODAL_MOTION,
 } from './modal-motion'
-import { getNovoMotionModeFromDOM } from '@/hooks/use-novo-motion-policy'
+import { createLiquidModalMotion, type LiquidModalController, type ModalOrigin } from '@/lib/liquid-modal-motion'
+import { readModalOrigin } from '@/lib/modal-origin'
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(CustomEase)
@@ -88,73 +88,6 @@ function clearTarget(target: HTMLElement, content: HTMLElement[], closeButton: H
     gsap.set(content, { clearProps: 'opacity,transform,transition,willChange' })
   }
   if (closeButton) gsap.set(closeButton, { clearProps: 'opacity,transform,transition,willChange' })
-}
-
-function isLowPowerDevice() {
-  const navigatorWithMemory = navigator as Navigator & { deviceMemory?: number }
-  const coarsePointer = matchMedia('(pointer: coarse)').matches
-  const memory = Number(navigatorWithMemory.deviceMemory ?? 8)
-  const cores = Number(navigator.hardwareConcurrency ?? 8)
-  return coarsePointer && (memory <= 4 || cores <= 4)
-}
-
-function addBridgeVelocityBlur(timeline: gsap.core.Timeline, bridge: HTMLElement, duration: number) {
-  if (getNovoMotionModeFromDOM() !== 'full') return
-  const peak = isLowPowerDevice() ? 0.34 : 0.52
-  const shoulder = peak * 0.42
-
-  gsap.set(bridge, { filter: 'blur(0px)' })
-  timeline.to(bridge, {
-    filter: `blur(${peak}px)`,
-    duration: duration * 0.09,
-    ease: 'power1.out',
-  }, duration * 0.075)
-  timeline.to(bridge, {
-    filter: `blur(${shoulder}px)`,
-    duration: duration * 0.085,
-    ease: 'none',
-  }, duration * 0.165)
-  timeline.to(bridge, {
-    filter: 'blur(0px)',
-    duration: duration * 0.17,
-    ease: 'power2.out',
-  }, duration * 0.245)
-}
-
-function animateBridge(
-  timeline: gsap.core.Timeline,
-  bridge: ReturnType<typeof createModalChromeBridge>,
-  direction: 'open' | 'close',
-  duration: number,
-  bounce = false,
-): SharedMotionEase {
-  const opening = direction === 'open'
-  gsap.set(bridge.root, { clipPath: opening ? bridge.startClip : bridge.endClip, opacity: 1 })
-  gsap.set(bridge.compactSkin, { opacity: opening ? 1 : 0 })
-  gsap.set(bridge.expandedSkin, { opacity: opening ? 0 : 1 })
-
-  const bridgeEase = bounce ? getSharedSurfaceMorphEase(direction) : EASE_FLUID
-
-  timeline.to(bridge.root, {
-    clipPath: opening ? bridge.endClip : bridge.startClip,
-    duration,
-    ease: bridgeEase,
-    force3D: true,
-  }, 0)
-
-  timeline.to(bridge.compactSkin, {
-    opacity: opening ? 0 : 1,
-    duration: duration * (opening ? 0.38 : 0.47),
-    ease: 'power2.out',
-  }, duration * (opening ? 0.11 : 0.08))
-  timeline.to(bridge.expandedSkin, {
-    opacity: opening ? 1 : 0,
-    duration: duration * (opening ? 0.48 : 0.44),
-    ease: 'power2.inOut',
-  }, duration * (opening ? 0.08 : 0.1))
-
-  addBridgeVelocityBlur(timeline, bridge.root, duration)
-  return bridgeEase
 }
 
 function getMobileNavSurfaceClips(origin: HTMLElement, target: HTMLElement) {
@@ -468,80 +401,6 @@ function createSharedFlights(
   })
 }
 
-function runFadeEntrance(id: string, target: HTMLElement, overlay: HTMLElement | null, onDone?: () => void) {
-  const mode = getNovoMotionModeFromDOM()
-  if (mode === 'off') {
-    // Motion off is an immediate, visible state—not a zero-duration hidden
-    // tween that waits for a GSAP tick to settle.
-    gsap.set(target, { clearProps: 'opacity,transform,transformOrigin,willChange' })
-    target.dataset.modalMotionState = 'open'
-    target.style.opacity = '1'
-    if (overlay) {
-      gsap.set(overlay, { clearProps: 'opacity' })
-      overlay.dataset.modalMotionState = 'open'
-      overlay.style.opacity = '1'
-    }
-    onDone?.()
-    return
-  }
-  const duration = mode === 'reduced' ? 0.16 : MODAL_MOTION.center.enter
-  gsap.set(target, {
-    opacity: 0,
-    y: mode === 'full' ? 10 : 0,
-    scale: mode === 'full' ? 0.94 : 1,
-    transformOrigin: '50% 50%',
-    willChange: 'transform,opacity',
-  })
-  target.dataset.modalMotionState = 'opening'
-  if (overlay) gsap.set(overlay, { opacity: 0 })
-
-  const finishOpen = () => {
-    clearTarget(target, [], null)
-    target.style.opacity = '1'
-    if (overlay) {
-      overlay.dataset.modalMotionState = 'open'
-      overlay.style.opacity = '1'
-    }
-    activeTransitions.delete(id)
-    onDone?.()
-  }
-  const finishClosed = (done?: () => void) => {
-    clearTarget(target, [], null)
-    target.dataset.modalMotionState = 'closing'
-    target.style.opacity = '0'
-    activeTransitions.delete(id)
-    done?.()
-  }
-  const timeline = gsap.timeline({ onComplete: finishOpen })
-  timeline.to(target, { opacity: 1, y: 0, scale: 1, duration, ease: EASE_FLUID }, 0)
-  if (overlay) timeline.to(overlay, { opacity: 1, duration: Math.min(duration, 0.22), ease: EASE_FLUID }, 0)
-  activeTransitions.set(id, { naturalDirection: 'open', timeline, finishOpen, finishClosed })
-}
-
-function runFadeExit(id: string, target: HTMLElement, overlay: HTMLElement | null, onDone?: () => void) {
-  const mode = getNovoMotionModeFromDOM()
-  const duration = mode === 'off' ? 0 : mode === 'reduced' ? 0.16 : MODAL_MOTION.center.exit
-  const finishOpen = () => {
-    clearTarget(target, [], null)
-    activeTransitions.delete(id)
-  }
-  const finishClosed = (done?: () => void) => {
-    clearTarget(target, [], null)
-    activeTransitions.delete(id)
-    done?.()
-  }
-  const timeline = gsap.timeline({ onComplete: () => finishClosed(onDone) })
-  timeline.to(target, {
-    opacity: 0,
-    y: mode === 'full' ? 6 : 0,
-    scale: mode === 'full' ? 0.97 : 1,
-    duration,
-    ease: EASE_FLUID,
-  }, 0)
-  if (overlay) timeline.to(overlay, { opacity: 0, duration: Math.min(duration, 0.18), ease: EASE_FLUID }, 0)
-  activeTransitions.set(id, { naturalDirection: 'close', timeline, finishOpen, finishClosed })
-}
-
 function reverseClosingTransition(active: ActiveTransition) {
   active.timeline.eventCallback('onComplete', null)
   active.timeline.eventCallback('onReverseComplete', active.finishOpen)
@@ -554,264 +413,64 @@ function reverseOpeningTransition(active: ActiveTransition, onDone?: () => void)
   active.timeline.timeScale(MODAL_MOTION.shared.enter / MODAL_MOTION.shared.exit).reverse()
 }
 
+const liquidControllers = new Map<string, LiquidModalController>()
+const origins = new Map<string, ModalOrigin>()
+const generations = new Map<string, number>()
+
 export const modalFlip = {
+  setOrigin(id: string, origin?: ModalOrigin) { if (origin) origins.set(id, origin) },
   cancel(id: string) {
+    generations.set(id, (generations.get(id) ?? 0) + 1)
+    liquidControllers.get(id)?.destroy(); liquidControllers.delete(id); origins.delete(id)
     const running = activeTransitions.get(id)
     if (running) {
       running.timeline.eventCallback('onComplete', null)
       running.timeline.eventCallback('onReverseComplete', null)
-      running.timeline.kill()
-      running.finishClosed()
-      return
+      running.timeline.kill(); running.finishClosed()
     }
-
-    // A settled shared modal no longer has an active timeline, but its trigger
-    // intentionally stays hidden until the modal closes. Route changes and
-    // conditional unmounts can skip that close animation, so hook cleanup must
-    // still restore every persistent visual state.
     const { origin, target, overlay } = findPair(id)
     origin?.classList.remove('modal-flip-source-active')
     target?.classList.remove('modal-flip-active')
     overlay?.classList.remove('modal-flip-active')
     if (origin) gsap.set(origin, { clearProps: 'opacity' })
-    if (target) gsap.set(target, { clearProps: 'opacity,clipPath,visibility,transition,transform,transformOrigin,willChange' })
   },
-
   toggle(id: string, onDone?: () => void, retries = 3) {
     if (typeof window === 'undefined') { onDone?.(); return }
-
-    const running = activeTransitions.get(id)
-    if (running) {
-      if (running.naturalDirection === 'close') reverseClosingTransition(running)
-      else running.timeline.timeScale(1).play()
-      return
-    }
-
+    const generation = generations.get(id) ?? 0
     const { origin, target, overlay } = findPair(id)
     if (!target && retries > 0) {
-      // Portals can finish their commit just after the controller effect. A
-      // microtask handles that same-turn commit; later retries use a macrotask
-      // instead of requestAnimationFrame so opening never depends on a frame
-      // that may be skipped or already consumed by a route transition.
-      const retry = () => modalFlip.toggle(id, onDone, retries - 1)
-      if (retries === 3 && typeof queueMicrotask === 'function') queueMicrotask(retry)
-      else setTimeout(retry, 0)
+      const retry = () => { if ((generations.get(id) ?? 0) === generation) modalFlip.toggle(id, onDone, retries - 1) }
+      if (retries === 3) queueMicrotask(retry); else setTimeout(retry, 0)
       return
     }
     if (!target) { onDone?.(); return }
-
-    target.classList.add('modal-flip-active')
-    target.classList.add('modal-flip-preparing')
-    overlay?.classList.add('modal-flip-active')
-    target.dataset.modalMotionState = 'preparing'
-    if (overlay) overlay.dataset.modalMotionState = 'preparing'
-
-    const mode = getNovoMotionModeFromDOM()
-    if (mode !== 'full' || !isElementVisibleForSharedMotion(origin)) {
-      runFadeEntrance(id, target, overlay, onDone)
+    if (id === 'mobile-nav-panel' && origin && isElementVisibleForSharedMotion(origin)) {
+      const running = activeTransitions.get(id)
+      if (running) {
+        if (running.naturalDirection === 'close') reverseClosingTransition(running)
+        else running.timeline.eventCallback('onReverseComplete', null).eventCallback('onComplete', running.finishOpen).timeScale(1).play()
+      } else runMobileNavSurfaceEntrance(id, origin, target, overlay, onDone)
       return
     }
-
-    try {
-      if (id === 'mobile-nav-panel') {
-        runMobileNavSurfaceEntrance(id, origin!, target, overlay, onDone)
-        return
-      }
-      const sharedPairs = findSharedItemPairs(origin!, target)
-      const reveal = getRevealElements(target)
-      const bridge = createModalChromeBridge(origin!, target)
-    const flights = createSharedFlights(sharedPairs, 'open')
-    const runtimeNodes = [bridge.root, ...flights.flatMap(({ nodes }) => nodes)]
-    origin!.classList.add('modal-flip-source-active')
-    gsap.set(origin!, { opacity: 0 })
-    gsap.set(target, { opacity: 0, visibility: 'visible', transition: 'none', transform: 'translateZ(0)' })
-    target.dataset.modalMotionState = 'opening'
-    target.classList.remove('modal-flip-preparing')
-    gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
-    gsap.set(reveal.content, { opacity: 0, y: 9, scale: 0.994, transition: 'none', willChange: 'transform,opacity' })
-    if (reveal.closeButton) gsap.set(reveal.closeButton, { opacity: 0, scale: 0.82, willChange: 'transform,opacity' })
-    if (overlay) gsap.set(overlay, { opacity: 0 })
-
-    const cleanupRuntime = () => runtimeNodes.forEach((node) => node.remove())
-    const finishOpen = () => {
-      cleanupRuntime()
-      restoreSharedItems(sharedPairs)
-      clearTarget(target, reveal.content, reveal.closeButton)
-      target.style.opacity = '1'
-      target.dataset.modalMotionState = 'open'
-      if (overlay) gsap.set(overlay, { opacity: 1 })
-      if (overlay) overlay.dataset.modalMotionState = 'open'
-      activeTransitions.delete(id)
-      onDone?.()
+    let driver = liquidControllers.get(id)
+    if (!driver) {
+      const snapshot = origins.get(id) ?? readModalOrigin()
+      driver = createLiquidModalMotion({ surface: target, overlay, origin: origin ?? snapshot.element, originRect: snapshot.rect, onOpened: onDone })
+      liquidControllers.set(id, driver)
     }
-    const finishClosed = (done?: () => void) => {
-      cleanupRuntime()
-      restoreSharedItems(sharedPairs)
-      target.classList.remove('modal-flip-active')
-      overlay?.classList.remove('modal-flip-active')
-      origin!.classList.remove('modal-flip-source-active')
-      gsap.set(origin!, { clearProps: 'opacity' })
-      gsap.set(target, { opacity: 0 })
-      target.dataset.modalMotionState = 'closing'
-      activeTransitions.delete(id)
-      done?.()
-    }
-
-    const timeline = gsap.timeline({ defaults: { overwrite: 'auto' }, onComplete: finishOpen })
-    const isMobileNavigation = id === 'mobile-nav-panel'
-    const navigationHandoffAt = MODAL_MOTION.shared.enter * 0.82
-    const bridgeEase = animateBridge(timeline, bridge, 'open', MODAL_MOTION.shared.enter, id === 'mobile-nav-panel')
-    flights.forEach((flight) => flight.addTo(timeline, MODAL_MOTION.shared.enter, bridgeEase))
-    timeline.to(target, {
-      opacity: 1,
-      duration: isMobileNavigation ? 0.12 : 0.16,
-      ease: EASE_FLUID,
-    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.subtitleAt)
-    timeline.to(reveal.content, {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      duration: isMobileNavigation ? 0.12 : MODAL_MOTION.shared.contentDuration,
-      stagger: isMobileNavigation ? 0.02 : MODAL_MOTION.shared.stagger,
-      ease: 'power3.out',
-    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.contentAt)
-    const closeButtonHasSharedFlight = Boolean(
-      reveal.closeButton && sharedPairs.some(({ targetEl }) => reveal.closeButton?.contains(targetEl)),
-    )
-    if (reveal.closeButton && !closeButtonHasSharedFlight) {
-      timeline.to(reveal.closeButton, {
-        opacity: 1,
-        scale: 1,
-        duration: MODAL_MOTION.shared.closeDuration,
-        ease: 'power3.out',
-      }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * MODAL_MOTION.shared.closeAt)
-    }
-    timeline.to(bridge.root, {
-      opacity: 0,
-      duration: 0.12,
-      ease: 'power2.out',
-    }, isMobileNavigation ? navigationHandoffAt : MODAL_MOTION.shared.enter * 0.814)
-    if (overlay) {
-      timeline.to(overlay, {
-        opacity: 1,
-        duration: MODAL_MOTION.shared.enter * 0.64,
-        ease: 'power2.out',
-      }, 0.012)
-    }
-    activeTransitions.set(id, { naturalDirection: 'open', timeline, finishOpen, finishClosed })
-    } catch {
-      // A malformed origin, a missing SVG resource, or a browser compositor
-      // failure must never leave the Radix surface hidden. Fall back to the
-      // native fade entrance and keep the dialog usable.
-      origin?.classList.remove('modal-flip-source-active')
-      if (origin) gsap.set(origin, { clearProps: 'opacity' })
-      target.classList.remove('modal-flip-preparing')
-      gsap.set(target, { clearProps: 'clipPath,visibility,transition,transform,willChange' })
-      target.dataset.modalMotionState = 'open'
-      target.style.opacity = '1'
-      if (overlay) {
-        overlay.classList.remove('modal-flip-active')
-        overlay.dataset.modalMotionState = 'open'
-        overlay.style.opacity = '1'
-      }
-      runFadeEntrance(id, target, overlay, onDone)
-    }
+    driver.open()
   },
-
   untoggle(id: string, onDone?: () => void) {
-    if (typeof window === 'undefined') { onDone?.(); return }
-
+    const driver = liquidControllers.get(id)
+    if (driver) { driver.close(() => onDone?.()); return }
     const running = activeTransitions.get(id)
     if (running) {
       if (running.naturalDirection === 'open') reverseOpeningTransition(running, onDone)
-      else running.timeline.timeScale(1).play()
+      else running.timeline.eventCallback('onReverseComplete', null).eventCallback('onComplete', () => running.finishClosed(onDone)).timeScale(1).play()
       return
     }
-
     const { origin, target, overlay } = findPair(id)
-    if (!target) { onDone?.(); return }
-    const mode = getNovoMotionModeFromDOM()
-    if (mode !== 'full' || !isElementVisibleForSharedMotion(origin)) {
-      origin?.classList.remove('modal-flip-source-active')
-      if (origin) gsap.set(origin, { clearProps: 'opacity' })
-      runFadeExit(id, target, overlay, onDone)
-      return
-    }
-
-    try {
-      if (id === 'mobile-nav-panel') {
-        runMobileNavSurfaceExit(id, origin!, target, overlay, onDone)
-        return
-      }
-      const sharedPairs = findSharedItemPairs(origin!, target)
-      const reveal = getRevealElements(target)
-      const bridge = createModalChromeBridge(origin!, target)
-    const flights = createSharedFlights(sharedPairs, 'close')
-    const runtimeNodes = [bridge.root, ...flights.flatMap(({ nodes }) => nodes)]
-    gsap.set(origin!, { opacity: 0 })
-    gsap.set(sharedPairs.flatMap(({ originEl, targetEl }) => [originEl, targetEl]), { opacity: 0 })
-    gsap.set(target, { transition: 'none', willChange: 'opacity' })
-    target.dataset.modalMotionState = 'closing'
-
-    const cleanupRuntime = () => runtimeNodes.forEach((node) => node.remove())
-    const finishOpen = () => {
-      cleanupRuntime()
-      restoreSharedItems(sharedPairs)
-      clearTarget(target, reveal.content, reveal.closeButton)
-      target.style.opacity = '1'
-      target.dataset.modalMotionState = 'open'
-      if (overlay) gsap.set(overlay, { opacity: 1 })
-      gsap.set(origin!, { opacity: 0 })
-      activeTransitions.delete(id)
-    }
-    const finishClosed = (done?: () => void) => {
-      cleanupRuntime()
-      restoreSharedItems(sharedPairs)
-      target.classList.remove('modal-flip-active')
-      overlay?.classList.remove('modal-flip-active')
-      origin!.classList.remove('modal-flip-source-active')
-      gsap.set(origin!, { clearProps: 'opacity' })
-      clearTarget(target, reveal.content, reveal.closeButton)
-      target.dataset.modalMotionState = 'closing'
-      target.style.opacity = '0'
-      activeTransitions.delete(id)
-      done?.()
-    }
-
-    const timeline = gsap.timeline({ defaults: { overwrite: 'auto' }, onComplete: () => finishClosed(onDone) })
-    const isMobileNavigation = id === 'mobile-nav-panel'
-    const bridgeEase = animateBridge(timeline, bridge, 'close', MODAL_MOTION.shared.exit, id === 'mobile-nav-panel')
-    flights.forEach((flight) => flight.addTo(timeline, MODAL_MOTION.shared.exit, bridgeEase))
-    timeline.to(reveal.content, { opacity: 0, y: 4, duration: 0.16, ease: 'power2.out' }, 0)
-    if (reveal.closeButton) {
-      timeline.to(reveal.closeButton, { opacity: 0, scale: 0.84, duration: 0.14, ease: 'power2.out' }, 0)
-    }
-    timeline.to(target, {
-      opacity: 0,
-      duration: isMobileNavigation ? 0.12 : 0.14,
-      ease: EASE_FLUID,
-    }, isMobileNavigation ? 0 : 0.06)
-    timeline.to(origin!, { opacity: 1, duration: 0.1, ease: EASE_FLUID }, MODAL_MOTION.shared.exit * 0.78)
-    timeline.to(bridge.root, { opacity: 0, duration: 0.1, ease: 'power2.out' }, MODAL_MOTION.shared.exit * 0.82)
-    if (overlay) {
-      timeline.to(overlay, {
-        opacity: 0,
-        duration: MODAL_MOTION.shared.exit * 0.72,
-        ease: 'power2.out',
-      }, MODAL_MOTION.shared.exit * 0.08)
-    }
-    activeTransitions.set(id, { naturalDirection: 'close', timeline, finishOpen, finishClosed })
-    } catch {
-      // Closing must also be fail-safe: release the portal instead of leaving
-      // a half-built bridge or a stale focus trap behind.
-      origin?.classList.remove('modal-flip-source-active')
-      if (origin) gsap.set(origin, { clearProps: 'opacity' })
-      target.classList.remove('modal-flip-active')
-      overlay?.classList.remove('modal-flip-active')
-      target.dataset.modalMotionState = 'closing'
-      target.style.opacity = '0'
-      overlay?.style.setProperty('opacity', '0')
-      onDone?.()
-    }
+    if (id === 'mobile-nav-panel' && target && origin && isElementVisibleForSharedMotion(origin)) runMobileNavSurfaceExit(id, origin, target, overlay, onDone)
+    else onDone?.()
   },
 }

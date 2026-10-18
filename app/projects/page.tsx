@@ -202,9 +202,8 @@ export default function ProjectsPage() {
   }
 
   // ── Reduced Capacity Override: Single macro-task focus shield ─────────────────
-  if (bioState.phase === 'REDUCED_CAPACITY_MODE') {
-    const primaryTask = projects?.[0]
-    return (
+  const primaryTask = projects?.[0]
+  const capacityShield = bioState.phase === 'REDUCED_CAPACITY_MODE' ? (
       <div className="flex flex-col gap-8 max-w-2xl mx-auto py-12 animate-in fade-in zoom-in duration-500">
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">
@@ -265,11 +264,10 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
-    )
-  }
+  ) : null
 
   return (
-    <div className="flex flex-col gap-10 md:gap-16">
+    <>{capacityShield}<div className="flex flex-col gap-10 md:gap-16" style={capacityShield ? { display: "none" } : undefined}>
       <ScrollReveal>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
@@ -339,6 +337,6 @@ export default function ProjectsPage() {
         onSave={editingProject ? handleUpdate : handleCreate}
         project={editingProject}
       />
-    </div>
+    </div></>
   )
 }

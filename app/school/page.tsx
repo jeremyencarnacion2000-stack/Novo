@@ -201,7 +201,6 @@ export default function SchoolPage() {
 
   const handleCloseGradeDialog = () => {
     setGradeDialogOpen(false);
-    setSelectedCourse(undefined);
   };
 
   // Calculate GPAs

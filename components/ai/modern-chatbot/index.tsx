@@ -108,11 +108,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
             />
 
             {/* Voice Overlay */}
-            <AnimatePresence>
-                {isVoiceListening && (
-                    <VoiceListeningOverlay onStop={toggleVoice} />
-                )}
-            </AnimatePresence>
+            <VoiceListeningOverlay open={isVoiceListening} onStop={toggleVoice} />
 
             {/* Content */}
             <div className="relative z-10 flex h-full w-full overflow-hidden">
