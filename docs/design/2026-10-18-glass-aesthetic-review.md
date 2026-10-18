@@ -23,8 +23,8 @@ regular es apropiado para navegación con texto; el transparente requiere un fon
 adecuado y protección de contraste. La respuesta al toque es inmediata, y el
 control mantiene su relación espacial con lo que abre.
 
-La adaptación web de Novo usa un tinte local según el tema para acotar el contraste
-sin leer píxeles ni analizar el fondo por fotograma. No reproduce el motor óptico
+La adaptación web de Novo conserva una lente transparente, tinte ligero y
+protección localizada de texto e iconos, sin analizar el fondo por fotograma. No reproduce el motor óptico
 privado de Apple ni cambia automáticamente el tema según el contenido al hacer
 scroll. El indicador compartido viaja mediante un resorte interrumpible; los
 estados de movimiento reducido o desactivado evitan ese desplazamiento elástico.
@@ -33,11 +33,11 @@ estados de movimiento reducido o desactivado evitan ese desplazamiento elástico
 
 | Frente | Cambio | Coste |
 | --- | --- | --- |
-| Barra móvil y menú | Una familia de material regular; el panel usa más tinte y dispersión. Mismo token en el Web Component y en el fallback. | Mantiene el límite global de cinco lentes |
-| Selección móvil, lateral y configuración | Indicador compartido de selección, realce fino, sin nueva lente por destino. | Menos filtros y texturas |
+| Barra móvil y menú | Lente visible con tinte del 5,5% en la barra y 18% en el panel; dispersión suave para distinguir el contenido del menú. | Mantiene el límite global de cinco lentes |
+| Selección móvil y lateral | Se restaura la lente del indicador compartido; configuración y opciones interiores conservan selección fina. | Lentes prioritarias dentro del mismo presupuesto |
 | Texto de navegación | Colores sólidos para texto principal/secundario; se elimina la doble opacidad del panel. | Nulo |
-| Barra lateral y configuración | Mismo relleno semántico y contraste que la navegación móvil. | Blur CSS limitado al contenedor |
-| Accesibilidad | Estado actual semántico, foco visible, objetivos de acciones del panel de al menos 44px, fallback para menos transparencia y más contraste. | Libera lentes en esos modos |
+| Barra lateral y configuración | Recuperan los materiales de Apariencia del usuario. | Blur CSS configurado en el contenedor |
+| Accesibilidad | Estado actual, foco y objetivos de 44px; modo sólido sólo al solicitarlo en Novo o con colores forzados. La preferencia general de Windows no apaga el cristal. | Libera lentes con la opción explícita |
 | CSS | Consolidación del bloque duplicado de controles; se eliminan brillos cromáticos y filtros por hover en cada botón. | Reduce composición |
 
 El controlador existente de apertura/cierre sigue siendo dueño de la geometría.
@@ -71,7 +71,7 @@ en cada flujo. El orden privilegia comprensión y coherencia antes que decoraci�
   selección, foco, apertura/cierre, interrupción y preferencias de accesibilidad.
 - La revisión de fuentes no implica que todos los puntos de la cola estén resueltos.
 
-## Verificación local
+## Verificación de la entrega inicial (antes de la restauración)
 
 - 54 pruebas de navegación, presencia, material, accesibilidad y política de
   movimiento; ESLint de los archivos TypeScript modificados sin incidencias.
@@ -87,3 +87,28 @@ en cada flujo. El orden privilegia comprensión y coherencia antes que decoraci�
   claro durante un cambio inmediato a material claro.
 - La compilación completa y TypeScript se comprueban en el despliegue de Vercel
   del mismo commit antes de integrar en producción.
+
+
+## Corrección: conservar el Liquid Glass solicitado
+
+La primera entrega produjo una regresión visual: fondos del 84–94% tapaban la
+lente y la preferencia de Windows por reducir transparencias la desactivaba por
+completo. Los límites de contraste de esos rellenos opacos no verificaban que el
+cristal siguiera presente. Esa solución queda sustituida.
+
+- Se mantiene el render óptico bajo la preferencia de Windows; se respetan la
+  reducción explícita de cristal de Novo y los colores forzados del sistema.
+- Se restauran el tinte ligero, la lente del indicador activo y el acabado óptico
+  CSS cuando el presupuesto de refracción está ocupado.
+- Se protegen texto e iconos con sombras pequeñas opuestas al tema, sin cubrir
+  todo el panel con un relleno opaco. Esto requiere inspección visual por fondo;
+  no se atribuye una garantía universal de 4,5:1 a una superficie transparente.
+- Se suavizan la distorsión y la separación cromática de navegación, manteniendo
+  la refracción visible y el resorte compartido existente.
+- La prueba de regresión reprodujo la pérdida de lente bajo las preferencias de
+  Windows antes de corregirla. El navegador confirma `osReduced: true`, lente
+  SVG activa y panel transparente; también confirma el cierre y ausencia de
+  errores de página.
+- Verificación de la corrección: 58 pruebas aprobadas y ESLint sin incidencias.
+  La máquina local requirió repetir la suite con `--testTimeout=20000` tras un
+  timeout de 5 segundos; no se modificaron las esperas ni aserciones del producto.

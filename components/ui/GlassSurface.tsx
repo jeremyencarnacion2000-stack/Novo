@@ -35,11 +35,10 @@ const glassPresets: Record<GlassPreset, {
   strength: number
   chromaticAberration: number
 }> = {
-  // These are the calibrated values from the supplied GlassElement variant:
-  // a light 5px RGB split for compact controls and a 15px split for focal
-  // lenses. The distinction keeps navigation calm while making the Twin pill
-  // and Context Hub visibly refractive instead of merely translucent.
-  navigation: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
+  // Navigation uses a restrained chromatic edge so the lens stays visible
+  // without splitting small labels into coloured echoes. Focal status/panel
+  // presets retain their separate calibration.
+  navigation: { radius: 32, depth: 10, blur: 1, strength: 70, chromaticAberration: 2.4 },
   status: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
   control: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
   panel: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
@@ -204,7 +203,10 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     const [simplifyNavigationGlass, setSimplifyNavigationGlass] = React.useState(false)
     React.useEffect(() => {
       if (!navigationMaterial || typeof window.matchMedia !== 'function') return
-      const queries = ['(prefers-reduced-transparency: reduce)', '(prefers-contrast: more)', '(forced-colors: active)']
+      // Appearance controls own the requested glass. Windows often reports
+      // reduced transparency globally; that must not silently replace an
+      // explicitly enabled Novo lens with a solid plate.
+      const queries = ['(forced-colors: active)']
         .map(query => window.matchMedia(query))
       const root = document.documentElement
       const update = () => setSimplifyNavigationGlass(
@@ -275,8 +277,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     // returns the CSS-only fallback for Safari/Firefox or when the five-lens
     // budget is occupied, so the material never flashes flat.
     const refractiveFilter = React.useMemo(
-      () => buildBackdropFilter(),
-      [buildBackdropFilter],
+      () => navigationMaterial && !useSVGFilter ? 'none' : buildBackdropFilter(),
+      [buildBackdropFilter, navigationMaterial, useSVGFilter],
     )
 
     const [resolvedContrast, setResolvedContrast] = React.useState<'light' | 'dark' | null>(null)
@@ -558,7 +560,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
             Settings-controlled backdrop layer: Chromium can reject a mixed
             `url(#filter) blur(...)` declaration as a whole, which would make
             a transparent card lose its blur. */}
-        {refractive && !webComponentActive && !simplifyNavigationGlass && (!navigationMaterial || useSVGFilter) && (
+        {refractive && !webComponentActive && !simplifyNavigationGlass && (
           <div
             aria-hidden
             data-glass-refractive

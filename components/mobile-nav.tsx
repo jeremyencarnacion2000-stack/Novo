@@ -176,7 +176,7 @@ export function MobileNav() {
                                         layout
                                     >
                                         {active && (
-                                            <NavigationIndicator layoutId="mobile-nav-pill" />
+                                            <NavigationIndicator layoutId="mobile-nav-pill" refractive refractiveActive={!drawerMounted} />
                                         )}
                                         <Icon
                                             data-shared-item={item.sharedId}

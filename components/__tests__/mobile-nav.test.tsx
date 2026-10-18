@@ -307,6 +307,7 @@ describe('MobileNav', () => {
     const current = screen.getByRole('link', { name: 'Cognitivo' })
     expect(current).toHaveAttribute('aria-current', 'page')
     expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).not.toBeNull()
+    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).toHaveAttribute('data-selection-refractive', 'true')
   })
 
   it('keeps background navigation inert until the drawer exit finishes', async () => {

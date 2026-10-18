@@ -3,10 +3,11 @@ import { act, render } from '@testing-library/react'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { useLiquidGlass } from '@/lib/liquid-glass/useLiquidGlass'
 
+let mockUseSVGFilter = true
 jest.mock('@/lib/liquid-glass/useLiquidGlass', () => ({
   useLiquidGlass: jest.fn(() => ({
     ref: jest.requireActual('react').useRef(null),
-    useSVGFilter: true, mapUrl: null, filterUrl: null,
+    useSVGFilter: mockUseSVGFilter, mapUrl: null, filterUrl: null,
     buildBackdropFilter: () => 'none',
   })),
 }))
@@ -15,7 +16,16 @@ describe('optical geometry during shared-element transforms', () => {
   beforeAll(() => {
     if (!customElements.get('glass-element')) customElements.define('glass-element', class extends HTMLElement {})
   })
-  afterEach(() => jest.restoreAllMocks())
+  beforeEach(() => {
+    mockUseSVGFilter = true
+    jest.spyOn(window, 'matchMedia').mockImplementation(() => ({
+      matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn(),
+    } as unknown as MediaQueryList))
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    document.documentElement.removeAttribute('data-accessibility-reduce-glass')
+  })
 
   it('sizes the lens from layout rather than the scaled mid-flight snapshot', () => {
     let width = 348
@@ -41,7 +51,18 @@ describe('optical geometry during shared-element transforms', () => {
     expect(view.container.querySelector('[data-glass-backdrop]')).toBeNull()
   })
 
-  it.each(['(prefers-reduced-transparency: reduce)', '(prefers-contrast: more)', '(forced-colors: active)'])(
+  it.each(['(prefers-reduced-transparency: reduce)', '(prefers-contrast: more)'])(
+    'preserves the requested lens when the OS reports %s', query => {
+      jest.spyOn(window, 'matchMedia').mockImplementation(value => ({
+        matches: value === query, addEventListener: jest.fn(), removeEventListener: jest.fn(),
+      } as unknown as MediaQueryList))
+      const view = render(<GlassSurface webComponent refractive navigationMaterial="bar" />)
+      expect(view.container.querySelector('glass-element')).not.toBeNull()
+      expect(jest.mocked(useLiquidGlass).mock.calls.at(-1)?.[0].active).toBe(true)
+    },
+  )
+
+  it.each(['(forced-colors: active)'])(
     'releases the navigation lens for %s while keeping a readable fallback', query => {
       jest.spyOn(window, 'matchMedia').mockImplementation(value => ({
         matches: value === query, addEventListener: jest.fn(), removeEventListener: jest.fn(),
@@ -52,4 +73,37 @@ describe('optical geometry during shared-element transforms', () => {
       expect(jest.mocked(useLiquidGlass).mock.calls.at(-1)?.[0].active).toBe(false)
     },
   )
+
+  it('keeps the optical CSS fallback when the SVG budget is occupied', () => {
+    mockUseSVGFilter = false
+    const view = render(<GlassSurface webComponent refractive navigationMaterial="bar" />)
+    expect(view.container.querySelector('glass-element')).toBeNull()
+    expect(view.container.querySelector('[data-glass-refractive-mode="css"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-glass-backdrop]')).not.toBeNull()
+  })
+
+  it('still respects the explicit Novo option to reduce glass', () => {
+    document.documentElement.dataset.accessibilityReduceGlass = 'true'
+    const view = render(<GlassSurface webComponent refractive navigationMaterial="bar" />)
+    expect(view.container.querySelector('glass-element')).toBeNull()
+    expect(view.container.querySelector('[data-glass-refractive]')).toBeNull()
+    expect(jest.mocked(useLiquidGlass).mock.calls.at(-1)?.[0].active).toBe(false)
+  })
+
+  it('releases and restores the mounted lens when Novo glass preference changes', async () => {
+    const view = render(<GlassSurface webComponent refractive navigationMaterial="bar" />)
+    expect(view.container.querySelector('glass-element')).not.toBeNull()
+    await act(async () => {
+      document.documentElement.dataset.accessibilityReduceGlass = 'true'
+      await Promise.resolve()
+    })
+    expect(view.container.querySelector('glass-element')).toBeNull()
+    expect(jest.mocked(useLiquidGlass).mock.calls.at(-1)?.[0].active).toBe(false)
+    await act(async () => {
+      document.documentElement.removeAttribute('data-accessibility-reduce-glass')
+      await Promise.resolve()
+    })
+    expect(view.container.querySelector('glass-element')).not.toBeNull()
+    expect(jest.mocked(useLiquidGlass).mock.calls.at(-1)?.[0].active).toBe(true)
+  })
 })

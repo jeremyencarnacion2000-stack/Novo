@@ -126,9 +126,12 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                         refractivePriority="interactive"
                         refractiveActive
                         webComponent
-                        // The same regular material becomes more substantial
-                        // as it expands, protecting text over busy content.
+                        // Preserve the rail's visible lens and a shallow tint.
+                        // Label treatment supplies contrast without a solid plate.
                         navigationMaterial="panel"
+                        depth={8}
+                        strength={60}
+                        chromaticAberration={1.6}
                         blur={3}
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[32px]"
