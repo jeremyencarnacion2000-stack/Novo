@@ -3358,7 +3358,7 @@ a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navig
 .novo-mobile-nav-panel .novo-nav-glass-control { color: var(--novo-navigation-secondary); }
 .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] { color: var(--novo-navigation-foreground); }
 .novo-mobile-nav-panel .novo-nav-glass-control:has(> svg) { min-height: 44px; }
-.novo-mobile-nav-panel .novo-nav-glass-control > div { background: transparent; }
+.novo-mobile-nav-panel .novo-nav-glass-control > div { background: transparent; transition: none; }
 [data-slot='sidebar-inner'], .novo-settings-nav {
   background: var(--novo-navigation-tint) !important;
   backdrop-filter: blur(var(--novo-navigation-blur)) saturate(135%);
