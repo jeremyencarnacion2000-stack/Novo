@@ -262,7 +262,7 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold transition-all active:scale-[0.97] hover:shadow-[0_0_15px_rgba(99,102,241,0.25)] shadow-md border border-primary/30"
                 >
                     <Check className="w-3.5 h-3.5" />
-                    {consentCopy.title}
+                    {action?.deliveryRecovery ? 'Comprobar envío' : consentCopy.title}
                 </button>
                 <button
                     onClick={onCancel}

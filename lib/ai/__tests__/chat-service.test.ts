@@ -34,6 +34,16 @@ it('passes native context capabilities to the existing builder and never starts 
   expect(buildUserContext).toHaveBeenCalledWith('owner',expect.objectContaining({contextAccess:{personal:false,integrations:false}}))
   expect(fetchMock).toHaveBeenCalledTimes(1)
 })
+it.each([web,native])('prepares a reviewed mail action for an address-only send on $surface',async(principal)=>{
+  const proposal={type:'SEND_EMAIL',payload:{to:'team@example.test',subject:'Review',body:'Please review the project.'}}
+  fetchMock.mockResolvedValueOnce(new Response('data: {"choices":[{"delta":{"content":"Preparé el correo para revisar."}}]}\n\ndata: [DONE]\n\n'))
+    .mockResolvedValueOnce(Response.json({choices:[{message:{content:JSON.stringify({action:proposal})}}]}))
+  const result=await streamNovoChat(parseNovoChatInput({message:'Send to team@example.test: please review the project',model:'openai/gpt-oss-20b'})!,principal,new AbortController().signal)
+  const output=await result.text()
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(fetchMock.mock.calls[1][1].body).messages[0].content).toContain('SKILL: CORRESPONDENCE')
+  expect(output).toContain(principal.surface==='companion'?'"proposal"':'SEND_EMAIL')
+})
 it('rejects disallowed models/Twin before context retrieval or provider access',async()=>{
   const result=await streamNovoChat(parseNovoChatInput({message:'Hola',model:'not-configured'})!,native,new AbortController().signal)
   expect(result.status).toBe(403)

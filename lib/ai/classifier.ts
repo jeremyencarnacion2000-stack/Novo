@@ -160,7 +160,7 @@ export function classifyIntent(message: string): IntentClassification {
     let intentType: IntentType = 'GENERAL';
     let confidence = 0.5;
 
-    if (/\b(correos?|emails?|gmail|inbox|mail)\b/i.test(message) || /\b(env[ií]a|send)\b.*[\w.+-]+@[\w.-]+/.test(message)) {
+    if (/\b(correos?|emails?|gmail|inbox|mail)\b/i.test(message) || /\b(env[ií]a|manda|send)\b.*[\w.+-]+@[\w.-]+/i.test(message)) {
         intentType = 'MAIL';
         confidence = 0.95;
     } else if (isCritical && entities.length > 0) {

@@ -430,7 +430,7 @@ async function generateNovoChat(input:NovoChatInput, principal:NovoChatPrincipal
             : '';
         const projects=await buildProjectQueryContext(userId,message,projectHints??[],principal.contextAccess,localConnections);
         for(const source of projects.sources){const attribution=getContextSource(source);if(attribution&&!context.structured.sources.some(s=>s.id===attribution.id))context.structured.sources.push(attribution);}
-        const skillPrompt = runtimeSkillPrompt({ mail: contextOptions.includeGmail, surface: principal.surface });
+        const skillPrompt = runtimeSkillPrompt({ mail: contextOptions.includeGmail || classification.type === 'MAIL', surface: principal.surface });
         const finalPrompt = `${selectedPrompt}\n\n${skillPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}${localContextStr}${projects.text}${agentModeGuidance}`;
 
         const cleanHistory = normalizeHistory(history || []);
@@ -766,7 +766,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     // has no tool access) just improvised "I created the file" with no real
                     // action ever executing and no download button ever appearing.
                     const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META', 'COGNITIVE', 'GENERATE_FILE'];
-                    const wantsMailSend = contextOptions.includeGmail && isMailSendRequest(message);
+                    const wantsMailSend = (contextOptions.includeGmail || classification.type === 'MAIL') && isMailSendRequest(message);
                     const agentProvider = groqKey ? { url: 'https://api.groq.com/openai/v1/chat/completions', key: groqKey, model: 'openai/gpt-oss-120b' }
                         : geminiKey ? { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: geminiKey, model: 'gemini-flash-latest' }
                             : openRouterKey ? { url: 'https://openrouter.ai/api/v1/chat/completions', key: openRouterKey, model: 'openai/gpt-oss-120b' } : null;
