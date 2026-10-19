@@ -520,14 +520,17 @@ html[data-appearance-transition]::view-transition-new(root) {
 
 .quick-capture-material::before {
   z-index: 1;
-  background: radial-gradient(80% 62% at 8% 0%, var(--quick-capture-tint, rgba(148, 163, 184, .28)), transparent 100%);
+  background: radial-gradient(62% 85% at 52% 54%, var(--quick-capture-tint, rgba(148, 163, 184, .28)), transparent 100%);
 }
 
 .quick-capture-material::after {
   z-index: 2;
   background-image: var(--glass-noise);
   background-size: 180px 180px;
-  opacity: .34;
+  /* The shared noise SVG is faint by design; this opacity brings its grain
+     up to the fine, film-like texture in the glass reference without making
+     the tile pattern visible. */
+  opacity: .75;
   mix-blend-mode: soft-light;
 }
 
