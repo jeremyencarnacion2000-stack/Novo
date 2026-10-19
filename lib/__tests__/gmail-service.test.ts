@@ -12,6 +12,7 @@ jest.mock('@/lib/google-account', () => ({ findGoogleAccountForScopes: jest.fn()
 import { gmailService } from '../google'
 import { findGoogleAccountForScopes } from '../google-account'
 import { getServerSession } from 'next-auth'
+import { google } from 'googleapis'
 
 describe('user-owned Gmail capabilities', () => {
   beforeEach(() => {
@@ -28,6 +29,7 @@ describe('user-owned Gmail capabilities', () => {
     expect(result.nextPageToken).toBe('next')
     expect(findGoogleAccountForScopes).toHaveBeenCalledWith('owner', ['gmail.readonly'])
     expect(getServerSession).not.toHaveBeenCalled()
+    expect(google.auth.OAuth2).toHaveBeenCalledWith(expect.objectContaining({ forceRefreshOnFailure: true }))
   })
   it('hydrates large text MIME parts without downloading document attachments', async () => {
     mockGet.mockResolvedValue({ data: { id: 'abc', payload: { parts: [
@@ -46,6 +48,7 @@ describe('user-owned Gmail capabilities', () => {
     expect(findGoogleAccountForScopes).toHaveBeenCalledWith('owner', ['gmail.send'])
     expect(mockSetCredentials).toHaveBeenCalledWith(expect.objectContaining({ refresh_token: 'refresh' }))
     expect(mockSend.mock.calls[0][1]).toMatchObject({ retry: false })
+    expect(google.auth.OAuth2).toHaveBeenCalledWith(expect.objectContaining({ forceRefreshOnFailure: false }))
     expect(getServerSession).not.toHaveBeenCalled()
   })
   it('validates recipient headers before consulting Google', async () => {
