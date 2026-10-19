@@ -22,7 +22,9 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      # Match the production install policy for NextAuth's existing peer ranges.
+      - run: npm ci --legacy-peer-deps
+      - run: npm run prisma:generate
       - name: TypeScript
         run: node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --pretty false --incremental false
       - name: Lint
