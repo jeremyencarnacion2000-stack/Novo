@@ -155,7 +155,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 if (response.ok && !controller.signal.aborted && accountGenerationRef.current === generation) {
                     const dbConversations = await response.json();
                     if (!controller.signal.aborted && accountGenerationRef.current === generation && dbConversations.length > 0) {
-                        const formattedConversations = dbConversations.map((conv: any) => {
+                        const formattedConversations: Conversation[] = dbConversations.map((conv: any) => {
                             persistedRef.current.add(conv.id);
                             return {
                                 id: conv.id,
