@@ -14,17 +14,21 @@ import { gmailService } from '@/lib/google'
 describe('Gmail chat context', () => {
   beforeEach(() => jest.clearAllMocks())
 
-  it('reads the persisted Gmail grant and passes only minimal message metadata to the chat context', async () => {
+  it('reads the persisted Gmail grant and passes bounded snippets without full message bodies', async () => {
     ;(findGoogleAccountForScopes as jest.Mock).mockResolvedValue({ id: 'gmail-grant' })
     ;(gmailService.listRecentForUser as jest.Mock).mockResolvedValue([
-      { id: 'mail-1', subject: 'Deploy review', from: 'Team <team@example.test>', snippet: 'Private body text' },
+      { id: 'mail-1', subject: 'Deploy review', from: 'Team <team@example.test>', snippet: 'The MECYT replied with the requested dates.', body: 'Full private message body' },
+      { id: 'mail-2', subject: 'Long preview', from: 'Sender <sender@example.test>', snippet: 'x'.repeat(500) },
     ])
 
     await expect(getGmailContextForUser('user-1')).resolves.toEqual({
       status: 'available',
-      messages: [{ id: 'mail-1', subject: 'Deploy review', from: 'Team <team@example.test>' }],
+      messages: [
+        { id: 'mail-1', subject: 'Deploy review', from: 'Team <team@example.test>', snippet: 'The MECYT replied with the requested dates.' },
+        { id: 'mail-2', subject: 'Long preview', from: 'Sender <sender@example.test>', snippet: 'x'.repeat(320) },
+      ],
     })
-    expect(gmailService.listRecentForUser).toHaveBeenCalledWith('user-1', 8)
+    expect(gmailService.listRecentForUser).toHaveBeenCalledWith('user-1', 20)
   })
 
   it('reports a configured-but-temporarily-unavailable mailbox without claiming it is disconnected', async () => {
@@ -49,6 +53,9 @@ describe('Gmail chat context', () => {
 
   it('only consults Gmail when the user asks about email', () => {
     expect(shouldConsultGmail('Quiero que me digas mis correos más relevantes')).toBe(true)
+    expect(shouldConsultGmail('Revisa si el MECYT respondió')).toBe(true)
+    expect(shouldConsultGmail('¿El MECYT me contestó?')).toBe(true)
+    expect(shouldConsultGmail('Did the MECYT reply?')).toBe(true)
     expect(shouldConsultGmail('¿Cuál es mi siguiente tarea?')).toBe(false)
   })
 
