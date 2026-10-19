@@ -3,11 +3,13 @@
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { shouldReduceNovoMotion } from '@/hooks/use-novo-motion-policy'
+import { getLiquidModalOverlay } from '@/lib/liquid-modal-motion'
 
 interface DragToDismissOptions<T extends HTMLElement> {
   /** Called after the surface has travelled off-screen. */
   onDismiss: (surface: T) => void
   enabled?: boolean
+  element?: T | null
 }
 
 const INTENT_THRESHOLD = 9
@@ -41,6 +43,7 @@ function getScrollableAncestor(target: HTMLElement, surface: HTMLElement) {
 export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
   onDismiss,
   enabled = true,
+  element,
 }: DragToDismissOptions<T>) {
   const surfaceRef = useRef<T | null>(null)
   const onDismissRef = useRef(onDismiss)
@@ -64,6 +67,8 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
 
     const isMobile = () => window.matchMedia('(max-width: 639px)').matches
     const getOverlay = () => {
+      const ownedOverlay = getLiquidModalOverlay(surface)
+      if (ownedOverlay) return ownedOverlay
       const slot = surface.dataset.slot
       const selector = slot === 'sheet-content'
         ? '[data-slot="sheet-overlay"]'
@@ -106,6 +111,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       // Desktop keeps the precision-first dialog behavior. On touch devices,
       // Pointer Events provide the same path for iOS, Android and Capacitor.
       if (!isMobile() || event.pointerType === 'mouse') return
+      if (surface.dataset.modalMotionState && surface.dataset.modalMotionState !== 'open') return
 
       const target = event.target instanceof HTMLElement ? event.target : null
       if (!target || isInteractiveTarget(target)) return
@@ -195,6 +201,14 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
         return
       }
 
+      // The liquid controller samples this presented position and owns the
+      // entire return. Do not first throw the sheet away and replay an exit.
+      if (surface.hasAttribute('data-liquid-modal-layer')) {
+        onDismissRef.current(surface)
+        clearGesture()
+        return
+      }
+
       const overlay = getOverlay()
       const reducedMotion = shouldReduceNovoMotion()
       const remaining = Math.max(window.innerHeight - distance + 24, 80)
@@ -225,7 +239,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       surface.removeEventListener('pointercancel', onPointerEnd)
       gsap.killTweensOf(surface)
     }
-  }, [enabled])
+  }, [enabled, element])
 
   return surfaceRef
 }

@@ -15,6 +15,7 @@
 // the same origin.
 
 import type { SileoOptions, SileoState, SileoButton } from 'sileo'
+import { LIQUID_NOTICE } from '@/lib/liquid-notification'
 
 export type { SileoOptions, SileoState, SileoButton }
 
@@ -28,18 +29,29 @@ type BellListener = (toast: BellToast | null) => void
 let listener: BellListener | null = null
 let counter = 0
 let clearTimer: ReturnType<typeof setTimeout> | null = null
+let current: BellToast | null = null
 
 function fire(type: SileoState, opts: SileoOptions): string {
   const id = `sileo-${++counter}`
   if (clearTimer) clearTimeout(clearTimer)
 
-  listener?.({ ...opts, type, id })
+  current = { ...opts, type, id }
+  listener?.(current)
 
   const duration = opts.duration === undefined ? 5000 : opts.duration
   if (duration !== null) {
-    clearTimer = setTimeout(() => listener?.(null), duration)
+    clearTimer = setTimeout(() => { current = null; listener?.(null) }, duration + LIQUID_NOTICE.enter.reveal + 2200)
   }
   return id
+}
+
+/** Start readable dwell after the retained previous card has returned and this
+ * notice has fully revealed. The fire() timer is a bounded unmounted fallback. */
+export function markSileoBellPresented(id: string) {
+  if (!current || current.id !== id) return
+  if (clearTimer) clearTimeout(clearTimer)
+  const duration = current.duration === undefined ? 5000 : current.duration
+  if (duration !== null) clearTimer = setTimeout(() => { current = null; listener?.(null) }, duration)
 }
 
 export const sileo = {
@@ -49,12 +61,15 @@ export const sileo = {
   error: (opts: SileoOptions) => fire('error', opts),
   info: (opts: SileoOptions) => fire('info', opts),
   action: (opts: SileoOptions) => fire('action', opts),
-  dismiss: (_id?: string) => {
+  dismiss: (id?: string) => {
+    if (id && current?.id !== id) return
     if (clearTimer) clearTimeout(clearTimer)
+    current = null
     listener?.(null)
   },
   clear: () => {
     if (clearTimer) clearTimeout(clearTimer)
+    current = null
     listener?.(null)
   },
 }
@@ -62,6 +77,7 @@ export const sileo = {
 // Called once by the bell (NotificationCenter) to receive live toasts.
 export function subscribeSileoBell(fn: BellListener) {
   listener = fn
+  fn(current)
   return () => {
     if (listener === fn) listener = null
   }

@@ -145,9 +145,10 @@ const CodeBlock = ({ language, value }: { language: string; value: string }) => 
             </div>
 
             {/* Inline Preview for HTML */}
-            {showPreview && canPreview && (
+            {canPreview && (
                 <div className="border-t border-white/10">
                     <DocumentViewer
+                        open={showPreview}
                         content={value}
                         mimeType={mimeType}
                         filename={`code${ext}`}

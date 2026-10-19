@@ -42,7 +42,10 @@ export function isGmailReauthorizationError(error: unknown): boolean {
 }
 
 export function shouldConsultGmail(message: string, history: MailHistory = []): boolean {
-  if (/\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(message)) return true
+  const normalized = message.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  if (/\b(correos?|emails?|gmail|bandeja|inbox|mail|mensajes?\s+de)\b/i.test(normalized)
+    || /\b(respondio|respondieron|respondido|contesto|contestaron|escribio|replied|answered|wrote|heard\s+from|get\s+back\s+to)\b/i.test(normalized)
+    || /\b(?:did|has|have)\b.*\b(?:reply|answer)\b/i.test(normalized)) return true
   const followUp = /respond|respuest|cont[eé]st|contesta|r[eé]sp[oó]nd|l[eé]e(?:lo|la)?\b|segund[oa]|primer[oa]|[uú]ltim[oa]|hilo|conversaci[oó]n|remitente|adjunt|redact|env[ií]a|mand[aá]/i.test(message)
   return followUp && history.slice(-6).some(item => /\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(item.content))
 }

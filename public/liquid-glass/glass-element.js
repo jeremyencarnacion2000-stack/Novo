@@ -318,7 +318,7 @@ class GlassElement extends HTMLElement {
             } else if (!this.hasSVGFilterSupport) {
                 element.style.backdropFilter = `blur(${this.blur * 2}px)`;
                 element.style.background = this.backgroundColor;
-                element.style.boxShadow = '1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04)';
+                element.style.boxShadow = 'var(--glass-element-shadow, 1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04))';
                 element.style.border = '1px solid rgba(255, 255, 255, 0.3)';
             } else {
                 element.style.backdropFilter = `blur(${this.blur / 2}px) url('${getDisplacementFilter({
@@ -330,7 +330,7 @@ class GlassElement extends HTMLElement {
                     chromaticAberration: this.chromaticAberration
                 })}') blur(${this.blur}px) brightness(1.1) saturate(1.5)`;
                 element.style.background = this.backgroundColor;
-                element.style.boxShadow = '1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04)';
+                element.style.boxShadow = 'var(--glass-element-shadow, 1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04))';
             }
         } else {
             element.style.height = `${this.height}px`;
@@ -348,7 +348,7 @@ class GlassElement extends HTMLElement {
             } else if (!this.hasSVGFilterSupport) {
                 element.style.backdropFilter = `blur(${this.blur * 2}px)`;
                 element.style.background = this.backgroundColor;
-                element.style.boxShadow = '1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04)';
+                element.style.boxShadow = 'var(--glass-element-shadow, 1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04))';
                 element.style.border = '1px solid rgba(255, 255, 255, 0.3)';
             } else {
                 element.style.backdropFilter = `blur(${this.blur / 2}px) url('${getDisplacementFilter({
@@ -360,7 +360,7 @@ class GlassElement extends HTMLElement {
                     chromaticAberration: this.chromaticAberration
                 })}') blur(${this.blur}px) brightness(1.1) saturate(1.5)`;
                 element.style.background = this.backgroundColor;
-                element.style.boxShadow = '1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04)';
+                element.style.boxShadow = 'var(--glass-element-shadow, 1px 1px 1px 0px rgba(255,255,255, 0.60) inset, -1px -1px 1px 0px rgba(255,255,255, 0.60) inset, 0px 0px 16px 0px rgba(0,0,0, 0.04))';
             }
         }
     }

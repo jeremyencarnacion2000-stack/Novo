@@ -15,6 +15,7 @@ import {
   CommandShortcut,
 } from '@/components/ui/command'
 import { useSettings } from '@/lib/settings-context'
+import { restoreMobileNavigationFocus } from '@/lib/mobile-nav-motion'
 
 export function CommandPalette({ initialOpen = false }: { initialOpen?: boolean }) {
   const [open, setOpen] = React.useState(initialOpen)
@@ -51,7 +52,7 @@ export function CommandPalette({ initialOpen = false }: { initialOpen?: boolean 
 
   return (
     <>
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog open={open} onOpenChange={setOpen} onExitComplete={restoreMobileNavigationFocus}>
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>

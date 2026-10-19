@@ -5,13 +5,14 @@ import { X, Maximize2, Minimize2, Download, ExternalLink } from 'lucide-react';
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 interface DocumentViewerProps {
+    open?: boolean;
     content: string;
     mimeType: string;
     filename: string;
     onClose?: () => void;
 }
 
-export function DocumentViewer({ content, mimeType, filename, onClose }: DocumentViewerProps) {
+export function DocumentViewer({ open = true, content, mimeType, filename, onClose }: DocumentViewerProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -78,7 +79,7 @@ export function DocumentViewer({ content, mimeType, filename, onClose }: Documen
     };
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose?.()}>
+        <Sheet open={open} onOpenChange={(open) => !open && onClose?.()}>
             <SheetContent
                 side="right"
                 showCloseButton={false}

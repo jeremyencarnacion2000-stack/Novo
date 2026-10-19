@@ -35,11 +35,10 @@ const glassPresets: Record<GlassPreset, {
   strength: number
   chromaticAberration: number
 }> = {
-  // These are the calibrated values from the supplied GlassElement variant:
-  // a light 5px RGB split for compact controls and a 15px split for focal
-  // lenses. The distinction keeps navigation calm while making the Twin pill
-  // and Context Hub visibly refractive instead of merely translucent.
-  navigation: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
+  // Navigation uses a restrained chromatic edge so the lens stays visible
+  // without splitting small labels into coloured echoes. Focal status/panel
+  // presets retain their separate calibration.
+  navigation: { radius: 32, depth: 10, blur: 1, strength: 70, chromaticAberration: 2.4 },
   status: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
   control: { radius: 32, depth: 10, blur: 1, strength: 100, chromaticAberration: 5 },
   panel: { radius: 64, depth: 10, blur: 1, strength: 100, chromaticAberration: 15 },
@@ -111,6 +110,9 @@ export interface GlassSurfaceProps extends React.ComponentPropsWithoutRef<'div'>
   /** The product material this surface represents. @default 'context' */
   material?: 'context' | 'focus'
 
+  /** Regular navigation glass. Larger menus receive a more substantial tint. */
+  navigationMaterial?: 'bar' | 'panel'
+
   /**
    * Elevation tier — affects shadow intensity.
    * @default 'medium'
@@ -168,8 +170,9 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       chromaticAberration: chromaticAberrationProp,
       adaptive = true,
       debug = false,
-      backgroundColor,
+      backgroundColor: backgroundColorProp,
       material = 'context',
+      navigationMaterial,
       elevation = 'medium',
       as,
       contrastObserver = false,
@@ -194,6 +197,30 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     const blur = blurProp ?? presetValues?.blur ?? 1
     const strength = strengthProp ?? presetValues?.strength ?? 40
     const chromaticAberration = chromaticAberrationProp ?? presetValues?.chromaticAberration ?? 6
+    // CSS variables inherit into the custom element's shadow tree as well as
+    // the React fallback. Theme changes never rebuild the displacement map.
+    const backgroundColor = backgroundColorProp ?? (navigationMaterial ? 'var(--novo-navigation-tint)' : undefined)
+    const [simplifyNavigationGlass, setSimplifyNavigationGlass] = React.useState(false)
+    React.useEffect(() => {
+      if (!navigationMaterial || typeof window.matchMedia !== 'function') return
+      // Appearance controls own the requested glass. Windows often reports
+      // reduced transparency globally; that must not silently replace an
+      // explicitly enabled Novo lens with a solid plate.
+      const queries = ['(forced-colors: active)']
+        .map(query => window.matchMedia(query))
+      const root = document.documentElement
+      const update = () => setSimplifyNavigationGlass(
+        queries.some(query => query.matches) || root.dataset.accessibilityReduceGlass === 'true',
+      )
+      update()
+      queries.forEach(query => query.addEventListener?.('change', update))
+      const observer = new MutationObserver(update)
+      observer.observe(root, { attributes: true, attributeFilter: ['data-accessibility-reduce-glass'] })
+      return () => {
+        queries.forEach(query => query.removeEventListener?.('change', update))
+        observer.disconnect()
+      }
+    }, [navigationMaterial])
 
     // The supplied <glass-element> is loaded lazily by the app shell. Keep
     // the React lens alive until the custom element is actually upgraded so
@@ -239,10 +266,10 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       enabled: refractive,
       leaseOnly: webComponentPreferred,
       priority: refractivePriority,
-      active: refractiveActive,
+      active: refractiveActive && !simplifyNavigationGlass,
       includeMap: debug,
     })
-    const webComponentActive = webComponentPreferred && refractive && refractiveActive && useSVGFilter
+    const webComponentActive = webComponentPreferred && refractive && refractiveActive && !simplifyNavigationGlass && useSVGFilter
 
     // Keep the optical chain identical to the reference Liquid Glass
     // renderer: a light pre-blur, the geometry-aware SVG displacement lens,
@@ -250,8 +277,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
     // returns the CSS-only fallback for Safari/Firefox or when the five-lens
     // budget is occupied, so the material never flashes flat.
     const refractiveFilter = React.useMemo(
-      () => buildBackdropFilter(),
-      [buildBackdropFilter],
+      () => navigationMaterial && !useSVGFilter ? 'none' : buildBackdropFilter(),
+      [buildBackdropFilter, navigationMaterial, useSVGFilter],
     )
 
     const [resolvedContrast, setResolvedContrast] = React.useState<'light' | 'dark' | null>(null)
@@ -285,11 +312,15 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       }
       let lastGeometry = ''
       const syncGeometry = () => {
-        const rect = host.getBoundingClientRect()
-        if (rect.width <= 0 || rect.height <= 0) return
-        const width = String(Math.max(1, Math.ceil(rect.width)))
-        const height = String(Math.max(1, Math.ceil(rect.height)))
-        const radiusValue = String(Math.min(radius, rect.width / 2, rect.height / 2))
+        // A morph transforms the optical shell on the compositor. Its map
+        // must describe the untransformed layout, otherwise a lens mounted
+        // mid-flight freezes at that frame's squashed viewport dimensions.
+        const layoutWidth = host.offsetWidth
+        const layoutHeight = host.offsetHeight
+        if (layoutWidth <= 0 || layoutHeight <= 0) return
+        const width = String(layoutWidth)
+        const height = String(layoutHeight)
+        const radiusValue = String(Math.min(radius, layoutWidth / 2, layoutHeight / 2))
         const background = backgroundColor && backgroundColor !== 'transparent'
           ? backgroundColor
           : 'rgba(255,255,255,0.10)'
@@ -460,7 +491,9 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         // Keep the Settings material as a standalone declaration. The SVG
         // lens is rendered in a separate overlay below so an unsupported or
         // temporarily invalid SVG URL can never disable the configured blur.
-        '--novo-glass-backdrop-filter': `var(${materialVariable}-backdrop-filter)`,
+        '--novo-glass-backdrop-filter': navigationMaterial
+          ? (simplifyNavigationGlass ? 'none' : 'blur(var(--novo-navigation-blur)) saturate(135%)')
+          : `var(${materialVariable}-backdrop-filter)`,
       }
     }, [
       backgroundColor,
@@ -472,6 +505,8 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
       material,
       filterUrl,
       refractive,
+      navigationMaterial,
+      simplifyNavigationGlass,
     ])
 
     const Component = as || 'div'
@@ -481,6 +516,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         ref={ref}
         data-novo-glass
         data-glass-preset={resolvedPreset}
+        data-navigation-material={navigationMaterial}
         data-refractive-priority={refractivePriority}
         data-liquid-refractive={refractive ? (useSVGFilter ? 'svg' : 'fallback') : 'off'}
         data-elevation={elevation}
@@ -488,6 +524,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
         className={cn(
           'flex flex-col',
           material === 'focus' ? 'novo-focus-surface' : 'novo-context-glass',
+          navigationMaterial && 'novo-navigation-glass',
           className,
         )}
         style={{ ...computedStyle, ...style }}
@@ -523,7 +560,7 @@ const GlassSurface = React.forwardRef<HTMLDivElement, GlassSurfaceProps>(
             Settings-controlled backdrop layer: Chromium can reject a mixed
             `url(#filter) blur(...)` declaration as a whole, which would make
             a transparent card lose its blur. */}
-        {refractive && !webComponentActive && (
+        {refractive && !webComponentActive && !simplifyNavigationGlass && (
           <div
             aria-hidden
             data-glass-refractive

@@ -1,5 +1,6 @@
 'use client'
 
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Code2, ExternalLink, Github, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react'
@@ -37,7 +38,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     authRequired: 'La conexión necesita autorización de nuevo.', permission: 'El token no tiene permiso de lectura suficiente.', rateLimit: 'El proveedor limitó las consultas temporalmente.', unavailable: 'La fuente no está disponible ahora.', requestFailed: 'No se pudo completar la solicitud.',
     reviewApproved: 'aprobada', reviewChanges: 'cambios solicitados', reviewCommented: 'comentarios', reviewPending: 'pendiente', reviewNone: 'sin actividad reciente',
     sourceReadOnly: 'Lectura únicamente; el Companion no fusiona cambios ni despliega.',
-    codex: 'Codex en este PC', codexWaiting: 'Los hooks están instalados, pero Codex aún no los ha aprobado o no se ha iniciado una sesión nueva.', codexConnected: 'Novo ya recibe contexto breve de Codex desde Companion.', codexEmpty: 'Todavía no llegó una tarea de Codex.',
+    codex: 'Codex en este PC', codexWaiting: 'Abre Codex, escribe /hooks y aprueba los hooks de Novo. Después inicia una sesión nueva; la conexión aparecerá aquí cuando llegue el primer evento.', codexConnected: 'Novo ya recibe contexto breve de Codex desde Companion.', codexEmpty: 'Todavía no llegó una tarea de Codex.',
   },
   en: {
     title: 'Development sources', description: 'Review GitHub and Vercel summaries alongside the brief Codex status from this PC.',
@@ -52,7 +53,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     authRequired: 'The connection needs authorisation again.', permission: 'The token does not have sufficient read permission.', rateLimit: 'The provider temporarily limited requests.', unavailable: 'The source is unavailable right now.', requestFailed: 'The request could not be completed.',
     reviewApproved: 'approved', reviewChanges: 'changes requested', reviewCommented: 'commented', reviewPending: 'pending', reviewNone: 'no recent review',
     sourceReadOnly: 'Read-only; the Companion does not merge changes or deploy.',
-    codex: 'Codex on this PC', codexWaiting: 'The hooks are installed, but Codex has not approved them or started a new session yet.', codexConnected: 'Novo is receiving brief Codex context from the Companion.', codexEmpty: 'No Codex task has arrived yet.',
+    codex: 'Codex on this PC', codexWaiting: 'Open Codex, enter /hooks, and approve Novo’s hooks. Then start a new session; this connection will appear when the first event arrives.', codexConnected: 'Novo is receiving brief Codex context from the Companion.', codexEmpty: 'No Codex task has arrived yet.',
   },
   fr: {
     title: 'Sources de développement', description: 'Consultez les résumés GitHub et Vercel ainsi que le bref état de Codex sur ce PC.',
@@ -67,7 +68,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     authRequired: 'La connexion doit être autorisée à nouveau.', permission: 'Le jeton ne dispose pas des permissions de lecture suffisantes.', rateLimit: 'Le fournisseur limite temporairement les requêtes.', unavailable: 'La source est indisponible pour le moment.', requestFailed: 'La requête n’a pas abouti.',
     reviewApproved: 'approuvée', reviewChanges: 'changements demandés', reviewCommented: 'commentée', reviewPending: 'en attente', reviewNone: 'aucune revue récente',
     sourceReadOnly: 'Lecture seule ; le Compagnon ne fusionne ni ne redéploie.',
-    codex: 'Codex sur ce PC', codexWaiting: 'Les hooks sont installés, mais Codex ne les a pas encore approuvés ou n’a pas démarré de nouvelle session.', codexConnected: 'Novo reçoit déjà un bref contexte Codex du Compagnon.', codexEmpty: 'Aucune tâche Codex n’est encore arrivée.',
+    codex: 'Codex sur ce PC', codexWaiting: 'Ouvrez Codex, saisissez /hooks et approuvez les hooks de Novo. Démarrez ensuite une nouvelle session ; la connexion apparaîtra à la réception du premier événement.', codexConnected: 'Novo reçoit déjà un bref contexte Codex du Compagnon.', codexEmpty: 'Aucune tâche Codex n’est encore arrivée.',
   },
   de: {
     title: 'Entwicklungsquellen', description: 'GitHub- und Vercel-Zusammenfassungen sowie den kurzen Codex-Status dieses PCs ansehen.',
@@ -82,7 +83,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     authRequired: 'Die Verbindung muss erneut autorisiert werden.', permission: 'Der Token hat nicht genügend Leseberechtigungen.', rateLimit: 'Der Anbieter begrenzt Anfragen vorübergehend.', unavailable: 'Die Quelle ist derzeit nicht verfügbar.', requestFailed: 'Die Anfrage konnte nicht abgeschlossen werden.',
     reviewApproved: 'genehmigt', reviewChanges: 'Änderungen angefordert', reviewCommented: 'kommentiert', reviewPending: 'ausstehend', reviewNone: 'keine aktuelle Review',
     sourceReadOnly: 'Nur lesend; der Companion führt keine Merges oder Deployments aus.',
-    codex: 'Codex auf diesem PC', codexWaiting: 'Die Hooks sind installiert, aber Codex hat sie noch nicht bestätigt oder eine neue Sitzung gestartet.', codexConnected: 'Novo erhält bereits kurze Codex-Kontexte vom Companion.', codexEmpty: 'Noch keine Codex-Aufgabe eingegangen.',
+    codex: 'Codex auf diesem PC', codexWaiting: 'Öffne Codex, gib /hooks ein und bestätige Novos Hooks. Starte danach eine neue Sitzung; die Verbindung erscheint, sobald das erste Ereignis eintrifft.', codexConnected: 'Novo erhält bereits kurze Codex-Kontexte vom Companion.', codexEmpty: 'Noch keine Codex-Aufgabe eingegangen.',
   },
 }
 
@@ -307,15 +308,15 @@ export function DeveloperContextPanel() {
         <button type="button" disabled={!preview || loading} onClick={() => { setCopied(false); setPreviewOpen(true) }} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 text-xs font-semibold text-primary disabled:opacity-40"><Upload className="size-3.5" />{copy.preview}</button>
       </div>
 
-      {previewOpen && <div role="dialog" aria-modal="true" aria-labelledby="developer-context-preview-title" className="fixed inset-0 z-[100] grid place-items-center bg-black/65 p-4" onKeyDown={(event) => { if (event.key === 'Escape') setPreviewOpen(false) }}>
-        <div className="w-full max-w-lg rounded-3xl border border-foreground/10 bg-background p-5 shadow-2xl md:p-7">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/75">{copy.preview}</p><h3 id="developer-context-preview-title" className="mt-2 text-lg font-semibold text-foreground">{copy.previewTitle}</h3></div><button type="button" aria-label={copy.close} onClick={() => setPreviewOpen(false)} className="grid size-9 place-items-center rounded-full border border-foreground/10 text-foreground/50 hover:bg-foreground/[0.05]"><X className="size-4" /></button></div>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent showCloseButton={false} aria-labelledby="developer-context-preview-title" className="max-w-lg rounded-3xl border-foreground/10 bg-background p-5 shadow-2xl md:p-7">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/75">{copy.preview}</p><DialogTitle id="developer-context-preview-title" className="mt-2 text-lg font-semibold text-foreground">{copy.previewTitle}</DialogTitle></div><button type="button" aria-label={copy.close} onClick={() => setPreviewOpen(false)} className="grid size-9 place-items-center rounded-full border border-foreground/10 text-foreground/50 hover:bg-foreground/[0.05]"><X className="size-4" /></button></div>
           <p className="mt-4 whitespace-pre-wrap rounded-2xl border border-foreground/[0.07] bg-foreground/[0.025] p-4 text-xs leading-6 text-foreground/70">{preview || copy.emptyPreview}</p>
           <p className="mt-3 text-xs font-medium text-foreground/65">{copy.proposalPrompt}</p>
           <p className="mt-3 text-[11px] leading-5 text-foreground/40">{copy.privacy}</p>
           <div className="mt-5 flex flex-wrap gap-2"><button type="button" disabled={!preview} onClick={() => void copyPreview()} className="min-h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50">{copied ? copy.copied : copy.copy}</button>{copied && <Link href="/cognitive" className="inline-flex min-h-10 items-center rounded-full border border-foreground/10 px-4 text-xs font-semibold text-foreground/70">{copy.openTwin}</Link>}<button type="button" onClick={() => setPreviewOpen(false)} className="min-h-10 rounded-full border border-foreground/10 px-4 text-xs text-foreground/55">{copy.close}</button></div>
-        </div>
-      </div>}
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

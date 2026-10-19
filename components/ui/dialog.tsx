@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils'
 import { useDragToDismiss } from '@/hooks/use-drag-to-dismiss'
 import { useNativeDialogMotion, type NativeDialogMotionController } from '@/hooks/use-native-dialog-motion'
 import { useSharedDialogMotion } from '@/hooks/use-shared-dialog-motion'
+import { readModalOrigin, rememberModalOrigin, restoreModalOriginFocus } from '@/lib/modal-origin'
+import type { ModalOrigin } from '@/lib/liquid-modal-motion'
 import {
   resolveModalMotionPreset,
   type ModalMobilePresentation,
@@ -16,6 +18,7 @@ import {
 
 type DialogMotionContextValue = {
   registerController: (controller: NativeDialogMotionController | null) => void
+  originRef: React.RefObject<ModalOrigin>
 }
 
 const DialogMotionContext = React.createContext<DialogMotionContextValue | null>(null)
@@ -24,48 +27,62 @@ function Dialog({
   open,
   defaultOpen,
   onOpenChange,
+  onExitComplete,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+}: React.ComponentProps<typeof DialogPrimitive.Root> & { onExitComplete?: () => void }) {
   const [present, setPresent] = React.useState(open ?? defaultOpen ?? false)
   const controllerRef = React.useRef<NativeDialogMotionController | null>(null)
   const previousOpenRef = React.useRef(open)
+  const closingRef = React.useRef(false)
+  const exitCompleteRef = React.useRef(onExitComplete)
+  exitCompleteRef.current = onExitComplete
+  const originRef = React.useRef(readModalOrigin())
+  const retainedChildren = React.useRef(props.children)
+  if (open !== false || !present) retainedChildren.current = props.children
 
   const registerController = React.useCallback((controller: NativeDialogMotionController | null) => {
     controllerRef.current = controller
   }, [])
 
-  const finishClose = React.useCallback((notify: boolean) => {
+  const finishClose = React.useCallback(() => {
+    if (closingRef.current) return
+    closingRef.current = true
     const complete = () => {
+      closingRef.current = false
       setPresent(false)
-      if (notify) onOpenChange?.(false)
+      exitCompleteRef.current?.()
     }
     const controller = controllerRef.current
     if (controller) controller.close(complete)
     else complete()
-  }, [onOpenChange])
+  }, [])
 
   React.useLayoutEffect(() => {
     if (open === undefined) return
     const wasOpen = previousOpenRef.current
     previousOpenRef.current = open
     if (open) {
+      closingRef.current = false
+      if (wasOpen === false && !present) originRef.current = readModalOrigin()
       if (!present) setPresent(true)
       else if (wasOpen === false) controllerRef.current?.open()
       return
     }
-    if (wasOpen === true && present) finishClose(false)
+    if (wasOpen === true && present) finishClose()
   }, [finishClose, open, present])
 
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
     if (nextOpen) {
+      closingRef.current = false
+      if (!present) originRef.current = readModalOrigin()
       setPresent(true)
       onOpenChange?.(true)
       return
     }
-    finishClose(true)
-  }, [finishClose, onOpenChange])
+    if (!closingRef.current) { onOpenChange?.(false); finishClose() }
+  }, [finishClose, onOpenChange, present])
 
-  const context = React.useMemo(() => ({ registerController }), [registerController])
+  const context = React.useMemo(() => ({ registerController, originRef }), [registerController])
 
   return (
     <DialogMotionContext.Provider value={context}>
@@ -74,15 +91,18 @@ function Dialog({
         {...props}
         open={present}
         onOpenChange={handleOpenChange}
-      />
+      >{retainedChildren.current}</DialogPrimitive.Root>
     </DialogMotionContext.Provider>
   )
 }
 
 function DialogTrigger({
+  onPointerDown, onClick,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props}
+    onPointerDown={(event) => { rememberModalOrigin(event.currentTarget); onPointerDown?.(event) }}
+    onClick={(event) => { rememberModalOrigin(event.currentTarget); onClick?.(event) }} />
 }
 
 function DialogPortal({
@@ -183,6 +203,7 @@ function FlipAnchoredPositioner({
   return (
     <div
       ref={ref}
+      data-modal-positioner
       className={cn(
         'fixed z-[5001] pointer-events-none',
         !anchored && 'inset-0 flex items-center justify-center',
@@ -218,6 +239,7 @@ function DialogContent({
   anchorRef,
   overlayClassName,
   overlayProps,
+  onCloseAutoFocus,
   ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
@@ -243,15 +265,17 @@ function DialogContent({
     mobilePresentation,
     isMobile,
   })
-  const isFlipModal = Boolean(flipId) && (resolvedPreset === 'shared' || resolvedPreset === 'anchored')
+  const isFlipModal = Boolean(flipId)
   const isIntegratedFlipModal = Boolean(motionId) && isFlipModal
   const resolvedAnchorRect = anchorRef?.current?.getBoundingClientRect() ?? contextualRect
   const isContextualModal = resolvedPreset === 'anchored' && Boolean(resolvedAnchorRect)
   const isMaterialOverlay = Boolean((props as any)['data-overlay-material'])
   const motionContext = React.useContext(DialogMotionContext)
   const surfaceRef = React.useRef<HTMLDivElement | null>(null)
+  const [surfaceElement, setSurfaceElement] = React.useState<HTMLDivElement | null>(null)
   const overlayRef = React.useRef<HTMLDivElement | null>(null)
   const dragSurfaceRef = useDragToDismiss<HTMLDivElement>({
+    element: surfaceElement,
     enabled: resolvedPreset === 'sheet',
     onDismiss: (surface) => surface.querySelector<HTMLElement>('[data-slot="dialog-close"]')?.click(),
   })
@@ -259,20 +283,27 @@ function DialogContent({
   React.useImperativeHandle(forwardedRef, () => surfaceRef.current as HTMLDivElement)
   const setSurfaceRef = React.useCallback((node: HTMLDivElement | null) => {
     surfaceRef.current = node
+    setSurfaceElement(node)
     dragSurfaceRef.current = node
   }, [dragSurfaceRef])
 
   useNativeDialogMotion({
     surfaceRef,
+    surfaceElement,
     overlayRef,
     preset: resolvedPreset,
     enabled: !isFlipModal,
     registerController: motionContext?.registerController,
+    originRef: motionContext?.originRef,
+    anchorRef,
+    contextualRect,
   })
   useSharedDialogMotion({
+    surfaceRef,
     motionId: flipId ?? '',
-    enabled: isIntegratedFlipModal,
+    enabled: isIntegratedFlipModal && Boolean(surfaceElement),
     registerController: motionContext?.registerController,
+    originRef: motionContext?.originRef,
   })
 
   const content = (
@@ -300,6 +331,7 @@ function DialogContent({
         className,
       )}
       {...props}
+      onCloseAutoFocus={(event) => { onCloseAutoFocus?.(event); restoreModalOriginFocus(event, anchorRef?.current ?? motionContext?.originRef.current.element) }}
     >
       <MobileDialogDragHandle />
       {children}
@@ -331,6 +363,7 @@ function DialogContent({
         <FlipAnchoredPositioner flipId={flipId!}>{content}</FlipAnchoredPositioner>
       ) : (
         <div
+          data-modal-positioner
           className={cn(
             "fixed inset-0 z-[5001] pointer-events-none",
             isContextualModal

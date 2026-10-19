@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  X, CheckCheck, Trash2, Sparkles, Zap
+  X, CheckCheck, Trash2, RefreshCw
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import {
@@ -12,11 +12,13 @@ import {
   useTransform,
   useAnimation,
 } from 'framer-motion'
-import { sileo, subscribeSileoBell, type BellToast } from '@/lib/sileo-bell'
+import { sileo, subscribeSileoBell, markSileoBellPresented, type BellToast } from '@/lib/sileo-bell'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 import { AnimatedSVGIcon, type IconState } from '@/components/ui/AnimatedSVGIcon'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { appleLiquidMotion } from '@/lib/design-tokens'
+import { LiquidNotification } from '@/components/ui/liquid-notification'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type NotificationType =
@@ -46,14 +48,14 @@ export interface AppNotification {
 // inconsistency with the app's otherwise monochrome + accent aesthetic.
 const typeConfig: Record<
   NotificationType,
-  { iconState: IconState; color: string; colorHex: string; bg: string; bloom: string }
+  { iconState: IconState; color: string; colorHex: string; bg: string }
 > = {
-  info:        { iconState: 'sync',       color: 'text-foreground/70', colorHex: 'rgba(255,255,255,0.7)', bg: 'bg-foreground/[0.06]', bloom: 'rgba(255,255,255,0.12)' },
-  warning:     { iconState: 'recovery',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12',      bloom: 'rgba(245,158,11,0.22)' },
-  success:     { iconState: 'execution',  color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
-  suggestion:  { iconState: 'prediction', color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
-  reminder:    { iconState: 'calendar',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12',      bloom: 'rgba(245,158,11,0.22)' },
-  achievement: { iconState: 'thinking',   color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12',  bloom: 'rgba(var(--primary-rgb), 0.22)' },
+  info:        { iconState: 'sync',       color: 'text-foreground/70', colorHex: 'rgba(255,255,255,0.7)', bg: 'bg-foreground/[0.06]' },
+  warning:     { iconState: 'recovery',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12' },
+  success:     { iconState: 'execution',  color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12' },
+  suggestion:  { iconState: 'prediction', color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12' },
+  reminder:    { iconState: 'calendar',   color: 'text-amber-400',     colorHex: '#fbbf24',               bg: 'bg-amber-500/12' },
+  achievement: { iconState: 'thinking',   color: 'text-primary',       colorHex: 'rgb(var(--primary-rgb))', bg: 'bg-primary/12' },
 }
 
 // ── Time helper ────────────────────────────────────────────────────────────────
@@ -167,7 +169,6 @@ function NotificationRow({
 }) {
   const config = typeConfig[notification.type]
   const x = useMotionValue(0)
-  const opacity = useTransform(x, [-160, -80, 0], [0, 0.5, 1])
   const background = useTransform(
     x,
     [-160, -60, 0],
@@ -188,29 +189,27 @@ function NotificationRow({
         delay: index * 0.055,
       }}
       style={{ background }}
-      className="relative overflow-hidden p-1"
+      className="relative overflow-hidden rounded-[18px]"
     >
-      <GlassSurface
-        radius={16}
-        depth={6}
-        blur={1}
-        strength={30}
-        chromaticAberration={4}
-        backgroundColor="transparent"
-        className="w-full border border-foreground/[0.04]"
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: -180, right: 0 }}
+        dragElastic={{ left: 0.15, right: 0 }}
+        style={{ x }}
+        onDragEnd={(_, info) => {
+          if (info.offset.x < -100) onDelete(notification.id)
+          else x.set(0)
+        }}
+        className={`group relative flex items-stretch gap-2.5 overflow-hidden rounded-[18px] border px-3.5 py-3 transition-colors ${
+          notification.read
+            ? 'border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.055]'
+            : 'border-white/[0.11] bg-white/[0.055] hover:bg-white/[0.075]'
+        }`}
       >
-        <motion.div
-          drag="x"
-          dragConstraints={{ left: -180, right: 0 }}
-          dragElastic={{ left: 0.15, right: 0 }}
-          style={{ x }}
-          onDragEnd={(_, info) => {
-            if (info.offset.x < -100) onDelete(notification.id)
-            else x.set(0)
-          }}
-          className={`group flex gap-3 px-4 py-3.5 cursor-default select-none transition-colors hover:bg-foreground/[0.025] ${
-            !notification.read ? 'bg-foreground/[0.018]' : ''
-          }`}
+        <button
+          type="button"
+          aria-label={`${notification.title}. ${notification.read ? 'Leída' : 'No leída'}`}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           onClick={() => {
             onRead(notification.id)
             if (notification.actionUrl) {
@@ -218,62 +217,56 @@ function NotificationRow({
             }
           }}
         >
-          {/* Icon */}
           <motion.div
-            className={`shrink-0 w-8 h-8 rounded-xl ${config.bg} flex items-center justify-center mt-0.5`}
+            className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[14px] ${config.bg}`}
             whileHover={{ scale: 1.1 }}
-            style={{
-              boxShadow: !notification.read ? `0 0 10px ${config.bloom}` : 'none',
-            }}
           >
             <AnimatedSVGIcon state={config.iconState} size={16} color={config.colorHex} />
           </motion.div>
 
-          {/* Text */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <p className={`text-xs font-medium leading-snug ${
-                notification.read ? 'text-foreground/45' : 'text-foreground/90'
+              <p className={`text-[13px] font-semibold leading-snug ${
+                notification.read ? 'text-foreground/70' : 'text-foreground/95'
               }`}>
                 {notification.title}
               </p>
               {!notification.read && (
-                <motion.div
-                  className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary mt-1.5"
-                  animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                <span
+                  aria-label="Nueva"
+                  className="mt-1.5 size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_rgba(var(--primary-rgb),0.12)]"
                 />
               )}
             </div>
-            <p className="text-[11px] text-foreground/35 mt-0.5 leading-relaxed line-clamp-2">
+            <p className="mt-1 text-xs leading-relaxed text-foreground/65 line-clamp-2">
               {notification.body}
             </p>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[9px] text-foreground/20 uppercase tracking-wider">
+              <span className="text-[10px] font-medium text-foreground/60">
                 {timeAgo(notification.timestamp)}
               </span>
               {notification.source && (
-                <span className="text-[9px] text-foreground/15 uppercase tracking-wider">
-                  · {notification.source}
+                <span className="text-[10px] text-foreground/60">
+                  · {notification.source === 'tasks' ? 'Tareas' : notification.source === 'system' ? 'Sistema' : notification.source}
                 </span>
               )}
             </div>
           </div>
+        </button>
 
-          {/* Delete btn */}
-          <motion.button
-            onClick={(e) => { e.stopPropagation(); onDelete(notification.id) }}
-            aria-label="Delete notification"
-            className="shrink-0 p-1 rounded-md text-foreground/0 group-hover:text-foreground/25 hover:!text-red-400 hover:bg-red-500/15 transition-colors"
+        <motion.button
+            type="button"
+            onClick={() => onDelete(notification.id)}
+            aria-label={`Eliminar notificación: ${notification.title}`}
+            className="mt-0.5 flex size-8 shrink-0 items-center justify-center self-start rounded-full text-foreground/60 transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/70 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             whileHover={{ scale: appleLiquidMotion.hoverScale }}
             whileTap={{ scale: appleLiquidMotion.pressScale }}
             transition={appleLiquidMotion.pressTransition}
             title="Eliminar"
           >
-            <X className="w-3 h-3" />
-          </motion.button>
-        </motion.div>
-      </GlassSurface>
+            <X className="size-4" />
+        </motion.button>
+      </motion.div>
 
       {/* Swipe-delete hint bar */}
       <motion.div
@@ -300,12 +293,13 @@ export function NotificationCenter() {
   const [prevUnread, setPrevUnread] = useState(0)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const bellControls = useAnimation()
+  const motionMode = useNovoMotionPolicy()
 
   const unreadCount = notifications.filter(n => !n.read).length
 
   // Bell bounce when new unread arrives
   useEffect(() => {
-    if (unreadCount > prevUnread) {
+    if (unreadCount > prevUnread && motionMode === 'full') {
       bellControls.start({
         rotate: [0, -18, 16, -12, 8, -4, 0],
         transition: { duration: 0.65, ease: 'easeInOut' },
@@ -323,14 +317,14 @@ export function NotificationCenter() {
   useEffect(() => {
     return subscribeSileoBell(toast => {
       setSileoToast(toast)
-      if (toast) {
+      if (toast && motionMode === 'full') {
         bellControls.start({
           rotate: [0, -14, 12, -8, 4, 0],
           transition: { duration: 0.5, ease: 'easeInOut' },
         })
       }
     })
-  }, [])
+  }, [bellControls, motionMode])
 
   const sileoColor =
     sileoToast?.type === 'success' ? '#34d399'
@@ -356,6 +350,8 @@ export function NotificationCenter() {
   // notification list or unread count.
   useEffect(() => {
     setNotifications([])
+    sileo.clear()
+    setSileoToast(null)
     setIsOpen(false)
     setPrevUnread(0)
     cachedNotificationsRef.current = []
@@ -510,25 +506,20 @@ export function NotificationCenter() {
         if (nextOpen) loadNotifications()
       }}
     >
-      {/* ── Bell Button — two physical phases: idle pill ↔ Sileo HUD ──── */}
+      {/* The bell stays available while its notice detaches and returns. */}
       <motion.button
         ref={buttonRef as any}
         data-flip-from="notifications"
-        layout
-        transition={{ ...appleLiquidMotion.pressTransition, layout: { type: 'spring', stiffness: 400, damping: 30 } }}
+        transition={appleLiquidMotion.pressTransition}
         onClick={() => {
           setIsOpen(prev => !prev)
           if (!isOpen) loadNotifications()
           if (sileoToast) sileo.dismiss(sileoToast.id)
         }}
-        aria-label="Notifications"
+        aria-label="Notificaciones"
         whileHover={{ scale: appleLiquidMotion.hoverScale }}
         whileTap={{ scale: appleLiquidMotion.pressScale }}
-        className={
-          sileoToast
-            ? "fixed top-4 right-3 sm:right-6 z-[200] h-11 max-w-[min(360px,calc(100vw-1.5rem))] rounded-full flex items-center gap-3 pl-3 pr-4 shadow-lg"
-            : "fixed top-4 right-3 sm:right-6 z-[200] size-9 rounded-full flex items-center justify-center shadow-lg"
-        }
+        className="fixed top-4 right-3 sm:right-6 z-[200] size-9 rounded-full flex items-center justify-center shadow-lg"
         style={{ isolation: 'isolate' }}
       >
         {/* Liquid glass background overlay */}
@@ -545,51 +536,13 @@ export function NotificationCenter() {
         />
 
         {/* Icon above glass — morphs to the toast's icon during Sileo phase */}
-        <motion.div layout="position" animate={bellControls} className="relative z-10 shrink-0">
+        <motion.div animate={bellControls} className="relative z-10 shrink-0">
           <AnimatedSVGIcon
             state={sileoToast ? sileoIconState : 'notification'}
             size={18}
             color={sileoColor}
           />
         </motion.div>
-
-        {/* Sileo HUD content — title + description reveal inside the capsule */}
-        <AnimatePresence mode="popLayout">
-          {sileoToast && (
-            <motion.div
-              key={sileoToast.id}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0, transition: { delay: 0.14, duration: 0.25 } }}
-              exit={{ opacity: 0, x: 6, transition: { duration: 0.12 } }}
-              className="relative z-10 flex items-center gap-2.5 min-w-0"
-            >
-              <div className="flex flex-col items-start min-w-0 text-left">
-                <span className="text-[11px] font-semibold text-foreground/90 truncate max-w-[230px] leading-tight">
-                  {sileoToast.title}
-                </span>
-                {sileoToast.description && (
-                  <span className="text-[9px] text-foreground/45 truncate max-w-[230px] leading-tight mt-0.5">
-                    {sileoToast.description}
-                  </span>
-                )}
-              </div>
-              {sileoToast.button && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    sileoToast.button!.onClick()
-                    sileo.dismiss(sileoToast.id)
-                  }}
-                  className="shrink-0 px-2.5 py-1 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground/85 text-[9px] font-semibold transition-colors cursor-pointer"
-                >
-                  {sileoToast.button.title}
-                </span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Badge */}
         <AnimatePresence>
@@ -608,32 +561,49 @@ export function NotificationCenter() {
         </AnimatePresence>
       </motion.button>
 
+      <LiquidNotification key={notificationStorageKey} noticeKey={sileoToast?.id ?? null} sourceRef={buttonRef} onDismiss={() => sileo.dismiss(sileoToast?.id)} onPresented={() => { if (sileoToast) markSileoBellPresented(sileoToast.id) }} urgent={sileoToast?.type === 'error'}>
+        {sileoToast && (
+          <div className="flex items-start gap-3 p-4">
+            <div className="mt-1 shrink-0 rounded-full bg-foreground/5 p-2">
+              <AnimatedSVGIcon state={sileoIconState} size={20} color={sileoColor} />
+            </div>
+            <div className="min-w-0 flex-1 py-1">
+              <p className="text-sm font-semibold leading-snug">{sileoToast.title}</p>
+              {sileoToast.description && <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{sileoToast.description}</div>}
+              {sileoToast.button && (
+                <button type="button" onClick={() => { sileoToast.button!.onClick(); sileo.dismiss(sileoToast.id) }} className="mt-3 min-h-9 rounded-full bg-foreground/10 px-4 text-xs font-medium transition-colors hover:bg-foreground/15">
+                  {sileoToast.button.title}
+                </button>
+              )}
+            </div>
+            <button type="button" aria-label="Cerrar aviso" onClick={() => sileo.dismiss(sileoToast.id)} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10"><X className="size-4" /></button>
+          </div>
+        )}
+      </LiquidNotification>
+
           <DialogContent
             motionPreset="anchored"
             motionId="notifications"
             mobilePresentation="sheet"
         anchorRef={buttonRef}
         showCloseButton={false}
-        aria-label="Notifications"
-        className="!z-[201] !w-[calc(100vw-1.5rem)] !max-w-[400px] !max-h-[min(70dvh,620px)] !overflow-hidden !rounded-3xl !border-0 !p-0 !shadow-[0_-8px_40px_rgba(0,0,0,0.25),0_30px_80px_rgba(0,0,0,0.55)] !mb-[4.5rem] sm:!mt-[164px] sm:!mb-0"
+        aria-label="Notificaciones"
+        className="!z-[201] !w-[calc(100vw-1.5rem)] !max-w-[420px] !max-h-[min(70dvh,620px)] !overflow-hidden !rounded-[28px] !border-0 !p-0 !shadow-[0_-8px_40px_rgba(0,0,0,0.25),0_30px_80px_rgba(0,0,0,0.55)] !mb-[4.5rem] sm:!mt-[164px] sm:!mb-0"
       >
         <DialogTitle className="sr-only">Notificaciones</DialogTitle>
-              {/* Backdrop blur glass shell — theme-aware, no hardcoded dark bg */}
-              <div className="relative w-full flex-1 flex flex-col bg-background/92 dark:bg-[rgba(10,10,18,0.92)] backdrop-blur-2xl border border-border/20 dark:border-white/[0.07] rounded-3xl overflow-hidden max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-5rem))]">
+              {/* Single dark glass shell keeps the panel distinct from bright dashboard surfaces. */}
+              <div className="relative flex w-full flex-1 flex-col overflow-hidden rounded-[28px] border border-white/[0.12] bg-[rgba(10,10,18,0.86)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl max-h-[min(70dvh,620px)] sm:max-h-[min(620px,calc(100vh-5rem))]">
                 {/* Subtle top shimmer line */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-[1px] rounded-full pointer-events-none"
-                  style={{ background: 'linear-gradient(90deg, transparent, rgba(var(--primary-rgb),0.4), transparent)' }}
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px rounded-full"
+                  style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.34), rgba(var(--primary-rgb),0.35), transparent)' }}
                 />
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07] shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <motion.div
-                      animate={{ rotate: [0, 15, -10, 5, 0] }}
-                      transition={{ duration: 1.5, delay: 0.3, ease: 'easeInOut' }}
-                    >
-                      <AnimatedSVGIcon state="prediction" size={16} color="#a78bfa" />
-                    </motion.div>
-                    <h3 className="text-sm font-semibold text-foreground/90 tracking-tight">Notificaciones</h3>
+                <div className="flex min-h-[68px] shrink-0 items-center justify-between border-b border-white/[0.09] px-3 sm:px-5">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/[0.09] sm:size-9">
+                      <AnimatedSVGIcon state="prediction" size={17} color="#b9a5ff" />
+                    </div>
+                    <h3 className="text-sm font-semibold tracking-[-0.015em] text-foreground/95 sm:text-[15px]">Notificaciones</h3>
                     <AnimatePresence>
                       {unreadCount > 0 && (
                         <motion.span
@@ -641,15 +611,15 @@ export function NotificationCenter() {
                           initial={{ opacity: 0, scale: 0.7 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.7 }}
-                          className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold"
+                          className="hidden rounded-full border border-primary/25 bg-primary/[0.12] px-2.5 py-1 text-[10px] font-semibold text-primary sm:inline-flex"
                         >
-                          {unreadCount} nueva{unreadCount > 1 ? 's' : ''}
+                          {unreadCount} {unreadCount === 1 ? 'nueva' : 'nuevas'}
                         </motion.span>
                       )}
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex shrink-0 items-center gap-1">
                     <AnimatePresence>
                       {notifications.length > 0 && (
                         <motion.div
@@ -657,48 +627,52 @@ export function NotificationCenter() {
                           initial={{ opacity: 0, x: 8 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 8 }}
-                          className="flex items-center gap-0.5"
+                          className="flex items-center gap-1"
                         >
                           <motion.button
+                            type="button"
                             onClick={markAllRead}
-                            aria-label="Mark all as read"
-                            className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
+                            disabled={unreadCount === 0}
+                            aria-label="Marcar todas como leídas"
+                            className="flex size-9 items-center justify-center rounded-full text-foreground/65 transition-colors hover:bg-white/[0.09] hover:text-foreground disabled:cursor-default disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                             whileHover={{ scale: appleLiquidMotion.hoverScale }}
                             whileTap={{ scale: appleLiquidMotion.pressScale }}
                             transition={appleLiquidMotion.pressTransition}
                             title="Marcar todo como leído"
                           >
-                            <CheckCheck className="w-3.5 h-3.5" />
+                            <CheckCheck className="size-4" />
                           </motion.button>
                           <motion.button
+                            type="button"
                             onClick={clearAll}
-                            aria-label="Clear all notifications"
-                            className="p-1.5 rounded-lg hover:bg-red-500/15 text-foreground/35 hover:text-red-400 transition-colors"
+                            aria-label="Eliminar todas las notificaciones"
+                            className="flex size-9 items-center justify-center rounded-full text-foreground/65 transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/70"
                             whileHover={{ scale: appleLiquidMotion.hoverScale }}
                             whileTap={{ scale: appleLiquidMotion.pressScale }}
                             transition={appleLiquidMotion.pressTransition}
                             title="Limpiar todo"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="size-4" />
                           </motion.button>
                         </motion.div>
                       )}
                     </AnimatePresence>
                     <motion.button
+                      type="button"
                       onClick={() => setIsOpen(false)}
-                      aria-label="Close notifications"
-                      className="p-1.5 rounded-lg hover:bg-foreground/10 text-foreground/35 hover:text-foreground/75 transition-colors"
+                      aria-label="Cerrar notificaciones"
+                      className="flex size-9 items-center justify-center rounded-full text-foreground/65 transition-colors hover:bg-white/[0.09] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                       whileHover={{ scale: appleLiquidMotion.hoverScale, rotate: 90 }}
                       whileTap={{ scale: appleLiquidMotion.pressScale }}
                       transition={appleLiquidMotion.pressTransition}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="size-4" />
                     </motion.button>
                   </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-2" data-lenis-prevent>
+                <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3.5 custom-scrollbar sm:p-4" data-lenis-prevent>
                   <AnimatePresence mode="wait">
                     {loading && notifications.length === 0 ? (
                       <motion.div
@@ -706,14 +680,14 @@ export function NotificationCenter() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex flex-col items-center justify-center py-14 gap-3"
+                        className="flex flex-col items-center justify-center gap-3 py-14"
                       >
                         <motion.div
                           className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full"
                           animate={{ rotate: 360 }}
                           transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                         />
-                        <span className="text-[11px] text-foreground/25">Cargando…</span>
+                        <span className="text-xs text-foreground/65">Cargando avisos…</span>
                       </motion.div>
                     ) : notifications.length === 0 ? (
                       <motion.div
@@ -722,24 +696,22 @@ export function NotificationCenter() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-                        className="flex flex-col items-center justify-center py-14 gap-3"
+                        className="flex flex-col items-center justify-center gap-3 py-14"
                       >
                         <motion.div
-                          className="w-14 h-14 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.06] flex items-center justify-center"
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                          className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045]"
                         >
-                          <AnimatedSVGIcon state="sync" size={24} color="rgba(255,255,255,0.25)" />
+                          <AnimatedSVGIcon state="sync" size={21} color="rgba(255,255,255,0.62)" />
                         </motion.div>
                         <div className="text-center">
-                          <p className="text-xs text-foreground/30 font-medium">Todo en orden</p>
-                          <p className="text-[10px] text-foreground/18 mt-0.5">Sin notificaciones pendientes</p>
+                          <p className="text-sm font-medium text-foreground/85">Todo en orden</p>
+                          <p className="mt-1 text-xs text-foreground/60">Sin notificaciones pendientes</p>
                         </div>
                       </motion.div>
                     ) : (
                       <motion.div
                         key="list"
-                        className="flex flex-col gap-2"
+                        className="flex flex-col gap-2.5"
                       >
                         <AnimatePresence initial={false}>
                           {notifications.map((n, i) => (
@@ -758,37 +730,35 @@ export function NotificationCenter() {
                 </div>
 
                 {/* Footer */}
-                <AnimatePresence>
-                  {notifications.length > 0 && (
-                    <motion.div
-                      key="footer"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 6 }}
-                      className="px-5 py-3.5 border-t border-foreground/[0.06] shrink-0 flex items-center justify-between"
+                <motion.div
+                  key="footer"
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-t border-white/[0.09] px-4 sm:px-5"
+                >
+                  <p className="text-[11px] text-foreground/60">
+                    Se actualiza cada 5 min
+                  </p>
+                  <motion.button
+                    onClick={() => loadNotifications(true)}
+                    type="button"
+                    disabled={loading}
+                    aria-label="Actualizar notificaciones"
+                    className="flex min-h-9 items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.035] px-3 text-xs font-medium text-foreground/80 transition-colors hover:border-white/[0.16] hover:bg-white/[0.08] hover:text-foreground disabled:cursor-wait disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    whileHover={{ scale: appleLiquidMotion.hoverScale }}
+                    whileTap={{ scale: appleLiquidMotion.pressScale }}
+                    transition={appleLiquidMotion.pressTransition}
+                  >
+                    <motion.span
+                      animate={loading ? { rotate: 360 } : { rotate: 0 }}
+                      transition={loading ? { duration: 0.8, repeat: Infinity, ease: 'linear' } : {}}
+                      className="inline-flex"
                     >
-                      <p className="text-[10px] text-foreground/18">
-                        Se actualiza cada 5 min
-                      </p>
-                      <motion.button
-                        onClick={() => loadNotifications(true)}
-                        className="text-[10px] text-foreground/25 hover:text-primary transition-colors flex items-center gap-1"
-                        whileHover={{ scale: appleLiquidMotion.hoverScale }}
-                        whileTap={{ scale: appleLiquidMotion.pressScale }}
-                        transition={appleLiquidMotion.pressTransition}
-                      >
-                        <motion.span
-                          animate={loading ? { rotate: 360 } : { rotate: 0 }}
-                          transition={loading ? { duration: 0.8, repeat: Infinity, ease: 'linear' } : {}}
-                          className="inline-block"
-                        >
-                          ↺
-                        </motion.span>
-                        Actualizar
-                      </motion.button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <RefreshCw className="size-3.5" />
+                    </motion.span>
+                    {loading ? 'Actualizando' : 'Actualizar'}
+                  </motion.button>
+                </motion.div>
               </div>
       </DialogContent>
     </Dialog>

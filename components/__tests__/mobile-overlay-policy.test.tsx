@@ -244,6 +244,8 @@ describe('mobile overlay policy', () => {
 
     act(() => window.dispatchEvent(new PopStateEvent('popstate', { state: {} })))
 
+    act(() => document.querySelector('[data-liquid-morph-panel]')?.dispatchEvent(new Event('novo:nav-morph-rest')))
+
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
     expect(window.location.pathname).toBe('/music')
     expect(push).not.toHaveBeenCalled()
@@ -291,7 +293,20 @@ describe('mobile overlay policy', () => {
         expect(Number(minHeight?.[1])).toBeGreaterThanOrEqual(44)
       })
       expect(overlayRoot).toHaveStyle('--mobile-safe-area-bottom: env(safe-area-inset-bottom)')
-      expect(navigation).toHaveStyle('padding-bottom: var(--mobile-safe-area-bottom)')
+      expect(navigation).toHaveClass('bottom-[var(--mobile-navigation-bottom)]')
     },
   )
+
+  it('releases navigation ownership when a phone viewport becomes desktop', async () => {
+    function Probe() {
+      const { activeOverlay, openOverlay } = useMobileOverlay()
+      return <button onClick={() => openOverlay('navigation')}>{activeOverlay}</button>
+    }
+    render(<MobileOverlayProvider><Probe /></MobileOverlayProvider>)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'none' }))
+    expect(screen.getByRole('button', { name: 'navigation' })).toBeInTheDocument()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
+    act(() => window.dispatchEvent(new Event('resize')))
+    expect(screen.getByRole('button', { name: 'none' })).toBeInTheDocument()
+  })
 })

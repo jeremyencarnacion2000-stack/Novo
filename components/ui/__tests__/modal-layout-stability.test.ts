@@ -5,10 +5,10 @@ const readSource = (relativePath: string) =>
   fs.readFileSync(path.join(process.cwd(), ...relativePath.split('/')), 'utf8').replace(/\r\n/g, '\n')
 
 describe('modal layout stability', () => {
-  it('starts the content reveal from the shared native timing contract', () => {
-    const source = readSource('lib/modal-flip.ts')
-
-    expect(source).toContain('MODAL_MOTION.shared.contentAt')
+  it('ties readable content to the same droplet progress as its chrome', () => {
+    const source = readSource('lib/liquid-modal-motion.ts')
+    expect(source).toContain('surface.style.opacity = String(g.reveal)')
+    expect(readSource('lib/liquid-modal.ts')).toContain('reveal: modalSegment(p, 0.54, 0.9)')
   })
 
   it('centers large flip dialogs unless a small dialog explicitly opts into anchoring', () => {
@@ -43,23 +43,22 @@ describe('modal layout stability', () => {
     // layout after the motion completes, which reads as a second jump.
     expect(source).not.toContain("position: 'fixed'")
     expect(source).not.toContain("position:  'fixed'")
-    expect(source).toContain('createModalChromeBridge')
+    expect(source).toContain('createLiquidModalMotion')
     expect(source).not.toContain('createModalSurfaceProxy')
     expect(source).not.toContain('animateProxyTo')
     expect(source).not.toMatch(/tl\.to\(target,\s*\{[\s\S]{0,220}scaleX:/)
     expect(source).not.toMatch(/tl\.to\(target,\s*\{[\s\S]{0,220}scaleY:/)
   })
 
-  it('uses the slower fluid prototype curve instead of a critical spring', () => {
-    const motion = readSource('lib/modal-motion.ts')
+  it('shares one interruptible spring between native and shared modal paths', () => {
+    const motion = readSource('lib/liquid-modal-motion.ts')
     const flip = readSource('lib/modal-flip.ts')
     const native = readSource('hooks/use-native-dialog-motion.ts')
 
-    expect(motion).toContain('M0,0 C0.10,0.64 0.14,0.91 0.32,0.985 C0.50,1 0.72,1 1,1')
-    expect(flip).toContain("CustomEase.create('novoModalFluid', MODAL_CUSTOM_EASE.fluid)")
-    expect(native).toContain("CustomEase.create('novoModalFluid', MODAL_CUSTOM_EASE.fluid)")
-    expect(native).toContain("const EASE_FLUID = 'novoModalFluid'")
-    expect(flip).not.toContain('criticalSpring')
+    expect(motion).toContain('spring.target = next')
+    expect(motion).toContain('spring.configure(')
+    expect(native).toContain('createLiquidModalMotion')
+    expect(flip).toContain('createLiquidModalMotion')
   })
 
   it('exposes one native motion API instead of per-modal animation classes', () => {

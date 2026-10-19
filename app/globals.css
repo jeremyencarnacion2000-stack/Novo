@@ -18,6 +18,90 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* One anchored response for menus, selects and small floating surfaces. Radix
+   keeps closed content mounted until the exit animation finishes. */
+.novo-fluid-floating {
+  --novo-float-x: 0px;
+  --novo-float-y: -6px;
+  animation: novo-fluid-arrive 380ms cubic-bezier(.16, 1, .3, 1) both;
+}
+.novo-fluid-floating[data-side='top'] { --novo-float-y: 6px; }
+.novo-fluid-floating[data-side='left'] { --novo-float-x: 6px; --novo-float-y: 0px; }
+.novo-fluid-floating[data-side='right'] { --novo-float-x: -6px; --novo-float-y: 0px; }
+.novo-fluid-floating[data-state='closed'] {
+  animation: novo-fluid-return 180ms cubic-bezier(.4, 0, .7, .2) both;
+  pointer-events: none;
+}
+@keyframes novo-fluid-arrive {
+  from { opacity: 0; transform: translate3d(var(--novo-float-x), var(--novo-float-y), 0) scale(.96); }
+  72% { opacity: 1; transform: translate3d(0, 0, 0) scale(1.003); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes novo-fluid-return {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(var(--novo-float-x), var(--novo-float-y), 0) scale(.98); }
+}
+.novo-liquid-notice { color: var(--background); }
+.novo-liquid-notice[data-liquid-notice-origin='left'] { color: rgb(10, 18, 24); }
+.novo-liquid-notice-card { max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; }
+:root[data-novo-motion='reduced'] .novo-fluid-floating { animation-name: novo-fluid-fade; animation-duration: 160ms; }
+:root[data-novo-motion='reduced'] .novo-fluid-floating[data-state='closed'] { animation-name: novo-fluid-fade-return; }
+:root[data-novo-motion='off'] .novo-fluid-floating { animation: none; }
+@keyframes novo-fluid-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes novo-fluid-fade-return { from { opacity: 1; } to { opacity: 0; } }
+
+/* Hub material: one lens, a black-to-clear optical volume, one static rim.
+   No filter, mask or isolation on the optical host or its ancestors. */
+.novo-hub-material { z-index: 0; }
+.novo-hub-lens { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+.novo-hub-lens .novo-glass-backdrop { border: 0 !important; box-shadow: none !important; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.novo-hub-lens .novo-glass-sheen,
+.novo-hub-lens .novo-glass-refractive::before { display: none; }
+.novo-hub-lens .novo-glass-refractive { background: transparent; box-shadow: none; }
+.novo-hub-material-tint {
+  background: linear-gradient(180deg, rgba(0,0,0,.97) 0%, rgba(0,0,0,.9) 28%, rgba(3,3,4,.8) 68%, rgba(10,10,11,.72) 88%, rgba(14,14,15,.18) 100%);
+}
+.novo-hub-material-rim {
+  border: 1px solid rgba(255,255,255,.13);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 0 rgba(239,224,203,.28);
+  background: radial-gradient(ellipse 58% 6% at 50% 102%, rgba(228,218,202,.12), transparent 100%);
+}
+.novo-hub-shell { color: #f5f5f7; border-color: transparent !important; }
+.novo-hub-feedback .novo-hub-material-rim { border-color: rgba(255,255,255,.3); }
+.novo-hub-panel { padding: 20px 22px 32px; color: #f5f5f7; font-size: 13px; font-weight: 400; }
+.novo-hub-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; flex-shrink:0; }
+.novo-hub-brand { font-size:16px; font-weight:550; letter-spacing:-.025em; line-height:1.3; }
+.novo-hub-subtitle, .novo-hub-date { color:rgba(255,255,255,.66); font-size:11px; line-height:1.5; margin-top:3px; }
+.novo-hub-clock-details { display:flex; flex-direction:column; align-items:flex-end; font-size:13px; font-weight:450; line-height:1.25; }
+.novo-hub-clock { font-size:10px; font-weight:500; letter-spacing:-.02em; }
+.novo-hub-tabs { border-bottom:1px solid rgba(255,255,255,.09); margin-bottom:14px; flex-shrink:0; }
+.novo-hub-tab { color:rgba(255,255,255,.64); }
+.novo-hub-tab[aria-selected='true'] { color:#fff; }
+.novo-hub-tab[aria-selected='true']::after { content:''; position:absolute; bottom:-1px; left:28%; right:28%; height:2px; border-radius:2px; background:rgba(255,255,255,.86); }
+.novo-hub-focus { gap:20px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.2) transparent; }
+.novo-hub-section-title { color:rgba(255,255,255,.66); font-size:12px; line-height:1.5; font-weight:450; letter-spacing:0; }
+.novo-hub-task-title { margin-top:6px; font-size:14px; line-height:1.4; font-weight:500; color:rgba(255,255,255,.94); overflow-wrap:anywhere; }
+.novo-hub-timer { font-size:36px; line-height:1.15; letter-spacing:-.035em; font-weight:400; }
+.novo-hub-session-controls { margin-top:12px; }
+.novo-hub-focus-hint { margin-top:6px; font-size:11px; line-height:1.5; color:rgba(255,255,255,.67); }
+.novo-hub-primary { background:rgba(255,255,255,.92); color:#111; }
+.novo-hub-primary:hover { background:#fff; }
+.novo-hub-capture { border-top:1px solid rgba(255,255,255,.09); padding-top:12px; }
+.novo-hub-capture-input:focus-visible { box-shadow:0 1px 0 rgba(255,255,255,.55); }
+.novo-hub-capture-action svg { width:15px; height:15px; stroke-width:1.5; }
+.novo-hub-setting { padding:12px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+.novo-hub-ambient { padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,.09); }
+.novo-hub-track-row { padding:12px 0; }
+.novo-hub-audio-tabs { padding-bottom:8px; }
+.novo-hub-audio-tabs button { font-size:12px; font-weight:450; letter-spacing:0; text-transform:none; min-height:44px; box-shadow:none; background:transparent; border:0; }
+.novo-hub-audio-tabs button[aria-pressed='true'] { background:rgba(255,255,255,.07); }
+.novo-hub-pause-hint { margin-bottom:12px; padding:10px 0; border-top:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.85); }
+.novo-liquid-notice[data-liquid-notice-origin='left'] { color:#080808; }
+.novo-liquid-notice[data-liquid-notice-origin='left'] .novo-liquid-notice-card { background:transparent; border-color:transparent; }
+.novo-hub-notice-body .novo-hub-material-tint { background:linear-gradient(180deg, rgba(0,0,0,.96), rgba(0,0,0,.76) 66%, rgba(8,8,9,.62)); }
+@media (prefers-contrast:more) { .novo-hub-material-rim { border-color:rgba(255,255,255,.5); } }
+html[data-accessibility-reduce-glass='true'] .novo-hub-material-tint { background:rgba(0,0,0,.96); }
+
 /* Ambient surface inspired by the reference: a restrained, slowly drifting
    color field plus dither noise. It lives inside the app viewport instead of
    on body so custom wallpapers and public pages remain independent. */
@@ -214,15 +298,62 @@ html[data-appearance-transition] body.has-bg-image::before {
 }
 
 ::view-transition-old(root) {
-  animation: novo-appearance-out 180ms ease-out both;
+  animation: none;
 }
 
 ::view-transition-new(root) {
+  animation: none;
+}
+
+html[data-appearance-transition]::view-transition-old(root) {
+  animation: novo-appearance-out 180ms ease-out both;
+}
+
+html[data-appearance-transition]::view-transition-new(root) {
   animation: novo-appearance-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes novo-appearance-out { to { opacity: 0; } }
 @keyframes novo-appearance-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+
+/* One route snapshot, never the persistent navigation or a second React tree.
+   The contour deforms; the live page and its glass keep their natural layout. */
+::view-transition { pointer-events: none; }
+::view-transition-group(.novo-route-liquid),
+::view-transition-group(.novo-route-fade) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.novo-route-liquid) {
+  transform-origin: var(--novo-route-origin, 50% 92%);
+  animation: novo-route-release 140ms ease-out both;
+}
+::view-transition-new(.novo-route-liquid) {
+  transform-origin: var(--novo-route-origin, 50% 92%);
+  animation: novo-route-drop 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes novo-route-release {
+  to { opacity: 0; transform: scale(0.988, 0.98); clip-path: inset(0 round 32px); }
+}
+@keyframes novo-route-drop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.978, 0.985);
+    clip-path: inset(0.5% 0.8% 1.2% round 44px 44px 30px 30px);
+  }
+  58% { opacity: 1; transform: translateY(0) scale(1.002, 0.999); clip-path: inset(0 round 18px); }
+  to { opacity: 1; transform: none; clip-path: inset(0 round 0); }
+}
+::view-transition-old(.novo-route-fade) { animation: novo-appearance-out 100ms linear both; }
+::view-transition-new(.novo-route-fade) { animation: novo-route-fade-in 120ms linear both; }
+@keyframes novo-route-fade-in { from { opacity: 0; } to { opacity: 1; } }
+:root[data-novo-motion='off']::view-transition-group(*),
+:root[data-novo-motion='off']::view-transition-old(*),
+:root[data-novo-motion='off']::view-transition-new(*) { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.novo-route-liquid) { animation: novo-appearance-out 100ms linear both; }
+  ::view-transition-new(.novo-route-liquid) { animation: novo-route-fade-in 120ms linear both; }
+}
 
 :root[data-novo-motion='reduced'] html[data-appearance-transition] body.has-bg-image::before,
 :root[data-novo-motion='reduced'] ::view-transition-old(root),
@@ -369,6 +500,47 @@ html[data-appearance-transition] body.has-bg-image::before {
 .novo-modal-surface,
 .novo-dialog-overlay {
   opacity: 1;
+}
+
+/* Quick Capture keeps its translucent glass, then adds one quiet, static
+   material grain and a Twin-state tint. The color sits behind the content so
+   it never competes with the text or controls. */
+.quick-capture-material {
+  text-shadow: none;
+}
+
+.quick-capture-material::before,
+.quick-capture-material::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.quick-capture-material::before {
+  z-index: 1;
+  background: radial-gradient(62% 85% at 52% 54%, var(--quick-capture-tint, rgba(148, 163, 184, .28)), transparent 100%);
+}
+
+.quick-capture-material::after {
+  z-index: 2;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+  /* The shared noise SVG is faint by design; this opacity brings its grain
+     up to the fine, film-like texture in the glass reference without making
+     the tile pattern visible. */
+  opacity: .75;
+  mix-blend-mode: soft-light;
+}
+
+.quick-capture-material :where(*) {
+  text-shadow: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .quick-capture-material::before { opacity: .45; }
+  .quick-capture-material::after { opacity: .18; }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1749,101 +1921,6 @@ html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
   box-shadow: var(--novo-focus-box-shadow);
 }
 
-/* Navigation controls use the same material language as the Pomodoro lens,
-   but with a deliberately lighter treatment. The rail itself and the active
-   route carry the real displacement surface; inactive controls only reveal a
-   small refractive edge on hover/focus so the shell remains calm and fast. */
-@layer components {
-  .novo-nav-glass-control,
-  .novo-sidebar-nav-button {
-    --novo-nav-aberration: 0.2;
-    isolation: isolate;
-    overflow: hidden;
-    border-color: transparent !important;
-    background: transparent !important;
-    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
-    transition:
-      background-color 180ms ease,
-      box-shadow 220ms ease,
-      color 180ms ease,
-      transform 220ms var(--novo-spring);
-  }
-
-  .novo-nav-glass-control::before,
-  .novo-sidebar-nav-button::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    z-index: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: 0;
-    background:
-      linear-gradient(110deg,
-        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
-        transparent 23%,
-        transparent 76%,
-        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
-    filter: blur(0.6px);
-    mix-blend-mode: screen;
-    transition: opacity 180ms ease;
-  }
-
-  .novo-nav-glass-control:hover,
-  .novo-nav-glass-control:focus-visible,
-  .novo-sidebar-nav-button:hover,
-  .novo-sidebar-nav-button:focus-visible {
-    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
-    backdrop-filter: var(--novo-context-backdrop-filter);
-    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      0 3px 14px rgba(0, 0, 0, 0.08);
-  }
-
-  .novo-nav-glass-control:hover::before,
-  .novo-nav-glass-control:focus-visible::before,
-  .novo-sidebar-nav-button:hover::before,
-  .novo-sidebar-nav-button:focus-visible::before {
-    opacity: 0.55;
-  }
-
-  /* The active route is already backed by GlassSurface. Keep its button
-     transparent so two full-strength lenses never fight each other. */
-  .novo-nav-glass-control[data-active='true'],
-  .novo-sidebar-nav-button[data-active='true'] {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  .novo-nav-glass-control[data-active='true']::before,
-  .novo-sidebar-nav-button[data-active='true']::before {
-    opacity: 0;
-  }
-
-  /* In the expanded mobile menu, keep the selected destination legible while
-     the small optical marker remains the only refractive child lens. */
-  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
-    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    isolation: auto;
-  }
-
-  .novo-mobile-nav-shell {
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
-  }
-
-  .novo-mobile-nav-fab {
-    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
-  }
-
-  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-nav-glass-control,
-  :root[data-novo-motion='reduced'] [data-app-viewport] .novo-sidebar-nav-button {
-    transition: opacity 160ms ease;
-  }
-}
-
 /* Sidebar depth balance -----------------------------------------------------
    The floating shell, its active navigation lens and the footer card were
    each painting an elevation shadow. On warm wallpapers those shadows merged
@@ -1885,11 +1962,8 @@ html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
   border-color: transparent !important;
 }
 
-/* Do not silently disable the configured liquid material because an operating
-   system reports reduced transparency. That media preference was disabling the
-   only refraction layer on desktop while the Appearance sliders still showed
-   non-zero values. A user may explicitly opt into the fallback via this data
-   attribute; otherwise the app's own material settings remain authoritative. */
+/* Content surfaces follow the app's material settings. Navigation has its own
+   accessible contrast treatment below, including reduced-transparency modes. */
 html[data-accessibility-reduce-glass='true'] [data-glass-refractive] {
   filter: none !important;
   backdrop-filter: none !important;
@@ -1914,42 +1988,29 @@ html:not(.dark) .cognitive-page .liquid-glass-premium {
   color: var(--foreground);
 }
 
-/* Cognitive dashboard field: one calm emerald/teal focal plane, inspired by
-   Stepbro's money dashboard. The noise stays low-contrast and never competes
-   with operational labels or chart data. */
+/* The Center belongs to the same wallpaper and neutral surfaces as Novo. */
 .cognitive-page {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 70% 80% at 52% 8%, rgba(20, 184, 166, 0.10), transparent 68%),
-    linear-gradient(180deg, color-mix(in srgb, var(--background) 92%, #06351f 8%), var(--background));
+  background: transparent;
 }
 
-.cognitive-page::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.12;
-  mix-blend-mode: soft-light;
-  background-image: var(--glass-noise);
-  background-size: 180px 180px;
-}
-
-.cognitive-page > * { position: relative; z-index: 1; }
-
-.dark .cognitive-page {
-  background:
-    radial-gradient(ellipse 72% 78% at 50% 5%, rgba(16, 185, 129, 0.14), transparent 67%),
-    radial-gradient(ellipse 54% 56% at 92% 96%, rgba(20, 184, 166, 0.08), transparent 72%),
-    linear-gradient(180deg, #06140c, #030805 88%);
-}
-
-.cognitive-shell {
-  backdrop-filter: var(--novo-context-backdrop-filter);
-  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
+/* Narrow screens keep the same selectable contexts in a readable sequence;
+   a free-positioned graph cannot keep long labels apart at phone widths. */
+@media (max-width: 1023px) {
+  [data-context-map] { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  [data-context-map] > svg,
+  [data-context-decoration] { display: none; }
+  [data-context-node],
+  [data-context-anchor],
+  [data-context-action] {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    transform: none !important;
+    translate: none !important;
+  }
 }
 
 .cognitive-chart {
@@ -1990,6 +2051,23 @@ html:not(.dark) .cognitive-chart {
 [data-slot="sheet-content"] {
   will-change: transform, opacity;
   transform: translateZ(0);
+}
+
+/* This panel's empty optical shell owns the flight. Promoting/fading/clipping
+   a dialog ancestor would create a backdrop root and flatten the same lens
+   that stays transparent in the navigation rail. */
+[data-slot='dialog-content'][data-liquid-morph-panel] {
+  will-change: auto;
+  transform: none;
+  isolation: auto;
+  clip-path: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-liquid-morph-panel] > [data-modal-drag-handle] { display: none; }
+[data-liquid-panel-material] {
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(0,0,0,.12);
 }
 
 @layer utilities {
@@ -2648,9 +2726,10 @@ html[data-novo-motion="off"] .novo-now-procedural-fields {
 .novo-now-noise {
   inset: 0;
   z-index: 2;
-  opacity: .045;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+  opacity: .95;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.25' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
   mix-blend-mode: soft-light;
+  /* Keep the fine grain clearly visible over the animated color field. */
 }
 @keyframes novo-now-field-a {
   from { transform: translate3d(-3%, -2%, 0) scale(1.08) rotate(-1deg); opacity: .58; }
@@ -3145,80 +3224,25 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 @layer components {
   .novo-nav-glass-control,
   .novo-sidebar-nav-button {
-    --novo-nav-aberration: 0.2;
     isolation: isolate;
     overflow: hidden;
     border-color: transparent !important;
     background: transparent !important;
-    box-shadow: inset 0 1px 0 transparent, 0 0 0 transparent;
-    transition:
-      background-color 180ms ease,
-      box-shadow 220ms ease,
-      color 180ms ease,
-      transform 220ms var(--novo-spring);
+    box-shadow: none;
+    transition: background-color 160ms ease, color 160ms ease;
   }
-
-  .novo-nav-glass-control::before,
-  .novo-sidebar-nav-button::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    z-index: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: 0;
-    background:
-      linear-gradient(110deg,
-        rgba(255, 118, 188, var(--novo-nav-aberration)) 0%,
-        transparent 23%,
-        transparent 76%,
-        rgba(98, 206, 255, calc(var(--novo-nav-aberration) * .7)) 100%);
-    filter: blur(0.6px);
-    mix-blend-mode: screen;
-    transition: opacity 180ms ease;
-  }
-
   .novo-nav-glass-control:hover,
-  .novo-nav-glass-control:focus-visible,
-  .novo-sidebar-nav-button:hover,
-  .novo-sidebar-nav-button:focus-visible {
-    background: color-mix(in srgb, var(--novo-context-background) 56%, transparent) !important;
-    backdrop-filter: var(--novo-context-backdrop-filter);
-    -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      0 3px 14px rgba(0, 0, 0, 0.08);
+  .novo-sidebar-nav-button:hover {
+    background: var(--novo-navigation-hover) !important;
   }
-
-  .novo-nav-glass-control:hover::before,
-  .novo-nav-glass-control:focus-visible::before,
-  .novo-sidebar-nav-button:hover::before,
-  .novo-sidebar-nav-button:focus-visible::before {
-    opacity: 0.55;
+  .novo-nav-glass-control:focus-visible,
+  .novo-sidebar-nav-button:focus-visible {
+    outline: 2px solid var(--novo-navigation-foreground);
+    outline-offset: -3px;
   }
   .novo-nav-glass-control[data-active='true'],
   .novo-sidebar-nav-button[data-active='true'] {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  .novo-nav-glass-control[data-active='true']::before,
-  .novo-sidebar-nav-button[data-active='true']::before {
-    opacity: 0;
-  }
-  .novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] {
-    background: color-mix(in srgb, var(--novo-context-background) 32%, transparent) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    isolation: auto;
-  }
-
-  .novo-mobile-nav-shell {
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
-  }
-
-  .novo-mobile-nav-fab {
-    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.18);
+    background: transparent !important;
   }
   .novo-mobile-nav-panel--compact {
     bottom: var(--novo-mobile-nav-panel-bottom) !important;
@@ -3234,8 +3258,10 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
     opacity: 0;
     border: 1px solid rgba(255, 255, 255, 0.86);
     border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.40));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(255, 255, 255, 0.20), 0 10px 26px rgba(76, 55, 39, 0.10);
+    /* Opaque alpha feeds the goo threshold; the SVG applies the .18 tint
+       afterward so the bridge cannot be erased by its own input gate. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.75));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
     transform: translate3d(0, -50%, 0) scale(0.58, 0.72);
     transform-origin: center;
     filter: url('#novo-mobile-nav-liquid-merge');
@@ -3318,4 +3344,114 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 }
 [data-liquid-morph-controller].modal-flip-source-active {
   opacity: 1 !important;
+}
+
+/* Regular navigation glass: one optical plane, a predictable local tint and
+   inexpensive selection overlays. No pixel sampling or per-item filters. */
+:root {
+  --novo-navigation-tint: rgba(255, 255, 255, .055);
+  --novo-navigation-panel-tint: rgba(255, 255, 255, .18);
+  --novo-navigation-solid: #f8faf9;
+  --novo-navigation-foreground: #17211c;
+  --novo-navigation-secondary: #3d4842;
+  --novo-navigation-hover: rgba(23, 33, 28, .055);
+  --novo-navigation-selection: rgba(23, 33, 28, .09);
+  --novo-navigation-rim: rgba(255, 255, 255, .7);
+  --novo-navigation-blur: 4px;
+}
+.dark {
+  --novo-navigation-tint: rgba(255, 255, 255, .055);
+  --novo-navigation-panel-tint: rgba(5, 12, 8, .18);
+  --novo-navigation-solid: #141a17;
+  --novo-navigation-foreground: #f3f7f5;
+  --novo-navigation-secondary: #e4ebe7;
+  --novo-navigation-hover: rgba(243, 247, 245, .07);
+  --novo-navigation-selection: rgba(243, 247, 245, .13);
+  --novo-navigation-rim: rgba(255, 255, 255, .34);
+}
+.novo-navigation-glass {
+  --glass-element-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06);
+}
+.novo-navigation-glass[data-navigation-material='panel'] {
+  --novo-navigation-tint: var(--novo-navigation-panel-tint);
+  --novo-navigation-blur: 5px;
+}
+.novo-navigation-glass > [data-glass-backdrop] {
+  border: 0 !important;
+  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), inset 0 -1px 0 rgba(0,0,0,.06) !important;
+}
+.novo-nav-selection {
+  border-radius: inherit;
+  background: var(--novo-navigation-selection);
+  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), 0 2px 5px rgba(0,0,0,.05);
+  transition: background-color 120ms ease;
+}
+button:active > .novo-nav-selection,
+a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navigation-selection), var(--novo-navigation-foreground) 5%); }
+.novo-nav-label { color: var(--novo-navigation-secondary); }
+.novo-nav-label-active { color: var(--novo-navigation-foreground); }
+/* Theme tint changes immediately. Foreground must follow in the same frame,
+   rather than fading pale text across an already-light navigation surface. */
+.novo-nav-label, .novo-nav-label-active,
+.novo-mobile-nav-panel .novo-nav-glass-control, .novo-settings-nav button {
+  transition-property: background-color, box-shadow;
+}
+.novo-mobile-nav-panel .novo-nav-glass-control { color: var(--novo-navigation-secondary); }
+.novo-mobile-nav-panel .novo-nav-glass-control[data-active='true'] { color: var(--novo-navigation-foreground); }
+.novo-mobile-nav-panel .novo-nav-glass-control:has(> svg) { min-height: 44px; }
+.novo-mobile-nav-panel .novo-nav-glass-control > div { background: transparent; transition: none; }
+[data-slot='sidebar-inner'], .novo-settings-nav {
+  background: var(--novo-context-background) !important;
+  backdrop-filter: var(--novo-context-backdrop-filter);
+  -webkit-backdrop-filter: var(--novo-context-backdrop-filter);
+  color: var(--novo-navigation-foreground);
+}
+.novo-settings-nav::before { display: none; }
+html[data-accessibility-reduce-glass='true'] .novo-navigation-glass,
+html[data-accessibility-reduce-glass='true'] [data-slot='sidebar-inner'],
+html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
+  --novo-navigation-tint: var(--novo-navigation-solid);
+  --novo-navigation-panel-tint: var(--novo-navigation-solid);
+  --novo-navigation-blur: 0px;
+}
+html[data-accessibility-reduce-glass='true'] [data-slot='sidebar-inner'],
+html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
+  background: var(--novo-navigation-solid) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@media (forced-colors: active) {
+  :root {
+    --novo-navigation-foreground: CanvasText;
+    --novo-navigation-secondary: CanvasText;
+  }
+  .novo-navigation-glass, [data-slot='sidebar-inner'], .novo-settings-nav {
+    --novo-navigation-tint: Canvas;
+    --novo-navigation-panel-tint: Canvas;
+    --novo-navigation-foreground: CanvasText;
+    --novo-navigation-secondary: CanvasText;
+    --novo-navigation-blur: 0px;
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  .novo-nav-selection { outline: 2px solid currentColor; outline-offset: -2px; }
+  [data-slot='sidebar-inner'], .novo-settings-nav { background: Canvas !important; backdrop-filter: none; }
+  .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
+}
+
+/* Keep navigation text clean. Contrast comes from the material tint and text
+   color; shadowing each glyph made labels look doubled on translucent glass. */
+.novo-nav-label, .novo-nav-label-active,
+.novo-mobile-nav-panel .novo-nav-glass-control {
+  text-shadow: none;
+}
+.novo-nav-selection[data-selection-refractive='true'] { background: transparent; box-shadow: none; }
+.novo-nav-glass-control[data-active='true'] { isolation: auto; }
+@media (prefers-contrast: more) {
+  .novo-nav-selection { outline: 1px solid currentColor; outline-offset: -1px; }
+}
+@media (forced-colors: active) {
+  [data-slot='sidebar-inner'], .novo-settings-nav { -webkit-backdrop-filter: none; }
+  .novo-nav-label, .novo-nav-label-active,
+  .novo-mobile-nav-panel .novo-nav-glass-control { text-shadow: none; }
 }

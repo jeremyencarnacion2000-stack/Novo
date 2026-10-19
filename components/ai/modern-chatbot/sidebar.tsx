@@ -1,5 +1,6 @@
 'use client';
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import React from 'react';
 import { ChevronLeft, ChevronRight, Search, Plus, MessageSquare, Trash2, MoreHorizontal } from 'lucide-react';
 import { useChatbot } from './context';
@@ -66,8 +67,8 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
 
     const groupedConversations = groupConversationsByDate(filteredConversations);
 
-    const handleClearAll = () => {
-        if (confirm('¿Estás seguro de que deseas eliminar todo el historial de conversaciones? Esta acción es irreversible.')) {
+    const handleClearAll = async () => {
+        if (await confirmNovo('¿Estás seguro de que deseas eliminar todo el historial de conversaciones? Esta acción es irreversible.')) {
             conversations.forEach(c => deleteConversation(c.id));
         }
     };
@@ -193,9 +194,9 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
                                         <>
                                             <span className="flex-1 text-xs truncate font-medium tracking-wide">{conv.title}</span>
                                             <button
-                                                onClick={(e) => {
+                                                onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    if (confirm('¿Eliminar esta conversación?')) {
+                                                    if (await confirmNovo('¿Eliminar esta conversación?')) {
                                                         deleteConversation(conv.id);
                                                     }
                                                 }}

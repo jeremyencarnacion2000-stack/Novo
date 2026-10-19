@@ -87,9 +87,11 @@ describe('mobile navigation liquid morph', () => {
     const hook = source('hooks/use-shared-dialog-motion.ts')
 
     expect(morph).toContain('springRef.current?.setTarget(active ? 1 : 0)')
-    expect(morph).toContain("if (motionMode === 'full')")
+    expect(morph).toContain("motionMode === 'full'")
     expect(morph).toContain('springRef.current?.setImmediate(active ? 1 : 0)')
-    expect(morph).toContain('panel.style.clipPath = clipPath')
+    expect(morph).not.toContain('panel.style.clipPath =')
+    expect(morph).toContain('material.style.transform =')
+    expect(morph).toContain('NAV_MORPH_REST_EVENT')
     expect(morph).toContain('fab.style.transform =')
     expect(drawer).toContain('motionId="mobile-nav-panel"')
     // Other shared dialogs retain their existing controller. The nav-specific
@@ -97,7 +99,7 @@ describe('mobile navigation liquid morph', () => {
     const openNav = hook.match(/if \(isLiquidNav\) \{([\s\S]*?)\n    \}/)?.[1]
     const closeNav = hook.match(/const close = useCallback[\s\S]*?if \(isLiquidNav\) \{([\s\S]*?)\n    \}/)?.[1]
     expect(openNav).toBeDefined()
-    expect(closeNav).toContain('onComplete()')
+    expect(closeNav).toContain('waitForNavigationRest')
     expect(openNav).not.toContain('modalFlip.')
     expect(closeNav).not.toContain('modalFlip.')
     expect(morph).not.toContain('gsap.')

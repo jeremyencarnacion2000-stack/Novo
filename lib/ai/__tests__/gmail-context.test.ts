@@ -51,6 +51,9 @@ describe('Gmail chat context', () => {
 
   it('only consults Gmail when the user asks about email', () => {
     expect(shouldConsultGmail('Quiero que me digas mis correos más relevantes')).toBe(true)
+    expect(shouldConsultGmail('Revisa si el MECYT respondió')).toBe(true)
+    expect(shouldConsultGmail('¿El MECYT me contestó?')).toBe(true)
+    expect(shouldConsultGmail('Did the MECYT reply?')).toBe(true)
     expect(shouldConsultGmail('¿Cuál es mi siguiente tarea?')).toBe(false)
     expect(shouldConsultGmail('Léelo completo y respóndele', [{ role: 'user', content: 'Revisa mis correos de MESCyT' }])).toBe(true)
     expect(shouldConsultGmail('Crea una tarea para mañana', [{ role: 'user', content: 'Revisa mis correos' }])).toBe(false)
@@ -63,6 +66,21 @@ describe('Gmail chat context', () => {
     expect(context.messages.reduce((sum, item) => sum + item.body.length, 0)).toBeLessThanOrEqual(60_000)
     expect(context.messages.some(item => item.bodyTruncated)).toBe(true)
     expect(context.hasMore).toBe(true)
+  })
+
+  it('uses a live mailbox read instead of cached Gmail signals and drops stale counts', () => {
+    expect(shouldIncludeGmailSignal(true, 'fresh')).toBe(false)
+    expect(shouldIncludeGmailSignal(false, 'stale')).toBe(false)
+    expect(shouldIncludeGmailSignal(false, 'fresh')).toBe(true)
+  })
+
+  it('recognizes a revoked Google refresh grant as requiring reauthorization', () => {
+    expect(isGmailReauthorizationError({
+      response: { status: 400, data: { error: 'invalid_grant' } },
+    })).toBe(true)
+    expect(isGmailReauthorizationError({
+      response: { status: 403, data: { error: { errors: [{ reason: 'userRateLimitExceeded' }] } } },
+    })).toBe(false)
   })
 
   it('uses a live mailbox read instead of cached Gmail signals and drops stale counts', () => {

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
+import { MobileOverlayProvider } from '@/components/mobile-overlay-provider'
 
 const FullClientLayout = dynamic(() => import('./client-layout'), { ssr: false })
 const CognitiveClientLayout = dynamic(() => import('./cognitive/cognitive-client-layout'), { ssr: false })
@@ -23,6 +24,11 @@ export default function ClientLayoutRouter({ children }: { children: ReactNode }
     pathname?.startsWith('/app') ||
     pathname?.startsWith('/auth')
   ) return <>{children}</>
-  if (pathname?.startsWith('/cognitive')) return <CognitiveClientLayout>{children}</CognitiveClientLayout>
-  return <FullClientLayout>{children}</FullClientLayout>
+  return (
+    <MobileOverlayProvider>
+      {pathname?.startsWith('/cognitive')
+        ? <CognitiveClientLayout>{children}</CognitiveClientLayout>
+        : <FullClientLayout>{children}</FullClientLayout>}
+    </MobileOverlayProvider>
+  )
 }

@@ -16,14 +16,19 @@ import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { GlassSurface } from '@/components/ui/GlassSurface'
+import { NavigationIndicator } from '@/components/ui/navigation-indicator'
+import { rememberNavigationOrigin } from '@/lib/navigation-origin'
 
 interface MobileSectionDrawerProps {
     open?: boolean
     onClose: (options?: { historyAction?: 'back' | 'replace' | 'none' }) => void
     onOpenVoice?: () => void
+    onOpenSearch?: () => void
+    onExitComplete?: () => void
+    anchorRef?: React.RefObject<HTMLElement | null>
 }
 
-export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: MobileSectionDrawerProps) {
+export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenSearch, onExitComplete, anchorRef }: MobileSectionDrawerProps) {
     const router = useRouter()
     const pathname = usePathname()
     const { t } = useTranslation()
@@ -81,8 +86,9 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
     }
 
     return (
-        <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+        <Dialog open={open} onExitComplete={onExitComplete} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
             <DialogContent
+                anchorRef={anchorRef}
                 motionPreset="shared"
                 motionId="mobile-nav-panel"
                 overlayClassName="md:hidden"
@@ -103,7 +109,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                 aria-label="Workspace menu"
                 onEscapeKeyDown={() => onClose()}
                 onPointerDownOutside={() => onClose()}
-                className="!fixed !left-4 !right-4 !top-auto !w-auto !max-w-none !max-h-[14rem] !translate-x-0 !translate-y-0 !rounded-[28px] !border-0 !bg-transparent novo-mobile-nav-panel novo-mobile-nav-panel--compact overflow-hidden p-0 shadow-[0_16px_36px_rgba(0,0,0,0.2)] md:hidden"
+                className="!fixed !left-4 !right-4 !top-auto !w-auto !max-w-none !max-h-[14rem] !translate-x-0 !translate-y-0 !rounded-[28px] !border-0 !bg-transparent novo-mobile-nav-panel novo-mobile-nav-panel--compact !overflow-visible p-0 !shadow-none md:hidden"
                 // Dialog portals render outside MobileOverlayProvider, so the
                 // provider-scoped --mobile-navigation-bottom token cannot be
                 // used here. Keep this surface on the exact physical baseline
@@ -111,32 +117,38 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                 style={{ '--novo-mobile-nav-panel-bottom': 'calc(1rem + env(safe-area-inset-bottom))' } as React.CSSProperties}
                 >
                     <DialogTitle className="sr-only">Workspace menu</DialogTitle>
+                    <div data-liquid-panel-material aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[28px]">
                     <GlassSurface
                         aria-hidden
                         data-testid="workspace-panel-glass-surface"
                         preset="navigation"
                         refractive
                         refractivePriority="interactive"
-                        refractiveActive={open}
+                        refractiveActive
                         webComponent
-                        // This is deliberately the same optical material as
-                        // the rail and + control. The contour changes during
-                        // the handoff; the glass identity does not.
-                        backgroundColor="rgba(255,255,255,0.055)"
+                        // Preserve the rail's visible lens and a shallow tint.
+                        // Label treatment supplies contrast without a solid plate.
+                        navigationMaterial="panel"
+                        depth={8}
+                        strength={60}
+                        chromaticAberration={1.6}
+                        blur={3}
                         elevation="low"
                         className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[32px]"
                         style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
                     />
+                    </div>
                     <DialogClose
                         aria-label="Close menu"
                         onClick={() => onClose()}
-                        className="novo-nav-glass-control absolute right-2 top-2 z-20 flex size-8 items-center justify-center rounded-full border border-foreground/[0.08] bg-foreground/[0.035] text-foreground/55 transition-colors hover:bg-foreground/[0.07] hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-95"
+                        className="novo-nav-glass-control absolute right-1 top-1 z-20 flex size-11 items-center justify-center rounded-full text-foreground/55 transition-colors hover:bg-foreground/[0.07] hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-95"
                     >
                         <X data-shared-item="mobile-nav-close" className="size-4" strokeWidth={1.8} />
                     </DialogClose>
                     {/* Handle — drag down from here to dismiss with native physics */}
                     <div
                         aria-hidden="true"
+                        data-liquid-panel-handle
                         className="relative z-10 flex justify-center pt-2.5 pb-1.5 pointer-events-none select-none"
                     >
                         <div className="w-9 h-[4px] rounded-full bg-foreground/15 hover:bg-foreground/30 transition-colors" />
@@ -149,7 +161,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                     >
                         {sections.map((section) => (
                             <div key={section.title} className="mb-3 last:mb-1">
-                                <p className="mb-1 pl-1 text-[8px] font-semibold uppercase tracking-[0.24em] text-foreground/30">
+                                <p className="novo-nav-label mb-1 pl-1 text-[10px] font-medium tracking-wide">
                                     {section.title}
                                 </p>
                                 <div className="grid grid-cols-4 gap-1.5">
@@ -162,35 +174,23 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                                         return (
                                             <button
                                                 key={item.href}
-                                                onClick={() => handleNavigate(item.href)}
+                                                onClick={(event) => { rememberNavigationOrigin(event.currentTarget, item.href); handleNavigate(item.href) }}
                                                 className={cn(
                                                     "novo-nav-glass-control relative flex min-h-[54px] flex-col items-center gap-1 rounded-[16px] px-1 py-2 transition-all duration-200 active:scale-95",
                                                     active
-                                                        ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-                                                        : "bg-foreground/[0.02] text-foreground/35 hover:bg-foreground/[0.04] hover:text-foreground/50"
+                                                        ? "novo-nav-label-active"
+                                                        : "novo-nav-label"
                                                 )}
                                                 data-active={active}
+                                                aria-current={active ? 'page' : undefined}
                                             >
+                                                {active && <NavigationIndicator />}
                                                 <div className={cn(
                                                     "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
                                                     active
                                                         ? "bg-primary/15"
                                                         : "bg-foreground/[0.03]"
                                                 )}>
-                                                    {active && (
-                                                        <GlassSurface
-                                                            aria-hidden
-                                                            data-testid="workspace-active-glass-indicator"
-                                                            preset="navigation"
-                                                            refractive
-                                                            refractivePriority="interactive"
-                                                            webComponent
-                                                            backgroundColor="rgba(255,255,255,0.055)"
-                                                            elevation="low"
-                                                            className="pointer-events-none absolute inset-0 h-full w-full rounded-2xl"
-                                                            style={{ position: 'absolute', inset: 0, borderRadius: 'inherit' }}
-                                                        />
-                                                    )}
                                                     <Icon
                                                         data-shared-item={item.sharedId}
                                                         className="relative z-10 h-4 w-4"
@@ -198,8 +198,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                                                     />
                                                 </div>
                                                 <span className={cn(
-                                                    "text-[9px] font-medium tracking-tight",
-                                                    active ? "opacity-90" : "opacity-55"
+                                                    "relative z-10 text-[11px] font-medium tracking-tight"
                                                 )}>
                                                     {item.title}
                                                 </span>
@@ -223,6 +222,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice }: Mobil
                             )}
                             <button
                                 onClick={() => {
+                                    if (onOpenSearch) { onOpenSearch(); return }
                                     window.dispatchEvent(new CustomEvent('open-command-palette'))
                                     onClose({ historyAction: 'none' })
                                 }}

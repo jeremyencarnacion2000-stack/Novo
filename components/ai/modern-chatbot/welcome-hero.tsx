@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import React from 'react';
 import { Mic, MicOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -101,20 +102,16 @@ export function MobileHero({
 }
 
 // Voice Listening Overlay - PulseChat style full-screen orb
-export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
+export function VoiceListeningOverlay({ open, onStop }: { open: boolean; onStop: () => void }) {
   // Reduced motion means gentler, not zero — the opacity pulse on "Escuchando..."
   // stays (it aids comprehension), but the continuous scaleY waveform movement
   // is the kind of infinite motion prefers-reduced-motion exists to suppress.
   const reduceMotion = useNovoMotionPolicy() !== 'full';
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[var(--background)]"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onStop() }}>
+    <DialogContent motionPreset="fullscreen" showCloseButton={false} className="!fixed !inset-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-none !rounded-none !border-0 !p-0 flex flex-col items-center justify-center bg-background sm:!max-w-none">
+      <DialogTitle className="sr-only">Conversación por voz</DialogTitle>
       <div className="relative flex items-center justify-center">
         <GlowingOrb state="listening" size="lg" />
         <Mic className="absolute w-10 h-10 text-white drop-shadow-lg" />
@@ -122,7 +119,7 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
 
       <motion.p
         className="mt-8 text-white/60 text-sm font-medium tracking-widest uppercase"
-        animate={{ opacity: [0.5, 1, 0.5] }}
+        animate={reduceMotion ? { opacity: 1 } : { opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
         Escuchando...
@@ -146,7 +143,8 @@ export function VoiceListeningOverlay({ onStop }: { onStop: () => void }) {
       >
         Detener
       </button>
-    </motion.div>
+    </DialogContent>
+    </Dialog>
   );
 }
 

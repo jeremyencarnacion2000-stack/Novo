@@ -1,5 +1,6 @@
 'use client'
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import React, { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { Search, Heart, Play, Pause, Loader2, AlertCircle, Music, Home, Compass, Library, PlaySquare, Mic2, Disc, SkipBack, SkipForward, Volume2, Maximize2, Clock, Users, MoreHorizontal, X, ArrowLeft, ArrowRight, Plus, FolderPlus, Trash2 } from 'lucide-react'
@@ -723,7 +724,7 @@ export default function MusicPage() {
   }
 
   const handleDeletePlaylist = async (playlistId: string) => {
-    if (!confirm('Are you sure you want to delete this playlist?')) return
+    if (!await confirmNovo('Are you sure you want to delete this playlist?')) return
     try {
       const res = await fetch(`/api/music/playlists/${playlistId}`, {
         method: 'DELETE'

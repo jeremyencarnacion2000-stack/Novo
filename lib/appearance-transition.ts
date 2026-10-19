@@ -5,6 +5,9 @@ type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => unknown
 }
 
+let markerTimer: ReturnType<typeof setTimeout> | undefined
+let appearanceRevision = 0
+
 /**
  * Keeps a visual preference update (theme, wallpaper, accent) as one atomic
  * handoff. Chromium can crossfade the full rendered frame; other browsers get
@@ -23,13 +26,22 @@ export function runAppearanceTransition(update: () => void) {
   }
 
   const viewTransitionDocument = document as ViewTransitionDocument
+  const root = document.documentElement
+  const revision = ++appearanceRevision
+  clearTimeout(markerTimer)
+  root.setAttribute('data-appearance-transition', 'true')
+  const clearMarker = () => {
+    if (revision !== appearanceRevision) return
+    clearTimeout(markerTimer)
+    root.removeAttribute('data-appearance-transition')
+  }
   if (typeof viewTransitionDocument.startViewTransition === 'function') {
-    safeViewTransition(update)
+    const transition = safeViewTransition(update)
+    markerTimer = setTimeout(clearMarker, 1200)
+    transition?.finished?.then(clearMarker, clearMarker)
     return
   }
 
-  const root = document.documentElement
-  root.setAttribute('data-appearance-transition', 'true')
   update()
-  window.setTimeout(() => root.removeAttribute('data-appearance-transition'), 560)
+  markerTimer = setTimeout(clearMarker, 560)
 }

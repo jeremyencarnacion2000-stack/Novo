@@ -1,5 +1,6 @@
 'use client'
 
+import { useLastModalValue } from '@/hooks/use-last-modal-value'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Routine } from '@/types/routine'
 import { RoutineDetailView } from './routine-detail-view'
@@ -13,7 +14,8 @@ interface RoutineDetailDialogProps {
   onUpdateProgress: (routineId: string, taskId: string, completed: boolean) => void
 }
 
-export function RoutineDetailDialog({ open, onClose, routine, onUpdateProgress }: RoutineDetailDialogProps) {
+export function RoutineDetailDialog({ open, onClose, routine: selectedRoutine, onUpdateProgress }: RoutineDetailDialogProps) {
+  const routine = useLastModalValue(selectedRoutine)
   const [isWorkoutActive, setIsWorkoutActive] = useState(false)
 
   const handleClose = onClose

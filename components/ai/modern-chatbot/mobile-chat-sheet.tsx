@@ -19,6 +19,8 @@ const DEFAULT_BOTTOM = 96 // px — clears the nav bar (bottom-4 + its own heigh
 const EXPANDED_BOTTOM = 0
 
 export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
+    const [open, setOpen] = React.useState(true)
+    const requestClose = () => setOpen(false)
     const [expanded, setExpanded] = React.useState(false)
     const [dragY, setDragY] = React.useState(0)
     const [dragging, setDragging] = React.useState(false)
@@ -39,7 +41,7 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
         // the nav bar; dragging down shrinks it back, or dismisses if it was
         // already at the default (nav-bar-visible) size.
         if (!expanded && dragY < -40) setExpanded(true)
-        else if (!expanded && dragY > 60) onClose()
+        else if (!expanded && dragY > 60) requestClose()
         else if (expanded && dragY > 40) setExpanded(false)
         setDragY(0)
     }
@@ -55,7 +57,7 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
     }
 
     return (
-        <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+        <Dialog open={open} onOpenChange={setOpen} onExitComplete={onClose}>
             <DialogContent
                 motionPreset="shared"
                 motionId="mobile-ai-panel"
@@ -67,7 +69,7 @@ export function MobileChatSheet({ onClose }: MobileChatSheetProps) {
             >
                 <DialogTitle className="sr-only">Chat móvil</DialogTitle>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                    <ModernChatbot onMobileClose={onClose} />
+                    <ModernChatbot onMobileClose={requestClose} />
                 </div>
 
                 {/* Handle — the "curvatura que delimita" boundary. Drag up to

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MobileNav } from '../mobile-nav'
@@ -66,6 +66,7 @@ jest.mock('@/components/ui/GlassSurface', () => ({
       data-glass-preset={props.preset}
       data-glass-priority={props.refractivePriority}
       data-glass-active={props.refractiveActive === false ? 'false' : 'true'}
+      data-navigation-material={props.navigationMaterial}
     />
   ),
 }))
@@ -76,6 +77,12 @@ function renderMobileNav() {
       <MobileNav />
     </MobileOverlayProvider>,
   )
+}
+
+function finishNavigationFlight() {
+  act(() => {
+    document.querySelector('[data-liquid-morph-panel]')?.dispatchEvent(new Event('novo:nav-morph-rest'))
+  })
 }
 
 describe('MobileNav', () => {
@@ -253,21 +260,22 @@ describe('MobileNav', () => {
 
     await user.click(closeButton)
 
+    finishNavigationFlight()
+
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
   })
 
-  it('uses the navigation liquid-glass treatment for the active workspace item', async () => {
+  it('uses a thin selection overlay instead of nesting another lens in the panel', async () => {
     pathname = '/calendar'
     const user = userEvent.setup()
     renderMobileNav()
 
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
-    const activityLens = screen.getByTestId('workspace-active-glass-indicator')
-    expect(activityLens).toHaveAttribute('data-glass-refractive', 'true')
-    expect(activityLens).toHaveAttribute('data-glass-preset', 'navigation')
-    expect(activityLens).toHaveAttribute('data-glass-priority', 'interactive')
-    expect(activityLens).toHaveAttribute('data-glass-active', 'true')
+    const selected = screen.getByRole('button', { name: 'Calendar' })
+    expect(selected).toHaveAttribute('aria-current', 'page')
+    expect(selected.querySelector('[data-nav-selection]')).not.toBeNull()
+    expect(selected.querySelector('[data-glass-refractive]')).toBeNull()
   })
 
   it('uses the navigation liquid-glass surface and control language across the open panel', async () => {
@@ -289,7 +297,17 @@ describe('MobileNav', () => {
     expect(panelGlass).toHaveAttribute('data-glass-active', 'true')
     expect(activeDestination).toHaveClass('novo-nav-glass-control')
     expect(activeDestination).toHaveAttribute('data-active', 'true')
-    expect(screen.getByTestId('workspace-active-glass-indicator').closest('.isolate')).toBeNull()
+    expect(panelGlass).toHaveAttribute('data-navigation-material', 'panel')
+    expect(screen.getByTestId('mobile-nav-rail-glass')).toHaveAttribute('data-navigation-material', 'bar')
+  })
+
+  it('shares a selection overlay and current-page semantics on desktop', () => {
+    pathname = '/cognitive'
+    render(<SidebarProvider><AppSidebar /></SidebarProvider>)
+    const current = screen.getByRole('link', { name: 'Cognitivo' })
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).not.toBeNull()
+    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).toHaveAttribute('data-selection-refractive', 'true')
   })
 
   it('keeps background navigation inert until the drawer exit finishes', async () => {
@@ -303,7 +321,37 @@ describe('MobileNav', () => {
     await user.click(screen.getByTestId('workspace-backdrop'))
     expect(nav).toHaveAttribute('inert')
 
+    finishNavigationFlight()
+
     await waitFor(() => expect(nav).not.toHaveAttribute('inert'))
+  })
+
+  it('keeps both lenses alive through the flight and releases presence from the spring', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const panel = screen.getByRole('dialog', { name: 'Workspace menu' })
+    expect(screen.getByTestId('mobile-nav-rail-glass')).toHaveAttribute('data-glass-active', 'true')
+    expect(screen.getByTestId('mobile-nav-plus-glass')).toHaveAttribute('data-glass-active', 'true')
+    expect(panel.querySelector('[data-liquid-panel-material]')).not.toBeNull()
+    await user.click(within(panel).getByRole('button', { name: 'Close menu' }))
+    expect(screen.getByTestId('workspace-panel-glass-surface')).toHaveAttribute('data-glass-active', 'true')
+    expect(panel).toBeInTheDocument()
+    finishNavigationFlight()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('navigation')).not.toHaveAttribute('inert')
+  })
+
+  it('can reopen during the return without an old completion closing the new panel', async () => {
+    const user = userEvent.setup()
+    renderMobileNav()
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByTestId('workspace-backdrop'))
+    // The source stays inert for real users until rest; this simulates a
+    // programmatic reversal while its spring is already returning.
+    fireEvent.click(document.querySelector('[data-testid="mobile-nav-plus-glass"]')!.parentElement!)
+    finishNavigationFlight()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('does not promote Workout as a critical quick action', () => {

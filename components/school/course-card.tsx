@@ -1,5 +1,6 @@
 'use client';
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -60,7 +61,7 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                             data-flip-from={`grade-${course.id}`}
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                                 e.stopPropagation();
                                 onAddGrade(course);
                             }}
@@ -81,9 +82,9 @@ export function CourseCard({ course, onEdit, onDelete, onAddGrade, onClick }: Co
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                                 e.stopPropagation();
-                                if (confirm(`Delete ${course.name}?`)) {
+                                if (await confirmNovo(`Delete ${course.name}?`)) {
                                     onDelete(course.id);
                                 }
                             }}

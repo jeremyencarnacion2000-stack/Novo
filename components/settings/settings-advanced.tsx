@@ -1,5 +1,6 @@
 'use client'
 
+import { confirmNovo } from '@/lib/confirm-modal'
 import { useState, useRef, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -162,7 +163,7 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
   }
 
   const handleDeleteAllData = async () => {
-    if (!confirm('Are you sure you want to delete all your data? This action cannot be undone.')) return
+    if (!await confirmNovo('Are you sure you want to delete all your data? This action cannot be undone.')) return
     if (!session?.user?.id) {
       toast({
         title: 'Delete failed',
@@ -200,7 +201,7 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
   }
 
   const handleResetTwin = async () => {
-    if (!confirm('Reset Cognitive Twin? This will clear all learned patterns.')) return
+    if (!await confirmNovo('Reset Cognitive Twin? This will clear all learned patterns.')) return
     setIsResettingTwin(true)
     try {
       const didReset = await resetTwin()
@@ -219,8 +220,8 @@ export function SettingsAdvanced({ onOpenMcp }: { onOpenMcp?: () => void }) {
     }
   }
 
-  const handleClearCache = () => {
-    if (!confirm('Clear local cache?')) return
+  const handleClearCache = async () => {
+    if (!await confirmNovo('Clear local cache?')) return
     if (session?.user?.id) DataIntegrator.clearUserLocalData(session.user.id)
     toast({
       title: 'Cache cleared',

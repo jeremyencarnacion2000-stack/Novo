@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { ArrowLeft, ArrowUpRight, Check, ChevronDown, CircleAlert, EyeOff, Loader2, Search, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, ArrowUpRight, Check, ChevronDown, CircleAlert, EyeOff, Loader2, RefreshCw, Search, Sparkles } from 'lucide-react'
 import type { CognitiveGraphNode, CognitiveGraphSnapshot, CognitiveLens } from '@/lib/cognitive-graph/types'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -219,7 +220,7 @@ function WhyDossier({
 }
 
 export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile(1024)
   const [lens, setLens] = useState<CognitiveLens>('now')
   const [graphMode, setGraphMode] = useState<GraphMode>('overview')
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
@@ -227,6 +228,8 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [access, setAccess] = useState<'pro' | 'signin' | null>(null)
+  const [visibleLimit, setVisibleLimit] = useState(10)
   const [expanded, setExpanded] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -238,6 +241,8 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
   const [correctionContext, setCorrectionContext] = useState('Novo no tiene todo el contexto')
   const [correctionNote, setCorrectionNote] = useState('')
   const [savingCorrection, setSavingCorrection] = useState(false)
+  const [correctionError, setCorrectionError] = useState<string | null>(null)
+  const inspectorRef = useRef<HTMLDivElement>(null)
   const lastSelectionRef = useRef<{ id: string; at: number } | null>(null)
 
   useEffect(() => {
@@ -264,22 +269,35 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
     // Cognitive error state. Subsequent requests are warm and return quickly.
     const timeout = window.setTimeout(() => controller.abort(), 45_000)
     setLoading(true)
+    setError(null)
+    setAccess(null)
     const params = new URLSearchParams({ lens, limit: '35', since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() })
     if (focusNodeId) params.set('focus', focusNodeId)
     fetch(`/api/cognitive/graph?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
+        if (response.status === 401 || response.status === 403) {
+          if (active) {
+            setAccess(response.status === 403 ? 'pro' : 'signin')
+            setSnapshot(null)
+          }
+          return null
+        }
         if (!response.ok) throw new Error('No se pudo recuperar el contexto operativo')
         return response.json() as Promise<{ snapshot?: CognitiveGraphSnapshot }>
       })
       .then((payload) => {
-        if (!active) return
-        setSnapshot(payload.snapshot ?? null)
-        setSelectedId(focusNodeId)
-        setGraphMode(focusNodeId ? 'focus' : 'overview')
+        if (!active || !payload) return
+        const next = payload.snapshot
+        if (!next || !Array.isArray(next.nodes) || !Array.isArray(next.edges) || !Array.isArray(next.evidence)) throw new Error('Invalid snapshot')
+        setSnapshot(next)
+        setSelectedId(current => next.nodes.some(node => node.id === current) ? current : focusNodeId)
+        setGraphMode(current => focusNodeId ? 'focus' : current)
         setError(null)
       })
       .catch((cause: unknown) => {
-        if (active && (cause as Error)?.name !== 'AbortError') setError('No se pudo cargar el Centro Cognitivo')
+        if (active) setError((cause as Error)?.name === 'AbortError'
+          ? 'La consulta tardó demasiado. Revisa tu conexión e inténtalo de nuevo.'
+          : 'No se pudo cargar el Centro Cognitivo')
       })
       .finally(() => {
         window.clearTimeout(timeout)
@@ -294,8 +312,20 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
 
   useEffect(() => {
     const refreshSnapshot = () => setRetryKey((value) => value + 1)
+    let lastReturn = Date.now()
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastReturn < 30_000) return
+      lastReturn = Date.now()
+      refreshSnapshot()
+    }
     window.addEventListener('novo:twin-updated', refreshSnapshot)
-    return () => window.removeEventListener('novo:twin-updated', refreshSnapshot)
+    window.addEventListener('focus', refreshOnReturn)
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    return () => {
+      window.removeEventListener('novo:twin-updated', refreshSnapshot)
+      window.removeEventListener('focus', refreshOnReturn)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+    }
   }, [])
 
   useEffect(() => {
@@ -404,6 +434,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
 
   function selectLens(nextLens: CognitiveLens) {
     setLens(nextLens)
+    setVisibleLimit(10)
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       params.set('lens', nextLens)
@@ -437,9 +468,18 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
   }
 
   function openCorrection(node: CognitiveGraphNode) {
+    setCorrectionError(null)
     setCorrectionNode(node)
     setCorrectionContext('Novo no tiene todo el contexto')
     setCorrectionNote('')
+  }
+
+  function openInspector() {
+    setInspectorOpen(true)
+    if (!isMobile) {
+      inspectorRef.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
+      inspectorRef.current?.focus({ preventScroll: true })
+    }
   }
 
   async function correctSignal(node: CognitiveGraphNode, correction: string) {
@@ -459,6 +499,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
       })
       if (!response.ok) {
         setError('No se pudo guardar la corrección. El mapa conserva su estado anterior.')
+        setCorrectionError('No se pudo guardar. Revisa la conexión e inténtalo de nuevo.')
         return
       }
       setRetryKey((value) => value + 1)
@@ -466,6 +507,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
       setCorrectionNote('')
     } catch {
       setError('No se pudo guardar la corrección. Revisa tu conexión e inténtalo de nuevo.')
+      setCorrectionError('No se pudo guardar. Revisa la conexión e inténtalo de nuevo.')
     }
   }
 
@@ -486,23 +528,29 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
         setError('No se pudo excluir esta señal. El mapa conserva su estado anterior.')
         return
       }
-      setSnapshot((current) => current ? { ...current, nodes: current.nodes.map((item) => item.id === node.id ? { ...item, isExcluded: true } : item) } : current)
+      setSnapshot((current) => current ? {
+        ...current,
+        nodes: current.nodes.filter(item => item.id !== node.id),
+        edges: current.edges.filter(edge => edge.source !== node.id && edge.target !== node.id),
+      } : current)
+      setSelectedId(null)
+      setInspectorOpen(false)
+      setRetryKey(value => value + 1)
     } catch {
       setError('No se pudo excluir esta señal. Revisa tu conexión e inténtalo de nuevo.')
     }
   }
 
   return (
-    <section aria-labelledby="cognitive-center-title" className="flex flex-col gap-4">
+    <section aria-labelledby="cognitive-center-title" aria-busy={loading} className="flex min-w-0 flex-col gap-5">
       {snapshot && (() => {
         const identityNodes = snapshot.nodes.filter((node) => (node.kind === 'pattern' || node.kind === 'memory') && node.evidenceIds.length > 0).slice(0, 3)
         const evidenceCount = snapshot.evidence.length
         const inferredCount = identityNodes.filter((node) => node.isInferred).length
         return (
-          <article data-testid="cognitive-identity" className="order-4 rounded-[26px] border border-primary/15 bg-primary/[0.045] p-5 sm:p-6">
+          <article data-testid="cognitive-identity" className="order-4 border-t border-foreground/10 py-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/75">Cognitive Identity</p>
                 <h2 id="cognitive-identity-title" className="mt-2 text-xl font-semibold tracking-tight text-foreground">Así es como Novo te entiende</h2>
                 <p className="mt-1 max-w-xl text-sm text-foreground/60">Un modelo operativo corregible, construido a partir de señales y resultados reales.</p>
               </div>
@@ -534,25 +582,40 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
         )
       })()}
 
-      <div data-testid="cognitive-heading" className="order-1 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 id="cognitive-center-title" className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">Centro Cognitivo</h2>
-          <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-foreground/65">Una vista operativa de lo que cambió, qué importa ahora y cómo Novo llegó a esa recomendación.</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-1" role="tablist" aria-label="Lentes del Centro Cognitivo">
+      <div data-testid="cognitive-heading" className="order-1 flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <h2 id="cognitive-center-title" className="sr-only">Centro Cognitivo</h2>
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-foreground/10 bg-foreground/[0.025] p-1 scrollbar-hide" role="tablist" aria-label="Lentes del Centro Cognitivo">
           {LENSES.map((item) => (
             <button
               key={item.id}
               role="tab"
               aria-selected={lens === item.id}
+              tabIndex={lens === item.id ? 0 : -1}
+              onKeyDown={(event) => {
+                const index = LENSES.findIndex(option => option.id === item.id)
+                const next = event.key === 'ArrowRight' ? (index + 1) % LENSES.length : event.key === 'ArrowLeft' ? (index + LENSES.length - 1) % LENSES.length : event.key === 'Home' ? 0 : event.key === 'End' ? LENSES.length - 1 : -1
+                if (next < 0) return
+                event.preventDefault()
+                selectLens(LENSES[next].id)
+                const tab = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]
+                tab?.focus()
+                tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+              }}
               onClick={() => selectLens(item.id)}
-              className={cn('rounded-xl px-3 py-2 text-xs font-semibold transition-colors', lens === item.id ? 'bg-foreground text-background shadow-sm' : 'text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground')}
+              className={cn('min-h-11 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50', lens === item.id ? 'bg-foreground text-background' : 'text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground')}
             >
               {item.label}
             </button>
           ))}
         </div>
+        <button type="button" disabled={loading} onClick={() => setRetryKey(value => value + 1)} aria-label="Actualizar contexto" className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-xs text-foreground/70 transition-colors hover:bg-foreground/[0.05] disabled:opacity-50"><RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />Actualizar</button>
       </div>
+
+      {access && <div className="order-2 rounded-[24px] border border-foreground/10 bg-foreground/[0.025] p-6" role="status">
+        <h3 className="text-lg font-semibold text-foreground">{access === 'pro' ? 'El mapa avanzado está en Novo Pro' : 'Tu sesión necesita renovarse'}</h3>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/70">{access === 'pro' ? 'Puedes seguir trabajando con tu plan, el chat y tus conexiones. Pro añade el mapa de relaciones y sus evidencias.' : 'Vuelve a iniciar sesión para consultar tu contexto privado.'}</p>
+        <Link href={access === 'pro' ? '/settings?tab=billing' : '/auth/signin?callbackUrl=%2Fcognitive'} className="mt-5 inline-flex min-h-11 items-center rounded-full bg-foreground px-4 text-xs font-semibold text-background">{access === 'pro' ? 'Ver Novo Pro' : 'Volver a iniciar sesión'}</Link>
+      </div>}
 
       {inferenceRunId && (
         <div className="order-5 rounded-[26px] border border-primary/15 bg-primary/[0.035] p-4 sm:p-5" aria-live="polite">
@@ -588,18 +651,18 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
 
       {loading && (
         <div className="order-2 flex min-h-28 items-center gap-3 rounded-3xl border border-foreground/10 bg-foreground/[0.025] p-5 text-sm text-foreground/65" role="status">
-          <Loader2 className="size-4 animate-spin text-primary" /> Recuperando señales reales de tu contexto…
+          <Loader2 className="size-4 animate-spin text-primary" /> {snapshot ? 'Actualizando tu contexto…' : 'Recuperando señales reales de tu contexto…'}
         </div>
       )}
 
-      {visibleError && !loading && (
-        <div className="order-2 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-red-400/20 bg-red-400/[0.06] p-5 text-sm text-red-200" role="alert">
+      {visibleError && !loading && !access && (
+        <div className="order-2 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-red-500/20 bg-red-500/[0.06] p-5 text-sm text-red-700 dark:text-red-200" role="alert">
           <span className="flex items-center gap-3"><CircleAlert className="size-4" /> {visibleError}</span>
-          <button type="button" onClick={() => setRetryKey((value) => value + 1)} className="rounded-xl border border-red-200/20 px-3 py-2 text-xs font-semibold text-red-100 transition-colors hover:bg-red-100/10">Intentar de nuevo</button>
+          <button type="button" onClick={() => setRetryKey((value) => value + 1)} className="min-h-11 rounded-xl border border-current/20 px-3 py-2 text-xs font-semibold transition-colors hover:bg-red-500/10">Intentar de nuevo</button>
         </div>
       )}
 
-      {snapshot && !loading && (
+      {snapshot && !access && (
         <>
           {learningNodes.length ? (
             <article className="order-7 rounded-[26px] border border-primary/15 bg-primary/[0.025] p-4 sm:p-5" aria-live="polite">
@@ -633,7 +696,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
             </article>
           )}
 
-          <article data-testid="twin-context-card" className="order-3 rounded-[26px] border border-primary/15 bg-primary/[0.025] p-4 sm:p-5">
+          <article data-testid="twin-context-card" className="order-3 min-w-0 rounded-[26px] border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">{graphMode === 'why' ? 'Evidencia y efecto' : 'Campo cognitivo actual'}</h3>
@@ -657,7 +720,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
                   relations={selectedRelations}
                   recommendation={snapshot.recommendation}
                   onBack={() => setGraphMode('focus')}
-                  onInspect={() => setInspectorOpen(true)}
+                  onInspect={openInspector}
                   onCorrect={() => openCorrection(selected)}
                   onExclude={() => excludeSignal(selected)}
                 />
@@ -668,7 +731,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
                   mode={graphMode === 'focus' ? 'focus' : 'overview'}
                   onSelectNode={selectNode}
                   onWhy={() => selected && setGraphMode('why')}
-                  onInspect={() => setInspectorOpen(true)}
+                  onInspect={openInspector}
                   onPrimaryAction={onPrimaryAction}
                 />
               )}
@@ -682,7 +745,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
               <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-foreground/68">{snapshot.recommendation?.nextStep ?? 'Completa una señal o un objetivo para que Novo pueda priorizar con evidencia.'}</p>
               {snapshot.recommendation && (
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <button onClick={onPrimaryAction} className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-transform hover:-translate-y-0.5">Comenzar <ArrowUpRight className="size-3.5" /></button>
+                  <button onClick={onPrimaryAction} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-background">Revisar mi siguiente paso <ArrowUpRight className="size-3.5" /></button>
                   <button onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} className="inline-flex items-center gap-2 rounded-xl border border-foreground/15 px-4 py-2.5 text-xs font-semibold text-foreground/75 hover:bg-foreground/[0.05]">Por qué esto <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} /></button>
                 </div>
               )}
@@ -745,7 +808,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
                 </div>
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {visibleNodes.slice(0, 10).map((node) => (
+                {visibleNodes.slice(0, visibleLimit).map((node) => (
                   <button
                     key={node.id}
                     onClick={() => selectNode(node.id)}
@@ -763,8 +826,9 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
                 ))}
                 {query && visibleNodes.length === 0 && <p className="text-xs text-foreground/50">No se encontraron elementos para esta búsqueda.</p>}
               </div>
+              {visibleNodes.length > visibleLimit && <button type="button" onClick={() => setVisibleLimit(value => value + 10)} className="mt-4 min-h-11 rounded-full border border-foreground/15 px-4 text-xs font-medium text-foreground/80">Ver más contexto</button>}
             </div>
-            <div className="hidden rounded-[26px] border border-foreground/10 bg-foreground/[0.02] p-5 lg:block" aria-live="polite">
+            {!isMobile && <div ref={inspectorRef} tabIndex={-1} className="hidden scroll-mt-6 rounded-[26px] border border-foreground/10 bg-foreground/[0.02] p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:block" aria-live="polite">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Inspector</p>
               {selected ? (
                 <InspectorDetails
@@ -778,7 +842,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
               ) : (
                 <p className="mt-4 text-sm leading-relaxed text-foreground/55">Selecciona un elemento para ver sus hechos, confianza y controles.</p>
               )}
-            </div>
+            </div>}
           </div>
 
           <div className="order-10 rounded-[26px] border border-foreground/10 bg-foreground/[0.02] p-5">
@@ -801,11 +865,11 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
         </>
       )}
 
-      <Sheet open={!!correctionNode} onOpenChange={(open) => { if (!open && !savingCorrection) setCorrectionNode(null) }}>
-        <SheetContent side={isMobile ? 'bottom' : 'right'} className="max-h-[82dvh] overflow-y-auto border-foreground/10 bg-background/95 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+      <Sheet open={!!correctionNode || (isMobile && inspectorOpen && !!selected)} onOpenChange={(open) => { if (!open) { setCorrectionNode(null); setInspectorOpen(false) } }}>
+        <SheetContent side={isMobile ? 'bottom' : 'right'} overlayClassName="z-[5000]" className="z-[5001] max-h-[82dvh] overflow-y-auto border-foreground/10 bg-background/95 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
           <SheetHeader className="px-5 pb-2 text-left">
-            <SheetTitle>Corrige la comprensión de Novo</SheetTitle>
-            <SheetDescription>Tu corrección se guarda con esta evidencia y actualiza el contexto del Twin.</SheetDescription>
+            <SheetTitle>{correctionNode ? 'Corrige la comprensión de Novo' : 'Detalle del contexto'}</SheetTitle>
+            <SheetDescription>{correctionNode ? 'Tu corrección se guarda con esta evidencia y actualiza el contexto del Twin.' : 'Hechos, relaciones y controles de este elemento.'}</SheetDescription>
           </SheetHeader>
           {correctionNode && (
             <div className="space-y-5 px-5 pb-5">
@@ -831,8 +895,10 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
               </fieldset>
               <label className="block text-sm font-semibold text-foreground">
                 Añade contexto <span className="font-normal text-foreground/48">(opcional)</span>
-                <textarea value={correctionNote} onChange={(event) => setCorrectionNote(event.target.value)} placeholder="Por ejemplo, esto ocurre mientras espero una compilación." className="mt-2 min-h-24 w-full resize-y rounded-xl border border-foreground/15 bg-foreground/[0.025] p-3 text-sm font-normal text-foreground outline-none placeholder:text-foreground/38 focus:border-primary/55" />
+                <textarea value={correctionNote} maxLength={180} onChange={(event) => setCorrectionNote(event.target.value)} placeholder="Por ejemplo, esto ocurre mientras espero una compilación." className="mt-2 min-h-24 w-full resize-y rounded-xl border border-foreground/15 bg-foreground/[0.025] p-3 text-sm font-normal text-foreground outline-none placeholder:text-foreground/38 focus:border-primary/55" />
+                <span className="mt-1 block text-right text-xs font-normal text-foreground/60">{correctionNote.length}/180</span>
               </label>
+              {correctionError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{correctionError}</p>}
               <button
                 type="button"
                 disabled={savingCorrection}
@@ -847,16 +913,7 @@ export function CognitiveCommandSurface({ onPrimaryAction }: Props) {
               </button>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={isMobile && inspectorOpen && !!selected} onOpenChange={setInspectorOpen}>
-        <SheetContent side="bottom" className="max-h-[78dvh] overflow-y-auto border-foreground/10 bg-background/95 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
-          <SheetHeader className="px-5 pb-2 text-left">
-            <SheetTitle>Detalle del contexto</SheetTitle>
-            <SheetDescription>Hechos, relaciones y controles de este elemento.</SheetDescription>
-          </SheetHeader>
-          {snapshot && selected && (
+          {!correctionNode && snapshot && selected && (
             <div className="px-5 pb-5" aria-live="polite">
               <InspectorDetails
                 selected={selected}

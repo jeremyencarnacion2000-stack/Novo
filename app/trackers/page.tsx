@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { modalFlip } from '@/lib/modal-flip'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -53,9 +52,7 @@ export default function TrackersPage() {
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = [...currentTrackers, optimisticTracker]
 
-    // untoggle first: it restores the origin button's hidden icon/text and
-    // plays the return flight before the dialog unmounts.
-    modalFlip.untoggle('btn-new-tracker', () => setDialogOpen(false))
+    setDialogOpen(false)
     try {
       await mutate(
         async () => {
@@ -106,10 +103,8 @@ export default function TrackersPage() {
     const currentTrackers = Array.isArray(trackers) ? trackers : []
     const optimisticData = currentTrackers.map((t) => (t.id === tracker.id ? { ...t, ...tracker } : t))
 
-    modalFlip.untoggle(`tracker-${tracker.id}`, () => {
-      setDialogOpen(false)
-      setEditingTracker(undefined)
-    })
+    setDialogOpen(false)
+    setEditingTracker(undefined)
     try {
       await mutate(
         async () => {

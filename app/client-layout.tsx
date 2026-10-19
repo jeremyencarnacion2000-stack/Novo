@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { getSession, SessionProvider, useSession } from 'next-auth/react'
-import { MotionConfig } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { NetworkStatus } from '@/components/network-status'
 import { FocusProvider } from '@/lib/focus-context'
@@ -21,13 +20,12 @@ import { CognitiveProvider } from '@/lib/cognitive-context'
 import { useCognitiveTheme } from '@/hooks/use-cognitive-theme'
 import { NovoSpriteLoader } from '@/components/ui/novo-sprite-loader'
 import { redirectWhenSessionMissing } from '@/lib/auth-navigation'
-import { MobileOverlayProvider } from '@/components/mobile-overlay-provider'
 import { CognitiveRouteShell } from '@/components/cognitive/cognitive-route-shell'
 import { AmbientContextHeartbeat } from '@/components/ambient-context-heartbeat'
-import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
-import { useSettings } from '@/lib/settings-context'
 import { LiquidGlassWebComponentLoader } from '@/components/liquid-glass/web-component-loader'
 import { usePlayerStore } from '@/lib/player-store'
+import { AppMotionSettings } from '@/components/app-motion-settings'
+import { CommandPaletteOnDemand } from '@/components/command-palette-on-demand'
 
 function composeProviders(...providers: React.FC<{ children: React.ReactNode }>[]) {
   return function ComposedProviders({ children }: { children: React.ReactNode }) {
@@ -66,16 +64,6 @@ function CognitiveThemeSyncer() {
  * animations off. Keeping this boundary inside AppProviders makes the
  * preference atomic across route transitions, overlays, buttons and widgets.
  */
-function AppMotionSettings({ children }: { children: React.ReactNode }) {
-  const { settings } = useSettings()
-  const mode = useNovoMotionPolicy(settings.showAnimations)
-
-  return (
-    <MotionConfig reducedMotion={mode === 'full' ? 'never' : 'always'}>
-      {children}
-    </MotionConfig>
-  )
-}
 
 
 // ─── Lazy-loaded widgets (not in initial bundle) ────────────────────────────
@@ -83,10 +71,6 @@ function AppMotionSettings({ children }: { children: React.ReactNode }) {
 // next/dynamic with ssr:false ensures they are code-split into separate chunks.
 const ContextHub = dynamic(
   () => import('@/components/ContextHub').then(m => ({ default: m.ContextHub })),
-  { ssr: false }
-)
-const CommandPalette = dynamic(
-  () => import('@/components/command-palette').then(m => ({ default: m.CommandPalette })),
   { ssr: false }
 )
 const NotificationCenter = dynamic(
@@ -161,6 +145,8 @@ function RoutePlayerBoundary({ children }: { children: React.ReactNode }) {
 function RouteQuickCapture() {
   const pathname = usePathname()
   const { isOpen, onOpen, onClose } = useQuickCapture()
+  const [loaded, setLoaded] = useState(isOpen)
+  useEffect(() => { if (isOpen) setLoaded(true) }, [isOpen])
 
   useEffect(() => {
     if (pathname?.startsWith('/cognitive')) return
@@ -178,7 +164,7 @@ function RouteQuickCapture() {
 
   // Keep the global shortcut responsive, but defer the full notes dialog and
   // its motion/form code until a real user action opens it.
-  if (pathname?.startsWith('/cognitive') || !isOpen) return null
+  if (pathname?.startsWith('/cognitive') || (!loaded && !isOpen)) return null
   return <QuickCapture />
 }
 // ─── Auth wrapper ────────────────────────────────────────────────────────────
@@ -367,29 +353,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 // opening the drawer on /ai also popped this second, separate chat panel open.
 // The chat experience is now a single surface: /ai (desktop) and MobileChatSheet
 // (mobile), both rendering the same ModernChatbot component.
-function CommandPaletteOnDemand() {
-  const [requested, setRequested] = useState(false)
-
-  useEffect(() => {
-    if (requested) return
-    const openFromShortcut = (event: KeyboardEvent) => {
-      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault()
-        setRequested(true)
-      }
-    }
-    const openFromEvent = () => setRequested(true)
-    document.addEventListener('keydown', openFromShortcut)
-    window.addEventListener('open-command-palette', openFromEvent)
-    return () => {
-      document.removeEventListener('keydown', openFromShortcut)
-      window.removeEventListener('open-command-palette', openFromEvent)
-    }
-  }, [requested])
-
-  return requested ? <CommandPalette initialOpen /> : null
-}
-
 function AuthenticatedWidgets() {
   const { status } = useSession()
   const pathname = usePathname()
@@ -565,7 +528,6 @@ export default function ClientLayout({
         <LiquidGlassWebComponentLoader />
         <AmbientContextHeartbeat />
         <CognitiveTwinProvider>
-          <MobileOverlayProvider>
             <RoutePlayerBoundary>
               <AuthWrapper>
                 <>
@@ -575,7 +537,6 @@ export default function ClientLayout({
               </AuthWrapper>
             </RoutePlayerBoundary>
             <AuthenticatedWidgets />
-          </MobileOverlayProvider>
         </CognitiveTwinProvider>
         <OfflineIndicator />
         <SyncQueueInit />

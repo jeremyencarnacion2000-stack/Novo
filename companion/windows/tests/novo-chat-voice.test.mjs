@@ -39,6 +39,7 @@ test("Novo chat dictation fills the active draft and waits for the user to send"
   try {
     input.value = "Ayúdame con este proyecto";
     mic.fire("click");
+    assert.equal(FakeRecognition.latest.lang, "es-BO");
     assert.equal(State.stateOverride, "listening");
     assert.equal(mic.classList.contains("listening"), true);
     assert.equal(view.el.querySelector(".novo-chat-body").classList.contains("voice-listening"), true);
