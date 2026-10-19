@@ -36,7 +36,7 @@ export function ModernChatbot({ onMobileClose }: ModernChatbotProps = {}) {
 function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
     const { createConversation, sendMessage, messages, streamingMessage, twinMode, setTwinMode, twinModeAvailable } = useChatbot();
     const { language } = useTranslation();
-    const agentLabel = language === 'es' ? 'Modo agente' : language === 'fr' ? 'Mode agent' : language === 'de' ? 'Agentenmodus' : 'Agent mode';
+    const agentLabel = language === 'es' ? 'Twin Novo' : language === 'fr' ? 'Jumeau Novo' : language === 'de' ? 'Novo-Zwilling' : 'Novo Twin';
     const assistantLabel = language === 'es' ? 'Asistente' : language === 'fr' ? 'Assistant' : language === 'de' ? 'Assistent' : 'Assistant';
     const agentHint = language === 'es' ? 'El Twin puede planificar y proponer acciones; siempre pedirá aprobación antes de cambios sensibles.' : language === 'fr' ? 'Le Jumeau peut planifier et proposer des actions ; il demandera toujours votre accord avant les changements sensibles.' : language === 'de' ? 'Der Zwilling kann planen und Aktionen vorschlagen; bei sensiblen Änderungen fragt er immer nach deiner Zustimmung.' : 'The Twin can plan and propose actions; it always asks before sensitive changes.';
     const containerRef = useRef<HTMLDivElement>(null)

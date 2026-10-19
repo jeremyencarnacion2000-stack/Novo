@@ -3,7 +3,7 @@ import { findGoogleAccountForScopes } from '@/lib/google-account'
 
 export type GmailContext = {
   status: 'available' | 'not_connected' | 'unavailable' | 'reauthorization_required'
-  messages: Array<{ id: string; subject: string; from: string }>
+  messages: Array<{ id: string; subject: string; from: string; snippet: string }>
 }
 
 export function shouldIncludeGmailSignal(
@@ -38,7 +38,9 @@ export function isGmailReauthorizationError(error: unknown): boolean {
 }
 
 export function shouldConsultGmail(message: string): boolean {
-  return /\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(message)
+  const normalized = message.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  return /\b(correos?|emails?|gmail|bandeja|inbox|mail|mensajes?\s+de)\b/i.test(normalized)
+    || /\b(respond\w*|contest\w*|escrib\w*|repl(?:y|ied)|answer\w*|wrote|heard\s+from|get\s+back\s+to)\b/i.test(normalized)
 }
 
 /**
@@ -46,7 +48,7 @@ export function shouldConsultGmail(message: string): boolean {
  * Bodies and snippets are deliberately excluded from the model context and
  * nothing from this result is persisted as a message archive.
  */
-export async function getGmailContextForUser(userId: string, maxResults = 8): Promise<GmailContext> {
+export async function getGmailContextForUser(userId: string, maxResults = 20): Promise<GmailContext> {
   const account = await findGoogleAccountForScopes(userId, ['gmail.readonly'])
   if (!account) return { status: 'not_connected', messages: [] }
 
@@ -58,6 +60,7 @@ export async function getGmailContextForUser(userId: string, maxResults = 8): Pr
         id: email.id,
         subject: email.subject,
         from: email.from,
+        snippet: typeof email.snippet === 'string' ? email.snippet.replace(/\s+/g, ' ').trim().slice(0, 320) : '',
       })),
     }
   } catch (error) {
