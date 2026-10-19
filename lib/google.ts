@@ -53,10 +53,14 @@ export async function getGoogleAuthClientForUser(userId: string, requiredScopes:
         throw new Error('Google connection with the required permission was not found.');
     }
 
-    const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-    );
+    const oauth2Client = new google.auth.OAuth2({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        // A legacy identity-only access token can look fresh while its durable
+        // refresh grant still authorizes Gmail. Repair one rejected read before
+        // asking for renewed consent. Never enable authentication replay on sends.
+        forceRefreshOnFailure: requiredScopes.includes('gmail.readonly') && !requiredScopes.includes('gmail.send'),
+    });
     oauth2Client.setCredentials(toGoogleOAuthCredentials(account));
     oauth2Client.on('tokens', (tokens) => {
         if (!tokens.access_token) return;
@@ -195,7 +199,7 @@ export const gmailService = {
     checkAccessForUser: async (userId: string) => {
         const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
         const gmail = google.gmail({ version: 'v1', auth });
-        await gmail.users.messages.list({ userId: 'me', maxResults: 1 });
+        await gmail.users.messages.list({ userId: 'me', maxResults: 1 }, { timeout: 12000 });
     },
 };
 
