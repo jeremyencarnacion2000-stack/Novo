@@ -67,6 +67,17 @@ describe('SettingsMcpAccess native companion permissions', () => {
     expect(payload.allowTaskWrites).toBe(false)
     expect(payload.allowDeviceActivity).toBe(false)
   })
+  it('shares selected-folder and Codex context without granting delegated execution', async () => {
+    render(<SettingsMcpAccess />)
+    fireEvent.change(screen.getByLabelText('Nombre del dispositivo'), { target: { value: 'Novo PC' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /Permitir vincular Novo Companion y usar su chat/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Compartir contexto de carpetas elegidas y Codex/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Crear token/ }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/mcp/tokens', expect.objectContaining({ method: 'POST' })))
+    const payload = JSON.parse(String(fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')?.[1]?.body))
+    expect(payload.allowWorkContext).toBe(true)
+    expect(payload.allowWorkExecution).toBe(false)
+  })
   it('requires a separate explicit choice for delegated work and never couples it to task edits',async()=>{
     render(<SettingsMcpAccess />)
     fireEvent.change(screen.getByLabelText('Nombre del dispositivo'),{target:{value:'Novo PC'}})

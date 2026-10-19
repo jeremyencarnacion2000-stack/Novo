@@ -31,6 +31,13 @@ beforeEach(()=>{
   ;(finishCompanionTurn as jest.Mock).mockResolvedValue({type:'complete',requestId,assistantMessageId,revision:2,modelId:'auto'})
 })
 afterEach(()=>delete process.env.NOVO_COMPANION_CHAT_ENABLED)
+it('hands an email proposal to the shared web conversation without executing it', async () => {
+  const proposal = { type: 'SEND_EMAIL', payload: { to: 'becas@example.test', subject: 'Consulta', body: 'Hola, quisiera consultar mi solicitud.' } }
+  ;(streamNovoChat as jest.Mock).mockResolvedValueOnce(new Response(`data: ${JSON.stringify({ content: 'He preparado el correo.' })}\n\ndata: ${JSON.stringify({ proposal })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } }))
+  const output = await (await POST(request())).text()
+  expect(output).toContain('/chat?conversation=conv')
+  expect(finishCompanionTurn).toHaveBeenCalledWith('owner', requestId, expect.objectContaining({ proposedEmail: proposal }))
+})
 it('adapts only account service output and rechecks OAuth before committing',async()=>{
   const response=await POST(request());const output=await response.text()
   expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('no-store')

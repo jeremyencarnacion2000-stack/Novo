@@ -41,6 +41,11 @@ describe('Google account capability selection', () => {
     expect(hasGoogleScopes('openid https://www.googleapis.com/auth/gmail.readonly', ['gmail.readonly'])).toBe(true)
     expect(hasGoogleScopes('openid email profile', ['gmail.readonly'])).toBe(false)
   })
+  it('recognizes broader Gmail grants without treating a send-only grant as mailbox access', () => {
+    expect(hasGoogleScopes('https://www.googleapis.com/auth/gmail.modify', ['gmail.readonly', 'gmail.send'])).toBe(true)
+    expect(hasGoogleScopes('https://www.googleapis.com/auth/gmail.compose', ['gmail.send'])).toBe(true)
+    expect(hasGoogleScopes('https://www.googleapis.com/auth/gmail.send', ['gmail.readonly'])).toBe(false)
+  })
 
   it('does not let a basic Google login replace an existing expanded grant', () => {
     expect(shouldPersistGoogleGrant(

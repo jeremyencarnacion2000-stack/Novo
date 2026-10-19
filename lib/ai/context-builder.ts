@@ -85,6 +85,7 @@ export interface UserContext {
 export async function buildUserContext(userId: string, options?: {
     twinMode?: boolean;
     includeGmail?: boolean;
+    gmailRequest?: { message: string; history?: Array<{role: string; content: string}>; signal?: AbortSignal };
     contextAccess?: { personal: boolean; integrations: boolean; twin?: boolean; development?: boolean; currentWorkContext?: boolean; deviceActivityRead?: boolean };
 }): Promise<UserContext> {
     try {
@@ -179,7 +180,7 @@ export async function buildUserContext(userId: string, options?: {
             }) : [],
             personal ? prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: { where: { status: { in: ['proposed', 'accepted', 'modified', 'started'] } }, orderBy: { priority: 'desc' }, take: 1 } } }) : null,
             personal ? prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } }) : [],
-            integrationSources.includes('gmail') && options?.includeGmail ? getGmailContextForUser(userId) : Promise.resolve(null),
+            integrationSources.includes('gmail') && options?.includeGmail ? getGmailContextForUser(userId, options.gmailRequest) : Promise.resolve(null),
             signalSources.length ? prisma.novoSignalLedger.findMany({
                 where: {
                     userId,

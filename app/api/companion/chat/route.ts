@@ -8,6 +8,7 @@ import {companionJson,companionErrorResponse,readCompanionJson} from '@/lib/comp
 import {assertNovoChatModelAllowed} from '@/lib/ai/chat-catalog'
 import {streamNovoChat,parseNovoChatInput,normalizeHistory} from '@/lib/ai/chat-service'
 import {releaseUserChatLease} from '@/lib/ai/chat-lease'
+import {emailProposalSchema,type EmailProposal} from '@/lib/gmail-message'
 
 export const maxDuration=180
 const encoder=new TextEncoder()
@@ -49,6 +50,7 @@ export async function POST(request:Request):Promise<Response> {
       async start(controller){
         const emit=(event:CompanionChatEvent)=>{if(!transportClosed)controller.enqueue(bytes(event))}
         let text='',modelId=input.model,buffer='',sawDone=false
+        let proposedEmail:EmailProposal|undefined
         const decoder=new TextDecoder('utf-8',{fatal:true})
         try{
           emit({type:'metadata',requestId:input.requestId,conversationId:claim.conversationId,revision:claim.revision,userMessageId:claim.userMessageId})
@@ -67,6 +69,11 @@ export async function POST(request:Request):Promise<Response> {
               if(sawDone)throw new CompanionError(503,'stream_interrupted')
               const event=JSON.parse(data)
               if(event.error)throw new CompanionError(503,'stream_interrupted')
+              if(event.proposal){
+                const proposal=emailProposalSchema.safeParse(event.proposal)
+                if(!proposal.success || proposedEmail)throw new CompanionError(503,'stream_interrupted')
+                proposedEmail=proposal.data
+              }
               if(event.meta){
                 if(typeof event.meta.model!=='string'||event.meta.model.length>120)throw new CompanionError(503,'stream_interrupted')
                 modelId=event.meta.model
@@ -87,7 +94,10 @@ export async function POST(request:Request):Promise<Response> {
           if(current.userId!==actor.userId || current.grantId!==actor.grantId || current.clientId!==actor.clientId)throw new CompanionError(401,'unauthorized')
           await requireActiveCompanionDevice(current,deviceId)
           if(signal.aborted)throw new CompanionError(409,'cancelled')
-          emit(await finishCompanionTurn(actor.userId,input.requestId,{text,modelId}))
+          const reviewLink=proposedEmail ? `\n\n[Revisar el correo y aprobar su envío en Novo](${new URL(request.url).origin}/chat?conversation=${encodeURIComponent(claim.conversationId)})` : ''
+          const complete=await finishCompanionTurn(actor.userId,input.requestId,{text:text+reviewLink,modelId,...(proposedEmail?{proposedEmail}:{})})
+          if(reviewLink)emit({type:'delta',requestId:input.requestId,text:reviewLink})
+          emit(complete)
         }catch(error){
           abort.abort()
           const safe=error instanceof CompanionError ? companionChatErrorSchema.safeParse(error.code) : null

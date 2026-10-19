@@ -3,10 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import {canonicalConversationMessages,conversationMessagesSchema,saveConversationRevision} from '@/lib/ai/conversation-revision'
+import {mergeConversationMessages} from '@/lib/ai/conversation-messages'
+import {CompanionError} from '@/lib/companion/auth'
 
 const updateAiConversationSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
-  messages: z.any().optional() // Assuming messages can be any JSON structure
+  messages: conversationMessagesSchema.optional(),
+  expectedRevision: z.number().int().nonnegative().optional(),
 })
 
 export async function GET(
@@ -60,21 +64,18 @@ export async function PUT(
       return NextResponse.json({ error: parsedBody.error.format() }, { status: 400 })
     }
 
-    const { title, messages } = parsedBody.data
-
-    const updatedConversation = await prisma.aIConversation.update({
-      where: {
-        id,
-        userId: session.user.id
-      },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(messages !== undefined && { messages }),
-      }
-    })
-
-    return NextResponse.json(updatedConversation)
+    const { title, messages, expectedRevision } = parsedBody.data
+    const current = await prisma.aIConversation.findFirst({where:{id,userId:session.user.id}})
+    if(!current)return NextResponse.json({error:'Conversation not found'},{status:404})
+    if(expectedRevision!==undefined && expectedRevision!==current.revision)return NextResponse.json({error:'revision_conflict',revision:current.revision},{status:409})
+    const stored=canonicalConversationMessages(id,current.messages,current.createdAt.toISOString())
+    // Legacy tabs have no revision. Preserve unseen server messages instead of
+    // allowing an old full-cache autosave to erase a Companion review card.
+    const next=messages===undefined?stored:expectedRevision===undefined?mergeConversationMessages(stored,messages):messages
+    const saved=await saveConversationRevision(session.user.id,id,current.revision,next,title)
+    return NextResponse.json({...current,...(title!==undefined?{title}:{}),messages:next,revision:saved.revision})
   } catch (error: any) {
+    if(error instanceof CompanionError)return NextResponse.json({error:error.code},{status:error.status})
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 })
     }

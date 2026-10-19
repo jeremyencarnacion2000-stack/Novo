@@ -55,7 +55,10 @@ export function hasGoogleScopes(scopeValue: string | null | undefined, requiredS
   const granted = new Set((scopeValue ?? '').split(/\s+/).filter(Boolean).map(normalizeScope))
   return requiredScopes.every((required) => {
     const normalized = normalizeScope(required)
-    return granted.has(normalized) || (normalized.startsWith('gmail.') && granted.has('mail.google.com'))
+    if (granted.has(normalized) || (normalized.startsWith('gmail.') && granted.has('mail.google.com'))) return true
+    if (normalized === 'gmail.readonly') return granted.has('gmail.modify')
+    if (normalized === 'gmail.send') return granted.has('gmail.modify') || granted.has('gmail.compose')
+    return false
   })
 }
 

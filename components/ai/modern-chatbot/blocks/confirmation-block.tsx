@@ -166,6 +166,12 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                                     Asunto: {payload.subject}
                                 </span>
                             )}
+                            {Array.isArray(payload.cc) && payload.cc.length > 0 && <span className="text-white/60 text-xs block mt-2">CC: {payload.cc.join(', ')}</span>}
+                            {Array.isArray(payload.bcc) && payload.bcc.length > 0 && <span className="text-white/60 text-xs block mt-2">CCO: {payload.bcc.join(', ')}</span>}
+                            {payload.replyToMessageId && <span className="text-white/60 text-xs block mt-2">Respuesta en el hilo original</span>}
+                            <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-white/85 whitespace-pre-wrap break-words">
+                                {typeof payload.body === 'string' ? payload.body : ''}
+                            </div>
                         </div>
                     </div>
                 );
@@ -256,7 +262,7 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold transition-all active:scale-[0.97] hover:shadow-[0_0_15px_rgba(99,102,241,0.25)] shadow-md border border-primary/30"
                 >
                     <Check className="w-3.5 h-3.5" />
-                    {consentCopy.title}
+                    {action?.deliveryRecovery ? 'Comprobar envío' : consentCopy.title}
                 </button>
                 <button
                     onClick={onCancel}
@@ -280,6 +286,7 @@ export function ConfirmationBlock({ onConfirm, onCancel, status, action }: Confi
                         </DialogHeader>
                     </div>
                     <div className="space-y-3 px-6 py-5">
+                        {(action?.type || action?.name) === 'SEND_EMAIL' && renderActionDetails()}
                         <div className="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4">
                             <p className="text-[10px] font-semibold tracking-[0.13em] text-white/42 uppercase">{consentCopy.change}</p>
                             <p className="mt-1.5 text-sm font-medium leading-relaxed text-white/88">{describeAction(action, consentCopy)}</p>

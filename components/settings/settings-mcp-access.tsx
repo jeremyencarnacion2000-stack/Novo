@@ -88,6 +88,7 @@ export function SettingsMcpAccess() {
   const [name, setName] = useState('')
   const [allowTaskWrites, setAllowTaskWrites] = useState(false)
   const [allowCompanion, setAllowCompanion] = useState(false)
+  const [allowWorkContext, setAllowWorkContext] = useState(false)
   const [allowWorkExecution,setAllowWorkExecution]=useState(false)
   const [allowDeviceActivity, setAllowDeviceActivity] = useState(false)
   const [allowTwinRead, setAllowTwinRead] = useState(false)
@@ -138,7 +139,7 @@ export function SettingsMcpAccess() {
       const response = await fetch('/api/mcp/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, allowTaskWrites, allowCompanion, allowDeviceActivity, allowTwinRead, allowProjectsRead, allowIntegrationRead, allowIntegrationSync, allowWorkExecution, expiresInDays: days }),
+        body: JSON.stringify({ name, allowTaskWrites, allowCompanion, allowWorkContext, allowDeviceActivity, allowTwinRead, allowProjectsRead, allowIntegrationRead, allowIntegrationSync, allowWorkExecution, expiresInDays: days }),
       })
       const payload = await readJsonResponse(response)
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'create failed')
@@ -218,8 +219,12 @@ export function SettingsMcpAccess() {
           <span><span className="block text-sm font-semibold text-foreground/80">{locale==='es'?'Permitir trabajos delegados y contexto de carpetas':'Allow delegated work and chosen folder context'}</span><span className="mt-1 block text-xs leading-5 text-foreground/60">{locale==='es'?'Conecta Novo Companion y elige después los proyectos, el PC y las capacidades en Seguimiento.':'Connect Novo Companion, then choose projects, the PC and capabilities in Following.'}</span></span>
         </label>
         <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
-          <input type="checkbox" checked={allowCompanion} onChange={(event) => {setAllowCompanion(event.target.checked);if(!event.target.checked)setAllowWorkExecution(false)}} className="mt-0.5 size-4 accent-primary" />
+          <input type="checkbox" checked={allowCompanion} onChange={(event) => {setAllowCompanion(event.target.checked);if(!event.target.checked){setAllowWorkExecution(false);setAllowWorkContext(false)}}} className="mt-0.5 size-4 accent-primary" />
           <span><span className="block text-sm font-semibold text-foreground/80">{copy.companionPermission}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">device:connect · ai:chat · {copy.companionPermissionDetails}</span></span>
+        </label>
+        <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">
+          <input type="checkbox" checked={allowWorkContext} disabled={!allowCompanion} onChange={event => setAllowWorkContext(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+          <span><span className="block text-sm font-semibold text-foreground/80">{locale === 'es' ? 'Compartir contexto de carpetas elegidas y Codex' : 'Share selected-folder and Codex context'}</span><span className="mt-1 block text-xs leading-5 text-foreground/50">{locale === 'es' ? 'Permite que el Twin relacione proyectos y resúmenes de sesiones. Las rutas y los archivos permanecen en tu PC; ejecutar trabajos se autoriza por separado.' : 'Let the Twin relate projects and session summaries. Paths and files stay on your PC; delegated execution is authorized separately.'}</span></span>
         </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-foreground/[0.07] bg-background/25 p-4">

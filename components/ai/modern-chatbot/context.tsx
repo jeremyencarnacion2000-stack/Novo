@@ -6,6 +6,7 @@ import type { ChatbotContextType, Conversation, Message, AIModel, FileAttachment
 import { splitSseLines, parseFinalSseLine } from '@/lib/ai/sse-buffer';
 import { sileo } from '@/lib/sileo-bell';
 import { createClientIdempotencyKey } from '@/lib/client-idempotency';
+import {mergeConversationMessages,recoverInterruptedMailReviews} from '@/lib/ai/conversation-messages';
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -131,6 +132,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         executingActionRef.current.clear();
         actionIntentKeysRef.current.clear();
         persistedRef.current.clear();
+        conversationRevisionsRef.current.clear();
+        savedConversationSnapshotsRef.current.clear();
         justLoadedFromDbRef.current = false;
         savingRef.current.clear();
         dirtySaveRef.current.clear();
@@ -152,7 +155,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 if (response.ok && !controller.signal.aborted && accountGenerationRef.current === generation) {
                     const dbConversations = await response.json();
                     if (!controller.signal.aborted && accountGenerationRef.current === generation && dbConversations.length > 0) {
-                        const formattedConversations = dbConversations.map((conv: any) => {
+                        const formattedConversations: Conversation[] = dbConversations.map((conv: any) => {
                             persistedRef.current.add(conv.id);
                             return {
                                 id: conv.id,
@@ -171,9 +174,16 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                                 model: conv.model || 'grok-beta'
                             };
                         });
+                        for (const conv of formattedConversations) {
+                            conv.messages = recoverInterruptedMailReviews(conv.messages);
+                            const remote = dbConversations.find((item: any) => item.id === conv.id);
+                            conversationRevisionsRef.current.set(conv.id, Number(remote?.revision ?? 0));
+                            savedConversationSnapshotsRef.current.set(conv.id, JSON.stringify({title:conv.title,messages:conv.messages,model:conv.model}));
+                        }
                         justLoadedFromDbRef.current = true;
                         setConversations(formattedConversations);
-                        setCurrentConversationId(formattedConversations[0].id);
+                        const linkedConversation = new URLSearchParams(window.location.search).get('conversation');
+                        setCurrentConversationId(formattedConversations.some(conv => conv.id === linkedConversation) ? linkedConversation! : formattedConversations[0].id);
                     }
                 }
             } catch (error) {
@@ -246,12 +256,16 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // Remember that a newer snapshot exists so it is persisted immediately
     // after the current request, instead of being silently skipped.
     const dirtySaveRef = React.useRef<Set<string>>(new Set());
+    const conversationRevisionsRef = React.useRef<Map<string,number>>(new Map());
+    const savedConversationSnapshotsRef = React.useRef<Map<string,string>>(new Map());
 
     const saveConversation = useCallback(async (conv: Conversation): Promise<void> => {
         if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
         const generation = accountGenerationRef.current;
         const signal = accountAbortRef.current?.signal;
         const cleanId = conv.id.replace(/\/$/, '');
+        const snapshot = JSON.stringify({title:conv.title,messages:conv.messages,model:conv.model});
+        if(savedConversationSnapshotsRef.current.get(cleanId)===snapshot)return;
         if (savingRef.current.has(cleanId)) {
             dirtySaveRef.current.add(cleanId);
             return;
@@ -262,12 +276,27 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             if (signal?.aborted || generation !== accountGenerationRef.current) return;
             const isPersisted = persistedRef.current.has(cleanId);
             if (isPersisted) {
-                await fetch(`/api/ai-conversations/${cleanId}`, {
+                const response = await fetch(`/api/ai-conversations/${cleanId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model }),
+                    body: JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model, expectedRevision: conversationRevisionsRef.current.get(cleanId) }),
                     signal,
                 });
+                if(response.status===409){
+                    const freshResponse=await fetch(`/api/ai-conversations/${cleanId}`,{signal});
+                    if(!freshResponse.ok)throw new Error('Conversation refresh failed');
+                    const fresh=await freshResponse.json();
+                    if(signal?.aborted||generation!==accountGenerationRef.current)return;
+                    conversationRevisionsRef.current.set(cleanId,Number(fresh.revision??0));
+                    const next=conversationsRef.current.map(item=>item.id===conv.id?{...item,messages:mergeConversationMessages(fresh.messages??[],item.messages)}:item);
+                    conversationsRef.current=next;setConversations(next);dirtySaveRef.current.add(cleanId);
+                }else{
+                    if(!response.ok)throw new Error('Conversation save failed');
+                    const saved=await response.json();
+                    if(signal?.aborted||generation!==accountGenerationRef.current)return;
+                    conversationRevisionsRef.current.set(cleanId,Number(saved.revision??0));
+                    savedConversationSnapshotsRef.current.set(cleanId,snapshot);
+                }
             } else {
                 const response = await fetch('/api/ai-conversations', {
                     method: 'POST',
@@ -277,6 +306,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 });
                 if (response.ok && generation === accountGenerationRef.current) {
                     persistedRef.current.add(cleanId);
+                    const saved=await response.json();
+                    if(signal?.aborted||generation!==accountGenerationRef.current)return;
+                    conversationRevisionsRef.current.set(cleanId,Number(saved.revision??0));
 
                     // A replay means the original create reached the server
                     // but its response was lost. The row may contain the
@@ -286,16 +318,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                     // Converge with the latest local snapshot immediately so
                     // a retry can never silently discard the new messages.
                     if (response.headers.get('X-Idempotent-Replay') === 'true') {
-                        const replayUpdate = await fetch(`/api/ai-conversations/${cleanId}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model }),
-                            signal,
-                        });
-                        if (!replayUpdate.ok) {
-                            throw new Error(`Conversation replay reconciliation failed (${replayUpdate.status})`);
-                        }
-                    }
+                        const next=conversationsRef.current.map(item=>item.id===conv.id?{...item,messages:mergeConversationMessages(saved.messages??[],item.messages)}:item);
+                        conversationsRef.current=next;setConversations(next);dirtySaveRef.current.add(cleanId);
+                    }else savedConversationSnapshotsRef.current.set(cleanId,snapshot);
                 }
             }
         } catch (error) {
@@ -1105,7 +1130,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const executionId = `${messageId}:${blockId}`;
         if (executingActionRef.current.has(executionId)) return;
         executingActionRef.current.add(executionId);
-        const idempotencyKey = actionIntentKeysRef.current.get(executionId) ?? createClientIdempotencyKey();
+        // Mail review IDs persist with the conversation. Reloading the page must
+        // not create a fresh delivery intent for an already-confirmed card.
+        const isMailAction = (block.content?.type || block.content?.name) === 'SEND_EMAIL';
+        const idempotencyKey = actionIntentKeysRef.current.get(executionId) ?? (isMailAction ? `mail:${executionId}` : createClientIdempotencyKey());
         actionIntentKeysRef.current.set(executionId, idempotencyKey);
         const requestGeneration = accountGenerationRef.current;
         const accountSignal = accountAbortRef.current?.signal;
@@ -1159,7 +1187,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
             const finalBlocks = updatedBlocks.map(b => {
                 if (b.id === blockId) {
-                    return { ...b, status: result.success ? ('confirmed' as const) : ('waiting' as const) };
+                    return { ...b, status: result.success ? ('confirmed' as const) : ('waiting' as const),
+                        ...(result.code==='GMAIL_DELIVERY_UNCERTAIN'?{content:{...b.content,deliveryRecovery:true}}:{}) };
                 }
                 if (b.type === 'plan' && Array.isArray(b.content)) {
                     return {

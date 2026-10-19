@@ -35,7 +35,7 @@ jest.mock('next/dynamic', () => (loader: () => Promise<unknown>) => {
   }
   if (String(loader).includes('components/quick-capture')) {
     return function DeferredQuickCapture() {
-      mockQuickCaptureMounts += 1
+      require('react').useEffect(() => { mockQuickCaptureMounts += 1 }, [])
       return require('react').createElement('div', { 'data-testid': 'deferred-quick-capture' })
     }
   }

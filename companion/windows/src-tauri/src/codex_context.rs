@@ -239,8 +239,9 @@ pub fn sync_hook_event(app: &AppHandle, payload: &Value) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let shared = app.state::<Shared>();
-        let Ok(access) = crate::novo_account::access_context(shared.inner()).await else {
-            return;
+        let access = match crate::novo_account::access_context(shared.inner()).await {
+            Ok(access) => access,
+            Err(error) => { crate::log::line(format!("Codex context sync blocked: {}", error.code)); return; }
         };
         let Ok(client) = crate::novo_account::client(8) else {
             return;
@@ -255,9 +256,16 @@ pub fn sync_hook_event(app: &AppHandle, payload: &Value) {
             .json(&input)
             .send()
             .await;
-        // Intentionally ignore the body and errors: neither summary content nor
-        // credentials belong in the local event log, and Codex must keep going.
-        let _ = response;
+        // Log only a fixed status, never the response body, summary or token.
+        // Missing work-context scopes must not look like a successful sync.
+        let status = match response {
+            Ok(response) if response.status().is_success() => "synced",
+            Ok(response) if response.status().as_u16() == 401 => "authorization_expired",
+            Ok(response) if response.status().as_u16() == 403 => "work_context_permission_required",
+            Ok(response) if response.status().as_u16() == 429 => "rate_limited",
+            _ => "temporarily_unavailable",
+        };
+        crate::log::line(format!("Codex context sync: {status}"));
     });
 }
 

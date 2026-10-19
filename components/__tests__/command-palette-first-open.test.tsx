@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { CommandPalette } from '../command-palette'
 
 jest.mock('next/navigation', () => ({
@@ -17,7 +17,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = jest.fn()
 })
 
-it('opens when the first shortcut arrived before its module mounted', () => {
+it('opens when the first shortcut arrived before its module mounted', async () => {
   render(<CommandPalette initialOpen />)
-  expect(screen.getByRole('dialog')).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('dialog')).toBeVisible())
 })

@@ -92,8 +92,9 @@ export async function cancelCompanionTurn(userId:string,requestId:string):Promis
   })
 }
 
-export async function finishCompanionTurn(userId:string,requestId:string,output:{text:string;modelId:string}):Promise<CompanionChatEvent> {
+export async function finishCompanionTurn(userId:string,requestId:string,output:{text:string;modelId:string;proposedEmail?:import('@/lib/gmail-message').EmailProposal}):Promise<CompanionChatEvent> {
   if(!output.text || output.text.length>500_000 || !output.modelId || output.modelId.length>120)throw new CompanionError(503,'stream_interrupted')
+  const proposal=output.proposedEmail ? (await import('@/lib/gmail-message')).emailProposalSchema.parse(output.proposedEmail) : null
   return prisma.$transaction(async tx=>{
     await lockUserChat(tx,userId)
     const turn=await tx.companionChatTurn.findUnique({where:turnKey(userId,requestId)})
@@ -120,7 +121,8 @@ export async function finishCompanionTurn(userId:string,requestId:string,output:
     if(!conversation)throw new CompanionError(404,'conversation_not_found')
     const messages=canonicalConversationMessages(conversation.id,conversation.messages,conversation.createdAt.toISOString())
     const assistantMessageId=randomUUID(),revision=conversation.revision+1
-    const result=await tx.aIConversation.updateMany({where:{id:conversation.id,userId,revision:conversation.revision},data:{messages:[...messages,{id:assistantMessageId,role:'assistant',content:output.text,model:output.modelId,timestamp:new Date().toISOString()}] as unknown as Prisma.InputJsonValue,revision:{increment:1}}})
+    const blocks=proposal ? [{id:randomUUID(),type:'markdown',content:output.text,status:'success'}, {id:randomUUID(),type:'confirmation',content:proposal,status:'waiting'}] : undefined
+    const result=await tx.aIConversation.updateMany({where:{id:conversation.id,userId,revision:conversation.revision},data:{messages:[...messages,{id:assistantMessageId,role:'assistant',content:output.text,model:output.modelId,timestamp:new Date().toISOString(),...(blocks?{blocks}:{})}] as unknown as Prisma.InputJsonValue,revision:{increment:1}}})
     if(!result.count)throw new CompanionError(409,'revision_conflict')
     await tx.companionChatTurn.updateMany({where:{userId,requestId,status:'running'},data:{status:'completed',assistantMessageId,resultRevision:revision,modelId:output.modelId,finishedAt:new Date()}})
     await tx.userChatLease.deleteMany({where:{userId,requestId}})

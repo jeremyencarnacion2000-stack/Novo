@@ -50,6 +50,19 @@ describe('POST /api/mcp/tokens', () => {
     const scopes=(issueMcpPersonalAccessToken as jest.Mock).mock.calls[0][0].scopes
     expect(scopes).toContain('projects:read');expect(scopes).not.toContain('tasks:write');expect(scopes).not.toContain('twin:write')
   })
+  it('allows selected-folder and Codex context independently of delegated command execution', async () => {
+    const request = new Request('http://localhost/api/mcp/tokens', { method: 'POST', body: JSON.stringify({ name: 'Novo PC', allowCompanion: true, allowWorkContext: true }) })
+    expect((await POST(request as never)).status).toBe(201)
+    const scopes = (issueMcpPersonalAccessToken as jest.Mock).mock.calls[0][0].scopes
+    expect(scopes).toEqual(expect.arrayContaining(['device:work-context:read', 'device:work-context:write', 'projects:read']))
+    expect(scopes).not.toContain('device:work:execute')
+    expect(scopes).not.toContain('tasks:write')
+  })
+  it('rejects work-context selection without Companion consent', async () => {
+    const request = new Request('http://localhost/api/mcp/tokens', { method: 'POST', body: JSON.stringify({ name: 'Novo PC', allowWorkContext: true }) })
+    expect((await POST(request as never)).status).toBe(400)
+    expect(issueMcpPersonalAccessToken).not.toHaveBeenCalled()
+  })
   it('requires Companion consent and issues bounded work/context scopes without general task writes',async()=>{
     const body={name:'Novo PC',allowWorkExecution:true,allowCompanion:false}
     const request=(value:unknown)=>new Request('http://localhost/api/mcp/tokens',{method:'POST',body:JSON.stringify(value)})
