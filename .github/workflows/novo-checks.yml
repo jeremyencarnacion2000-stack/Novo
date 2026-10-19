@@ -29,5 +29,9 @@ jobs:
         run: node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --pretty false --incremental false
       - name: Lint
         run: npm run lint
+      - name: Prepare native shell assets for security checks
+        run: |
+          npx cap copy android
+          npx cap copy ios
       - name: Regression tests
         run: npm test -- --runInBand --silent
