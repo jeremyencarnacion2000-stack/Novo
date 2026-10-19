@@ -1,9 +1,13 @@
 import { gmailService } from '@/lib/google'
 import { findGoogleAccountForScopes } from '@/lib/google-account'
+import { planMailboxRead, type MailHistory } from './mailbox-plan'
 
 export type GmailContext = {
   status: 'available' | 'not_connected' | 'unavailable' | 'reauthorization_required'
-  messages: Array<{ id: string; subject: string; from: string }>
+  messages: Array<Awaited<ReturnType<typeof gmailService.readMessageForUser>>>
+  query?: string
+  hasMore?: boolean
+  threadTruncated?: boolean
 }
 
 export function shouldIncludeGmailSignal(
@@ -37,28 +41,40 @@ export function isGmailReauthorizationError(error: unknown): boolean {
     || errorCodes.some((code) => code === 'invalid_grant' || code === 'invalid_token')
 }
 
-export function shouldConsultGmail(message: string): boolean {
-  return /\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(message)
+export function shouldConsultGmail(message: string, history: MailHistory = []): boolean {
+  if (/\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(message)) return true
+  const followUp = /respond|respuest|cont[eé]st|contesta|r[eé]sp[oó]nd|l[eé]e(?:lo|la)?\b|segund[oa]|primer[oa]|[uú]ltim[oa]|hilo|conversaci[oó]n|remitente|adjunt|redact|env[ií]a|mand[aá]/i.test(message)
+  return followUp && history.slice(-6).some(item => /\b(correos?|emails?|gmail|bandeja|inbox|mail)\b/i.test(item.content))
 }
 
 /**
- * Reads a small, request-scoped window of recent inbox messages for a user asking about email.
- * Bodies and snippets are deliberately excluded from the model context and
- * nothing from this result is persisted as a message archive.
+ * Request-scoped full-body evidence for the user's question. Contents are never
+ * persisted as a mailbox archive and must be treated as untrusted source data.
  */
-export async function getGmailContextForUser(userId: string, maxResults = 8): Promise<GmailContext> {
+export async function getGmailContextForUser(userId: string, options: { message?: string; history?: MailHistory; signal?: AbortSignal } = {}): Promise<GmailContext> {
   const account = await findGoogleAccountForScopes(userId, ['gmail.readonly'])
   if (!account) return { status: 'not_connected', messages: [] }
 
   try {
-    const emails = await gmailService.listRecentForUser(userId, maxResults)
+    const plan = await planMailboxRead(options.message ?? '', options.history, options.signal)
+    const result = await gmailService.searchForUser(userId, { query: plan.query, maxResults: plan.maxResults, bodyLimit: 20_000, signal: options.signal })
+    let emails = result.messages
+    let threadTruncated = false
+    if (plan.expandThread && emails[0]?.threadId) {
+      const thread = await gmailService.readThreadForUser(userId, emails[0].threadId, { bodyLimit: 20_000, signal: options.signal })
+      const ids = new Set(thread.messages.map(item => item.id))
+      emails = [...thread.messages, ...emails.filter(item => !ids.has(item.id))]
+      threadTruncated = thread.threadTruncated
+    }
+    let remaining = 60_000
+    const messages = emails.filter(email => email.id).map(email => {
+      const body = (email.body ?? '').slice(0, remaining)
+      remaining -= body.length
+      return { ...email, body, bodyTruncated: email.bodyTruncated || body.length < (email.body?.length ?? 0) }
+    })
     return {
       status: 'available',
-      messages: emails.filter((email): email is typeof email & { id: string } => typeof email.id === 'string').map((email) => ({
-        id: email.id,
-        subject: email.subject,
-        from: email.from,
-      })),
+      messages, query: plan.query, hasMore: Boolean(result.nextPageToken), threadTruncated,
     }
   } catch (error) {
     if (isGmailReauthorizationError(error)) {

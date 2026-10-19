@@ -173,7 +173,8 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                         });
                         justLoadedFromDbRef.current = true;
                         setConversations(formattedConversations);
-                        setCurrentConversationId(formattedConversations[0].id);
+                        const linkedConversation = new URLSearchParams(window.location.search).get('conversation');
+                        setCurrentConversationId(formattedConversations.some(conv => conv.id === linkedConversation) ? linkedConversation! : formattedConversations[0].id);
                     }
                 }
             } catch (error) {
@@ -1105,7 +1106,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const executionId = `${messageId}:${blockId}`;
         if (executingActionRef.current.has(executionId)) return;
         executingActionRef.current.add(executionId);
-        const idempotencyKey = actionIntentKeysRef.current.get(executionId) ?? createClientIdempotencyKey();
+        // Mail review IDs persist with the conversation. Reloading the page must
+        // not create a fresh delivery intent for an already-confirmed card.
+        const isMailAction = (block.content?.type || block.content?.name) === 'SEND_EMAIL';
+        const idempotencyKey = actionIntentKeysRef.current.get(executionId) ?? (isMailAction ? `mail:${executionId}` : createClientIdempotencyKey());
         actionIntentKeysRef.current.set(executionId, idempotencyKey);
         const requestGeneration = accountGenerationRef.current;
         const accountSignal = accountAbortRef.current?.signal;

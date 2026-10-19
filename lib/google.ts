@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { findGoogleAccountForScopes, toGoogleOAuthCredentials } from '@/lib/google-account';
+import { composeGmailRaw, decodeGmailMessage, emailSendSchema, gmailIdSchema, type EmailSendInput, type GmailMessageInput, type GmailPart } from '@/lib/gmail-message';
 
 /**
  * Resolve a usable Google OAuth access token for a user from the server-owned
@@ -76,6 +77,59 @@ export async function getGoogleAuthClientForUser(userId: string, requiredScopes:
  * Gmail Service
  */
 export const gmailService = {
+    /** Full-body reads use the durable owner grant, including automatic OAuth refresh. */
+    searchForUser: async (userId: string, options: { query?: string; maxResults?: number; pageToken?: string; bodyLimit?: number; signal?: AbortSignal } = {}) => {
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const maxResults = Math.min(8, Math.max(1, Math.trunc(options.maxResults || 6)));
+        const result = await gmail.users.messages.list({ userId: 'me', q: (options.query ?? '').slice(0, 500), maxResults,
+            ...(options.pageToken ? { pageToken: options.pageToken.slice(0, 512) } : {}) }, { signal: options.signal, timeout: 12000 });
+        const messages = await Promise.all((result.data.messages ?? []).filter(item => item.id).slice(0, maxResults).map(async item => {
+            const response = await gmail.users.messages.get({ userId: 'me', id: item.id!, format: 'full' }, { signal: options.signal, timeout: 12000 });
+            return readGmailBody(gmail, response.data, options.bodyLimit, options.signal);
+        }));
+        return { messages, nextPageToken: result.data.nextPageToken ?? null };
+    },
+
+    readMessageForUser: async (userId: string, id: string, options: { bodyLimit?: number; signal?: AbortSignal } = {}) => {
+        gmailIdSchema.parse(id);
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const response = await gmail.users.messages.get({ userId: 'me', id, format: 'full' }, { signal: options.signal, timeout: 12000 });
+        return readGmailBody(gmail, response.data, options.bodyLimit, options.signal);
+    },
+
+    readThreadForUser: async (userId: string, id: string, options: { bodyLimit?: number; signal?: AbortSignal } = {}) => {
+        gmailIdSchema.parse(id);
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const response = await gmail.users.threads.get({ userId: 'me', id, format: 'full' }, { signal: options.signal, timeout: 12000 });
+        const all = response.data.messages ?? [];
+        const messages = await Promise.all(all.slice(-20).map(item => readGmailBody(gmail, item, options.bodyLimit, options.signal)));
+        return { messages, threadTruncated: all.length > messages.length };
+    },
+
+    sendEmailForUser: async (userId: string, input: EmailSendInput, messageId?: string) => {
+        const mail = emailSendSchema.parse(input);
+        const original = mail.replyToMessageId ? await gmailService.readMessageForUser(userId, mail.replyToMessageId, { bodyLimit: 1 }) : null;
+        if (original && (!original.threadId || !original.messageId)) throw new Error('gmail_reply_unavailable');
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.send']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const raw = composeGmailRaw(mail, { messageId, inReplyTo: original?.messageId, references: original ? [original.references, original.messageId].filter(Boolean).join(' ') : undefined });
+        // Gmail does not offer send idempotency. The caller claims delivery durably;
+        // disable SDK retries so a lost response cannot silently send a second copy.
+        const result = await gmail.users.messages.send({ userId: 'me', requestBody: { raw, ...(original ? { threadId: original.threadId } : {}) } }, { retry: false, timeout: 15000 });
+        return { id: result.data.id, threadId: result.data.threadId };
+    },
+
+    findSentForUser: async (userId: string, messageId: string) => {
+        if (!/^<[a-f0-9]{64}@novo\.local>$/.test(messageId)) throw new Error('invalid_message_id');
+        const auth = await getGoogleAuthClientForUser(userId, ['gmail.readonly']);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const response = await gmail.users.messages.list({ userId: 'me', q: `in:sent rfc822msgid:${messageId.slice(1, -1)}`, maxResults: 1 }, { timeout: 10000 });
+        return response.data.messages?.[0]?.id ?? null;
+    },
+
     sendEmail: async (to: string, subject: string, body: string) => {
         const auth = await getGoogleAuthClient(['gmail.send']);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -144,6 +198,24 @@ export const gmailService = {
         await gmail.users.messages.list({ userId: 'me', maxResults: 1 });
     },
 };
+
+async function readGmailBody(gmail: ReturnType<typeof google.gmail>, message: GmailMessageInput, bodyLimit = 96_000, signal?: AbortSignal) {
+    let budget = 2_000_000;
+    async function hydrate(part: GmailPart): Promise<void> {
+        if (part.filename) return;
+        if (/^text\/(plain|html)$/i.test(part.mimeType ?? '') && part.body?.attachmentId && !part.body.data && message.id) {
+            const size = part.body.size ?? 0;
+            if (size <= budget) {
+                budget -= size;
+                const response = await gmail.users.messages.attachments.get({ userId: 'me', messageId: message.id, id: part.body.attachmentId }, { signal, timeout: 12000 });
+                if (response.data.data && response.data.data.length <= 3_000_000) part.body.data = response.data.data;
+            }
+        }
+        for (const child of part.parts ?? []) await hydrate(child);
+    }
+    if (message.payload) await hydrate(message.payload);
+    return decodeGmailMessage(message, Math.min(96_000, Math.max(1, bodyLimit)));
+}
 
 async function listMessagesWithAuth(auth: Awaited<ReturnType<typeof getGoogleAuthClient>>, maxResults: number, query: string, signal?: AbortSignal) {
         const gmail = google.gmail({ version: 'v1', auth });

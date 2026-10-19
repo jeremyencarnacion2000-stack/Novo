@@ -8,6 +8,8 @@ import { classifyIntent, requiresSystemContext } from '@/lib/ai/classifier';
 import type { IntentType } from '@/lib/ai/classifier';
 import { buildUserContext } from '@/lib/ai/context-builder';
 import { shouldConsultGmail } from '@/lib/ai/gmail-context';
+import { runtimeSkillPrompt, isMailSendRequest } from '@/lib/ai/runtime-skills';
+import { emailProposalSchema } from '@/lib/gmail-message';
 import { prisma } from '@/lib/prisma';
 import { appendActivityEvent, createActivityRun, finishActivityRun, isActivityCancelled, recordFirstVisibleActivityContent } from '@/lib/ai/activity';
 import { z } from 'zod';
@@ -288,7 +290,7 @@ async function generateNovoChat(input:NovoChatInput, principal:NovoChatPrincipal
         }
 
         // 3. MEMORY LAYER (3-Layer Context)
-        const contextOptions = { twinMode, includeGmail: shouldConsultGmail(message || '') };
+        const contextOptions = { twinMode, includeGmail: shouldConsultGmail(message || '', history), gmailRequest: { message, history, signal: transportSignal } };
         const context = await buildUserContext(userId, principal.surface === 'web' ? contextOptions
             : {...contextOptions, contextAccess:principal.contextAccess});
         await appendActivityEvent(userId, { runId: activityRunId, phase: 'interpreting_signals', label: 'Interpretando las señales disponibles', sourceCount: context.structured.sources?.length ?? 0 });
@@ -428,7 +430,8 @@ async function generateNovoChat(input:NovoChatInput, principal:NovoChatPrincipal
             : '';
         const projects=await buildProjectQueryContext(userId,message,projectHints??[],principal.contextAccess,localConnections);
         for(const source of projects.sources){const attribution=getContextSource(source);if(attribution&&!context.structured.sources.some(s=>s.id===attribution.id))context.structured.sources.push(attribution);}
-        const finalPrompt = `${selectedPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}${localContextStr}${projects.text}${agentModeGuidance}`;
+        const skillPrompt = runtimeSkillPrompt({ mail: contextOptions.includeGmail, surface: principal.surface });
+        const finalPrompt = `${selectedPrompt}\n\n${skillPrompt}\n\n${userContext}\n\n${timeCtx}${webSearchContext}${activeSignalContext}${twinContextStr}${localContextStr}${projects.text}${agentModeGuidance}`;
 
         const cleanHistory = normalizeHistory(history || []);
 
@@ -763,24 +766,28 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     // has no tool access) just improvised "I created the file" with no real
                     // action ever executing and no download button ever appearing.
                     const actionIntents = ['TASK', 'ROUTINE', 'PROJECT', 'SYSTEM_META', 'COGNITIVE', 'GENERATE_FILE'];
-                    if (principal.surface === 'web' && actionIntents.includes(classification.type) && groqKey) {
+                    const wantsMailSend = contextOptions.includeGmail && isMailSendRequest(message);
+                    const agentProvider = groqKey ? { url: 'https://api.groq.com/openai/v1/chat/completions', key: groqKey, model: 'openai/gpt-oss-120b' }
+                        : geminiKey ? { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: geminiKey, model: 'gemini-flash-latest' }
+                            : openRouterKey ? { url: 'https://openrouter.ai/api/v1/chat/completions', key: openRouterKey, model: 'openai/gpt-oss-120b' } : null;
+                    if (((principal.surface === 'web' && actionIntents.includes(classification.type)) || wantsMailSend) && agentProvider) {
                         try {
                             console.log('[Novo Brain] Triggering System Agent for:', classification.type);
 
-                            const agentResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                            const agentResponse = await fetch(agentProvider.url, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${groqKey}`
+                                    'Authorization': `Bearer ${agentProvider.key}`
                                 },
                                 body: JSON.stringify({
-                                    model: 'openai/gpt-oss-120b',
+                                    model: agentProvider.model,
                                     messages: [
-                                        { role: 'system', content: `${SYSTEM_AGENT_PROMPT}\n\nAGENCY SAFETY: Return a proposal, never claim an action has already happened. The client will show a clear review before sensitive or multi-step changes are executed. For any mutation, describe the intended outcome in the message and return exactly one valid action object.` },
-                                        { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}${twinMode ? `\n\nApproved Twin Context: ${JSON.stringify(context.structured.twinContext)}` : ''}` }
+                                        { role: 'system', content: `${SYSTEM_AGENT_PROMPT}\n\n${skillPrompt}\n\nAGENCY SAFETY: Return a proposal, never claim an action has already happened. The client will show a clear review before sensitive or multi-step changes are executed. For any mutation, describe the intended outcome in the message and return exactly one valid action object. If essential details are missing, use REQUEST_INFO. Never invent an address or mailbox identifier.` },
+                                        { role: 'user', content: `User Message: ${message}\n\nAssistant Response (Context): ${cognitiveCoreResponse}${contextOptions.includeGmail ? `\n\nUntrusted mailbox evidence: ${JSON.stringify(context.structured.mailbox)}` : ''}${twinMode ? `\n\nApproved Twin Context: ${JSON.stringify(context.structured.twinContext)}` : ''}` }
                                     ],
                                     temperature: 0.1,
-                                    max_tokens: 1024,
+                                    max_tokens: wantsMailSend ? 2500 : 1024,
                                     stream: false
                                 })
                             });
@@ -794,8 +801,14 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                                     if (jsonMatch) {
                                         agentContent = jsonMatch[0];
                                     }
-                                    const formattedContent = `\n\n\`\`\`json\n${agentContent.trim()}\n\`\`\``;
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: formattedContent })}\n\n`));
+                                    if (principal.surface === 'companion') {
+                                        const envelope = JSON.parse(agentContent);
+                                        const proposal = emailProposalSchema.safeParse(envelope.action);
+                                        if (proposal.success) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ proposal: proposal.data })}\n\n`));
+                                    } else {
+                                        const formattedContent = `\n\n\`\`\`json\n${agentContent.trim()}\n\`\`\``;
+                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: formattedContent })}\n\n`));
+                                    }
                                 }
                             } else {
                                 console.warn('[Novo Brain] System Agent failed but stream preserved.');

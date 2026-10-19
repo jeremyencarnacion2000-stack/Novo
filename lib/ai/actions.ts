@@ -183,6 +183,10 @@ export interface SendEmailAction extends BaseAction {
         to: string;
         subject: string;
         body: string;
+        cc?: string[];
+        bcc?: string[];
+        replyToMessageId?: string;
+        confirmed?: boolean;
     };
 }
 

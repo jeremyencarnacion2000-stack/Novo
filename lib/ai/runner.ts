@@ -15,7 +15,7 @@ export async function runAI(message: string, history: any[] = [], userId: string
 
     // 2. MEMORY LAYER
     const context = await buildUserContext(userId, {
-        includeGmail: shouldConsultGmail(message),
+        includeGmail: shouldConsultGmail(message, history), gmailRequest: { message, history },
     });
     const userContext = context.summary;
 

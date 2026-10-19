@@ -30,7 +30,8 @@ import {
     CreateTasksAction
 } from './actions';
 import { ACTION_PERMISSIONS, AIPermission } from './permissions';
-import { calendarService, gmailService, getGoogleAccessToken } from '@/lib/google';
+import { calendarService, getGoogleAccessToken } from '@/lib/google';
+import { sendReviewedEmail } from '@/lib/ai/gmail-send';
 import { createMutationFingerprint, runIdempotentCreate } from '@/lib/server-idempotency';
 
 // --- Interfaces ---
@@ -102,6 +103,7 @@ export function toSafeActionErrorCode(error: unknown): string {
     const value = typeof error === 'string' ? error : '';
     if (value === 'Free plan monthly AI action limit reached') return value;
     if (value === 'Gmail not connected') return value;
+    if (['GMAIL_DELIVERY_UNCERTAIN', 'EMAIL_CONFIRMATION_REQUIRED', 'gmail_reauthorization_required', 'gmail_permission_required', 'gmail_send_rejected', 'gmail_reply_unavailable'].includes(value)) return value;
     if (value.startsWith('Invalid action:')) return 'Invalid action';
     if (value.startsWith('Database verification failed:')) return 'Resource not found';
     if (value.startsWith('Recipient, subject, and body are required')) return 'Invalid email payload';
@@ -786,6 +788,7 @@ registerActionHandler<CreateEventAction>('CREATE_EVENT', async (action, ctx) => 
 // fallback exists, so a missing/expired Gmail connection must fail loudly
 // instead of silently no-op'ing.
 registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
+    if (action.payload.confirmed !== true) return { success: false, error: 'EMAIL_CONFIRMATION_REQUIRED', message: 'Revisa el correo completo y confirma su envío.' };
     // Sending is irreversible and externally visible — unlike the graceful
     // "Tarea sin título" fallbacks elsewhere, a hallucinated "undefined" here
     // must block the send, not quietly substitute a placeholder and mail it.
@@ -794,24 +797,22 @@ registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
     const body = dropHallucinatedPlaceholder(action.payload.body);
     if (!to || !subject || !body) throw new Error("Recipient, subject, and body are required to send an email");
 
-    const token = await getGoogleAccessToken(ctx.userId, ['gmail.send']);
-    if (!token) {
-        return {
-            success: false,
-            error: 'Gmail not connected',
-            message: 'Gmail no está conectado — conéctalo en /connectors para poder enviar correos.',
-        };
-    }
-
     try {
-        const sent = await gmailService.sendEmail(to, subject, body);
+        const sent = await sendReviewedEmail(ctx.userId, { to, subject, body,
+            ...(action.payload.cc ? { cc: action.payload.cc } : {}), ...(action.payload.bcc ? { bcc: action.payload.bcc } : {}),
+            ...(action.payload.replyToMessageId ? { replyToMessageId: action.payload.replyToMessageId } : {}) }, ctx.idempotencyKey, ctx.prisma);
+        if (sent.status === 'uncertain') return { success: false, error: 'GMAIL_DELIVERY_UNCERTAIN', message: 'Gmail no confirmó el resultado. El envío quedó protegido contra duplicados; vuelve a comprobar esta misma solicitud para buscar el correo en Enviados.' };
+        if (sent.status === 'failed') return { success: false, error: sent.code,
+            message: sent.code === 'gmail_reauthorization_required' || sent.code === 'gmail_permission_required'
+                ? 'Autoriza Gmail para enviar correos en Conexiones y vuelve a revisar el mensaje.'
+                : 'Gmail rechazó el envío. Revisa la conexión y los datos del correo antes de preparar otro intento.' };
         return {
             success: true,
-            data: sent,
+            data: { id: sent.id },
             message: `Correo enviado a ${to}.`,
             metadata: {
                 sectionName: 'Gmail',
-                redirectPath: '/connectors'
+                redirectPath: `https://mail.google.com/mail/u/0/#sent/${sent.id}`
             }
         };
     } catch (err: any) {
@@ -819,7 +820,7 @@ registerActionHandler<SendEmailAction>('SEND_EMAIL', async (action, ctx) => {
         return {
             success: false,
             error: 'GMAIL_SEND_FAILED',
-            message: 'No se pudo enviar el correo. Verifica tu conexión con Gmail e intenta de nuevo.',
+            message: 'Revisa el destinatario, el asunto y el mensaje, y confirma su envío desde la vista previa.',
         };
     }
 });

@@ -21,6 +21,17 @@ beforeEach(()=>{
   ;(claimUserChatLease as jest.Mock).mockResolvedValue({userId:'owner',requestId,expiresAt:new Date(now.getTime()+180_000)})
 })
 afterEach(()=>jest.useRealTimers())
+it('persists a Companion email proposal as an unapproved web review card', async () => {
+  await claimCompanionTurn(actor, deviceId, input)
+  const data = tx.companionChatTurn.create.mock.calls[0][0].data
+  tx.companionChatTurn.findUnique.mockResolvedValue({ ...data, conversationId: 'conv', createdAt: now })
+  tx.aIConversation.findFirst.mockResolvedValue({ id: 'conv', userId: 'owner', revision: 1, messages: [], createdAt: now })
+  const proposedEmail = { type: 'SEND_EMAIL', payload: { to: 'becas@example.test', subject: 'Consulta', body: 'Hola, quisiera confirmar el estado de mi solicitud.' } }
+  await finishCompanionTurn('owner', requestId, { text: 'Correo preparado para revisar', modelId: 'auto', proposedEmail } as any)
+  const written = tx.aIConversation.updateMany.mock.calls.at(-1)[0].data.messages.at(-1)
+  expect(written.blocks).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'confirmation', status: 'waiting', content: proposedEmail })]))
+  expect(written.blocks.find((block: any) => block.type === 'confirmation').content.payload).not.toHaveProperty('confirmed')
+})
 it('claims once and a same-body concurrent retry is pending, not another generation',async()=>{
   const first=await claimCompanionTurn(actor,deviceId,input)
   expect(first.kind).toBe('claimed')

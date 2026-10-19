@@ -84,12 +84,17 @@ fn observations(workspaces:&[WorkspaceDescriptor])->Vec<serde_json::Value>{
 pub fn start(app:AppHandle){
     tauri::async_runtime::spawn(async move{
         let mut signatures=BTreeMap::<String,(String,std::time::Instant)>::new();
+        let mut previous_status="";
         loop{
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             let shared=app.state::<crate::Shared>();
             let enabled=shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).novo_local_connections;
-            let Ok(authorization)=crate::novo_account::verify_account(&shared).await else{continue};
-            if !authorization.capabilities.work_context_write{continue}
+            let Ok(authorization)=crate::novo_account::verify_account(&shared).await else{
+                if previous_status!="authorization_unavailable"{crate::log::line("Project context sync: authorization_unavailable");previous_status="authorization_unavailable";}continue
+            };
+            if !authorization.capabilities.work_context_write{
+                if previous_status!="work_context_permission_required"{crate::log::line("Project context sync: work_context_permission_required");previous_status="work_context_permission_required";}continue
+            }
             let Ok(access)=crate::novo_account::access_context(&shared).await else{continue};
             let mut workspaces=if enabled{match tauri::async_runtime::spawn_blocking(inventory).await{Ok(Ok(values))=>values,_=>continue}}else{vec![]};
             if !shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).novo_local_connections{workspaces.clear()}
@@ -101,7 +106,7 @@ pub fn start(app:AppHandle){
             let Ok(client)=crate::novo_account::client(20)else{continue};
             let body=serde_json::json!({"observations":observations(&workspaces),"replaceInventory":true});
             if let Ok(response)=client.post(format!("{}/api/companion/project-observations",access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",access.device_id).json(&body).send().await{
-                if response.status().is_success(){signatures.clear();signatures.insert(key,(signature,std::time::Instant::now()));}
+                if response.status().is_success(){signatures.clear();signatures.insert(key,(signature,std::time::Instant::now()));if previous_status!="synced"{crate::log::line("Project context sync: synced");previous_status="synced";}}
             }
         }
     });

@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
     let userContextStr = '';
     try {
       const context = await buildUserContext(userId, {
-        includeGmail: shouldConsultGmail(message || ''),
+        includeGmail: shouldConsultGmail(message || '', history), gmailRequest: { message, history },
       });
       userContextStr = context.summary;
     } catch { console.error('[AI] Context retrieval failed.'); }

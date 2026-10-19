@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import { executeAIAction } from '../executor';
 import { prisma } from '@/lib/prisma';
+import { gmailService } from '@/lib/google';
 
 // Mock Google (executor.ts pulls this in for CREATE_EVENT's best-effort push
 // sync — mocked the same way other suites touching @/lib/google do, so this
@@ -8,7 +9,7 @@ import { prisma } from '@/lib/prisma';
 // crashes on missing TextEncoder). No token => sync is skipped silently.
 jest.mock('@/lib/google', () => ({
     calendarService: { createEvent: jest.fn(), listEvents: jest.fn() },
-    gmailService: { sendEmail: jest.fn(), listUnread: jest.fn() },
+    gmailService: { sendEmail: jest.fn(), listUnread: jest.fn(), sendEmailForUser: jest.fn(), findSentForUser: jest.fn() },
     getGoogleAccessToken: jest.fn().mockResolvedValue(null),
 }));
 
@@ -398,6 +399,17 @@ describe('AI Executor', () => {
     // graceful "Tarea sin título" fallback above, a hallucinated field here
     // must block the send rather than mail a placeholder.
     describe('dropHallucinatedPlaceholder guard on SEND_EMAIL', () => {
+        it('accepts the real confirmation envelope and sends through the owner grant', async () => {
+            (gmailService.sendEmailForUser as jest.Mock).mockResolvedValue({ id: 'sent123' });
+            const result = await executeAIAction({ type: 'SEND_EMAIL', payload: { to: 'a@b.test', subject: 'Revisado', body: 'Hola', confirmed: true } } as any, userId, prisma, 'reviewed-intent');
+            expect(result.success).toBe(true);
+            expect(gmailService.sendEmailForUser).toHaveBeenCalledWith(userId, expect.objectContaining({ to: 'a@b.test', body: 'Hola' }), expect.any(String));
+        });
+        it('requires an explicit review confirmation for external delivery', async () => {
+            const result = await executeAIAction({ type: 'SEND_EMAIL', payload: { to: 'a@b.test', subject: 'Revisado', body: 'Hola' } } as any, userId, prisma, 'unconfirmed-intent');
+            expect(result.success).toBe(false);
+            expect(gmailService.sendEmailForUser).not.toHaveBeenCalled();
+        });
         it('refuses to send when the subject is a hallucinated "undefined"', async () => {
             const result = await executeAIAction({
                 type: 'SEND_EMAIL',
