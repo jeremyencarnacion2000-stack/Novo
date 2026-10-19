@@ -12,6 +12,8 @@ import {
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useQuickCapture } from '@/lib/quick-capture-context';
+import { useCognitiveTwin, type CognitiveTwin } from '@/lib/cognitive-twin-context';
+import { useTranslation } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { createClientIdempotencyKey } from '@/lib/client-idempotency';
 
@@ -25,6 +27,39 @@ const typeConfig = {
     reminder: { icon: Bell, color: 'bg-amber-500', label: 'Reminder' },
 };
 
+type TwinTone = 'syncing' | 'learning' | 'adapted' | 'attuned' | 'warning' | 'critical' | 'quiet';
+
+function getTwinStatus(twin: CognitiveTwin, isLoading: boolean, language: string) {
+    const labels = {
+        es: { syncing: 'Sincronizando', learning: 'Aprendiendo', adapted: 'Adaptándose', attuned: 'En sintonía', warning: 'Carga en aumento', critical: 'Carga alta', quiet: 'Preparándose' },
+        en: { syncing: 'Syncing', learning: 'Learning', adapted: 'Adapting', attuned: 'In sync', warning: 'Load rising', critical: 'High load', quiet: 'Getting ready' },
+        fr: { syncing: 'Synchronisation', learning: 'Apprentissage', adapted: 'Adaptation', attuned: 'En harmonie', warning: 'Charge élevée', critical: 'Charge forte', quiet: 'Préparation' },
+        de: { syncing: 'Synchronisiert', learning: 'Lernt dazu', adapted: 'Passt sich an', attuned: 'Im Einklang', warning: 'Last steigt', critical: 'Hohe Auslastung', quiet: 'Bereitet sich vor' },
+    };
+    const locale = language.startsWith('es') ? 'es' : language.startsWith('fr') ? 'fr' : language.startsWith('de') ? 'de' : 'en';
+
+    let tone: TwinTone;
+    if (isLoading) tone = 'syncing';
+    else if (twin.confidenceScore > 0 && (twin.metrics.decisionFatigueRisk === 'critical' || twin.metrics.currentCognitiveLoad > 90)) tone = 'critical';
+    else if (twin.confidenceScore > 0 && (twin.metrics.decisionFatigueRisk === 'high' || twin.metrics.currentCognitiveLoad > 75)) tone = 'warning';
+    else if (!twin.isInitialized || twin.trustLevel === 'initial') tone = 'quiet';
+    else if (twin.trustLevel === 'learning') tone = 'learning';
+    else if (twin.trustLevel === 'adapted') tone = 'adapted';
+    else tone = 'attuned';
+
+    const tones: Record<TwinTone, { color: string; dot: string; chip: string }> = {
+        syncing: { color: 'rgba(129, 140, 248, .34)', dot: 'bg-indigo-300', chip: 'border-indigo-200/15 bg-indigo-300/[.08] text-indigo-100' },
+        learning: { color: 'rgba(56, 189, 248, .36)', dot: 'bg-sky-300', chip: 'border-sky-200/15 bg-sky-300/[.08] text-sky-100' },
+        adapted: { color: 'rgba(167, 139, 250, .34)', dot: 'bg-violet-300', chip: 'border-violet-200/15 bg-violet-300/[.08] text-violet-100' },
+        attuned: { color: 'rgba(52, 211, 153, .34)', dot: 'bg-emerald-300', chip: 'border-emerald-200/15 bg-emerald-300/[.08] text-emerald-100' },
+        warning: { color: 'rgba(251, 191, 36, .38)', dot: 'bg-amber-300', chip: 'border-amber-200/20 bg-amber-300/[.09] text-amber-100' },
+        critical: { color: 'rgba(251, 113, 133, .4)', dot: 'bg-rose-300', chip: 'border-rose-200/20 bg-rose-300/[.09] text-rose-100' },
+        quiet: { color: 'rgba(148, 163, 184, .28)', dot: 'bg-slate-300', chip: 'border-white/10 bg-white/[.04] text-foreground/75' },
+    };
+
+    return { tone, label: labels[locale][tone], ...tones[tone] };
+}
+
 interface SavedNote {
     id: string;
     content: string;
@@ -35,6 +70,9 @@ interface SavedNote {
 
 export function QuickCapture() {
     const { isOpen, onClose, originRef } = useQuickCapture();
+    const { twin, isLoading: isTwinLoading } = useCognitiveTwin();
+    const { language } = useTranslation();
+    const twinStatus = getTwinStatus(twin, isTwinLoading, language);
     const [content, setContent] = useState('');
     const [type, setType] = useState<NoteType>('note');
     const [saving, setSaving] = useState(false);
@@ -215,7 +253,8 @@ export function QuickCapture() {
                 showCloseButton={false}
                 anchorRef={originRef}
                 aria-describedby="quick-capture-description"
-                className="relative max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-[30px] border-0 bg-transparent p-0 shadow-none"
+                style={{ '--quick-capture-tint': twinStatus.color } as React.CSSProperties}
+                className="quick-capture-material relative max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-[30px] border-0 bg-transparent p-0 shadow-none"
             >
                         <GlassSurface
                             preset="panel"
@@ -238,14 +277,21 @@ export function QuickCapture() {
                                     <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">Quick capture</DialogTitle>
                                     <DialogDescription id="quick-capture-description" className="mt-1 text-sm leading-5 text-muted-foreground">Save a thought before it slips away.</DialogDescription>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    aria-label="Close quick capture"
-                                    className="-mr-2 -mt-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
-                                >
-                                    <X className="size-4" />
-                                </button>
+                                <div className="-mr-2 -mt-2 flex shrink-0 items-center gap-2">
+                                    <div role="status" title={`Twin · ${twinStatus.label}`} aria-label={`Twin · ${twinStatus.label}`} className={cn('flex h-9 items-center gap-2 rounded-full border px-2.5 text-[10px] font-medium tracking-normal', twinStatus.chip)}>
+                                        <span aria-hidden="true" className={cn('size-1.5 rounded-full shadow-[0_0_8px_currentColor]', twinStatus.dot)} />
+                                        <span className="hidden sm:inline">Twin · {twinStatus.label}</span>
+                                        <span className="sr-only sm:hidden">Twin · {twinStatus.label}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        aria-label="Close quick capture"
+                                        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
+                                    >
+                                        <X className="size-4" />
+                                    </button>
+                                </div>
                             </div>
                             <div role="group" aria-label="Quick capture view" className="inline-flex w-fit gap-1 rounded-full border border-foreground/[0.09] bg-foreground/[0.035] p-1">
                                 <button
@@ -336,7 +382,7 @@ export function QuickCapture() {
                                 className="relative z-10 p-8 space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Project Context</h3>
+                                    <h3 className="text-sm font-medium text-foreground/80">Project context</h3>
                                     <div className="grid grid-cols-2 gap-3">
                                         {projects.slice(0, 4).map(p => (
                                             <button
@@ -348,25 +394,25 @@ export function QuickCapture() {
                                                 )}
                                             >
                                                 <Layers className="h-4 w-4" />
-                                                <span className="text-xs font-bold truncate">{p.title}</span>
+                                                <span className="text-xs font-medium truncate">{p.title}</span>
                                             </button>
                                         ))}
                                         <button className="flex items-center gap-3 p-4 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-foreground/40 transition-colors">
                                             <Plus className="h-4 w-4" />
-                                            <span className="text-xs font-bold">New Project</span>
+                                            <span className="text-xs font-medium">New project</span>
                                         </button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Temporal State</h3>
+                                    <h3 className="text-sm font-medium text-foreground/80">When</h3>
                                     <div className="flex gap-3">
                                         {['Today', 'Tomorrow', 'Next Week'].map(d => (
                                             <button
                                                 key={d}
                                                 onClick={() => setSelectedDate(d)}
                                                 className={cn(
-                                                    "px-6 py-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                    "px-6 py-3 rounded-xl border text-xs font-medium transition-all",
                                                     selectedDate === d ? "bg-primary border-primary text-primary-foreground" : "bg-muted/60 border-border/70 text-muted-foreground hover:border-foreground/20"
                                                 )}
                                             >
@@ -380,16 +426,16 @@ export function QuickCapture() {
                                     <Button
                                         variant="ghost"
                                         onClick={() => setActiveTab('capture')}
-                                        className="h-12 rounded-2xl text-muted-foreground hover:text-foreground"
+                                        className="h-11 rounded-full px-5 text-muted-foreground hover:text-foreground"
                                     >
-                                        BACK
+                                        Back
                                     </Button>
                                     <Button
                                         ripple
                                         onClick={handleSave}
-                                        className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground font-black tracking-tighter italic"
+                                        className="flex-1 h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                                     >
-                                        LEGALIZE ACTION
+                                        Save task
                                     </Button>
                                 </div>
                             </motion.div>

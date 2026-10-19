@@ -502,6 +502,44 @@ html[data-appearance-transition]::view-transition-new(root) {
   opacity: 1;
 }
 
+/* Quick Capture keeps its translucent glass, then adds one quiet, static
+   material grain and a Twin-state tint. The color sits behind the content so
+   it never competes with the text or controls. */
+.quick-capture-material {
+  text-shadow: none;
+}
+
+.quick-capture-material::before,
+.quick-capture-material::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.quick-capture-material::before {
+  z-index: 1;
+  background: radial-gradient(80% 62% at 8% 0%, var(--quick-capture-tint, rgba(148, 163, 184, .28)), transparent 100%);
+}
+
+.quick-capture-material::after {
+  z-index: 2;
+  background-image: var(--glass-noise);
+  background-size: 180px 180px;
+  opacity: .34;
+  mix-blend-mode: soft-light;
+}
+
+.quick-capture-material :where(*) {
+  text-shadow: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .quick-capture-material::before { opacity: .45; }
+  .quick-capture-material::after { opacity: .18; }
+}
+
 @media (hover: hover) and (pointer: fine) {
   [data-flip-from],
   [data-slot="dialog-trigger"],
