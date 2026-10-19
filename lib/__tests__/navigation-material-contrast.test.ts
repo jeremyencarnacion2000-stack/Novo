@@ -14,11 +14,15 @@ describe('visible navigation glass contract', () => {
         expect(channels[3]).toBeGreaterThan(0)
         expect(channels[3]).toBeLessThanOrEqual(0.2)
       }
-      expect(token(block, 'text-shadow')).toContain('rgba(')
-      expect(token(block, 'icon-shadow')).toContain('rgba(')
       expect(token(block, 'foreground')).toMatch(/^#[a-f0-9]{6}$/i)
     },
   )
+
+  it('keeps labels and icons free from the removed shadow tokens', () => {
+    expect(css).not.toContain('--novo-navigation-text-shadow:')
+    expect(css).not.toContain('--novo-navigation-icon-shadow:')
+    expect(css).toMatch(/\.novo-nav-label, \.novo-nav-label-active,[\s\S]*?text-shadow: none/)
+  })
 
   it('uses the configured sidebar material and never disables lenses for OS transparency hints', () => {
     expect(css).toContain('background: var(--novo-context-background) !important')

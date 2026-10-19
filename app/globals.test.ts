@@ -101,7 +101,14 @@ describe('liquid glass card tiers', () => {
   it('keeps desktop liquid refraction controlled by Novo rather than an implicit OS media override', () => {
     const root = stylesheet()
 
-    expect(root.toString()).not.toContain('@media (prefers-reduced-transparency: reduce)')
+    root.walkAtRules('media', rule => {
+      if (rule.params !== '(prefers-reduced-transparency: reduce)') return
+      // Quick Capture may soften its decorative highlights. It must not
+      // silently turn off the shared card/navigation refraction contract.
+      expect(rule.toString()).not.toContain('backdrop-filter: none')
+      expect(rule.toString()).not.toContain('[data-glass-refractive]')
+      expect(rule.toString()).not.toContain('.novo-navigation-glass')
+    })
     expect(backdropFilterFor(root, "html[data-accessibility-reduce-glass='true'] [data-glass-refractive]")).toBe('none')
   })
 
@@ -184,11 +191,12 @@ describe('mobile navigation panel glass controls', () => {
   it('keeps the selected destination visibly distinct on the shared nav-control material', () => {
     const root = stylesheet()
     expect(
-      declarationFor(root, ".novo-mobile-nav-panel .novo-nav-glass-control[data-active='true']", 'background'),
-    ).toBe('color-mix(in srgb, var(--novo-context-background) 32%, transparent)')
+      declarationFor(root, '.novo-nav-selection', 'background'),
+    ).toBe('var(--novo-navigation-selection)')
     expect(
-      declarationFor(root, ".novo-mobile-nav-panel .novo-nav-glass-control[data-active='true']", 'isolation'),
+      declarationFor(root, ".novo-nav-glass-control[data-active='true']", 'isolation'),
     ).toBe('auto')
+    expect(declarationFor(root, '.novo-nav-label-active', 'color')).toBe('var(--novo-navigation-foreground)')
   })
 })
 
