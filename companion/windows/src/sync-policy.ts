@@ -3,6 +3,7 @@ export type ActivitySyncPolicy = {
   syncInFlight: boolean;
   historyClearRequested: boolean;
   tokenPresent: boolean;
+  accountState: string;
   queuedEvents: number;
   online: boolean;
 };
@@ -29,6 +30,7 @@ export function shouldStartActivitySync(policy: ActivitySyncPolicy): boolean {
     && !policy.syncInFlight
     && !policy.historyClearRequested
     && policy.tokenPresent
+    && policy.accountState === 'connected'
     && policy.queuedEvents > 0
     && policy.online;
 }

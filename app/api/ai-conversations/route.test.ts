@@ -45,6 +45,7 @@ describe('AI conversation creation idempotency', () => {
     expect(response.status).toBe(201)
     expect(response.headers.get('X-Idempotent-Replay')).toBe('false')
     expect(prisma.aIConversation.create).toHaveBeenCalledTimes(1)
+    expect(prisma.aIConversation.create).toHaveBeenCalledWith(expect.objectContaining({ select: { id: true, revision: true } }))
   })
 
   it('replays the owned row instead of creating a duplicate', async () => {
@@ -56,5 +57,10 @@ describe('AI conversation creation idempotency', () => {
     expect(response.headers.get('X-Idempotent-Replay')).toBe('true')
     expect(await response.json()).toMatchObject({ id: payload.id, userId: 'user-1' })
     expect(prisma.aIConversation.create).not.toHaveBeenCalled()
+  })
+  it('keeps the stored messages available for recovery of an idempotent create', async () => {
+    ;(prisma.aIConversation.findFirst as jest.Mock).mockResolvedValue({ ...payload, userId: 'user-1', revision: 7 })
+    const response = await POST(request() as never)
+    expect(await response.json()).toMatchObject({ messages: payload.messages, revision: 7 })
   })
 })

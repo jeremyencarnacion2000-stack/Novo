@@ -7,6 +7,7 @@ const ready = {
   syncInFlight: false,
   historyClearRequested: false,
   tokenPresent: true,
+  accountState: 'connected',
   queuedEvents: 2,
   online: true,
 };
@@ -22,6 +23,9 @@ test('allows sync only when the device is connected, online, and has queued even
   assert.equal(shouldStartActivitySync({ ...ready, queuedEvents: 0 }), false);
   assert.equal(shouldStartActivitySync({ ...ready, online: false }), false);
   assert.equal(shouldStartActivitySync({ ...ready, isTauri: false }), false);
+  for (const accountState of ['offline', 'verifying', 'expired', 'revoked', 'demo']) {
+    assert.equal(shouldStartActivitySync({ ...ready, accountState }), false);
+  }
 });
 
 test('developer provider context is refreshed at most every five minutes unless requested manually', () => {

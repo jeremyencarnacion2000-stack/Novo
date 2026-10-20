@@ -105,8 +105,8 @@ pub fn start(app:AppHandle){
             if shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).epoch!=access.epoch{continue}
             let Ok(client)=crate::novo_account::client(20)else{continue};
             let body=serde_json::json!({"observations":observations(&workspaces),"replaceInventory":true});
-            if let Ok(response)=client.post(format!("{}/api/companion/project-observations",access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",access.device_id).json(&body).send().await{
-                if response.status().is_success(){signatures.clear();signatures.insert(key,(signature,std::time::Instant::now()));if previous_status!="synced"{crate::log::line("Project context sync: synced");previous_status="synced";}}
+            if access.send_json::<serde_json::Value>(client.post(format!("{}/api/companion/project-observations",access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",&access.device_id).json(&body),65536).await.is_ok(){
+                signatures.clear();signatures.insert(key,(signature,std::time::Instant::now()));if previous_status!="synced"{crate::log::line("Project context sync: synced");previous_status="synced";}
             }
         }
     });

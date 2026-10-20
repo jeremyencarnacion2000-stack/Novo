@@ -63,6 +63,7 @@ export class NovoChatController {
   private terminal:Extract<CompanionChatEvent,{type:'complete'}>|null=null;
   private streamError:NovoSafeError|null=null;
   private ready:Promise<void>;
+  private accountRetry:ReturnType<typeof setTimeout>|null=null;
   constructor(api:NovoChatApi,subscribe:Subscription,changed:()=>void) {
     this.api=api;this.changed=changed;
     const save=(stop:()=>void)=>{if(this.disposed)stop();else this.unlisten.push(stop);};
@@ -79,6 +80,7 @@ export class NovoChatController {
   private notify(){if(!this.disposed)this.changed();}
   private isCurrent(generation:number){return !this.disposed && generation===this.generation;}
   private resetAccount(){
+    if(this.accountRetry!==null){clearTimeout(this.accountRetry);this.accountRetry=null;}
     const request=this.state.activeRequestId;++this.generation;++this.selection;
     Object.assign(this.state,{account:null,models:[],conversations:[],conversation:null,activeRequestId:null,liveText:'',pendingMessage:'',phase:'idle',error:null});
     this.metadata=null;this.terminal=null;this.streamError=null;this.cooldownUntil=0;
@@ -87,6 +89,7 @@ export class NovoChatController {
   }
   async loadAccount():Promise<void> {
     await this.ready;if(this.disposed || this.state.activeRequestId)return;
+    if(this.accountRetry!==null){clearTimeout(this.accountRetry);this.accountRetry=null;}
     const generation=++this.generation;this.state.phase='loading';this.state.error=null;this.notify();
     try {
       const account=await this.api.novoAccountStatus();if(!this.isCurrent(generation))return;
@@ -97,8 +100,17 @@ export class NovoChatController {
         const [models,conversations]=await Promise.all([this.api.novoChatModels(),this.api.novoConversations()]);
         if(!this.isCurrent(generation))return;this.state.models=models;this.state.conversations=conversations;
       } else {this.state.conversation=null;}
-    } catch(error){if(this.isCurrent(generation))this.state.error=safeNovoError(error);}
-    finally {if(this.isCurrent(generation)){this.state.phase='idle';this.notify();}}
+    } catch(error){if(this.isCurrent(generation)){
+      this.state.error=safeNovoError(error);
+      if(['offline','unavailable','rate_limited'].includes(this.state.error.code)){
+        this.state.account={state:'offline',authorization:this.state.account?.authorization??null,lastVerifiedAt:this.state.account?.lastVerifiedAt??null,revocationPending:this.state.account?.revocationPending??false};
+        this.state.models=[];
+      }
+    }}
+    finally {if(this.isCurrent(generation)){
+      this.state.phase='idle';this.notify();
+      if(this.state.account?.state==='offline')this.accountRetry=setTimeout(()=>{this.accountRetry=null;void this.loadAccount();},60_000);
+    }}
   }
   async selectConversation(id:string):Promise<void> {
     if(this.disposed || this.state.activeRequestId)return;

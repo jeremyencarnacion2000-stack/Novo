@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
           title,
           messages,
           userId: session.user.id
-        }
+        },
+        select: { id: true, revision: true },
       })
     } catch (error) {
       if (id && isUniqueConstraintError(error)) {

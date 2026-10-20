@@ -23,6 +23,35 @@ test('stored token is not connected when server verification is offline',async()
   await f.controller.loadAccount();assert.equal(accountLabel(f.controller.state.account),'Sin conexión');
   assert.equal(f.controller.canSend,false);f.controller.dispose();
 });
+
+test('an open offline chat recovers automatically without replaying a message',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture();let checks=0;
+  f.api.novoAccountStatus=async()=>++checks===1?{state:'offline',authorization:null,lastVerifiedAt:null,revocationPending:false}:status('a');
+  await f.controller.loadAccount();assert.equal(f.controller.canSend,false);
+  t.mock.timers.tick(60_000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.controller.canSend,true);assert.equal(checks,2);assert.equal(f.sends.length,0);
+  f.controller.dispose();t.mock.timers.tick(600_000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(checks,2);
+});
+
+test('disposing an offline chat cancels its account retry',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture();let checks=0;
+  f.api.novoAccountStatus=async()=>{checks++;return {state:'offline',authorization:null,lastVerifiedAt:null,revocationPending:false};};
+  await f.controller.loadAccount();f.controller.dispose();
+  t.mock.timers.tick(60_000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(checks,1);
+});
+
+test('a transient catalog failure after verification also recovers without sending',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture();let loads=0;
+  f.api.novoChatModels=async()=>{if(++loads===1)throw {code:'unavailable'};return [{id:'auto',label:'Automático',allowsTwinMode:false}];};
+  await f.controller.loadAccount();assert.equal(f.controller.canSend,false);
+  t.mock.timers.tick(60_000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.controller.canSend,true);assert.equal(f.sends.length,0);f.controller.dispose();
+});
 test('Novo send bypasses legacy provider and capture denial does not block chat',async()=>{
   const f=fixture();await f.controller.loadAccount();assert.equal(f.controller.canSend,true);
   let finish;f.api.novoChatStart=request=>{f.sends.push(request);return new Promise(resolve=>{finish=resolve;});};

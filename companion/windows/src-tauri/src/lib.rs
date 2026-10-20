@@ -1,6 +1,7 @@
 // Novo Companion native app and privacy-bounded activity commands.
 
 mod agent_hooks;
+mod transport_retry;
 mod agents;
 mod chat;
 mod companion;
