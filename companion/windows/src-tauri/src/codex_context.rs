@@ -246,23 +246,21 @@ pub fn sync_hook_event(app: &AppHandle, payload: &Value) {
         let Ok(client) = crate::novo_account::client(8) else {
             return;
         };
-        let response = client
+        let response = access.send_json::<serde_json::Value>(client
             .post(format!(
                 "{}/api/companion/codex-context",
                 access.origin.trim_end_matches('/')
             ))
             .bearer_auth(&access.token)
             .header("X-Novo-Device-Id", &access.device_id)
-            .json(&input)
-            .send()
-            .await;
+            .json(&input), 65536).await;
         // Log only a fixed status, never the response body, summary or token.
         // Missing work-context scopes must not look like a successful sync.
         let status = match response {
-            Ok(response) if response.status().is_success() => "synced",
-            Ok(response) if response.status().as_u16() == 401 => "authorization_expired",
-            Ok(response) if response.status().as_u16() == 403 => "work_context_permission_required",
-            Ok(response) if response.status().as_u16() == 429 => "rate_limited",
+            Ok(_) => "synced",
+            Err(error) if error.code == "expired" => "authorization_expired",
+            Err(error) if error.code == "permission_required" => "work_context_permission_required",
+            Err(error) if error.code == "rate_limited" => "rate_limited",
             _ => "temporarily_unavailable",
         };
         crate::log::line(format!("Codex context sync: {status}"));

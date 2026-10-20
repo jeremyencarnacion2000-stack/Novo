@@ -81,18 +81,12 @@ pub(super) async fn request(
     body: Value,
 ) -> Result<Value, String> {
     let suffix = id.map(|id| format!("/{id}")).unwrap_or_default();
-    let response = crate::novo_account::client(10)
+    access.send_json(crate::novo_account::client(10)
         .map_err(|_| "offline")?
         .post(format!("{}/api/companion/work{suffix}", access.origin))
         .bearer_auth(&access.token)
         .header("X-Novo-Device-Id", &access.device_id)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|_| "offline")?;
-    crate::novo_account::read_json(response, 128 * 1024)
-        .await
-        .map_err(|_| "work_not_running".into())
+        .json(&body), 128 * 1024).await.map_err(|error| error.code)
 }
 pub(super) async fn report(
     access: &crate::novo_account::AccessContext,

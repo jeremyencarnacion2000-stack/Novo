@@ -101,14 +101,10 @@ async fn account_get<T: serde::de::DeserializeOwned>(
             segments.push(part);
         }
     }
-    let response = client(15)?
+    let result = access.send_json(client(15)?
         .get(url)
         .bearer_auth(&access.token)
-        .header("X-Novo-Device-Id", &access.device_id)
-        .send()
-        .await
-        .map_err(|_| SafeError::new("offline"))?;
-    let result = read_json(response, limit).await?;
+        .header("X-Novo-Device-Id", &access.device_id), limit).await?;
     if shared
         .novo_account
         .lock()
@@ -297,6 +293,7 @@ pub async fn novo_chat_start(
         Ok(())
     }
     .await;
+    if let Err(error) = &result { access.record_error(error); }
     shared
         .novo_account
         .lock()
@@ -319,17 +316,13 @@ pub async fn novo_chat_cancel(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .cancel(&request_id);
     let access = access_context(&shared).await?;
-    let response = client(12)?
+    let _: serde_json::Value = access.send_json(client(12)?
         .post(format!(
             "{}/api/companion/chat/{}/cancel",
             access.origin, request_id
         ))
         .bearer_auth(&access.token)
-        .header("X-Novo-Device-Id", &access.device_id)
-        .send()
-        .await
-        .map_err(|_| SafeError::new("offline"))?;
-    let _: serde_json::Value = read_json(response, 65536).await?;
+        .header("X-Novo-Device-Id", &access.device_id), 65536).await?;
     Ok(())
 }
 

@@ -235,7 +235,7 @@ pub struct AccountRuntime {
     pub authorization_attempt: u64,
     active: Option<(String, tokio::sync::watch::Sender<bool>)>,
     pub retry_at: Option<std::time::Instant>,
-    transport_retry: crate::transport_retry::TransportRetry,
+    transport_retry: std::sync::Arc<std::sync::Mutex<crate::transport_retry::TransportRetry>>,
 }
 impl AccountRuntime {
     pub fn begin_stream(&mut self, id: String) -> Result<StreamTicket, SafeError> {
@@ -290,11 +290,11 @@ impl AccountRuntime {
         self.epoch = self.epoch.wrapping_add(1);
         self.status = NativeAccountStatus::default();
         self.retry_at = None;
-        self.transport_retry.reset();
+        self.transport_retry = Default::default();
     }
     pub fn fail(&mut self, error: &SafeError) {
         if matches!(error.code.as_str(), "offline" | "unavailable" | "rate_limited") {
-            self.transport_retry.fail(std::time::Instant::now(), error.retry_after_seconds);
+            self.transport_retry.lock().unwrap_or_else(std::sync::PoisonError::into_inner).fail(std::time::Instant::now(), error.retry_after_seconds);
         }
         self.status.state = match error.code.as_str() {
             "demo" => AccountState::Demo,
@@ -312,7 +312,7 @@ impl AccountRuntime {
             }
             self.epoch = self.epoch.wrapping_add(1);
             self.status.authorization = None;
-            self.transport_retry.reset();
+            self.transport_retry = Default::default();
         }
     }
     pub fn fail_if_current(&mut self, epoch: u64, error: &SafeError) -> bool {
@@ -321,6 +321,11 @@ impl AccountRuntime {
         }
         self.fail(error);
         true
+    }
+    fn accept_result<T>(&mut self, epoch: u64, result: Result<T, SafeError>) -> Result<T, SafeError> {
+        if self.epoch != epoch { return Err(SafeError::new("cancelled")); }
+        if let Err(error) = &result { self.fail(error); }
+        result
     }
 }
 
@@ -440,6 +445,32 @@ pub struct AccessContext {
     pub token: String,
     pub device_id: String,
     pub epoch: u64,
+    transport_retry: std::sync::Arc<std::sync::Mutex<crate::transport_retry::TransportRetry>>,
+}
+fn retry_error(retry: &std::sync::Mutex<crate::transport_retry::TransportRetry>) -> Option<SafeError> {
+    retry.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remaining_seconds(std::time::Instant::now()).map(|seconds| {
+            let mut error = SafeError::new("unavailable");
+            error.retry_after_seconds = Some(seconds);
+            error
+        })
+}
+impl AccessContext {
+    pub fn record_error(&self, error: &SafeError) {
+        if matches!(error.code.as_str(), "offline" | "unavailable" | "rate_limited") {
+            self.transport_retry.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+                .fail(std::time::Instant::now(), error.retry_after_seconds);
+        }
+    }
+    pub async fn send_json<T: DeserializeOwned>(&self, request: reqwest::RequestBuilder, limit: usize) -> Result<T, SafeError> {
+        if let Some(error) = retry_error(&self.transport_retry) { return Err(error); }
+        let result = async {
+            let response = request.send().await.map_err(|_| SafeError::new("offline"))?;
+            read_json(response, limit).await
+        }.await;
+        if let Err(error) = &result { self.record_error(error); }
+        result
+    }
 }
 pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError> {
     serialized(&shared.companion_auth_lock, async {
@@ -457,27 +488,22 @@ pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError>
         if stopped {
             return Err(SafeError::new("revocation_pending"));
         }
-        if let Some(seconds) = shared.novo_account.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .transport_retry.remaining_seconds(std::time::Instant::now()) {
-            let mut error = SafeError::new("unavailable");
-            error.retry_after_seconds = Some(seconds);
-            return Err(error);
-        }
+        let (epoch, transport_retry) = {
+            let runtime = shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            (runtime.epoch, runtime.transport_retry.clone())
+        };
+        if let Some(error) = retry_error(&transport_retry) { return Err(error); }
         let origin = companion::validate_origin(&origin).map_err(|_| SafeError::new("demo"))?;
-        let token = companion::companion_access_token_locked(&origin)
+        let result = companion::companion_access_token_locked(&origin)
             .await
-            .map_err(|e| SafeError::new(&e))?;
-        let epoch = shared
-            .novo_account
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .epoch;
+            .map_err(|code| SafeError::new(&code));
+        let token = shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).accept_result(epoch, result)?;
         Ok(AccessContext {
             origin,
             token,
             device_id,
             epoch,
+            transport_retry,
         })
     })
     .await
@@ -485,14 +511,10 @@ pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError>
 pub async fn verify_account(shared: &Shared) -> Result<CompanionAuthorization, SafeError> {
     let access = access_context(shared).await?;
     let result = async {
-        let response = client(15)?
+        let authorization: CompanionAuthorization = access.send_json(client(15)?
             .get(format!("{}/api/companion/authorization", access.origin))
             .bearer_auth(&access.token)
-            .header("X-Novo-Device-Id", &access.device_id)
-            .send()
-            .await
-            .map_err(|_| SafeError::new("offline"))?;
-        let authorization: CompanionAuthorization = read_json(response, 65536).await?;
+            .header("X-Novo-Device-Id", &access.device_id), 65536).await?;
         authorization.validate(&access.device_id)?;
         Ok::<_, SafeError>(authorization)
     }.await;
@@ -500,14 +522,8 @@ pub async fn verify_account(shared: &Shared) -> Result<CompanionAuthorization, S
         .novo_account
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if runtime.epoch != access.epoch {
-        return Err(SafeError::new("cancelled"));
-    }
-    let authorization = match result {
-        Ok(authorization) => authorization,
-        Err(error) => { runtime.fail(&error); return Err(error); }
-    };
-    runtime.transport_retry.reset();
+    let authorization = runtime.accept_result(access.epoch, result)?;
+    runtime.transport_retry.lock().unwrap_or_else(std::sync::PoisonError::into_inner).succeed(std::time::Instant::now());
     runtime.status = NativeAccountStatus {
         state: AccountState::Connected,
         authorization: Some(authorization.clone()),
@@ -729,9 +745,46 @@ mod tests {
         assert!(account.fail_if_current(ticket.epoch, &SafeError::new("unavailable")));
         assert_eq!(account.status.state, AccountState::Offline);
         assert!(account.accepts(&ticket));
-        assert!(account.transport_retry.remaining_seconds(std::time::Instant::now()).is_some());
+        assert!(retry_error(&account.transport_retry).is_some());
         account.invalidate();
-        assert!(account.transport_retry.remaining_seconds(std::time::Instant::now()).is_none());
+        assert!(retry_error(&account.transport_retry).is_none());
+    }
+
+    #[test]
+    fn failed_refresh_backs_off_but_cannot_change_a_replacement_account() {
+        let mut account = AccountRuntime::default();
+        let epoch = account.epoch;
+        assert!(account.accept_result::<String>(epoch, Err(SafeError::new("offline"))).is_err());
+        assert!(retry_error(&account.transport_retry).is_some());
+        account.invalidate();
+        assert_eq!(account.accept_result::<String>(epoch, Err(SafeError::new("offline"))).unwrap_err().code, "cancelled");
+        assert!(retry_error(&account.transport_retry).is_none());
+    }
+
+    fn test_access(account: &AccountRuntime) -> AccessContext {
+        AccessContext { origin: "https://novo.test".into(), token: "synthetic".into(), device_id: "device".into(), epoch: account.epoch, transport_retry: account.transport_retry.clone() }
+    }
+
+    #[test]
+    fn held_contexts_share_http_backoff_but_old_failures_cannot_block_a_new_account() {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async {
+            let mut account = AccountRuntime::default();
+            let first = test_access(&account);
+            let held = test_access(&account);
+            let url = fixture_response(503, "Retry-After: 600\r\nContent-Type: application/json\r\n", "{}");
+            assert!(first.send_json::<serde_json::Value>(client(3).unwrap().get(url), 1024).await.is_err());
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let request = client(3).unwrap().get(format!("http://{}", listener.local_addr().unwrap()));
+            assert!(held.send_json::<serde_json::Value>(request, 1024).await.unwrap_err().retry_after_seconds.is_some());
+            assert!(matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock));
+            account.invalidate();
+            held.record_error(&SafeError::new("offline"));
+            let replacement = test_access(&account);
+            let url = fixture_response(200, "Content-Type: application/json\r\n", "{}");
+            assert!(replacement.send_json::<serde_json::Value>(client(3).unwrap().get(url), 1024).await.is_ok());
+        });
     }
 
     #[test]
