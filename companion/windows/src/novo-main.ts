@@ -179,6 +179,7 @@ async function syncPending(manual = false) {
     syncInFlight,
     historyClearRequested,
     tokenPresent: local.tokenPresent,
+    accountState: account.state,
     queuedEvents: local.queuedEvents,
     online: navigator.onLine,
   })) return;
@@ -196,7 +197,7 @@ async function syncPending(manual = false) {
 }
 
 async function refreshSignals() {
-  if (!isTauri || !local.tokenPresent || account.authorization?.capabilities.activityRead!==true) { signals=[]; return; }
+  if (!isTauri || !local.tokenPresent || account.state!=='connected' || account.authorization?.capabilities.activityRead!==true) { signals=[]; return; }
   const generation=accountGeneration;
   const result=await invoke<Signal[]>("companion_context");if(generation===accountGeneration)signals=result;
 }
@@ -212,7 +213,7 @@ function workContextExpiry(context:NovoWorkContext|null):string {
 }
 
 async function refreshWorkContext() {
-  if(!isTauri || !local.tokenPresent || account.authorization?.capabilities.workContextRead!==true){
+  if(!isTauri || !local.tokenPresent || account.state!=='connected' || account.authorization?.capabilities.workContextRead!==true){
     currentWorkContext=null;
     currentWorkStatus=account.state==='connected' ? 'Autoriza la lectura y escritura de contexto de trabajo para que el Twin lo use.' : 'Conecta tu cuenta Novo para compartir el enfoque actual.';
     render();
@@ -235,7 +236,7 @@ async function refreshWorkContext() {
 }
 
 async function refreshDeveloperContext(force = false) {
-  if (!isTauri || !local.tokenPresent || account.authorization?.capabilities.integrationsRead!==true) { developerContextLines=[];developerContextError='';return; }
+  if (!isTauri || !local.tokenPresent || account.state!=='connected' || account.authorization?.capabilities.integrationsRead!==true) { developerContextLines=[];developerContextError='';return; }
   const generation=accountGeneration;
   const lastAttemptMs=developerContextLastAttempt?.generation===generation ? developerContextLastAttempt.atMs : null;
   if (!shouldRefreshDeveloperContext({nowMs:Date.now(),lastAttemptMs,inFlight:developerContextRequestGeneration===generation,force})) return;
@@ -494,6 +495,7 @@ export function mountNovoAccount(element:HTMLElement){
   timers.push(window.setInterval(()=>{void refreshAndSync();},15_000));
   const online=()=>{void refreshAndSync();};window.addEventListener('online',online);
   timers.push(window.setInterval(()=>{void refreshSignals().catch(()=>undefined);},60_000));
+  timers.push(window.setInterval(()=>{if(account.state==='offline')void refreshAccount().catch(()=>undefined);},60_000));
   timers.push(window.setInterval(()=>{void refreshDeveloperContext();},DEVELOPER_CONTEXT_REFRESH_INTERVAL_MS));
   window.addEventListener('beforeunload',()=>{stopped=true;for(const id of timers)window.clearInterval(id);if(authorizationTimer!==null)window.clearTimeout(authorizationTimer);for(const stop of subscriptions)stop();window.removeEventListener('online',online);},{once:true});
 }

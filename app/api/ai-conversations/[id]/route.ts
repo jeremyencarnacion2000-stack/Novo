@@ -65,15 +65,19 @@ export async function PUT(
     }
 
     const { title, messages, expectedRevision } = parsedBody.data
-    const current = await prisma.aIConversation.findFirst({where:{id,userId:session.user.id}})
+    const needsStoredMessages = messages === undefined || expectedRevision === undefined
+    const current = await prisma.aIConversation.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true, revision: true, createdAt: true, messages: needsStoredMessages },
+    })
     if(!current)return NextResponse.json({error:'Conversation not found'},{status:404})
     if(expectedRevision!==undefined && expectedRevision!==current.revision)return NextResponse.json({error:'revision_conflict',revision:current.revision},{status:409})
-    const stored=canonicalConversationMessages(id,current.messages,current.createdAt.toISOString())
+    const stored=needsStoredMessages?canonicalConversationMessages(id,current.messages,current.createdAt.toISOString()):[]
     // Legacy tabs have no revision. Preserve unseen server messages instead of
     // allowing an old full-cache autosave to erase a Companion review card.
     const next=messages===undefined?stored:expectedRevision===undefined?mergeConversationMessages(stored,messages):messages
     const saved=await saveConversationRevision(session.user.id,id,current.revision,next,title)
-    return NextResponse.json({...current,...(title!==undefined?{title}:{}),messages:next,revision:saved.revision})
+    return NextResponse.json({id:current.id,revision:saved.revision})
   } catch (error: any) {
     if(error instanceof CompanionError)return NextResponse.json({error:error.code},{status:error.status})
     if (error instanceof z.ZodError) {

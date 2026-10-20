@@ -1311,13 +1311,7 @@ pub async fn companion_sample(shared: State<'_, Shared>) -> Result<Option<Activi
 pub async fn companion_sync(shared: State<'_, Shared>) -> Result<SyncResponse, String> {
     let _history_guard = activity_history_guard(&shared).await;
     recorder(&shared).maintain_retention_at(&event_path(),Utc::now())?;
-    let (origin, device_id) = {
-        let current = shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        (current.companion_api_origin.clone(), current.companion_device_id.clone())
-    };
-    if origin.is_empty() { return Err("connection_unavailable".into()) }
-    let origin=validate_origin(&origin)?;
-    let token = companion_access_token(&shared,&origin).await?;
+    let access = crate::novo_account::access_context(&shared).await.map_err(|error| error.code)?;
     let summaries = {
         let mut recorder = recorder(&shared);
         recorder.prune(Utc::now());
@@ -1326,13 +1320,24 @@ pub async fn companion_sync(shared: State<'_, Shared>) -> Result<SyncResponse, S
     };
     if summaries.is_empty() { return Ok(SyncResponse { accepted: 0, skipped: 0 }) }
     let client = crate::novo_account::client(15).map_err(|_|"connection_unavailable".to_string())?;
-    let response = client.post(format!("{}/api/companion/activity", origin.trim_end_matches('/')))
-        .bearer_auth(token)
-        .header("X-Novo-Device-Id",&device_id)
-        .json(&serde_json::json!({ "deviceId": device_id, "summaries": summaries }))
-        .send().await.map_err(|_| "connection_unavailable".to_string())?;
-    if !response.status().is_success() { return Err(if response.status().as_u16() == 403 { "activity_permission_required" } else { "sync_unavailable" }.into()) }
-    let result: SyncResponse = crate::novo_account::read_json(response,65536).await.map_err(|_| "sync_unavailable".to_string())?;
+    let result = async {
+        let response = client.post(format!("{}/api/companion/activity", access.origin))
+            .bearer_auth(&access.token)
+            .header("X-Novo-Device-Id",&access.device_id)
+            .json(&serde_json::json!({ "deviceId": access.device_id, "summaries": summaries }))
+            .send().await.map_err(|_| crate::novo_account::SafeError::new("offline"))?;
+        crate::novo_account::read_json::<SyncResponse>(response,65536).await
+    }.await;
+    let result = match result {
+        Ok(result) => result,
+        Err(error) => {
+            shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).fail_if_current(access.epoch, &error);
+            return Err(error.code);
+        }
+    };
+    if shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).epoch != access.epoch {
+        return Err("cancelled".into());
+    }
     let mut recorder = recorder(&shared);
     recorder.mark_daily_summaries_synced(&summaries);
     recorder.save()?;
@@ -1342,15 +1347,9 @@ pub async fn companion_sync(shared: State<'_, Shared>) -> Result<SyncResponse, S
 #[tauri::command]
 pub async fn companion_context(shared: State<'_, Shared>) -> Result<Vec<ContextSignal>, String> {
     let _history_guard=activity_history_guard(&shared).await;
-    let origin = {
-        let current = shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        current.companion_api_origin.clone()
-    };
-    let origin=validate_origin(&origin)?;
-    let token = companion_access_token(&shared,&origin).await?;
-    let device_id=shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).companion_device_id.clone();
+    let access = crate::novo_account::access_context(&shared).await.map_err(|error| error.code)?;
     let client = oauth_client()?;
-    let response = client.get(format!("{}/api/companion/activity", origin.trim_end_matches('/'))).bearer_auth(token).header("X-Novo-Device-Id",&device_id).send().await.map_err(|_| "connection_unavailable".to_string())?;
+    let response = client.get(format!("{}/api/companion/activity", access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",&access.device_id).send().await.map_err(|_| "connection_unavailable".to_string())?;
     if !response.status().is_success() { return Err("context_unavailable".into()) }
     let payload: ContextResponse = crate::novo_account::read_json(response,1024*1024).await.map_err(|_| "context_unavailable".to_string())?;
     Ok(payload.signals)
@@ -1359,17 +1358,11 @@ pub async fn companion_context(shared: State<'_, Shared>) -> Result<Vec<ContextS
 #[tauri::command]
 pub async fn companion_developer_context(shared: State<'_, Shared>) -> Result<DeveloperContextResponse, String> {
     let _history_guard=activity_history_guard(&shared).await;
-    let origin = {
-        let current = shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        current.companion_api_origin.clone()
-    };
-    let origin=validate_origin(&origin)?;
-    let token = companion_access_token(&shared,&origin).await?;
-    let device_id=shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).companion_device_id.clone();
+    let access = crate::novo_account::access_context(&shared).await.map_err(|error| error.code)?;
     let client = crate::novo_account::client(15).map_err(|_|"connection_unavailable".to_string())?;
-    let response = client.get(format!("{}/api/companion/developer-context", origin.trim_end_matches('/')))
-        .bearer_auth(token)
-        .header("X-Novo-Device-Id",&device_id)
+    let response = client.get(format!("{}/api/companion/developer-context", access.origin))
+        .bearer_auth(&access.token)
+        .header("X-Novo-Device-Id",&access.device_id)
         .send().await.map_err(|_| "connection_unavailable".to_string())?;
     if !response.status().is_success() {
         return Err(match response.status().as_u16() {

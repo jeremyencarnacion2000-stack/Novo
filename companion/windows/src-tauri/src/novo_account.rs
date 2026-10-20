@@ -235,6 +235,7 @@ pub struct AccountRuntime {
     pub authorization_attempt: u64,
     active: Option<(String, tokio::sync::watch::Sender<bool>)>,
     pub retry_at: Option<std::time::Instant>,
+    transport_retry: crate::transport_retry::TransportRetry,
 }
 impl AccountRuntime {
     pub fn begin_stream(&mut self, id: String) -> Result<StreamTicket, SafeError> {
@@ -289,8 +290,12 @@ impl AccountRuntime {
         self.epoch = self.epoch.wrapping_add(1);
         self.status = NativeAccountStatus::default();
         self.retry_at = None;
+        self.transport_retry.reset();
     }
     pub fn fail(&mut self, error: &SafeError) {
+        if matches!(error.code.as_str(), "offline" | "unavailable" | "rate_limited") {
+            self.transport_retry.fail(std::time::Instant::now(), error.retry_after_seconds);
+        }
         self.status.state = match error.code.as_str() {
             "demo" => AccountState::Demo,
             "expired" => AccountState::Expired,
@@ -307,6 +312,7 @@ impl AccountRuntime {
             }
             self.epoch = self.epoch.wrapping_add(1);
             self.status.authorization = None;
+            self.transport_retry.reset();
         }
     }
     pub fn fail_if_current(&mut self, epoch: u64, error: &SafeError) -> bool {
@@ -451,6 +457,13 @@ pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError>
         if stopped {
             return Err(SafeError::new("revocation_pending"));
         }
+        if let Some(seconds) = shared.novo_account.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .transport_retry.remaining_seconds(std::time::Instant::now()) {
+            let mut error = SafeError::new("unavailable");
+            error.retry_after_seconds = Some(seconds);
+            return Err(error);
+        }
         let origin = companion::validate_origin(&origin).map_err(|_| SafeError::new("demo"))?;
         let token = companion::companion_access_token_locked(&origin)
             .await
@@ -471,15 +484,18 @@ pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError>
 }
 pub async fn verify_account(shared: &Shared) -> Result<CompanionAuthorization, SafeError> {
     let access = access_context(shared).await?;
-    let response = client(15)?
-        .get(format!("{}/api/companion/authorization", access.origin))
-        .bearer_auth(&access.token)
-        .header("X-Novo-Device-Id", &access.device_id)
-        .send()
-        .await
-        .map_err(|_| SafeError::new("offline"))?;
-    let authorization: CompanionAuthorization = read_json(response, 65536).await?;
-    authorization.validate(&access.device_id)?;
+    let result = async {
+        let response = client(15)?
+            .get(format!("{}/api/companion/authorization", access.origin))
+            .bearer_auth(&access.token)
+            .header("X-Novo-Device-Id", &access.device_id)
+            .send()
+            .await
+            .map_err(|_| SafeError::new("offline"))?;
+        let authorization: CompanionAuthorization = read_json(response, 65536).await?;
+        authorization.validate(&access.device_id)?;
+        Ok::<_, SafeError>(authorization)
+    }.await;
     let mut runtime = shared
         .novo_account
         .lock()
@@ -487,6 +503,11 @@ pub async fn verify_account(shared: &Shared) -> Result<CompanionAuthorization, S
     if runtime.epoch != access.epoch {
         return Err(SafeError::new("cancelled"));
     }
+    let authorization = match result {
+        Ok(authorization) => authorization,
+        Err(error) => { runtime.fail(&error); return Err(error); }
+    };
+    runtime.transport_retry.reset();
     runtime.status = NativeAccountStatus {
         state: AccountState::Connected,
         authorization: Some(authorization.clone()),
@@ -699,6 +720,18 @@ mod tests {
         assert!(account.fail_if_current(current.epoch, &SafeError::new("revoked")));
         assert_eq!(account.status.state, AccountState::Revoked);
         assert!(!account.accepts(&current));
+    }
+
+    #[test]
+    fn transient_failure_waits_without_replacing_account_or_cancelling_the_current_turn() {
+        let mut account = AccountRuntime::default();
+        let ticket = account.begin_stream("current-request".into()).unwrap();
+        assert!(account.fail_if_current(ticket.epoch, &SafeError::new("unavailable")));
+        assert_eq!(account.status.state, AccountState::Offline);
+        assert!(account.accepts(&ticket));
+        assert!(account.transport_retry.remaining_seconds(std::time::Instant::now()).is_some());
+        account.invalidate();
+        assert!(account.transport_retry.remaining_seconds(std::time::Instant::now()).is_none());
     }
 
     #[test]

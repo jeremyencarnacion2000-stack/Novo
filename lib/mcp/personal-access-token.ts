@@ -92,15 +92,21 @@ export async function validateMcpPersonalAccessToken(token: string): Promise<
       scopes: true,
       expiresAt: true,
       revokedAt: true,
+      lastUsedAt: true,
     },
   })
 
   if (!record || record.revokedAt || !record.expiresAt || record.expiresAt <= new Date()) return { ok: false }
 
-  await prisma.mcpPersonalAccessToken.update({
-    where: { id: record.id },
-    data: { lastUsedAt: new Date() },
-  })
+  const now = new Date()
+  // Usage is an approximate audit timestamp; authorization is still checked on every request.
+  if (!record.lastUsedAt || now.getTime() - record.lastUsedAt.getTime() >= 5 * 60 * 1000) {
+    await prisma.mcpPersonalAccessToken.update({
+      where: { id: record.id },
+      data: { lastUsedAt: now },
+      select: { id: true },
+    })
+  }
 
   return {
     ok: true,
