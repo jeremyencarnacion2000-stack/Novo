@@ -494,9 +494,7 @@ pub async fn access_context(shared: &Shared) -> Result<AccessContext, SafeError>
         };
         if let Some(error) = retry_error(&transport_retry) { return Err(error); }
         let origin = companion::validate_origin(&origin).map_err(|_| SafeError::new("demo"))?;
-        let result = companion::companion_access_token_locked(&origin)
-            .await
-            .map_err(|code| SafeError::new(&code));
+        let result = companion::companion_access_token_locked(&origin).await;
         let token = shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).accept_result(epoch, result)?;
         Ok(AccessContext {
             origin,

@@ -671,64 +671,62 @@ fn open_external_url(value: &str) -> bool {
 
 // Caller owns companion_auth_lock. The vault is re-read after taking it,
 // so concurrent callers use a single rotated refresh token.
-pub(crate) async fn oauth_access_token_locked(origin: &str) -> Result<String, String> {
+async fn read_refreshed_token(response: reqwest::Response) -> Result<OAuthTokenResponse, crate::novo_account::SafeError> {
+    use crate::novo_account::SafeError;
+    let rejected = matches!(response.status().as_u16(), 400 | 401 | 403);
+    let token: OAuthTokenResponse = crate::novo_account::read_json(response, 65536).await
+        .map_err(|error|if rejected{SafeError::new("expired")}else{error})?;
+    if token.access_token.is_empty() || token.expires_in == 0 || token.refresh_token.as_ref().is_some_and(|value|value.is_empty()) {
+        return Err(SafeError::new("unavailable"));
+    }
+    Ok(token)
+}
+
+pub(crate) async fn oauth_access_token_locked(origin: &str) -> Result<String, crate::novo_account::SafeError> {
+    use crate::novo_account::SafeError;
     if let Some(raw) = secrets::get(OAUTH_CREDENTIALS_KEY) {
         let mut credentials: OAuthCredentials = serde_json::from_str(&raw)
-            .map_err(|_| "credential_store_unavailable".to_string())?;
+            .map_err(|_| SafeError::new("credential_store_unavailable"))?;
         let credential_origin = if credentials.api_origin.is_empty() {
-            return Err("permission_required".into());
+            return Err(SafeError::new("permission_required"));
         } else { credentials.api_origin.clone() };
-        if credential_origin != origin {return Err("permission_required".into());}
-        validate_oauth_endpoint(origin, &credentials.token_endpoint)?;
-        validate_oauth_endpoint(origin, &credentials.revocation_endpoint)?;
+        if credential_origin != origin {return Err(SafeError::new("permission_required"));}
+        validate_oauth_endpoint(origin, &credentials.token_endpoint).map_err(|code|SafeError::new(&code))?;
+        validate_oauth_endpoint(origin, &credentials.revocation_endpoint).map_err(|code|SafeError::new(&code))?;
         if credentials.expires_at > Utc::now() + chrono::Duration::seconds(60) {
             return Ok(credentials.access_token);
         }
 
-        let client = oauth_client()?;
+        let client = oauth_client().map_err(|code|SafeError::new(&code))?;
         let response = client.post(&credentials.token_endpoint)
             .form(&[
                 ("grant_type", "refresh_token"),
                 ("refresh_token", credentials.refresh_token.as_str()),
                 ("client_id", credentials.client_id.as_str()),
             ])
-            .send().await.map_err(|_| "offline".to_string())?;
-        if !response.status().is_success() {
-            return Err(if response.status().is_server_error() || response.status().as_u16()==429 {"offline"} else {"expired"}.into());
-        }
-        let refreshed: OAuthTokenResponse = crate::novo_account::read_json(response, 65536).await.map_err(|_| "authorization_expired".to_string())?;
-        if refreshed.access_token.is_empty() || refreshed.expires_in == 0 {
-            return Err("authorization_expired".into());
-        }
+            .send().await.map_err(|_| SafeError::new("offline"))?;
+        let refreshed = read_refreshed_token(response).await?;
         credentials.access_token = refreshed.access_token;
-        if refreshed.refresh_token.as_ref().is_some_and(|t|t.is_empty()){return Err("authorization_expired".into());}
         credentials.refresh_token = refreshed.refresh_token.unwrap_or(credentials.refresh_token);
         credentials.expires_at = Utc::now() + chrono::Duration::seconds(refreshed.expires_in.min(86400) as i64);
         let access_token = credentials.access_token.clone();
-        let serialized = serde_json::to_string(&credentials).map_err(|_| "credential_store_unavailable".to_string())?;
-        secrets::set(OAUTH_CREDENTIALS_KEY, &serialized).map_err(|_| "credential_store_unavailable".to_string())?;
+        let serialized = serde_json::to_string(&credentials).map_err(|_| SafeError::new("credential_store_unavailable"))?;
+        secrets::set(OAUTH_CREDENTIALS_KEY, &serialized).map_err(|_| SafeError::new("credential_store_unavailable"))?;
         return Ok(access_token);
     }
 
-    Err("demo".into())
-}
-
-async fn companion_access_token(shared: &Shared, origin:&str) -> Result<String,String> {
-    crate::novo_account::serialized(&shared.companion_auth_lock, async {
-        if shared.settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).companion_revocation_pending {return Err("revocation_pending".into());}
-        companion_access_token_locked(origin).await
-    }).await
+    Err(SafeError::new("demo"))
 }
 
 // Caller owns companion_auth_lock. OAuth refresh remains unchanged; a Novo
 // personal token is the other first-party credential supported by Companion.
-pub(crate) async fn companion_access_token_locked(origin:&str) -> Result<String,String> {
+pub(crate) async fn companion_access_token_locked(origin:&str) -> Result<String,crate::novo_account::SafeError> {
     if secrets::present(OAUTH_CREDENTIALS_KEY) {oauth_access_token_locked(origin).await}
     else {
         let stored = read_personal_access_token(secrets::get(TOKEN_KEY))
-            .ok_or_else(|| "permission_required".to_string())?;
+            .ok_or_else(|| crate::novo_account::SafeError::new("permission_required"))?;
         if !personal_token_origin_matches(Some(&stored.api_origin), origin) {
-            return Err("permission_required".into());
+            return Err(crate::novo_account::SafeError::new("permission_required"));
         }
         Ok(stored.token)
     }
@@ -1365,6 +1363,35 @@ pub async fn companion_developer_context(shared: State<'_, Shared>) -> Result<De
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn refresh_errors_preserve_server_waits_and_only_rejected_grants_require_reauthorization() {
+        use std::io::{Read, Write};
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async {
+            for (status, body, code, wait) in [
+                (429, "{}", "rate_limited", Some(600)),
+                (503, "{}", "unavailable", Some(600)),
+                (400, "{\"error\":\"invalid_grant\"}", "expired", None),
+                (200, "{\"access_token\":\"\",\"expires_in\":0}", "unavailable", None),
+            ] {
+                let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                let url = format!("http://{}", listener.local_addr().unwrap());
+                let response = format!("HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\nRetry-After: 600\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len());
+                let server = std::thread::spawn(move || {
+                    let (mut socket, _) = listener.accept().unwrap();
+                    socket.set_read_timeout(Some(std::time::Duration::from_secs(3))).unwrap();
+                    let mut input = [0; 4096];let _ = socket.read(&mut input);
+                    socket.write_all(response.as_bytes()).unwrap();
+                });
+                let response = crate::novo_account::client(3).unwrap().post(url).send().await.unwrap();
+                let error = super::read_refreshed_token(response).await.err().unwrap();
+                assert_eq!(error.code, code);
+                assert_eq!(error.retry_after_seconds, wait);
+                server.join().unwrap();
+            }
+        });
+    }
+
     use super::{
         activity_history_guard, clear_local_history, is_novo_personal_access_token,
         personal_token_origin_matches, read_personal_access_token,

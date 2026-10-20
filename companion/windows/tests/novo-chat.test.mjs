@@ -43,6 +43,15 @@ test('disposing an offline chat cancels its account retry',async t=>{
   t.mock.timers.tick(60_000);await new Promise(resolve=>setImmediate(resolve));
   assert.equal(checks,1);
 });
+
+test('a transient catalog failure after verification also recovers without sending',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture();let loads=0;
+  f.api.novoChatModels=async()=>{if(++loads===1)throw {code:'unavailable'};return [{id:'auto',label:'Automático',allowsTwinMode:false}];};
+  await f.controller.loadAccount();assert.equal(f.controller.canSend,false);
+  t.mock.timers.tick(60_000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.controller.canSend,true);assert.equal(f.sends.length,0);f.controller.dispose();
+});
 test('Novo send bypasses legacy provider and capture denial does not block chat',async()=>{
   const f=fixture();await f.controller.loadAccount();assert.equal(f.controller.canSend,true);
   let finish;f.api.novoChatStart=request=>{f.sends.push(request);return new Promise(resolve=>{finish=resolve;});};

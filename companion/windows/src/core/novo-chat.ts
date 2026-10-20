@@ -100,7 +100,13 @@ export class NovoChatController {
         const [models,conversations]=await Promise.all([this.api.novoChatModels(),this.api.novoConversations()]);
         if(!this.isCurrent(generation))return;this.state.models=models;this.state.conversations=conversations;
       } else {this.state.conversation=null;}
-    } catch(error){if(this.isCurrent(generation))this.state.error=safeNovoError(error);}
+    } catch(error){if(this.isCurrent(generation)){
+      this.state.error=safeNovoError(error);
+      if(['offline','unavailable','rate_limited'].includes(this.state.error.code)){
+        this.state.account={state:'offline',authorization:this.state.account?.authorization??null,lastVerifiedAt:this.state.account?.lastVerifiedAt??null,revocationPending:this.state.account?.revocationPending??false};
+        this.state.models=[];
+      }
+    }}
     finally {if(this.isCurrent(generation)){
       this.state.phase='idle';this.notify();
       if(this.state.account?.state==='offline')this.accountRetry=setTimeout(()=>{this.accountRetry=null;void this.loadAccount();},60_000);
