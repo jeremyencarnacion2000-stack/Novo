@@ -3388,8 +3388,9 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 }
 .novo-liquid-navigation-selection {
   contain: layout style;
-  border: 1px solid rgba(255,255,255,.11);
-  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), 0 2px 8px rgba(0,0,0,.08);
+  background: var(--novo-navigation-selection);
+  border: 1px solid color-mix(in srgb, var(--novo-navigation-foreground) 12%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--novo-navigation-foreground) 15%, transparent), 0 2px 8px rgba(0,0,0,.08);
   pointer-events: none;
 }
 .novo-liquid-navigation-selection::after {
@@ -3419,13 +3420,9 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
 .novo-liquid-navigation-trail--far { fill: rgba(255,255,255,.014); stroke-opacity: .6; }
 .novo-liquid-navigation-outline {
   fill: none;
-  stroke: rgba(255,255,255,.23);
+  stroke: color-mix(in srgb, var(--novo-navigation-foreground) 24%, transparent);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
-}
-[data-slot='sidebar-inner'] .novo-liquid-navigation-outline,
-.novo-mobile-nav-shell .novo-liquid-navigation-outline {
-  stroke: var(--novo-navigation-rim);
 }
 button:active > .novo-nav-selection,
 a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navigation-selection), var(--novo-navigation-foreground) 5%); }
@@ -3476,6 +3473,14 @@ html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
     outline-offset: -1px;
   }
   .novo-nav-selection { outline: 2px solid currentColor; outline-offset: -2px; }
+  .novo-liquid-navigation-selection {
+    background: Canvas;
+    border-color: CanvasText;
+    box-shadow: none;
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+  .novo-liquid-navigation-selection::after { display: none; }
   [data-slot='sidebar-inner'], .novo-settings-nav { background: Canvas !important; backdrop-filter: none; }
   .novo-navigation-glass > glass-element, .novo-navigation-glass > [data-glass-refractive] { display: none; }
 }
@@ -3490,6 +3495,7 @@ html[data-accessibility-reduce-glass='true'] .novo-settings-nav {
 .novo-nav-glass-control[data-active='true'] { isolation: auto; }
 @media (prefers-contrast: more) {
   .novo-nav-selection { outline: 1px solid currentColor; outline-offset: -1px; }
+  .novo-liquid-navigation-selection { outline: 1px solid currentColor; outline-offset: -1px; }
 }
 @media (forced-colors: active) {
   [data-slot='sidebar-inner'], .novo-settings-nav { -webkit-backdrop-filter: none; }
