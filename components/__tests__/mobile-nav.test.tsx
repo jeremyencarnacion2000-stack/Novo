@@ -265,7 +265,7 @@ describe('MobileNav', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Workspace menu' })).not.toBeInTheDocument())
   })
 
-  it('uses a thin selection overlay instead of nesting another lens in the panel', async () => {
+  it('uses one shared liquid selection plane in the expanded navigation panel', async () => {
     pathname = '/calendar'
     const user = userEvent.setup()
     renderMobileNav()
@@ -273,8 +273,11 @@ describe('MobileNav', () => {
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
     const selected = screen.getByRole('button', { name: 'Calendar' })
+    const panel = screen.getByRole('dialog', { name: 'Workspace menu' })
     expect(selected).toHaveAttribute('aria-current', 'page')
-    expect(selected.querySelector('[data-nav-selection]')).not.toBeNull()
+    expect(selected).toHaveAttribute('data-navigation-selection-target')
+    expect(selected.querySelector('[data-nav-selection]')).toBeNull()
+    expect(panel.querySelectorAll('[data-liquid-navigation-selection]')).toHaveLength(1)
     expect(selected.querySelector('[data-glass-refractive]')).toBeNull()
   })
 
@@ -305,9 +308,25 @@ describe('MobileNav', () => {
     pathname = '/cognitive'
     render(<SidebarProvider><AppSidebar /></SidebarProvider>)
     const current = screen.getByRole('link', { name: 'Cognitivo' })
+    const owner = current.closest('[data-sidebar="menu-item"]')
+    const sidebarContent = current.closest('[data-sidebar="content"]')
     expect(current).toHaveAttribute('aria-current', 'page')
-    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).not.toBeNull()
-    expect(current.closest('[data-sidebar="menu-item"]')?.querySelector('[data-nav-selection]')).toHaveAttribute('data-selection-refractive', 'true')
+    expect(owner).toHaveAttribute('data-navigation-selection-target')
+    expect(sidebarContent?.querySelectorAll('[data-liquid-navigation-selection]')).toHaveLength(1)
+    expect(owner?.querySelector('[data-nav-selection]')).toBeNull()
+  })
+
+  it('keeps one mobile selection surface alive while the active route changes', () => {
+    const view = renderMobileNav()
+    const selection = document.querySelector('[data-liquid-navigation-selection]')
+    expect(selection).not.toBeNull()
+
+    pathname = '/chat'
+    view.rerender(<MobileOverlayProvider><MobileNav /></MobileOverlayProvider>)
+
+    expect(document.querySelectorAll('[data-liquid-navigation-selection]')).toHaveLength(1)
+    expect(document.querySelector('[data-liquid-navigation-selection]')).toBe(selection)
+    expect(screen.getByRole('button', { name: 'Chat' })).toHaveAttribute('data-navigation-selection-target')
   })
 
   it('keeps background navigation inert until the drawer exit finishes', async () => {

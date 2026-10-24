@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils'
 import { springConfig } from '@/lib/design-tokens'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { NavigationIndicator } from '@/components/ui/navigation-indicator'
+import { LiquidNavigationSelection } from '@/components/ui/liquid-navigation-selection'
 import { GlassSurface } from '@/components/ui/GlassSurface'
 
 import { useTranslation } from '@/lib/i18n'
@@ -273,7 +273,11 @@ export function AppSidebar() {
 
         <SmoothScrollProvider scrollRef={sidebarContentRef}>
           <LayoutGroup id="desktop-navigation">
-          <SidebarContent ref={sidebarContentRef} className={cn("py-2 transition-all duration-300", state === 'collapsed' ? "!px-0" : "px-3")}>
+          <SidebarContent ref={sidebarContentRef} className={cn("relative py-2 transition-all duration-300", state === 'collapsed' ? "!px-0" : "px-3")}>
+            <LiquidNavigationSelection
+              containerRef={sidebarContentRef}
+              activeKey={`${pathname ?? ''}|${selectedSection ?? ''}|${state}`}
+            />
             {navigation.map((section) => (
               <Collapsible key={section.title} defaultOpen className="group/collapsible">
                 <SidebarGroup className={cn(state === 'collapsed' && "!p-0")}>
@@ -298,10 +302,11 @@ export function AppSidebar() {
                               ? pathname === '/today' && typeof window !== 'undefined' && window.location.hash === '#actividad'
                               : pathname === item.href || pathname === item.href + '/'
                             return (
-                              <SidebarMenuItem key={item.title} className="relative rounded-full">
-                                {isActive && selectedSection === section.title && (
-                                  <NavigationIndicator layoutId="desktop-nav-pill" className="rounded-full" refractive />
-                                )}
+                              <SidebarMenuItem
+                                key={item.title}
+                                className="relative rounded-full"
+                                data-navigation-selection-target={isActive && selectedSection === section.title ? '' : undefined}
+                              >
                                 <motion.div
                                   whileHover={{ scale: 1.015 }}
                                   whileTap={{ scale: 0.97 }}

@@ -3386,6 +3386,47 @@ html.cognitive-reduced-capacity .container { gap: 1.5rem; }
   box-shadow: inset 0 1px 0 var(--novo-navigation-rim), 0 2px 5px rgba(0,0,0,.05);
   transition: background-color 120ms ease;
 }
+.novo-liquid-navigation-selection {
+  contain: layout style;
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: inset 0 1px 0 var(--novo-navigation-rim), 0 2px 8px rgba(0,0,0,.08);
+  pointer-events: none;
+}
+.novo-liquid-navigation-selection::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at var(--novo-nav-selection-highlight-x, 50%) var(--novo-nav-selection-highlight-y, 50%),
+    rgba(255,255,255,.14),
+    rgba(255,255,255,.035) 28%,
+    transparent 66%
+  );
+  opacity: var(--novo-nav-selection-highlight-opacity, .12);
+}
+.novo-liquid-navigation-selection-contour {
+  overflow: visible;
+  z-index: 2;
+}
+.novo-liquid-navigation-trail {
+  fill: rgba(255,255,255,.026);
+  stroke: rgba(255,255,255,.045);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.novo-liquid-navigation-trail--far { fill: rgba(255,255,255,.014); stroke-opacity: .6; }
+.novo-liquid-navigation-outline {
+  fill: none;
+  stroke: rgba(255,255,255,.23);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+[data-slot='sidebar-inner'] .novo-liquid-navigation-outline,
+.novo-mobile-nav-shell .novo-liquid-navigation-outline {
+  stroke: var(--novo-navigation-rim);
+}
 button:active > .novo-nav-selection,
 a:active > .novo-nav-selection { background: color-mix(in srgb, var(--novo-navigation-selection), var(--novo-navigation-foreground) 5%); }
 .novo-nav-label { color: var(--novo-navigation-secondary); }
