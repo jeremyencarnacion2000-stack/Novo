@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -16,7 +16,7 @@ import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { GlassSurface } from '@/components/ui/GlassSurface'
-import { NavigationIndicator } from '@/components/ui/navigation-indicator'
+import { LiquidNavigationSelection } from '@/components/ui/liquid-navigation-selection'
 import { rememberNavigationOrigin } from '@/lib/navigation-origin'
 
 interface MobileSectionDrawerProps {
@@ -33,6 +33,7 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
     const pathname = usePathname()
     const { t } = useTranslation()
     const { setModalOpen } = useMobileOverlay()
+    const drawerContentRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         setModalOpen(open)
@@ -156,9 +157,15 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
 
                     {/* Sections */}
                     <div
+                        ref={drawerContentRef}
                         data-modal-content
                         className="relative z-10 max-h-[calc(14rem-1.5rem)] overflow-y-auto px-3 pb-3 scrollbar-hide"
                     >
+                        <LiquidNavigationSelection
+                            containerRef={drawerContentRef}
+                            activeKey={pathname ?? ''}
+                            refractiveActive={false}
+                        />
                         {sections.map((section) => (
                             <div key={section.title} className="mb-3 last:mb-1">
                                 <p className="novo-nav-label mb-1 pl-1 text-[10px] font-medium tracking-wide">
@@ -176,15 +183,15 @@ export function MobileSectionDrawer({ open = true, onClose, onOpenVoice, onOpenS
                                                 key={item.href}
                                                 onClick={(event) => { rememberNavigationOrigin(event.currentTarget, item.href); handleNavigate(item.href) }}
                                                 className={cn(
-                                                    "novo-nav-glass-control relative flex min-h-[54px] flex-col items-center gap-1 rounded-[16px] px-1 py-2 transition-all duration-200 active:scale-95",
+                                                    "novo-nav-glass-control relative z-10 flex min-h-[54px] flex-col items-center gap-1 rounded-[16px] px-1 py-2 transition-all duration-200 active:scale-95",
                                                     active
                                                         ? "novo-nav-label-active"
                                                         : "novo-nav-label"
                                                 )}
                                                 data-active={active}
+                                                data-navigation-selection-target={active ? '' : undefined}
                                                 aria-current={active ? 'page' : undefined}
                                             >
-                                                {active && <NavigationIndicator />}
                                                 <div className={cn(
                                                     "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
                                                     active

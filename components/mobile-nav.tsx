@@ -8,7 +8,7 @@ import { MobileSectionDrawer } from '@/components/mobile-section-drawer'
 import { motion, LayoutGroup } from 'framer-motion'
 import { appleLiquidMotion } from '@/lib/design-tokens'
 import { GlassSurface } from '@/components/ui/GlassSurface'
-import { NavigationIndicator } from '@/components/ui/navigation-indicator'
+import { LiquidNavigationSelection } from '@/components/ui/liquid-navigation-selection'
 import { useTranslation } from '@/lib/i18n'
 import { useMobileOverlay } from '@/components/mobile-overlay-provider'
 import { useState } from 'react'
@@ -149,6 +149,11 @@ export function MobileNav() {
                             className="pointer-events-none absolute inset-0 z-0 h-full w-full"
                             style={{ position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit' }}
                         />
+                        <LiquidNavigationSelection
+                            containerRef={liquidRailRef}
+                            activeKey={pathname ?? ''}
+                            refractiveActive={!drawerMounted}
+                        />
                         <LayoutGroup>
                             {navItems.map((item) => {
                                 const Icon = item.icon
@@ -171,13 +176,11 @@ export function MobileNav() {
                                             active && "px-4"
                                         )}
                                         data-active={active}
+                                        data-navigation-selection-target={active ? '' : undefined}
                                         whileTap={{ scale: appleLiquidMotion.pressScale }}
                                         transition={appleLiquidMotion.pressTransition}
                                         layout
                                     >
-                                        {active && (
-                                            <NavigationIndicator layoutId="mobile-nav-pill" refractive refractiveActive={!drawerMounted} />
-                                        )}
                                         <Icon
                                             data-shared-item={item.sharedId}
                                             className={cn("relative z-10", isCompactPath ? "h-[18px] w-[18px]" : "h-[20px] w-[20px]")}
