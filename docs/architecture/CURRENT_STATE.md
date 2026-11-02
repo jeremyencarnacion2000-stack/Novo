@@ -4,7 +4,7 @@ Auditoría: 2026-11-01. Base inspeccionada: `cd0af5f`, con los cambios locales p
 
 Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arquitectura objetivo](TARGET_ARCHITECTURE.md), [evaluación de ecosistema/voz](../research/ECOSYSTEM_EVALUATION.md), [hoja de ruta](../roadmap/NOVO_EVOLUTION.md) y [registro de cambios y evidencia](../engineering/IMPLEMENTATION_LOG.md).
 
-Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en `productivitynovo.vercel.app`. CI web pasa tipos, lint y regresiones; el workflow Windows pasa pruebas y genera EXE/MSI. Se prepara la versión pública 0.2.13 con una corrección adicional descubierta en la ejecución real de Codex. El detector, proceso limitado y parser de producción ya devuelven una respuesta del plan ChatGPT; falta instalar ese arreglo y probar los botones. Gmail fue renovado por el usuario y el chat web ya consulta correos reales con atribución Gmail; no se envió correo.
+Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en `productivitynovo.vercel.app`. CI web pasa tipos, lint y regresiones. [Companion 0.2.13](https://github.com/jeremyencarnacion2000-stack/Novo/releases/tag/companion-v0.2.13) publicado e instalado, con versión del ejecutable comprobada y proceso activo. El detector, proceso limitado y parser de producción devuelven una respuesta del plan ChatGPT; la prueba de botones sigue pendiente por fallos del control de ventanas de Windows. Gmail fue renovado por el usuario y el chat web ya consulta correos reales con atribución Gmail; no se envió correo.
 
 ## Capas existentes
 
@@ -26,7 +26,7 @@ Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en
 
 ## Coucou
 
-Identificado: [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), revisión declarada `a7bd575e90253673e7e08370a78f1261eb53ac2f`. `companion/windows/THIRD-PARTY-LICENSE.txt` conserva la licencia MIT y atribución a Louis Raillé. Novo sustituye los recursos de personaje/audio reservados. Mantener este aviso al distribuir. Manifiestos y README se alinean en 0.2.13 para sustituir la descarga pública 0.2.12; publicación del instalador pendiente de su compilación versionada.
+Identificado: [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), revisión declarada `a7bd575e90253673e7e08370a78f1261eb53ac2f`. `companion/windows/THIRD-PARTY-LICENSE.txt` conserva la licencia MIT y atribución a Louis Raillé. Novo sustituye los recursos de personaje/audio reservados. Mantener este aviso al distribuir. Manifiestos, README, release y ejecutable instalado coinciden en 0.2.13; el instalador incluye el aviso de licencia, comprobado en la instalación.
 
 Novo reutiliza ventana/isla, hooks de agentes, integraciones, preferencias y runtime nativo. Sobre esa base añade cuenta Novo, chat compartido, captura consentida, carpetas/contexto de trabajo, scopes y trabajo durable. No se encontró evidencia de un Windows Widget de Windows App SDK independiente: la superficie actual es el Companion Tauri.
 
