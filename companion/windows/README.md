@@ -1,8 +1,15 @@
 # Novo Companion para Windows
 
-Versión preparada: **0.2.10**.
+Versión preparada: **0.2.13**.
 
-[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.10/Novo-Companion-Windows-0.2.10-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.10/Novo-Companion-Windows-0.2.10.msi)
+[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.13/Novo-Companion-Windows-0.2.13-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.13/Novo-Companion-Windows-0.2.13.msi)
+
+## Novedades de 0.2.13
+
+- Permite elegir Cuenta Novo o ChatGPT / Codex como fuente de respuesta en la configuración del chat activo.
+- Codex usa la sesión local del plan ChatGPT, con historial temporal separado y cancelación al cambiar de fuente. Requiere un Codex CLI compatible y una sesión válida; no transfiere automáticamente el historial ni los archivos de la cuenta Novo.
+- Comprueba el tipo de cuenta mediante el protocolo de Codex y conserva el aislamiento del proceso y los límites de respuesta.
+- Incluye las correcciones de protocolo verificadas en Windows y mantiene los hooks, preferencias, carpetas autorizadas y cuenta existentes.
 
 ## Novedades de 0.2.10
 
