@@ -4,7 +4,7 @@ Auditoría: 2026-11-01. Base inspeccionada: `cd0af5f`, con los cambios locales p
 
 Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arquitectura objetivo](TARGET_ARCHITECTURE.md), [evaluación de ecosistema/voz](../research/ECOSYSTEM_EVALUATION.md), [hoja de ruta](../roadmap/NOVO_EVOLUTION.md) y [registro de cambios y evidencia](../engineering/IMPLEMENTATION_LOG.md).
 
-Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en `productivitynovo.vercel.app`. CI web pasa tipos, lint y regresiones; el workflow Windows pasa pruebas y genera EXE/MSI. El binario nuevo se instaló localmente conservando datos; se prepara la versión pública 0.2.13. La interacción real de Codex sigue pendiente porque Windows no permite capturar ni accionar la ventana en esta sesión. Una consulta real de Gmail confirma `reauthorization_required`, sin inventar mensajes.
+Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en `productivitynovo.vercel.app`. CI web pasa tipos, lint y regresiones; el workflow Windows pasa pruebas y genera EXE/MSI. Se prepara la versión pública 0.2.13 con una corrección adicional descubierta en la ejecución real de Codex. El detector, proceso limitado y parser de producción ya devuelven una respuesta del plan ChatGPT; falta instalar ese arreglo y probar los botones. Gmail fue renovado por el usuario y el chat web ya consulta correos reales con atribución Gmail; no se envió correo.
 
 ## Capas existentes
 
