@@ -1,8 +1,8 @@
 /** @jest-environment node */
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
-jest.mock('@/lib/prisma', () => ({ prisma: { aIConversation: { findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn() } } }))
-import { PUT } from './route'
+jest.mock('@/lib/prisma', () => ({ prisma: { aIConversation: { findUnique: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn() } } }))
+import { GET, PUT } from './route'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 
@@ -40,4 +40,21 @@ it('still reads and preserves history when only changing a title', async () => {
   expect(response.status).toBe(200)
   expect(prisma.aIConversation.findFirst).toHaveBeenCalledWith(expect.objectContaining({ select: expect.objectContaining({ messages: true }) }))
   expect(prisma.aIConversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: 'Nuevo título', messages: expect.arrayContaining([expect.objectContaining({ id: newCard.id })]) }) }))
+})
+
+it('loads owned detail with stable legacy message IDs and all message extensions', async () => {
+  const legacy = { role: 'assistant', content: 'Correo revisado', attachments: [{ id: 'file', name: 'documento.pdf' }], sources: [{ id: 'gmail', label: 'Gmail' }], blocks: newCard.blocks, liked: true }
+  ;(prisma.aIConversation.findUnique as jest.Mock).mockResolvedValue({ id: 'conv', revision: 4, createdAt: new Date('2026-10-19T00:00:00Z'), messages: [legacy] })
+  const response = await GET(new Request('https://novo.test/api/ai-conversations/conv') as never, params)
+  const first = await response.json()
+  const second = await (await GET(new Request('https://novo.test/api/ai-conversations/conv') as never, params)).json()
+  expect(prisma.aIConversation.findUnique).toHaveBeenCalledWith({ where: { id: 'conv', userId: 'owner' } })
+  expect(first.messages[0]).toMatchObject({ ...legacy, id: expect.stringMatching(/^legacy-/), timestamp: '2026-10-19T00:00:00.000Z' })
+  expect(first.messages).toEqual(second.messages)
+  expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+})
+
+it('returns 404 instead of a missing or foreign detail', async () => {
+  ;(prisma.aIConversation.findUnique as jest.Mock).mockResolvedValue(null)
+  expect((await GET(new Request('https://novo.test/api/ai-conversations/conv') as never, params)).status).toBe(404)
 })

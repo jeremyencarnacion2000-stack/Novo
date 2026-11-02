@@ -36,7 +36,10 @@ export async function GET(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    return NextResponse.json(conversation)
+    return NextResponse.json({
+      ...conversation,
+      messages: canonicalConversationMessages(id, conversation.messages, conversation.createdAt.toISOString()),
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     console.error('Error fetching AI conversation.')
     return NextResponse.json({
