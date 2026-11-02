@@ -12,7 +12,7 @@ jest.mock('gsap', () => ({ gsap: {
 jest.mock('@/lib/liquid-modal-motion', () => ({ getLiquidModalOverlay: () => null }))
 
 function Gesture({ onDismiss }: { onDismiss: (surface: HTMLElement) => void }) {
-  const ref = useDragToDismiss({ onDismiss })
+  const ref = useDragToDismiss<HTMLDivElement>({ onDismiss })
   return <><div data-modal-drag-overlay /><div ref={ref} data-testid="surface" data-liquid-modal-layer data-modal-motion-state="open">Drag</div></>
 }
 
