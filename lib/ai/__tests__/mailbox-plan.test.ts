@@ -8,6 +8,7 @@ describe('mailbox read planning', () => {
   it('preserves the named correspondent instead of always reading only the latest inbox', () => {
     expect(fallbackGmailQuery('Quiero que revises si MESCyT me respondió')).toBe('MESCyT')
     expect(fallbackGmailQuery('revisa mis correos recientes importantes')).toBe('newer_than:30d')
+    expect(fallbackGmailQuery('¿Hay algo del MESCyT?')).toBe('MESCyT')
   })
   it('keeps explicit Gmail operators intact', () => {
     expect(fallbackGmailQuery('from:becas@example.test after:2026/09/01')).toContain('from:becas@example.test')

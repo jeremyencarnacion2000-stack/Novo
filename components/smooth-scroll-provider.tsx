@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Lenis from 'lenis'
 import { useSettings } from '@/lib/settings-context'
+import { useNovoMotionPolicy } from '@/hooks/use-novo-motion-policy'
 
 const LenisContext = createContext<Lenis | null>(null)
 
@@ -23,6 +24,7 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
     const pathname = usePathname()
     const rafIdRef = useRef<number | null>(null)
     const { settings } = useSettings()
+    const motionMode = useNovoMotionPolicy(settings.showAnimations)
 
     // Reset scroll on navigation
     useEffect(() => {
@@ -43,7 +45,7 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
     useEffect(() => {
         // Resolve the wrapper element: prefer scrollElement, fallback to scrollRef
         const wrapper = scrollElement ?? scrollRef?.current
-        if (!wrapper || !settings.showAnimations) {
+        if (!wrapper || motionMode !== 'full') {
             lenisRef.current?.destroy()
             lenisRef.current = null
             setLenisInstance(null)
@@ -137,7 +139,7 @@ export function SmoothScrollProvider({ children, scrollRef, scrollElement }: Smo
             lenisRef.current = null
             setLenisInstance(null)
         }
-    }, [scrollRef, scrollElement, settings.showAnimations, pathname])
+    }, [scrollRef, scrollElement, motionMode, pathname])
 
     return <LenisContext.Provider value={lenisInstance}>{children}</LenisContext.Provider>
 }

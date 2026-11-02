@@ -1,0 +1,44 @@
+# Evaluación de ecosistema
+
+Investigación del 2026-11-01 con `/browse`: metadatos públicos oficiales de GitHub (`/repos/{owner}/{repo}`) para los quince repositorios indicados, y README de los motores de voz. Las fechas son `pushed_at`, no una garantía de release, soporte o seguridad. Las decisiones siguientes son una evaluación para Novo, no una certificación del software. No se instaló ninguno de estos motores ni se ejecutaron scripts de terceros.
+
+## Selección inicial
+
+| Proyecto / fuente primaria | Estado consultado; licencia del repo | Encaje y coste de integración | Decisión para Novo |
+| --- | --- | --- | --- |
+| [Open Interpreter](https://github.com/openinterpreter/openinterpreter) | El enlace indicado redirige a `openinterpreter/openinterpreter`; Rust, activo, push 2026-11-01; Apache-2.0 | Su identidad actual difiere de descripciones históricas; otro runtime de agente duplicaría permisos/procesos existentes | Estudiar; no integrar a ciegas el paquete histórico |
+| [Microsoft UFO](https://github.com/microsoft/UFO) | Python, activo, 2026-10-30; MIT | Referencia de automatización Windows; añadir proceso Python/modelos antes de validar workflows aumentaría memoria y mantenimiento | Estudiar adaptadores estructurados; no integrar framework completo |
+| [Leon](https://github.com/leon-ai/leon) | TypeScript, activo, 2026-10-31; MIT | Asistente completo; útil para estudiar módulos de habilidades, duplicaría orquestación | Estudiar arquitectura |
+| [Home Assistant](https://github.com/home-assistant/core) | Python, activo, 2026-11-01; Apache-2.0 | Dominio de dispositivos; no resuelve por sí solo continuidad del trabajo de Novo | Adaptador opcional futuro mediante API, sólo si hay dispositivos autorizados |
+| [Pipecat](https://github.com/pipecat-ai/pipecat) | Python, activo, 2026-10-31; BSD-2-Clause | Pipeline realtime multimodal; nuevo servicio/transporte frente a los existentes | Estudiar streaming/interrupción; integrar sólo si un prototipo demuestra menor complejidad |
+| [Playwright](https://github.com/microsoft/playwright) | TypeScript, activo, 2026-10-31; Apache-2.0 | Ya figura como dependencia de desarrollo; requiere navegador, no implica permiso para operar sesión del usuario | Reutilizar para validación; automatización de producto necesitaría permisos propios |
+| [Mem0](https://github.com/mem0ai/mem0) | Python, activo, 2026-10-30; Apache-2.0 | Novo ya tiene señales y memoria con procedencia/revisiones; sumar otra persistencia añade coste y conflictos | Estudiar recuperación/deduplicación; rechazar dependencia en esta fase |
+| [Ollama](https://github.com/ollama/ollama) | Go, activo, 2026-10-31; MIT | El Companion ya habla su protocolo; RAM/GPU y licencia dependen del modelo | Reutilizar adaptador existente, instalación/modelos optativos |
+| [Semantic Kernel](https://github.com/microsoft/semantic-kernel) | C#, activo, 2026-10-31; MIT | Otro framework sobre planner/executor existentes | Estudiar patrones; rechazar incorporación ahora |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | C++, activo, 2026-10-30; MIT | CPU/quantización y Windows documentados; sidecar nativo encaja mejor que un servidor general | Candidato a prototipo STT local optativo |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Python, activo, 2026-10-31; MIT | CTranslate2 y runtime Python; GPU añade requisitos CUDA/cuDNN | Comparar en estación adecuada; evitar empaquetar para todos |
+| [Piper original](https://github.com/rhasspy/piper) | Archivado; último push 2025-08-26; MIT | README declara traslado a [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl); no trasladar la licencia MIT del repo antiguo al sucesor | Rechazar integración del repo archivado; evaluar sucesor y voces por separado |
+| [OpenWakeWord](https://github.com/dscripka/openWakeWord) | No archivado; último push 2025-12-30; Apache-2.0 | README: Windows usa ONNX; modelos incluidos sólo en inglés; revisar licencia de cada peso/dataset | Estudiar; no habilitar escucha continua ni prometer wake word español |
+| [Silero VAD](https://github.com/snakers4/silero-vad) | Python, activo, 2026-10-22; MIT | VAD de audio; ONNX permite separar inferencia de Python, con I/O propio | Candidato pequeño para detección de voz, tras benchmark |
+| [Kokoro](https://github.com/hexgrad/kokoro) | No archivado; último push 2025-08-06; Apache-2.0 | README enlaza modelo de 82M y ejemplos ES/EN; empaquetado, voces, fonetización y calidad requieren revisión | Prototipo TTS optativo; no sustituir síntesis existente aún |
+
+La licencia indicada corresponde al repositorio consultado. Antes de distribuir binarios, modelos, voces o datasets hay que verificar sus archivos/licencias concretos y las dependencias transitivas. Un repositorio no archivado puede estar poco mantenido.
+
+## Comparación de voz aplicable al equipo
+
+| Alternativa | Latencia / calidad | CPU, GPU y memoria | Offline e integración |
+| --- | --- | --- | --- |
+| Dictado browser existente | Depende del proveedor y red; no medido en este equipo | Sin nuevo motor empaquetado; CPU/red dependen del navegador | No garantizar offline. Mantener detección de soporte, permiso y envío manual |
+| whisper.cpp multilingüe | Calidad y velocidad dependen de tamaño/quantización; comparar ES/EN | CPU posible; GPU opcional. README estima ~273 MB para tiny, ~388 MB para base y ~852 MB para small | Offline con pesos locales; requiere capturar/reconvertir audio y gestionar proceso/streaming |
+| faster-whisper | Benchmarks del autor dependen de hardware/configuración, no prueban ventaja en este PC | CPU int8 o GPU; Python/CTranslate2 y, en GPU, CUDA/cuDNN añaden carga | Offline con modelo descargado; proceso separado, cancelación y empaquetado Windows |
+| Silero VAD | Detecta segmentos, no transcribe ni razona; ajustar falsos cortes con muestras reales | Ruta ONNX a medir; no asumir que instalar PyTorch completo sea necesario | Offline; conectar frames, umbral, silencio y cancelación al pipeline existente |
+| Piper | Síntesis local; voz/calidad dependen del modelo | Medir motor sucesor/voces antes de presupuestar | Repo original archivado; revisión legal/técnica del sucesor pendiente |
+| Kokoro | Calidad ES/EN y tiempo al primer audio pendientes de prueba | 82M parámetros según README; tamaño de pesos no equivale a RAM total | Pesos locales y fonetización; streaming por segmentos y cancelación por integrar |
+| OpenWakeWord | Precisión depende de ruido, hablante y umbral; modelos oficiales indicados en inglés | Escucha continua añade coste permanente; presupuesto no medido | Offline; exige consentimiento explícito y evaluación de modelos antes de habilitar |
+| Pipecat | Orquesta servicios; por sí mismo no determina calidad ni latencia | Proceso Python y motores/transporte elegidos | Evaluar únicamente si simplifica de forma medible el pipeline |
+
+Las cifras de whisper.cpp proceden de su [tabla de memoria](https://github.com/ggml-org/whisper.cpp#memory-usage), no de una prueba local. El equipo de esta sesión informa unos 3.4 GiB de RAM total y poca RAM disponible durante la instalación: no conviene cargar otro modelo automáticamente. El [benchmark de faster-whisper](https://github.com/SYSTRAN/faster-whisper#benchmark) usa hardware distinto; no se presenta como comparación directa aquí.
+
+## Siguiente experimento, sin framework adicional
+
+Reutilizar el dictado manual y el executor autorizado. Capturar un corpus pequeño consentido ES/EN (silencio, ruido, interrupciones); comparar browser contra un único modelo multilingüe pequeño de whisper.cpp. Medir arranque, tiempo al primer texto/audio, p50/p95, RAM, CPU, errores de transcripción, falsos cortes y cancelación. Sólo después elegir VAD/TTS. Guardar métricas sin audio o texto privado por defecto. La adaptación por hardware requiere esas medidas; no se declara implementada por esta investigación.

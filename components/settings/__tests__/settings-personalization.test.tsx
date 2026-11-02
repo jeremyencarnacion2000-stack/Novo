@@ -24,6 +24,8 @@ function WallpaperSelector() {
 
 describe('SettingsPersonalization material preview', () => {
   beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn()
+    HTMLElement.prototype.getAnimations = jest.fn(() => [])
     window.matchMedia = jest.fn().mockReturnValue({
       matches: false,
       addEventListener: jest.fn(),
@@ -70,5 +72,30 @@ describe('SettingsPersonalization material preview', () => {
         'blur(32px) saturate(160%) brightness(1.04)',
       )
     })
+  })
+
+  it('applies accessibility choices globally and exposes labelled controls', async () => {
+    render(
+      <SettingsProvider>
+        <SettingsPersonalization />
+      </SettingsProvider>,
+    )
+
+    const contrast = screen.getByLabelText('High contrast')
+    const transparency = screen.getByLabelText('Reduce transparency')
+    expect(contrast).toBeInTheDocument()
+    expect(transparency).toBeInTheDocument()
+
+    fireEvent.click(contrast)
+    fireEvent.click(transparency)
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-accessibility-high-contrast', 'true')
+      expect(document.documentElement).toHaveAttribute('data-accessibility-reduce-glass', 'true')
+    })
+
+    const textSize = screen.getByRole('combobox', { name: 'Text size' })
+    fireEvent.click(textSize)
+    fireEvent.click(await screen.findByRole('option', { name: 'Large' }))
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-accessibility-text-scale', 'large'))
   })
 })

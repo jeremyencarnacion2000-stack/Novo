@@ -1964,10 +1964,35 @@ html[data-novo-motion="off"] [data-slot="alert-dialog-trigger"] {
 
 /* Content surfaces follow the app's material settings. Navigation has its own
    accessible contrast treatment below, including reduced-transparency modes. */
+html[data-accessibility-text-scale='large'] { font-size: 112.5%; }
+html[data-accessibility-text-scale='larger'] { font-size: 125%; }
 html[data-accessibility-reduce-glass='true'] [data-glass-refractive] {
   filter: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+html[data-accessibility-high-contrast='true'] {
+  --muted-foreground: #52525b;
+  --border: #71717a;
+  --input: #71717a;
+}
+html.dark[data-accessibility-high-contrast='true'] {
+  --muted-foreground: #e4e4e7;
+  --border: rgba(255,255,255,.42);
+  --input: rgba(255,255,255,.42);
+}
+html[data-accessibility-high-contrast='true'] :focus-visible {
+  outline: 2px solid currentColor !important;
+  outline-offset: 2px;
+}
+html[data-accessibility-high-contrast='true'] [class*='text-foreground/'] { color: var(--foreground) !important; }
+html.dark[data-accessibility-high-contrast='true'] [class*='text-white/'] { color: #fff !important; }
+@media (prefers-contrast: more) {
+  :root { --muted-foreground: #52525b; --border: #71717a; --input: #71717a; }
+  :root.dark { --muted-foreground: #e4e4e7; --border: rgba(255,255,255,.42); --input: rgba(255,255,255,.42); }
+  :root :focus-visible { outline: 2px solid currentColor !important; outline-offset: 2px; }
+  :root [class*='text-foreground/'] { color: var(--foreground) !important; }
+  :root.dark [class*='text-white/'] { color: #fff !important; }
 }
 
 /* Cognitive Engine surfaces use a few legacy white-on-glass utilities. Keep
@@ -2675,17 +2700,24 @@ html:not(.dark) .cognitive-chart {
 .novo-now-procedural-fields .novo-thinking-pill__field {
   width: 62%;
   opacity: .72;
-  filter: blur(38px) saturate(155%);
+  /* Soft color stops avoid filtering three viewport-sized animated layers. */
+  filter: none;
   mix-blend-mode: screen;
 }
 .novo-now-procedural-fields .novo-thinking-pill__field--one {
-  background: color-mix(in srgb, var(--now-primary) 82%, #ffffff 18%);
+  background: radial-gradient(ellipse,
+    color-mix(in srgb, var(--now-primary) 82%, #ffffff 18%) 0%,
+    color-mix(in srgb, var(--now-primary) 72%, transparent) 38%, transparent 72%);
 }
 .novo-now-procedural-fields .novo-thinking-pill__field--two {
-  background: color-mix(in srgb, var(--now-secondary) 78%, #f0abff 22%);
+  background: radial-gradient(ellipse,
+    color-mix(in srgb, var(--now-secondary) 78%, #f0abff 22%) 0%,
+    color-mix(in srgb, var(--now-secondary) 68%, transparent) 38%, transparent 72%);
 }
 .novo-now-procedural-fields .novo-thinking-pill__field--three {
-  background: color-mix(in srgb, var(--now-tertiary) 78%, #ffd6a5 22%);
+  background: radial-gradient(ellipse,
+    color-mix(in srgb, var(--now-tertiary) 78%, #ffd6a5 22%) 0%,
+    color-mix(in srgb, var(--now-tertiary) 68%, transparent) 38%, transparent 72%);
 }
 .novo-now-panel[data-now-visible="false"] .novo-now-procedural-fields,
 .novo-now-panel[data-novo-motion="reduced"] .novo-now-procedural-fields,

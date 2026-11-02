@@ -230,7 +230,11 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. MEMORY LAYER (3-Layer Context)
-        const context = await buildUserContext(userId, { twinMode, includeGmail: shouldConsultGmail(message || '') });
+        const context = await buildUserContext(userId, {
+            twinMode,
+            includeGmail: shouldConsultGmail(message, history),
+            gmailRequest: { message, history, signal: request.signal },
+        });
         await appendActivityEvent(userId, { runId: activityRunId, phase: 'interpreting_signals', label: 'Interpretando las señales disponibles', sourceCount: context.structured.sources?.length ?? 0 });
         const userContext = context.summary;
 

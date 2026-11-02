@@ -9,6 +9,7 @@
 
 use std::cmp::Ordering;
 use std::io::{BufRead, BufReader, Read, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::mpsc;
@@ -57,7 +58,25 @@ pub fn read() -> Option<Value> {
     let _busy = NotBusy;
 
     let exe = platform::codex_candidates().into_iter().next()?;
-    let mut cmd = Command::new(&exe);
+    query(&exe, REQUESTS).map(|result| limits_only(&result))
+}
+
+/// Local account metadata avoids doctor's unrelated network/sandbox probes.
+pub fn uses_chatgpt_login(exe: &Path) -> bool {
+    let requests = concat!(
+        r#"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"novo","version":"1"}}}"#, "\n",
+        r#"{"method":"initialized"}"#, "\n",
+        r#"{"id":2,"method":"account/read","params":{"refreshToken":false}}"#, "\n",
+    );
+    query(exe, requests).is_some_and(|result| chatgpt_account(&result))
+}
+
+fn chatgpt_account(result: &Value) -> bool {
+    result["account"]["type"] == "chatgpt"
+}
+
+fn query(exe: &Path, requests: &str) -> Option<Value> {
+    let mut cmd = Command::new(exe);
     cmd.arg("app-server").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
     // An npm install is a `#!/usr/bin/env node` script (or a .cmd calling node):
     // its own folder first on PATH, as the Mac does, so it finds its Node.
@@ -80,7 +99,7 @@ pub fn read() -> Option<Value> {
         std::thread::spawn(move || {
             let _ = tx.send(first_answer(BufReader::new(stdout)));
         });
-        stdin.write_all(REQUESTS.as_bytes()).ok()?;
+        stdin.write_all(requests.as_bytes()).ok()?;
         stdin.flush().ok()?;
         let answer = rx.recv_timeout(TIMEOUT).ok().flatten();
         // Closing its input is how app-server learns we are done.
@@ -98,7 +117,7 @@ pub fn read() -> Option<Value> {
     }
     let _ = child.kill();
     let _ = child.wait();
-    answer.map(|result| limits_only(&result))
+    answer
 }
 
 /// Reads JSON-RPC lines until the answer to request 2 and returns its `result`.
@@ -171,6 +190,14 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chatgpt_plan_requires_an_explicit_chatgpt_account() {
+        assert!(chatgpt_account(&json!({"account":{"type":"chatgpt"}})));
+        for account in [json!({"type":"apiKey"}), json!({"type":"unknown"}), json!({}), Value::Null] {
+            assert!(!chatgpt_account(&json!({"account":account})));
+        }
+    }
 
     #[test]
     fn the_answer_to_the_question_is_picked_out_of_the_conversation() {

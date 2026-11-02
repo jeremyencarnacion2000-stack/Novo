@@ -1,7 +1,6 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { User, UserSettings, UserCognitiveSnapshot } from '@prisma/client';
 import { CalendarAggregator } from '@/lib/calendar-aggregator';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getActiveSignal, type ActiveSignal } from '@/lib/cognitive/active-signal';
@@ -11,6 +10,7 @@ import { getGmailContextForUser, shouldIncludeGmailSignal, type GmailContext } f
 import { providerSignalFreshness, type ProviderSignalFreshness } from '@/lib/cognitive/provider-signal-freshness';
 
 const BLOCKED_PROVIDER_STATES = new Set(['disconnected', 'revoked', 'reauth_required', 'error']);
+const CONTEXT_LIMITS = { tasks: 15, routines: 10, routineDays: 7, exercisesPerDay: 12, projects: 10 } as const;
 
 export interface CognitiveContext {
     system: {
@@ -21,17 +21,17 @@ export interface CognitiveContext {
         title: string;
         time: string;
         source: string;
-    }[];
+    }[] | null;
     metrics: {
-        focusTimeToday: number;
-        productivityScore: number;
+        focusTimeToday: number | null;
+        productivityScore: number | null;
         fatigueEstimate: string;
     };
     state: {
-        overdueTasks: number;
-        activeTasks: number;
-        activeRoutines: number;
-        activeProjects: number;
+        overdueTasks: number | null;
+        activeTasks: number | null;
+        activeRoutines: number | null;
+        activeProjects: number | null;
         lastInsight?: string | null;
         tasksList?: any[];
         routinesList?: any[];
@@ -75,6 +75,8 @@ export interface CognitiveContext {
         expiresAt: string;
     }[];
     sources: ContextSource[];
+    retrieval?: { status: 'complete' | 'partial' | 'unavailable'; unavailable: string[] };
+    contextWindow?: typeof CONTEXT_LIMITS;
 }
 
 export interface UserContext {
@@ -105,6 +107,11 @@ export async function buildUserContext(userId: string, options?: {
             where: { userId, excludedAt: { not: null } }, select: { source: true },
         }) : [];
         const excludedSignalSources = new Set(signalSourcePreferences.map((item) => item.source));
+        const unavailable = new Set<string>();
+        const read = async <T, F>(field: string, operation: () => PromiseLike<T>, fallback: F): Promise<T | F> => {
+            try { return await operation(); }
+            catch { unavailable.add(field); return fallback; }
+        };
         const integrationSources = [...(integrations ? ['gmail','notion','todoist','slack','calendar'] : []),
             ...(development ? ['github','vercel'] : [])].filter(source => !excludedSignalSources.has(source));
         const codexContextRead = (development || currentWorkContext) && !excludedSignalSources.has('codex');
@@ -132,56 +139,66 @@ export async function buildUserContext(userId: string, options?: {
             mailbox,
             externalSignalRows,
             currentWorkContextRow,
+            twinContext,
         ] = await Promise.all([
-            personal ? prisma.userSettings.findUnique({ where: { userId } }) : null,
-            personal ? prisma.userCognitiveSnapshot.findUnique({ where: { userId } }) : null,
-            personal ? prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }) : 0,
-            personal ? prisma.task.count({
+            personal ? read('preferences', () => prisma.userSettings.findUnique({ where: { userId } }), null) : null,
+            personal ? read('metrics', () => prisma.userCognitiveSnapshot.findUnique({ where: { userId } }), null) : null,
+            personal ? read('state.activeTasks', () => prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }), null) : 0,
+            personal ? read('state.overdueTasks', () => prisma.task.count({
                 where: {
                     userId,
                     status: { in: ['todo', 'in-progress'] },
                     dueDate: { lt: new Date().toISOString() } // simplified check
                 }
-            }) : 0,
-            personal ? prisma.routine.count({ where: { userId, isActive: true } }) : 0,
-            personal ? prisma.project.count({ where: { userId, status: 'in-progress' } }) : 0,
-            calendarSources.length ? CalendarAggregator.getEventsForRange(userId, start, end, calendarSources) : [],
-            personal ? prisma.task.findMany({
+            }), null) : 0,
+            personal ? read('state.activeRoutines', () => prisma.routine.count({ where: { userId, isActive: true } }), null) : 0,
+            personal ? read('state.activeProjects', () => prisma.project.count({ where: { userId, status: 'in-progress' } }), null) : 0,
+            calendarSources.length ? read('todaySchedule', () => CalendarAggregator.getEventsForRange(userId, start, end, calendarSources, () => { unavailable.add('todaySchedule'); }), null) : [],
+            personal ? read('state.tasksList', () => prisma.task.findMany({
                 where: { userId, status: { in: ['todo', 'in-progress'] } },
                 orderBy: { updatedAt: 'desc' },
-                take: 15
-            }) : [],
-            personal ? prisma.routine.findMany({
+                take: CONTEXT_LIMITS.tasks
+            }), []) : [],
+            personal ? read('state.routinesList', () => prisma.routine.findMany({
                 where: { userId, isActive: true },
-                include: {
+                orderBy: { updatedAt: 'desc' },
+                take: CONTEXT_LIMITS.routines,
+                select: {
+                    id: true, name: true, description: true, timeOfDay: true, duration: true,
+                    scheduledTime: true, daysOfWeek: true, objective: true, frequency: true,
+                    level: true, tempo: true, method: true,
                     days: {
-                        include: {
+                        take: CONTEXT_LIMITS.routineDays,
+                        select: {
+                            id: true, name: true, weekday: true, order: true,
                             exercises: {
-                                orderBy: { order: 'asc' }
+                                orderBy: { order: 'asc' },
+                                take: CONTEXT_LIMITS.exercisesPerDay,
+                                select: { id: true, name: true, muscleGroup: true, sets: true, reps: true, tempo: true, notes: true, order: true },
                             }
                         },
                         orderBy: { order: 'asc' }
                     }
                 }
-            }) : [],
-            personal ? prisma.project.findMany({
+            }), []) : [],
+            personal ? read('state.projectsList', () => prisma.project.findMany({
                 where: { userId, status: 'in-progress' },
                 orderBy: { updatedAt: 'desc' },
-                take: 10
-            }) : [],
-            personal && integrations ? getActiveSignal(userId) : null,
-            checklistSources.length ? prisma.checklistItem.findMany({
+                take: CONTEXT_LIMITS.projects
+            }), []) : [],
+            personal && integrations ? read('activeSignal', () => getActiveSignal(userId), null) : null,
+            checklistSources.length ? read('checklist', () => prisma.checklistItem.findMany({
                 where: { userId, completed: false, source: { in: checklistSources } },
                 take: 15
-            }) : [],
-            integrationSources.length ? prisma.integrationAccount.findMany({
+            }), []) : [],
+            integrationSources.length ? read('providerHealth', () => prisma.integrationAccount.findMany({
                 where: { userId, provider: { in: integrationSources } },
                 select: { provider: true, createdAt: true, syncStatus: true, lastSuccessfulSyncAt: true }
-            }) : [],
-            personal ? prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: { where: { status: { in: ['proposed', 'accepted', 'modified', 'started'] } }, orderBy: { priority: 'desc' }, take: 1 } } }) : null,
-            personal ? prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } }) : [],
-            integrationSources.includes('gmail') && options?.includeGmail ? getGmailContextForUser(userId, options.gmailRequest) : Promise.resolve(null),
-            signalSources.length ? prisma.novoSignalLedger.findMany({
+            }), []) : [],
+            personal ? read('currentPlan', () => prisma.actionPlan.findFirst({ where: { userId, status: 'active' }, orderBy: { createdAt: 'desc' }, include: { actions: { where: { status: { in: ['proposed', 'accepted', 'modified', 'started'] } }, orderBy: { priority: 'desc' }, take: 1 } } }), null) : null,
+            personal ? read('recentOutcomes', () => prisma.outcomeEvent.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 12, include: { recommendedAction: { select: { taskId: true } } } }), []) : [],
+            integrationSources.includes('gmail') && options?.includeGmail ? read('mailbox', () => getGmailContextForUser(userId, options.gmailRequest), { status: 'unavailable' as const, messages: [] }) : null,
+            signalSources.length ? read('externalSignals', () => prisma.novoSignalLedger.findMany({
                 where: {
                     userId,
                     excludedAt: null,
@@ -191,18 +208,20 @@ export async function buildUserContext(userId: string, options?: {
                 orderBy: { observedAt: 'desc' },
                 take: 20,
                 select: { source: true, signalType: true, label: true, observedAt: true, reliability: true },
-            }) : [],
-            currentWorkContext && !excludedSignalSources.has('work_context') ? prisma.companionWorkContext.findFirst({
+            }), []) : [],
+            currentWorkContext && !excludedSignalSources.has('work_context') ? read('currentWorkContexts', () => prisma.companionWorkContext.findFirst({
                 where: { userId, status: 'active', expiresAt: { gt: now } },
                 orderBy: { updatedAt: 'desc' },
                 select: { projectLabel: true, focusSummary: true, source: true, status: true, observedAt: true, expiresAt: true },
-            }) : null,
+            }), null) : null,
+            // Twin consent is independent of personal task/schedule access.
+            options?.twinMode && twin ? read('twinContext', () => buildTwinContextSummary(userId), null) : null,
         ]);
+        if (mailbox?.status === 'unavailable') unavailable.add('mailbox');
 
         // Aggregate Twin data has its own consent boundary; it must not imply
         // permission to load task, routine, schedule, or planning records.
         // This builder never fetches provider credentials or provider records.
-        const twinContext = options?.twinMode && twin ? await buildTwinContextSummary(userId) : null;
         const externalSignals = externalSignalRows
             .filter((item) => !excludedSignalSources.has(item.source))
             .filter((item) => item.source !== 'gmail' || shouldIncludeGmailSignal(
@@ -253,7 +272,7 @@ export async function buildUserContext(userId: string, options?: {
             if (source) sourceById.set(source.id, source);
         };
         checklistItems.forEach((item) => addSource(item.source));
-        todayEvents.forEach((event: any) => addSource(event.source));
+        todayEvents?.forEach((event: any) => addSource(event.source));
         addSource((contextActiveSignal as any)?.metadata?.source);
         if (mailbox?.status === 'available') addSource('gmail');
         externalSignals.forEach((signal) => addSource(signal.source));
@@ -264,21 +283,21 @@ export async function buildUserContext(userId: string, options?: {
                 timestamp: now.toISOString(),
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             },
-            todaySchedule: todayEvents.map((e: any) => ({
+            todaySchedule: todayEvents?.map((e: any) => ({
                 title: e.title,
                 time: e.allDay ? 'All Day' : e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 source: e.source
-            })),
+            })) ?? null,
             metrics: {
-                focusTimeToday: snapshot?.focusTimeToday || 0,
-                productivityScore: snapshot?.productivityScore || 0,
+                focusTimeToday: unavailable.has('metrics') ? null : snapshot?.focusTimeToday ?? 0,
+                productivityScore: unavailable.has('metrics') ? null : snapshot?.productivityScore ?? 0,
                 // A persisted legacy string is an unverified model inference,
                 // not a physiological observation. Absence must stay absent.
                 fatigueEstimate: snapshot?.fatigueEstimate || 'unavailable',
             },
             state: {
                 overdueTasks: overdueTaskCount,
-                activeTasks: taskCount + checklistItems.length,
+                activeTasks: taskCount === null || unavailable.has('checklist') ? null : taskCount + checklistItems.length,
                 activeRoutines: routineCount,
                 activeProjects: projectCount,
                 lastInsight: snapshot?.lastInsightGeneratedAt ? snapshot.lastInsightGeneratedAt.toISOString() : null,
@@ -317,9 +336,11 @@ export async function buildUserContext(userId: string, options?: {
             externalSignals,
             ...(currentWorkContext && !excludedSignalSources.has('work_context') ? { currentWorkContexts } : {}),
             sources: Array.from(sourceById.values()),
+            retrieval: { status: unavailable.size ? 'partial' : 'complete', unavailable: [...unavailable] },
+            contextWindow: CONTEXT_LIMITS,
         };
 
-        const summary = JSON.stringify(structuredContext, null, 2);
+        const summary = (unavailable.size ? 'Some context could not be retrieved. Fields in retrieval.unavailable are unknown or incomplete, not empty or zero. Do not invent missing data or ask for reauthorization without an explicit provider authorization status.\n' : '') + JSON.stringify(structuredContext);
 
         return {
             summary,
@@ -333,9 +354,9 @@ export async function buildUserContext(userId: string, options?: {
         // Fallback simple context
         const fallback: CognitiveContext = {
             system: { timestamp: new Date().toISOString(), timezone: 'UTC' },
-            todaySchedule: [],
-            metrics: { focusTimeToday: 0, productivityScore: 0, fatigueEstimate: 'unavailable' },
-            state: { overdueTasks: 0, activeTasks: 0, activeRoutines: 0, activeProjects: 0 },
+            todaySchedule: null,
+            metrics: { focusTimeToday: null, productivityScore: null, fatigueEstimate: 'unavailable' },
+            state: { overdueTasks: null, activeTasks: null, activeRoutines: null, activeProjects: null },
             preferences: { language: 'en', theme: 'system', compactMode: false },
             activeSignal: null,
             twinContext: null,
@@ -344,11 +365,12 @@ export async function buildUserContext(userId: string, options?: {
             providerHealth: [],
             mailbox: null,
             externalSignals: [],
-            sources: [NOVO_CONTEXT_SOURCE],
+            sources: [],
+            retrieval: { status: 'unavailable', unavailable: ['all'] },
         };
 
         return {
-            summary: JSON.stringify(fallback, null, 2),
+            summary: 'Context is unavailable. Do not interpret missing information as an empty account or zero activity.\n' + JSON.stringify(fallback),
             structured: fallback
         };
     }

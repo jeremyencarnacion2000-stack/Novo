@@ -6,7 +6,6 @@ import { RecentActivity } from '@/components/recent-activity'
 import { DashboardHabits } from '@/components/dashboard-habits'
 import { useSettings } from '@/lib/settings-context'
 import { useTranslation } from '@/lib/i18n'
-import { Card } from '@/components/ui/card'
 import React, { useEffect, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { motion, type Variants } from 'framer-motion'
@@ -136,15 +135,11 @@ export default function DashboardClient() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-6 md:grid-cols-2">
             <ScrollReveal delay={0} className="space-y-6 cognitive-secondary-element">
-              <Card variant="primary" className="p-0">
-                <QuickActions />
-              </Card>
+              <QuickActions />
               <DashboardHabits />
             </ScrollReveal>
             <ScrollReveal delay={0.06} className="cognitive-secondary-element">
-              <Card variant="primary" className="p-0 h-full">
-                <RecentActivity onActivityClick={handleActivityClick} />
-              </Card>
+              <RecentActivity onActivityClick={handleActivityClick} />
             </ScrollReveal>
           </div>
           <ScrollReveal delay={0.12} className="space-y-6">

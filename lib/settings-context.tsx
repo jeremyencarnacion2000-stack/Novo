@@ -13,6 +13,9 @@ export interface AppSettings {
   autoThemeMode: 'system' | 'time' | 'both'
   compactMode: boolean
   showAnimations: boolean
+  accessibilityTextScale: 'normal' | 'large' | 'larger'
+  accessibilityHighContrast: boolean
+  accessibilityReduceTransparency: boolean
   backgroundImage?: string
   backgroundHistory: string[]  // Recent wallpapers (Windows 10/11 style)
   backgroundBlur: number
@@ -64,6 +67,9 @@ const defaultSettings: AppSettings = {
   autoThemeMode: 'system',
   compactMode: false,
   showAnimations: true,
+  accessibilityTextScale: 'normal',
+  accessibilityHighContrast: false,
+  accessibilityReduceTransparency: false,
   backgroundImage: '',
   backgroundHistory: [],
   backgroundBlur: 0,
@@ -293,6 +299,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     // Sincronizar preferencia de animaciones/efectos en el DOM root
     root.setAttribute('data-animations', settings.showAnimations ? 'true' : 'false')
+    root.setAttribute('data-accessibility-text-scale', settings.accessibilityTextScale)
+    root.setAttribute('data-accessibility-high-contrast', String(settings.accessibilityHighContrast))
+    root.setAttribute('data-accessibility-reduce-glass', String(settings.accessibilityReduceTransparency))
 
     // Apply accent color
     const colors: Record<string, string> = {
@@ -394,7 +403,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     }
-  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.showAnimations, settings.backgroundBlur, settings.backgroundDimness, settings.autoContrast, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
+  }, [settings.theme, settings.autoThemeEnabled, settings.autoThemeMode, settings.showAnimations, settings.accessibilityTextScale, settings.accessibilityHighContrast, settings.accessibilityReduceTransparency, settings.backgroundBlur, settings.backgroundDimness, settings.autoContrast, settings.glassOpacity, settings.glassBlur, settings.cardOpacity, settings.cardLiquidIntensity, settings.accentColor, settings.backgroundImage, isLoaded])
 
   useEffect(() => {
     if (!isLoaded || !settings.dailyReminder) return

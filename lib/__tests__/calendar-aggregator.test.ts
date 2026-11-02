@@ -56,4 +56,13 @@ describe('CalendarAggregator google events', () => {
 
     expect(events).toEqual([]);
   });
+
+  it('reports incomplete Google evidence while retaining healthy native events', async () => {
+    (calendarService.listEventsForUser as jest.Mock).mockRejectedValue(new Error('calendar unavailable'));
+    (prisma.calendarEvent.findMany as jest.Mock).mockResolvedValue([{ id: 'native-1', title: 'Native meeting', start: new Date(), end: new Date(), allDay: false }]);
+    const unavailable = jest.fn();
+    const events = await CalendarAggregator.getEventsForRange('user-1', new Date(), new Date(), ['novo', 'google'], unavailable);
+    expect(events).toEqual([expect.objectContaining({ title: 'Native meeting', source: 'novo' })]);
+    expect(unavailable).toHaveBeenCalledWith('google');
+  });
 });

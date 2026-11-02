@@ -8,8 +8,11 @@ jest.mock('@/lib/i18n', () => ({ useTranslation: () => ({ t: (key: string) => ke
 jest.mock('@/lib/cognitive-context', () => ({ useCognitivePhase: () => 'LINEAR_EXECUTION' }))
 jest.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }))
 jest.mock('@/components/dashboard-metrics', () => ({ DashboardMetrics: () => null }))
-jest.mock('@/components/quick-actions', () => ({ QuickActions: () => null }))
-jest.mock('@/components/recent-activity', () => ({ RecentActivity: () => null }))
+jest.mock('@/hooks/use-swr', () => ({
+  useChecklist: () => ({ data: [] }),
+  useRoutines: () => ({ data: [] }),
+  useProjects: () => ({ data: [] }),
+}))
 jest.mock('@/components/dashboard-habits', () => ({ DashboardHabits: () => null }))
 jest.mock('@/components/dashboard/dashboard-quick-view', () => ({ DashboardQuickView: () => null }))
 jest.mock('@/components/cognitive/cognitive-engine-widget', () => ({ CognitiveEngineWidget: () => null }))
@@ -30,7 +33,7 @@ jest.mock('@/lib/liquid-glass/useLiquidGlass', () => ({
 }))
 
 describe('dashboard liquid card material', () => {
-  it('keeps ordinary dashboard cards on CSS glass without SVG refraction leases', () => {
+  it('keeps one glass plane per dashboard section without nesting cards or leasing SVG lenses', () => {
     const { container } = render(<DashboardClient />)
     const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-slot="card"]'))
 
@@ -38,6 +41,7 @@ describe('dashboard liquid card material', () => {
     expect(cards.map((card) => card.dataset.variant)).toEqual(['primary', 'primary'])
     expect(container.querySelectorAll('[data-slot="card"][data-liquid-refractive="svg"]')).toHaveLength(0)
     expect(cards.every((card) => card.classList.contains('glass-surface'))).toBe(true)
+    expect(container.querySelector('[data-slot="card"] [data-slot="card"]')).toBeNull()
   })
 
   it('uses the Focus Surface contract for dashboard liquid cards', () => {

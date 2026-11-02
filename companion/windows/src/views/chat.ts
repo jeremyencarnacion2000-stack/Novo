@@ -19,6 +19,7 @@ import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 import { NovoChatController } from '../core/novo-chat';
 import { SpeechDictation } from "../core/speech-dictation";
+import { buildCodexPrompt } from './codex-chat';
 
 const STRINGS = {
   placeholderFirst: N_("Ask me anything…"),
@@ -290,8 +291,40 @@ function buildPicker(onChange: () => void): Picker {
 
 // ── View ──────────────────────────────────────────────────────────────────────
 
-/** Default island conversation: only the signed-in Novo account and server history. */
 export function buildPrompt(onHeightChange: () => void): ViewHost {
+  const el = h('div', { class: 'view' });
+  let child: ViewHost | null = null;
+  let backend = '';
+  let disposed = false;
+  function sync() {
+    if (disposed) return;
+    const wanted = State.settings.chatProvider === 'codex' ? 'codex' : 'novo';
+    if (wanted !== backend) {
+      backend = wanted;
+      const previous = child;
+      child = null;
+      previous?.dispose?.();
+      State.chatHistory = [];
+      child = wanted === 'codex' ? buildCodexPrompt(onHeightChange) : buildAccountPrompt(onHeightChange);
+      child.el.classList.remove('view');
+      child.el.style.height = '100%';
+      clear(el);
+      el.append(child.el);
+      el.dataset.backend = wanted;
+    }
+    child?.sync();
+  }
+  sync();
+  return { el, sync, focus: () => child?.focus?.(), dispose() {
+    if (disposed) return;
+    disposed = true;
+    child?.dispose?.();
+    child = null;
+  } };
+}
+
+/** The signed-in Novo account and server history remain independent of local plan chat. */
+function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   let dictation: SpeechDictation | null = null;
   const conversations=buildChoiceMenu('novo-conversations',t('Conversación de Novo'),value=>void controller.selectConversation(value),open=>{body.classList.toggle('history-open',open);});
   const settingsButton=h('button',{type:'button',class:'novo-chat-settings','aria-label':tl('Configuración del chat'),title:tl('Configuración del chat'),onclick:()=>void Bridge.openSettingsWindow('assistant')},svg(ICONS.gear,12));

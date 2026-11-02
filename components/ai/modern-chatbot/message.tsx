@@ -260,6 +260,10 @@ const MarkdownComponents = {
     }
 };
 
+const FormattedMessage = React.memo(function FormattedMessage({ content }: { content: string }) {
+    return <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>{content}</ReactMarkdown>;
+});
+
 export function Message({ message, onCopy, onRetry, onLike, onDislike }: MessageProps) {
     const isUser = message.role === 'user';
     const { confirmAction, cancelAction, submitClarification, editMessage, likeMessage, dislikeMessage, retryMessage } = useChatbot();
@@ -388,9 +392,7 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                             className="max-w-none"
                                             style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', overflowX: 'hidden' }}
                                         >
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
-                                                {block.content as string}
-                                            </ReactMarkdown>
+                                            <FormattedMessage content={block.content as string} />
                                         </div>
                                     );
                                 case 'analysis':
@@ -470,12 +472,7 @@ export function Message({ message, onCopy, onRetry, onLike, onDislike }: Message
                                 overflowX: 'hidden',
                             }}
                         >
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={MarkdownComponents}
-                            >
-                                {message.content}
-                            </ReactMarkdown>
+                            <FormattedMessage content={message.content} />
                         </div>
                     )
                 )}

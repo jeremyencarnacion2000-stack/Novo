@@ -119,7 +119,7 @@ export interface Settings {
   planRelayInstalled: boolean;
   /** Show the Codex plan pill in the island's header. */
   showCodexPlanInNotch: boolean;
-  /** Who the chat talks to (see core/providers.ts); picked in the chat view. */
+  /** "codex" selects local plan chat; other ids keep Novo account chat and the legacy adapter's provider. */
   chatProvider: ProviderId;
   /** The model picked for each provider other than Anthropic, by provider id. */
   chatModels: Record<string, string>;

@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { ContextHub } from '@/components/ContextHub'
-import { FocusProvider } from '@/lib/focus-context'
+import { FocusProvider, useFocus, useFocusControls } from '@/lib/focus-context'
 import { usePlayerStore } from '@/lib/player-store'
 
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { id: 'hub-test' } }, status: 'authenticated' }) }))
@@ -60,6 +60,28 @@ describe('ContextHub detached Pomodoro lifecycle', () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({}) })) as unknown as typeof fetch
   })
   afterEach(() => { jest.restoreAllMocks(); jest.useRealTimers() })
+
+  it('defers hidden Hub panels while an external focus session keeps running', () => {
+    function StartFocus() {
+      const { toggleTimer } = useFocusControls()
+      const { time } = useFocus()
+      return <><button onClick={toggleTimer}>Start outside Hub</button><output data-testid="focus-time">{time}</output></>
+    }
+    const { container } = render(
+      <FocusProvider>
+        <StartFocus />
+        <ContextHub />
+      </FocusProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Start outside Hub' }))
+    advance(1000)
+
+    for (let second = 0; second < 3; second++) advance(1000)
+
+    expect(screen.getByTestId('focus-time')).toHaveTextContent('1496')
+    expect(container.querySelector('#novo-hub-panel')).toBeNull()
+    expect(container.querySelector('[data-pomodoro-content]')).toBeNull()
+  })
 
   it('starts and pauses focus directly from the compact Hub capsule', () => {
     const { container } = render(<FocusProvider><ContextHub /></FocusProvider>)
@@ -190,9 +212,11 @@ describe('ContextHub detached Pomodoro lifecycle', () => {
       expect(hub().dataset.hubState).toBe('capsule')
       fireEvent.keyDown(document, { key: 'Escape' })
       expect(liquidLayer.style.visibility).toBe('visible')
+      expect(widget().querySelector('[data-pomodoro-content]')).not.toBeNull()
       advance(1600)
       expect(hub().dataset.hubState).toBe('expanded')
       expect(widget()).toHaveAttribute('aria-hidden', 'true')
+      expect(widget().querySelector('[data-pomodoro-content]')).toBeNull()
       expect(screen.getByRole('button', { name: 'Abrir' })).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Contraer Hub' }))
       advance(800)

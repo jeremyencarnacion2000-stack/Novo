@@ -4,7 +4,6 @@ import { forwardRef } from 'react'
 import { useFocus, useFocusControls } from '@/lib/focus-context'
 import { HubGlassMaterial } from '@/components/ui/hub-glass-material'
 import { Pause, Play, RotateCcw, Timer, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 type PomodoroWidgetProps = {
   open: boolean
@@ -14,12 +13,6 @@ type PomodoroWidgetProps = {
 
 export const PomodoroWidget = forwardRef<HTMLDivElement, PomodoroWidgetProps>(
   function PomodoroWidget({ open, animating, onClose }, ref) {
-    const { mode, time, formatTime, isActive, progress, selectedTaskId, tasks } = useFocus()
-    const { toggleTimer, resetTimer } = useFocusControls()
-    const modeLabel = mode === 'work' ? 'Trabajo' : mode === 'shortBreak' ? 'Descanso' : 'Descanso largo'
-    const selectedTask = tasks.find(task => task.id === selectedTaskId && !task.completed)
-    const progressValue = Math.min(100, Math.max(0, Math.round(progress)))
-
     return (
       <div
         ref={ref}
@@ -30,7 +23,22 @@ export const PomodoroWidget = forwardRef<HTMLDivElement, PomodoroWidgetProps>(
         style={{ opacity: 0, clipPath: 'circle(0px at 50% 50%)', pointerEvents: 'none' }}
       >
         <HubGlassMaterial radius={24} active={open || animating} priority="interactive" />
+        {(open || animating) && <PomodoroContent onClose={onClose} />}
+      </div>
+    )
+  },
+)
 
+PomodoroWidget.displayName = 'PomodoroWidget'
+
+function PomodoroContent({ onClose }: Pick<PomodoroWidgetProps, 'onClose'>) {
+    const { mode, time, formatTime, isActive, progress, selectedTaskId, tasks } = useFocus()
+    const { toggleTimer, resetTimer } = useFocusControls()
+    const modeLabel = mode === 'work' ? 'Trabajo' : mode === 'shortBreak' ? 'Descanso' : 'Descanso largo'
+    const selectedTask = tasks.find(task => task.id === selectedTaskId && !task.completed)
+    const progressValue = Math.min(100, Math.max(0, Math.round(progress)))
+
+    return (
         <div data-pomodoro-content role="region" aria-label="Temporizador Pomodoro" className="relative z-[1] flex h-full flex-col items-center justify-between px-3 py-0.5">
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center gap-1.5">
@@ -95,9 +103,5 @@ export const PomodoroWidget = forwardRef<HTMLDivElement, PomodoroWidgetProps>(
             </button>
           </div>
         </div>
-      </div>
     )
-  },
-)
-
-PomodoroWidget.displayName = 'PomodoroWidget'
+}

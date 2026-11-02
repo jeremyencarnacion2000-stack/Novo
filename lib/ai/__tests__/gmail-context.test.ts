@@ -59,6 +59,13 @@ describe('Gmail chat context', () => {
     expect(shouldConsultGmail('Crea una tarea para mañana', [{ role: 'user', content: 'Revisa mis correos' }])).toBe(false)
   })
 
+  it('recognizes a named-correspondent follow-up only inside a recent mail conversation', () => {
+    const history = [{ role: 'user', content: 'Dime los últimos correos recibidos' }]
+    expect(shouldConsultGmail('¿Hay algo del MESCyT?', history)).toBe(true)
+    expect(shouldConsultGmail('Any updates from MESCyT?', history)).toBe(true)
+    expect(shouldConsultGmail('¿Hay algo del MESCyT?')).toBe(false)
+  })
+
   it('bounds context text and explicitly marks a partial read', async () => {
     ;(findGoogleAccountForScopes as jest.Mock).mockResolvedValue({ id: 'gmail-grant' })
     ;(gmailService.searchForUser as jest.Mock).mockResolvedValue({ messages: Array.from({ length: 6 }, (_, i) => ({ id: `m${i}`, body: 'x'.repeat(20_000), bodyTruncated: false })), nextPageToken: 'more' })
