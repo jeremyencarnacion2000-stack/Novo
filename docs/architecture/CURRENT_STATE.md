@@ -4,6 +4,8 @@ Auditoría: 2026-11-01. Base inspeccionada: `cd0af5f`, con los cambios locales p
 
 Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arquitectura objetivo](TARGET_ARCHITECTURE.md), [evaluación de ecosistema/voz](../research/ECOSYSTEM_EVALUATION.md), [hoja de ruta](../roadmap/NOVO_EVOLUTION.md) y [registro de cambios y evidencia](../engineering/IMPLEMENTATION_LOG.md).
 
+Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en `productivitynovo.vercel.app`. CI web pasa tipos, lint y regresiones. [Companion 0.2.13](https://github.com/jeremyencarnacion2000-stack/Novo/releases/tag/companion-v0.2.13) publicado e instalado, con versión del ejecutable comprobada y proceso activo. El detector, proceso limitado y parser de producción devuelven una respuesta del plan ChatGPT; la prueba de botones sigue pendiente por fallos del control de ventanas de Windows. Gmail fue renovado por el usuario y el chat web ya consulta correos reales con atribución Gmail; no se envió correo.
+
 ## Capas existentes
 
 | Capa | Implementación encontrada | Límite actual |
@@ -18,13 +20,13 @@ Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arqui
 | Chat Companion | `/api/companion/chat` → `lib/ai/chat-service.ts` | Recibe mejoras de correo/proyectos que el chat web no comparte automáticamente |
 | Acciones | `lib/ai/executor.ts`, `/api/ai/execute`, scopes, auditoría e idempotencia; correo en `lib/gmail-message.ts` | Las escrituras externas deben conservar propuesta revisada y confirmación explícita |
 | Actividad | `lib/ai/activity.ts`, eventos secuenciados, cancelación y recuperación | Unificar consumidores sin perder arrendamientos ni estado terminal |
-| Trabajo en segundo plano | Inngest, crons Vercel, claims persistidos de refresco; `lib/inngest`, `vercel.json` | El despliegue/activación del scheduler no se certificó aquí |
+| Trabajo en segundo plano | Inngest, crons Vercel, claims persistidos de refresco; `lib/inngest`, `vercel.json`, workflow `project-assistant-refresh.yml` | Cron cloud observado correctamente; falta certificar actualización de cada proveedor/proyecto |
 | Escritorio | Tauri 2 + Rust + TypeScript/Vite; `companion/windows` | Conexión de hooks, contexto autorizado y respuesta del modelo son capacidades distintas |
 | Móvil | Capacitor Android/iOS carga la aplicación HTTPS en `/app` | No equivale a un agente nativo con control del sistema |
 
 ## Coucou
 
-Identificado: [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), revisión declarada `a7bd575e90253673e7e08370a78f1261eb53ac2f`. `companion/windows/THIRD-PARTY-LICENSE.txt` conserva la licencia MIT y atribución a Louis Raillé. Novo sustituye los recursos de personaje/audio reservados. Mantener este aviso al distribuir. El manifiesto del Companion declara 0.2.12 y su README todavía menciona 0.2.10: hay deriva documental de versiones.
+Identificado: [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), revisión declarada `a7bd575e90253673e7e08370a78f1261eb53ac2f`. `companion/windows/THIRD-PARTY-LICENSE.txt` conserva la licencia MIT y atribución a Louis Raillé. Novo sustituye los recursos de personaje/audio reservados. Mantener este aviso al distribuir. Manifiestos, README, release y ejecutable instalado coinciden en 0.2.13; el instalador incluye el aviso de licencia, comprobado en la instalación.
 
 Novo reutiliza ventana/isla, hooks de agentes, integraciones, preferencias y runtime nativo. Sobre esa base añade cuenta Novo, chat compartido, captura consentida, carpetas/contexto de trabajo, scopes y trabajo durable. No se encontró evidencia de un Windows Widget de Windows App SDK independiente: la superficie actual es el Companion Tauri.
 
@@ -32,11 +34,11 @@ Novo reutiliza ventana/isla, hooks de agentes, integraciones, preferencias y run
 
 ## Contexto, memoria y coste
 
-`lib/ai/context-builder.ts` reúne aproximadamente 18 fuentes por turno; incluye rutinas con relaciones anidadas sin límite equivalente al de otras fuentes. Un fallo en su `Promise.all` puede convertir contexto indisponible en valores vacíos. `lib/cognitive/ambient-twin-runtime.ts` realiza unas 15 lecturas; ya existen claims de refresco de 15 minutos que conviene reutilizar.
+`lib/ai/context-builder.ts` reúne aproximadamente 18 fuentes por turno. La entrega limita el prefetch de rutinas, conserva lecturas sanas ante fallos independientes y declara campos desconocidos; la comprobación de exclusiones sigue fallando cerrada. Aún falta recuperación selectiva por intención y un presupuesto global del contexto. `lib/cognitive/ambient-twin-runtime.ts` realiza unas 15 lecturas; ya existen claims de refresco de 15 minutos que conviene reutilizar.
 
 La memoria de trabajo vive en turnos/contexto; señales/outcomes representan memoria episódica; preferencias y entidades de proyectos representan memoria semántica; skills de runtime y acciones representan memoria procedural. No constituyen todavía una política única de retención y borrado para todas las fuentes.
 
-El refresco de proyectos cada 15 minutos depende de Inngest. El cron de contexto ambiental configurado en Vercel es diario; son mecanismos distintos, y ninguno se certificó operativamente aquí.
+El refresco de proyectos tiene mecanismos Inngest y un workflow GitHub programado cada 15 minutos, que llama al endpoint protegido. La ejecución `41378587708` responde `success:true`, `processed:63`, `failed:0`, `skipped:0`; son cuentas procesadas, no 63 proyectos ni prueba de salud de todos los proveedores. El cron de contexto ambiental configurado en Vercel es diario; es un mecanismo distinto.
 
 Hay clasificación determinista y routing, pero no una medición uniforme de tokens, coste y escalados en todos los streams. No añadir una llamada de IA para decidir si cada comando necesita IA.
 

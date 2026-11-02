@@ -90,20 +90,12 @@ fn scripts(path: &Path) -> Result<serde_json::Value, String> {
 pub fn verification_scripts_unchanged(prepared: &Prepared) -> Result<bool, String> {
     Ok(scripts(&prepared.path)? == prepared.original_scripts)
 }
-pub fn dependency_permission_args(prepared: &Prepared) -> Vec<String> {
-    let mut args = vec![];
+pub fn dependency_paths(prepared: &Prepared) -> Vec<PathBuf> {
+    let mut paths = vec![];
     if let Some(deps) = &prepared.dependencies {
-        for dir in [deps.clone(), prepared.path.join("node_modules")] {
-            args.extend([
-                "-c".into(),
-                format!(
-                    "permissions.novo.filesystem.{}=\"read\"",
-                    super::codex::quoted(&dir.to_string_lossy())
-                ),
-            ]);
-        }
+        paths.extend([deps.clone(), prepared.path.join("node_modules")]);
     }
-    args
+    paths
 }
 pub fn link_dependencies(
     node: &Path,

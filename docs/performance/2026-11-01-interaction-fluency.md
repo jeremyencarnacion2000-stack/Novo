@@ -5,7 +5,7 @@ La aceptación incluye escribir, leer, desplazar, abrir/cerrar y cambiar de pane
 ## Entorno y método
 
 - Windows del usuario: ~3.4 GiB de RAM física. Chrome instalado, extensión de Codex y sesión autenticada existente, autorizada por el usuario. Viewport de escritorio 1366 × 551; prueba responsive 375 × 812, restaurado al terminar.
-- Producción: `https://productivitynovo.vercel.app/`. Los cambios locales aún no están desplegados. No confundir esta base de producción con el worktree `cd0af5f` modificado.
+- Producción al comenzar las mediciones: `https://productivitynovo.vercel.app/`, antes de desplegar estos cambios. No confundir esa base con el worktree `cd0af5f` modificado. PR #29 publicó las correcciones después; ver la actualización al final.
 - Observación temporal por CDP: intervalos de `requestAnimationFrame`, `PerformanceObserver` para tareas largas y eventos de interacción. Se desconectan los observadores y se retiran estilos de diagnóstico al terminar. No se guardan contenidos de chats/correos, credenciales ni preferencias de cuenta.
 - Las ventanas de aislamiento de filtros duran 1600 ms. La comparación cambia sólo CSS temporal de los campos de color de Ahora, con el mismo documento, sesión y equipo. No ejecutamos compiladores durante estas mediciones.
 - Son diagnósticos locales bajo presión de memoria, no una medición de INP de campo, FPS garantizados o un benchmark de todas las páginas. Las muestras cortas y la propia instrumentación limitan la precisión.
@@ -70,3 +70,9 @@ El hook conserva el muestreo de velocidad por evento, presenta como máximo una 
 | Accesibilidad | Texto grande, contraste, transparencia reducida y preferencia de movimiento en dispositivos reales |
 
 Objetivo: intervalos cercanos al refresco del dispositivo, sin tareas largas atribuibles al gesto, escritura sin perder caracteres y lectura sin saltos forzados. Mantener una tabla por interacción; no declarar la aplicación fluida a partir del tiempo de carga.
+
+## Actualización tras publicación — 2026-11-02
+
+PR #29 está en producción. La inspección DOM confirma campos de color sin blur y sin Cards redundantes anidadas. El chat recibe una respuesta Gmail real y la recupera al abrir otra pestaña. No se sustituyen con ello las mediciones de interacción de la tabla anterior.
+
+La nueva sonda gráfica sólo entregó dos intervalos durante una ventana de 1.8 s; la captura nativa de Windows también falla. La muestra es insuficiente y no comparable con el ensayo controlado anterior. Se descarta como benchmark, sin atribuirla a una regresión de Novo ni certificar FPS. No quedan observadores o estilos temporales instalados en la página.

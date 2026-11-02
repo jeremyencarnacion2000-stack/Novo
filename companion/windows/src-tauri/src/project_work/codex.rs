@@ -13,20 +13,15 @@ pub fn quoted(value: &str) -> String {
     )
     .unwrap_or_else(|_| "\"\"".into())
 }
-// Keys must be quoted complete paths (including glob); no server-controlled config.
-pub fn permission_args(workspace: &Path, writable: bool) -> Vec<String> {
-    let mut args = vec![
-        "-c".into(),
-        "default_permissions=\"novo\"".into(),
-        "-c".into(),
-        "permissions.novo.filesystem.\":minimal\"=\"read\"".into(),
-        "-c".into(),
-        format!(
-            "permissions.novo.filesystem.{}=\"{}\"",
-            quoted(&workspace.to_string_lossy()),
-            if writable { "write" } else { "read" }
-        ),
+// CLI override keys split on dots; path keys belong inside one TOML table value.
+pub fn permission_args(workspace: &Path, writable: bool, readable: &[PathBuf]) -> Vec<String> {
+    let mut entries = vec![
+        "\":minimal\"=\"read\"".into(),
+        format!("{}=\"{}\"", quoted(&workspace.to_string_lossy()), if writable { "write" } else { "read" }),
     ];
+    for path in readable {
+        entries.push(format!("{}=\"read\"", quoted(&path.to_string_lossy())));
+    }
     for suffix in [
         ".git",
         ".codex",
@@ -36,15 +31,13 @@ pub fn permission_args(workspace: &Path, writable: bool) -> Vec<String> {
         "**/credentials*",
         "**/auth.json",
     ] {
-        args.extend([
-            "-c".into(),
-            format!(
-                "permissions.novo.filesystem.{}=\"deny\"",
-                quoted(&format!("{}/{suffix}", workspace.to_string_lossy()))
-            ),
-        ]);
+        entries.push(format!("{}=\"deny\"", quoted(&format!("{}/{suffix}", workspace.to_string_lossy()))));
     }
-    args.extend([
+    vec![
+        "-c".into(),
+        "default_permissions=\"novo\"".into(),
+        "-c".into(),
+        format!("permissions.novo.filesystem={{{}}}", entries.join(",")),
         "-c".into(),
         "permissions.novo.network.enabled=false".into(),
         "-c".into(),
@@ -53,10 +46,9 @@ pub fn permission_args(workspace: &Path, writable: bool) -> Vec<String> {
         "approval_policy=\"never\"".into(),
         "-c".into(),
         "shell_environment_policy.inherit=\"none\"".into(),
-    ]);
-    args
+    ]
 }
-pub fn agent_args(workspace: &Path, model: &str, writable: bool) -> Result<Vec<String>, String> {
+pub fn agent_args(workspace: &Path, model: &str, writable: bool, readable: &[PathBuf]) -> Result<Vec<String>, String> {
     if model.is_empty()
         || model.len() > 100
         || !model
@@ -86,15 +78,20 @@ pub fn agent_args(workspace: &Path, model: &str, writable: bool) -> Result<Vec<S
         "-c".into(),
         "web_search=\"disabled\"".into(),
     ];
-    args.extend(permission_args(workspace, writable));
+    args.extend(permission_args(workspace, writable, readable));
     args.push("-".into());
     Ok(args)
 }
 
 fn chat_args(workspace: &Path, model: &str) -> Result<Vec<String>, String> {
-    let mut args = agent_args(workspace, model, false)?;
+    let mut args = agent_args(workspace, model, false, &[])?;
     args.pop();
-    args.extend(["-c".into(), "forced_login_method=\"chatgpt\"".into(), "-".into()]);
+    // A plan reply needs no project discovery or local tools; keep narrow read permissions.
+    args.extend(["-c".into(), "project_doc_max_bytes=0".into(), "-c".into(), "forced_login_method=\"chatgpt\"".into()]);
+    for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks", "browser_use", "computer_use", "in_app_browser", "in_app_local_automation", "code_mode_host"] {
+        args.extend(["--disable".into(), feature.into()]);
+    }
+    args.push("-".into());
     Ok(args)
 }
 
@@ -300,16 +297,7 @@ pub fn probe(runtime: &Runtime, root: &Path) -> Result<(), String> {
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
     )?;
     let mut args = vec!["sandbox".into()];
-    args.extend(permission_args(&workspace, true));
-    for path in [&readonly, &workspace.join("readonly-link")] {
-        args.extend([
-            "-c".into(),
-            format!(
-                "permissions.novo.filesystem.{}=\"read\"",
-                quoted(&path.to_string_lossy())
-            ),
-        ]);
-    }
+    args.extend(permission_args(&workspace, true, &[readonly, workspace.join("readonly-link")]));
     args.extend(["-P".into(),"novo".into(),"-C".into(),workspace.to_string_lossy().into(),"--".into(),system_powershell().to_string_lossy().into(),"-NoProfile".into(),"-NonInteractive".into(),"-Command".into(),"$ErrorActionPreference='Stop'; Set-Content -LiteralPath './ok.txt' -Value fixture; try { Get-Content -LiteralPath '../outside.txt' -ErrorAction Stop | Out-Null; exit 4 } catch {}; Get-Content -LiteralPath './readonly-link/public.txt' -ErrorAction Stop | Out-Null; try { Set-Content -LiteralPath './readonly-link/private.txt' -Value fixture -ErrorAction Stop; exit 5 } catch { exit 0 }".into()]);
     let out = process::capture(&runtime.cli, &args, None, 20, 32768)?;
     if out.success && workspace.join("ok.txt").is_file() {
@@ -342,8 +330,35 @@ mod permission_tests {
     use std::path::Path;
 
     #[test]
+    fn filesystem_paths_are_values_not_dotted_cli_override_keys() {
+        let args = permission_args(Path::new("C:/Users/Angel/work/project.v2"), false, &[]);
+        let filesystem: Vec<_> = args.windows(2)
+            .filter(|pair| pair[0] == "-c" && pair[1].starts_with("permissions.novo.filesystem"))
+            .map(|pair| pair[1].as_str()).collect();
+        assert_eq!(filesystem.len(), 1, "Codex CLI splits override keys on dots and retains quotes");
+        let table = filesystem[0];
+        assert!(table.starts_with("permissions.novo.filesystem={"));
+        assert!(table.contains("\":minimal\"=\"read\""));
+        assert!(table.contains("\"C:/Users/Angel/work/project.v2\"=\"read\""));
+        assert!(table.contains("\"C:/Users/Angel/work/project.v2/**/.env*\"=\"deny\""));
+        assert!(!table.contains("=\"write\""));
+    }
+
+    #[test]
+    fn dependency_reads_keep_workspace_writes_and_secret_denials_in_one_table() {
+        let args = permission_args(Path::new("C:/work/project.v2"), true, &["C:/deps.v1/node_modules".into()]);
+        let tables: Vec<_> = args.iter().filter(|arg| arg.starts_with("permissions.novo.filesystem=")).collect();
+        assert_eq!(tables.len(), 1);
+        assert!(tables[0].contains("\"C:/work/project.v2\"=\"write\""));
+        assert!(tables[0].contains("\"C:/deps.v1/node_modules\"=\"read\""));
+        assert!(tables[0].contains("\"C:/work/project.v2/.git\"=\"deny\""));
+        assert!(tables[0].contains("\"C:/work/project.v2/**/auth.json\"=\"deny\""));
+        assert!(!tables[0].contains("\":root\"=\"read\""));
+    }
+
+    #[test]
     fn windows_codex_uses_elevated_sandbox_and_denies_secrets_and_network() {
-        let args = permission_args(Path::new("C:/Users/Angel/work/project"), true);
+        let args = permission_args(Path::new("C:/Users/Angel/work/project"), true, &[]);
         let settings: Vec<_> = args
             .windows(2)
             .filter_map(|pair| (pair[0] == "-c").then_some(pair[1].as_str()))
@@ -358,17 +373,28 @@ mod permission_tests {
     }
 
     #[test]
+    fn plan_chat_does_not_load_project_docs_or_expose_local_tools() {
+        let args = super::chat_args(Path::new("C:/Users/Angel/temp"), "gpt-6-luna").unwrap();
+        assert!(args.iter().any(|arg| arg == "project_doc_max_bytes=0"));
+        for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks", "browser_use", "computer_use", "in_app_browser", "in_app_local_automation", "code_mode_host"] {
+            assert!(args.windows(2).any(|pair| pair[0] == "--disable" && pair[1] == feature), "{feature}");
+        }
+        let project = super::agent_args(Path::new("C:/work/project"), "gpt-6-luna", true, &[]).unwrap();
+        assert!(!project.iter().any(|arg| arg == "project_doc_max_bytes=0"));
+    }
+
+    #[test]
     fn codex_chat_is_read_only() {
         let args = super::chat_args(Path::new("C:/Users/Angel/temp"), "gpt-5-codex").unwrap();
         let settings: Vec<_> = args
             .windows(2)
             .filter_map(|pair| (pair[0] == "-c").then_some(pair[1].as_str()))
             .collect();
-        assert!(settings.iter().any(|setting| setting.ends_with("=\"read\"")));
-        assert!(!settings.iter().any(|setting| setting.ends_with("=\"write\"")));
+        assert!(settings.iter().any(|setting| setting.contains("=\"read\"")));
+        assert!(!settings.iter().any(|setting| setting.contains("=\"write\"")));
         assert!(settings.contains(&"permissions.novo.network.enabled=false"));
         assert!(settings.contains(&"forced_login_method=\"chatgpt\""));
-        let project = super::agent_args(Path::new("C:/Users/Angel/temp"), "gpt-5-codex", true).unwrap();
+        let project = super::agent_args(Path::new("C:/Users/Angel/temp"), "gpt-5-codex", true, &[]).unwrap();
         assert!(!project.iter().any(|argument| argument.contains("forced_login_method")));
     }
 

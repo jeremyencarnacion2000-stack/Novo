@@ -90,35 +90,7 @@ pub fn run_guarded(
     if let Some(dir) = dir {
         command.current_dir(dir);
     }
-    // The only authentication retained is the CLI's own protected login.
-    for (key, _) in std::env::vars() {
-        let upper = key.to_ascii_uppercase();
-        if upper.contains("TOKEN")
-            || upper.contains("SECRET")
-            || upper.ends_with("API_KEY")
-            || upper.starts_with("GIT_")
-            || upper.starts_with("OPENAI_")
-            || [
-                "DATABASE_URL",
-                "DIRECT_URL",
-                "PGPASSWORD",
-                "NODE_OPTIONS",
-                "RUSTC_WRAPPER",
-                "NPM_CONFIG_USERCONFIG",
-            ]
-            .contains(&upper.as_str())
-        {
-            command.env_remove(key);
-        }
-    }
-    command
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env(
-            "GIT_CONFIG_GLOBAL",
-            if cfg!(windows) { "NUL" } else { "/dev/null" },
-        )
-        .env_remove("GIT_CONFIG_COUNT")
-        .env_remove("GIT_CONFIG_PARAMETERS");
+    crate::codex_plan::isolate_command_environment(&mut command);
     let mut child = crate::platform::no_console(&mut command)
         .spawn()
         .map_err(|_| "runtime_unavailable")?;

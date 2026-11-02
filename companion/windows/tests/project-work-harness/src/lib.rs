@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn argv_has_explicit_confinement_and_no_bypass() {
         let args =
-            codex::agent_args(std::path::Path::new("C:/fixture"), "gpt-6-luna", false).unwrap();
+            codex::agent_args(std::path::Path::new("C:/fixture"), "gpt-6-luna", false, &[]).unwrap();
         let joined = args.join(" ");
         for required in [
             "--json",
@@ -44,7 +44,7 @@ mod tests {
         assert!(!joined.contains("danger-full-access"));
         assert!(!joined.contains("bypass"));
         assert!(
-            codex::agent_args(std::path::Path::new("C:/fixture"), "model;unsafe", true).is_err()
+            codex::agent_args(std::path::Path::new("C:/fixture"), "model;unsafe", true, &[]).is_err()
         );
     }
     #[test]
