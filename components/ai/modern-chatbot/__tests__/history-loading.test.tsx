@@ -304,3 +304,31 @@ it.each(['edit', 'retry'])('preserves the full history when %s is requested befo
   expect(writes(fetchMock)).toHaveLength(0)
   expect(result.current.messages).toMatchObject(history)
 })
+
+it('keeps a new save tracked when an older save finishes after returning to the same account', async () => {
+  const firstSave = deferred<Response>()
+  const currentSave = deferred<Response>()
+  const { result, fetchMock, rerender } = setup(() => [detail(mockSession.data.user.id === 'user-a' ? 'a' : 'b')], async id => response(detail(id)))
+  await settle()
+  let saves = 0
+  const implementation = fetchMock.getMockImplementation()!
+  fetchMock.mockImplementation((input, options) => options?.method === 'PUT' && String(input) === '/api/ai-conversations/a'
+    ? ++saves === 1 ? firstSave.promise : currentSave.promise : implementation(input, options))
+  act(() => result.current.updateConversation('a', { title: 'First pending save' }))
+  await advance()
+  for (const id of ['user-b', 'user-a']) {
+    mockSession = { data: { user: { id } }, status: 'authenticated' }
+    rerender()
+    await settle()
+  }
+  act(() => result.current.updateConversation('a', { title: 'Current pending save' }))
+  await advance()
+  firstSave.resolve(response({ revision: 5 }))
+  await settle()
+  let deletion!: Promise<void>
+  act(() => { deletion = result.current.deleteConversation('a') })
+  expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false)
+  currentSave.resolve(response({ revision: 5 }))
+  await act(async () => { await deletion })
+  expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(1)
+})

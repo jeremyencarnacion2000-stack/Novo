@@ -395,7 +395,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             if (!signal?.aborted) console.error('Failed to save conversation to database:', error);
         } finally {
-            savingRef.current.delete(cleanId);
+            if (generation === accountGenerationRef.current) savingRef.current.delete(cleanId);
             if (generation === accountGenerationRef.current && dirtySaveRef.current.delete(cleanId)) {
                 const latest = conversationsRef.current.find((item) => item.id === conv.id);
                 if (latest) void saveConversation(latest);

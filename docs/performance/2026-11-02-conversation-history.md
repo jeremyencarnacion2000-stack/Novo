@@ -32,6 +32,6 @@ Reducción en este fixture: **98.76%**. No representa consumo facturado de Neon,
 
 ## Evidencia y límites
 
-Suite inicial completa antes de los ajustes de revisión: 328 suites, 1330 pruebas y dos snapshots aprobados. La revisión independiente encontró dos casos importantes y uno de compatibilidad; se reprodujeron antes de corregirlos. Tras el ajuste: 45 pruebas dirigidas de API, proveedor, UI, normalización y turnos Companion aprobadas; lint de los archivos modificados aprobado. La verificación remota mantiene activas las puertas de tipos, pruebas y build.
+Suite inicial completa antes de los ajustes de revisión: 328 suites, 1330 pruebas y dos snapshots aprobados. La revisión independiente encontró dos casos importantes y uno de compatibilidad; se reprodujeron antes de corregirlos. Tras el ajuste: 46 pruebas dirigidas de API, proveedor, UI, normalización y turnos Companion aprobadas; lint de los archivos modificados aprobado. Incluyen volver a la misma cuenta mientras termina un guardado anterior: esa respuesta no puede quitar el seguimiento de un guardado nuevo ni adelantar su borrado. La verificación remota mantiene activas las puertas de tipos, pruebas y build.
 
 La aceptación en producción consiste en observar únicamente metadatos más el detalle seleccionado, cambiar de conversación, conservar fuentes/adjuntos y comprobar ausencia de escrituras por mera lectura. No requiere enviar mensajes ni modificar historiales reales. La medición de fluidez física y la convergencia de los dos orquestadores siguen siendo trabajos distintos.
