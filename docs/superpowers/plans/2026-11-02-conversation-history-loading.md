@@ -58,11 +58,13 @@
 
 **Interfaces:** No new runtime contract. Update existing capability/debt/implementation documents with actual evidence and limits.
 
-- [ ] Measure total initial JSON bytes for 200 representative synthetic histories: old full list versus summary list plus one detail; report this as a fixture, not a production bill.
-- [ ] Run relevant regression checks and complete remote type/build validation if the local machine cannot sustain them.
-- [ ] Request one fresh-context review of the whole branch; fix important findings with observed red/green tests.
-- [ ] Publish using the user's existing GitHub/Vercel authorization. Verify the compiled result and an authenticated read-only flow; do not send mail or modify real histories for QA.
-- [ ] Update the required documentation and report exactly what was tested and what remains uncertain.
+- [x] Measure total initial JSON bytes for 200 representative synthetic histories: old full list versus summary list plus one detail; report this as a fixture, not a production bill.
+- [x] Run relevant regression checks and complete remote type/build validation if the local machine cannot sustain them.
+- [x] Request one fresh-context review of the whole branch; fix important findings with observed red/green tests.
+- [x] Publish using the user's existing GitHub/Vercel authorization. Verify the compiled result and an authenticated read-only flow; do not send mail or modify real histories for QA.
+- [x] Update the required documentation and report exactly what was tested and what remains uncertain.
+
+Release evidence: PR #31 merged as `b882c82`; CI `41397618757` passes types/lint/1336 tests. Production Vercel deployment READY, canonical alias verified. Authenticated read-only QA: 75 metadata rows without messages, one initial detail retaining sources, one detail for another selected history, zero history writes. See the performance report for measured bytes and limits.
 
 ## Execution rulings
 

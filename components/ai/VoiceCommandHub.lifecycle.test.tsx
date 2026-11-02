@@ -1,9 +1,11 @@
 import React from 'react'
-import { act, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { VoiceCommandHub } from './VoiceCommandHub'
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand } from '@/lib/voice-executor'
 
+let mockAccountId = 'account-a'
+jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { id: mockAccountId } } }) }))
 jest.mock('@/lib/cognitive-context', () => ({ useCognitiveEngine: () => ({ bioState: { phase: 'LINEAR_EXECUTION', attentionScore: 80 } }) }))
 jest.mock('@/lib/whisper', () => ({ whisperAPI: { transcribeAudio: jest.fn() } }))
 jest.mock('@/lib/voice-executor', () => ({ executeVoiceCommand: jest.fn() }))
@@ -30,6 +32,7 @@ describe('voice panel cancellation', () => {
   const getUserMedia = jest.fn()
   beforeEach(() => {
     jest.clearAllMocks()
+    mockAccountId = 'account-a'
     recorders = []
     Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
     Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: Recorder })
@@ -82,5 +85,50 @@ describe('voice panel cancellation', () => {
     view.unmount()
     await act(async () => transcribe('crea una tarea'))
     expect(executeVoiceCommand).not.toHaveBeenCalled()
+  })
+
+  it('dictates into the current chat without executing an isolated command', async () => {
+    ;(whisperAPI.transcribeAudio as jest.Mock).mockResolvedValue('Revisa mis correos recientes')
+    const transcript = jest.fn()
+    window.addEventListener('novo:voice-transcript', transcript)
+    try {
+      render(<VoiceCommandHub headless />)
+      toggle()
+      await waitFor(() => expect(recorders).toHaveLength(1))
+      toggle()
+      await waitFor(() => expect(transcript).toHaveBeenCalledTimes(1))
+      expect(transcript.mock.calls[0][0].detail).toEqual({ text: 'Revisa mis correos recientes' })
+      expect(executeVoiceCommand).not.toHaveBeenCalled()
+    } finally { window.removeEventListener('novo:voice-transcript', transcript) }
+  })
+
+  it('discards an old account transcription and stops its microphone', async () => {
+    let transcribe!: (value: string) => void
+    ;(whisperAPI.transcribeAudio as jest.Mock).mockReturnValue(new Promise(resolve => { transcribe = resolve }))
+    const transcript = jest.fn()
+    window.addEventListener('novo:voice-transcript', transcript)
+    try {
+      const view = render(<VoiceCommandHub headless />)
+      toggle()
+      await waitFor(() => expect(recorders).toHaveLength(1))
+      toggle()
+      await waitFor(() => expect(whisperAPI.transcribeAudio).toHaveBeenCalled())
+      mockAccountId = 'account-b'
+      view.rerender(<VoiceCommandHub headless />)
+      await act(async () => transcribe('Texto privado de la cuenta anterior'))
+      expect(stopTrack).toHaveBeenCalled()
+      expect(transcript).not.toHaveBeenCalled()
+      expect(executeVoiceCommand).not.toHaveBeenCalled()
+    } finally { window.removeEventListener('novo:voice-transcript', transcript) }
+  })
+
+  it('preserves the standalone command panel executor', async () => {
+    ;(whisperAPI.transcribeAudio as jest.Mock).mockResolvedValue('cómo está mi energía')
+    ;(executeVoiceCommand as jest.Mock).mockResolvedValue({ success: true, action: 'cognitive_status', message: 'Estado actual', deferred: false })
+    render(<VoiceCommandHub />)
+    fireEvent.keyDown(document.body, { code: 'Space', key: ' ' })
+    await screen.findByText('Listening — release to process')
+    fireEvent.keyUp(document.body, { code: 'Space', key: ' ' })
+    await waitFor(() => expect(executeVoiceCommand).toHaveBeenCalledTimes(1))
   })
 })

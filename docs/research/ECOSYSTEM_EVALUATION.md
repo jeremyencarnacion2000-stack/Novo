@@ -1,6 +1,6 @@
 # Evaluación de ecosistema
 
-Investigación del 2026-11-01 con `/browse`: metadatos públicos oficiales de GitHub (`/repos/{owner}/{repo}`) para los quince repositorios indicados, y README de los motores de voz. Las fechas son `pushed_at`, no una garantía de release, soporte o seguridad. Las decisiones siguientes son una evaluación para Novo, no una certificación del software. No se instaló ninguno de estos motores ni se ejecutaron scripts de terceros.
+Investigación del 2026-11-01, actualizada el 2026-11-02 con `/browse`: metadatos públicos oficiales de GitHub (`/repos/{owner}/{repo}`) de los quince repositorios indicados, README de los motores de voz y lectura actual de Leon/Pipecat. Las fechas son `pushed_at` (UTC), no una garantía de release, soporte o seguridad. Las decisiones siguientes son una evaluación para Novo, no una certificación del software. No se instaló ninguno de estos motores ni se ejecutaron scripts de terceros.
 
 ## Selección inicial
 
@@ -8,21 +8,29 @@ Investigación del 2026-11-01 con `/browse`: metadatos públicos oficiales de Gi
 | --- | --- | --- | --- |
 | [Open Interpreter](https://github.com/openinterpreter/openinterpreter) | El enlace indicado redirige a `openinterpreter/openinterpreter`; Rust, activo, push 2026-11-01; Apache-2.0 | Su identidad actual difiere de descripciones históricas; otro runtime de agente duplicaría permisos/procesos existentes | Estudiar; no integrar a ciegas el paquete histórico |
 | [Microsoft UFO](https://github.com/microsoft/UFO) | Python, activo, 2026-10-30; MIT | Referencia de automatización Windows; añadir proceso Python/modelos antes de validar workflows aumentaría memoria y mantenimiento | Estudiar adaptadores estructurados; no integrar framework completo |
-| [Leon](https://github.com/leon-ai/leon) | TypeScript, activo, 2026-10-31; MIT | Asistente completo; útil para estudiar módulos de habilidades, duplicaría orquestación | Estudiar arquitectura |
-| [Home Assistant](https://github.com/home-assistant/core) | Python, activo, 2026-11-01; Apache-2.0 | Dominio de dispositivos; no resuelve por sí solo continuidad del trabajo de Novo | Adaptador opcional futuro mediante API, sólo si hay dispositivos autorizados |
-| [Pipecat](https://github.com/pipecat-ai/pipecat) | Python, activo, 2026-10-31; BSD-2-Clause | Pipeline realtime multimodal; nuevo servicio/transporte frente a los existentes | Estudiar streaming/interrupción; integrar sólo si un prototipo demuestra menor complejidad |
-| [Playwright](https://github.com/microsoft/playwright) | TypeScript, activo, 2026-10-31; Apache-2.0 | Ya figura como dependencia de desarrollo; requiere navegador, no implica permiso para operar sesión del usuario | Reutilizar para validación; automatización de producto necesitaría permisos propios |
+| [Leon](https://github.com/leon-ai/leon) | TypeScript, activo, 2026-11-02; MIT | Su README actual separa controlled skills/actions/tools de ejecución agentic y contexto/memoria | Adaptar esa separación en el dictado del chat; no incorporar otro asistente |
+| [Home Assistant](https://github.com/home-assistant/core) | Python, activo, 2026-11-02; Apache-2.0 | Dominio de dispositivos; no resuelve por sí solo continuidad del trabajo de Novo | Adaptador opcional futuro mediante API, sólo si hay dispositivos autorizados |
+| [Pipecat](https://github.com/pipecat-ai/pipecat) | Python, activo, 2026-11-02; BSD-2-Clause | Pipeline realtime multimodal; nuevo servicio/transporte frente a los existentes | Adaptar separación captura/transcripción/ejecución; streaming/VAD quedan pendientes de medición |
+| [Playwright](https://github.com/microsoft/playwright) | TypeScript, activo, 2026-11-02; Apache-2.0 | Ya figura como dependencia de desarrollo; requiere navegador, no implica permiso para operar sesión del usuario | Reutilizar para validación; automatización de producto necesitaría permisos propios |
 | [Mem0](https://github.com/mem0ai/mem0) | Python, activo, 2026-10-30; Apache-2.0 | Novo ya tiene señales y memoria con procedencia/revisiones; sumar otra persistencia añade coste y conflictos | Estudiar recuperación/deduplicación; rechazar dependencia en esta fase |
-| [Ollama](https://github.com/ollama/ollama) | Go, activo, 2026-10-31; MIT | El Companion ya habla su protocolo; RAM/GPU y licencia dependen del modelo | Reutilizar adaptador existente, instalación/modelos optativos |
-| [Semantic Kernel](https://github.com/microsoft/semantic-kernel) | C#, activo, 2026-10-31; MIT | Otro framework sobre planner/executor existentes | Estudiar patrones; rechazar incorporación ahora |
+| [Ollama](https://github.com/ollama/ollama) | Go, activo, 2026-11-02; MIT | El Companion ya habla su protocolo; RAM/GPU y licencia dependen del modelo | Reutilizar adaptador existente, instalación/modelos optativos |
+| [Semantic Kernel](https://github.com/microsoft/semantic-kernel) | C#, activo, 2026-11-02; MIT | Otro framework sobre planner/executor existentes | Estudiar patrones; rechazar incorporación ahora |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | C++, activo, 2026-10-30; MIT | CPU/quantización y Windows documentados; sidecar nativo encaja mejor que un servidor general | Candidato a prototipo STT local optativo |
-| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Python, activo, 2026-10-31; MIT | CTranslate2 y runtime Python; GPU añade requisitos CUDA/cuDNN | Comparar en estación adecuada; evitar empaquetar para todos |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Python, activo, 2026-11-02; MIT | CTranslate2 y runtime Python; GPU añade requisitos CUDA/cuDNN | Comparar en estación adecuada; evitar empaquetar para todos |
 | [Piper original](https://github.com/rhasspy/piper) | Archivado; último push 2025-08-26; MIT | README declara traslado a [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl); no trasladar la licencia MIT del repo antiguo al sucesor | Rechazar integración del repo archivado; evaluar sucesor y voces por separado |
 | [OpenWakeWord](https://github.com/dscripka/openWakeWord) | No archivado; último push 2025-12-30; Apache-2.0 | README: Windows usa ONNX; modelos incluidos sólo en inglés; revisar licencia de cada peso/dataset | Estudiar; no habilitar escucha continua ni prometer wake word español |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | Python, activo, 2026-10-22; MIT | VAD de audio; ONNX permite separar inferencia de Python, con I/O propio | Candidato pequeño para detección de voz, tras benchmark |
 | [Kokoro](https://github.com/hexgrad/kokoro) | No archivado; último push 2025-08-06; Apache-2.0 | README enlaza modelo de 82M y ejemplos ES/EN; empaquetado, voces, fonetización y calidad requieren revisión | Prototipo TTS optativo; no sustituir síntesis existente aún |
 
 La licencia indicada corresponde al repositorio consultado. Antes de distribuir binarios, modelos, voces o datasets hay que verificar sus archivos/licencias concretos y las dependencias transitivas. Un repositorio no archivado puede estar poco mantenido.
+
+## Utilidad adaptada: voz dentro de la conversación
+
+El [README actual de Leon](https://github.com/leon-ai/leon#readme) documenta modos controlados, acciones y herramientas; el [de Pipecat](https://github.com/pipecat-ai/pipecat#readme) separa servicios de voz, transporte y procesamiento. La adaptación para Novo es propia: reutilizar `VoiceCommandHub` y el compositor persistente, sin copiar código ni instalar ambos frameworks.
+
+En `/chat` y `/ai`, el micrófono entrega texto al borrador de la conversación actual. Conserva texto y adjuntos existentes; requiere pulsar Enviar para entrar en el mismo flujo de contexto, herramientas y confirmaciones que un mensaje escrito. Cambio de cuenta/selección o cierre cancela la captura/transcripción pendiente. No se ejecutan comandos aislados ni se crea una tarea sólo por dictar una frase. El clasificador del panel independiente también deja de convertir conversación genérica en tareas.
+
+Esto implementa una entrada de voz revisable; no implementa Pipecat, VAD, síntesis, wake word, STT offline ni un protocolo nuevo. El panel independiente conserva sus comandos explícitos y todavía requiere converger con el chat; no se certifica aquí su catálogo completo. La transcripción sigue usando el servicio existente y requiere red/configuración del servidor. Las pruebas de captura usan audio/transcripción simulados; la calidad física ES/EN queda pendiente.
 
 ## Comparación de voz aplicable al equipo
 
