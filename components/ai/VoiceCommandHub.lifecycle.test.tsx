@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { VoiceCommandHub } from './VoiceCommandHub'
 import { whisperAPI } from '@/lib/whisper'
 import { executeVoiceCommand } from '@/lib/voice-executor'
+import { sileo } from '@/lib/sileo-bell'
 
 let mockAccountId = 'account-a'
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { id: mockAccountId } } }) }))
@@ -130,5 +131,16 @@ describe('voice panel cancellation', () => {
     await screen.findByText('Listening — release to process')
     fireEvent.keyUp(document.body, { code: 'Space', key: ' ' })
     await waitFor(() => expect(executeVoiceCommand).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows a retryable error when chat dictation fails without executing anything', async () => {
+    ;(whisperAPI.transcribeAudio as jest.Mock).mockRejectedValue(new Error('private-provider-detail'))
+    render(<VoiceCommandHub headless />)
+    toggle()
+    await waitFor(() => expect(recorders).toHaveLength(1))
+    toggle()
+    await waitFor(() => expect(sileo.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'No se pudo dictar', description: expect.not.stringContaining('private-provider-detail') })))
+    expect(executeVoiceCommand).not.toHaveBeenCalled()
+    expect(stopTrack).toHaveBeenCalled()
   })
 })

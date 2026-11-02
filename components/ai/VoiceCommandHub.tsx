@@ -206,6 +206,10 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   const [history, setHistory] = useState<TranscriptEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
 
+  useEffect(() => {
+    if (headless && error) sileo.error({ title: 'No se pudo dictar', description: error, duration: 5000 })
+  }, [headless, error])
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
