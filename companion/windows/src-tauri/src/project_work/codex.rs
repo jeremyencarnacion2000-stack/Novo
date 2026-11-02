@@ -88,7 +88,7 @@ fn chat_args(workspace: &Path, model: &str) -> Result<Vec<String>, String> {
     args.pop();
     // A plan reply needs no project discovery or local tools; keep narrow read permissions.
     args.extend(["-c".into(), "project_doc_max_bytes=0".into(), "-c".into(), "forced_login_method=\"chatgpt\"".into()]);
-    for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks"] {
+    for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks", "browser_use", "computer_use", "in_app_browser", "in_app_local_automation", "code_mode_host"] {
         args.extend(["--disable".into(), feature.into()]);
     }
     args.push("-".into());
@@ -376,7 +376,7 @@ mod permission_tests {
     fn plan_chat_does_not_load_project_docs_or_expose_local_tools() {
         let args = super::chat_args(Path::new("C:/Users/Angel/temp"), "gpt-6-luna").unwrap();
         assert!(args.iter().any(|arg| arg == "project_doc_max_bytes=0"));
-        for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks"] {
+        for feature in ["shell_tool", "unified_exec", "apply_patch_freeform", "view_image", "image_generation", "hooks", "browser_use", "computer_use", "in_app_browser", "in_app_local_automation", "code_mode_host"] {
             assert!(args.windows(2).any(|pair| pair[0] == "--disable" && pair[1] == feature), "{feature}");
         }
         let project = super::agent_args(Path::new("C:/work/project"), "gpt-6-luna", true, &[]).unwrap();

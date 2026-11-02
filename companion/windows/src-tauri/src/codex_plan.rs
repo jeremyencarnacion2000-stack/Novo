@@ -75,9 +75,33 @@ fn chatgpt_account(result: &Value) -> bool {
     result["account"]["type"] == "chatgpt"
 }
 
+fn private_environment_key(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    upper.contains("TOKEN")
+        || upper.contains("SECRET")
+        || upper.ends_with("API_KEY")
+        || upper.starts_with("GIT_")
+        || upper.starts_with("OPENAI_")
+        || upper.starts_with("CODEX_") && upper != "CODEX_HOME"
+        || ["DATABASE_URL", "DIRECT_URL", "PGPASSWORD", "NODE_OPTIONS", "RUSTC_WRAPPER", "NPM_CONFIG_USERCONFIG"].contains(&upper.as_str())
+}
+
+/// Retain protected CLI login, never credentials or tools from a parent agent.
+pub(crate) fn isolate_command_environment(command: &mut Command) {
+    for (key, _) in std::env::vars() {
+        if private_environment_key(&key) {
+            command.env_remove(key);
+        }
+    }
+    command.env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", if cfg!(windows) { "NUL" } else { "/dev/null" })
+        .env_remove("GIT_CONFIG_COUNT").env_remove("GIT_CONFIG_PARAMETERS");
+}
+
 fn query(exe: &Path, requests: &str) -> Option<Value> {
     let mut cmd = Command::new(exe);
     cmd.arg("app-server").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+    isolate_command_environment(&mut cmd);
     // An npm install is a `#!/usr/bin/env node` script (or a .cmd calling node):
     // its own folder first on PATH, as the Mac does, so it finds its Node.
     if let Some(dir) = exe.parent() {
@@ -111,7 +135,7 @@ fn query(exe: &Path, requests: &str) -> Option<Value> {
     #[cfg(windows)]
     {
         let mut kill = Command::new("taskkill");
-        kill.args(["/T", "/F", "/PID", &child.id().to_string()]);
+        kill.args(["/T", "/F", "/PID", &child.id().to_string()]).stdout(Stdio::null()).stderr(Stdio::null());
         platform::no_console(&mut kill);
         let _ = kill.status();
     }
@@ -190,6 +214,22 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_does_not_inherit_desktop_tool_pipes_or_parent_thread_identity() {
+        for key in ["CODEX_APP_TOOLS_PIPE_PATH", "CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_MCP_NODE_PATH", "codex_app_tools_pipe_path", "OPENAI_API_KEY", "DATABASE_URL"] {
+            assert!(private_environment_key(key), "{key}");
+        }
+        for key in ["CODEX_HOME", "PATH", "USERPROFILE", "LOCALAPPDATA"] {
+            assert!(!private_environment_key(key), "{key}");
+        }
+        let mut command = Command::new("fixture");
+        isolate_command_environment(&mut command);
+        for (key, _) in std::env::vars().filter(|(key, _)| private_environment_key(key)) {
+            assert!(command.get_envs().any(|(name, value)| name == key.as_str() && value.is_none()), "{key}");
+        }
+        assert!(!command.get_envs().any(|(name, value)| name == "CODEX_HOME" && value.is_none()));
+    }
 
     #[test]
     fn chatgpt_plan_requires_an_explicit_chatgpt_account() {

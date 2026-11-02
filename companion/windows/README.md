@@ -10,6 +10,7 @@ Versión preparada: **0.2.13**.
 - Codex usa la sesión local del plan ChatGPT, con historial temporal separado y cancelación al cambiar de fuente. Requiere un Codex CLI compatible y una sesión válida; no transfiere automáticamente el historial ni los archivos de la cuenta Novo.
 - Comprueba el tipo de cuenta mediante el protocolo de Codex y conserva el aislamiento del proceso y los límites de respuesta.
 - Corrige el formato de los permisos que rechazaba Codex CLI. El chat del plan responde sin cargar instrucciones de proyectos ni habilitar herramientas locales; no requiere lectura general del disco. Las acciones del Twin siguen en Cuenta Novo y el trabajo de código conserva sus comprobaciones de aislamiento.
+- Aísla los procesos de Codex de las herramientas, conexiones y secretos del proceso que los abre, conservando el login local protegido.
 - Incluye las correcciones de protocolo verificadas en Windows y mantiene los hooks, preferencias, carpetas autorizadas y cuenta existentes.
 
 ## Novedades de 0.2.10
