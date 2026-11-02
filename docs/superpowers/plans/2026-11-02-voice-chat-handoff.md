@@ -8,8 +8,10 @@ Alternatives considered: adding Pipecat duplicates the recorder/runtime; adding 
 
 - [x] Reproduce missing transcript handoff and account cancellation with focused tests.
 - [x] Deliver headless recorder output into the existing composer, preserving drafts/files and manual send; guard account and selection changes.
-- [ ] Verify both ends, cancellation and existing command panel behavior; run lint and remote type/build/regression checks.
+- [x] Verify both ends, cancellation and existing command panel behavior; run lint and remote type/build/regression checks.
 - [x] Refresh repository research with source evidence and document this adaptation separately from uninstalled engines.
-- [ ] Publish and verify the production controls; distinguish simulated transcription tests from real microphone validation.
+- [x] Publish and verify the production controls; distinguish simulated transcription tests from real microphone validation.
+
+Evidence: PR #32 merged as `80bcc3a`; final CI `41456515869` passes types/lint/329 suites/1349 tests/2 snapshots, Vercel preview and production READY. Independent review approved and reran the initial 20 focused tests; final sanitized error recovery has a red/green regression (21 focused tests total). Production QA with the authorized Chrome session confirms the dictation button/hint and simulated transcript delivery to the draft, zero assistant/executor/task/history requests, then cleared draft. Real microphone/STT quality, VAD and offline speech remain unverified/uninstalled.
 
 No new service, persistence, dependency, voice model, credential, or permission. The existing transcription service remains cloud-based and the broader standalone command-panel migration is separate work.

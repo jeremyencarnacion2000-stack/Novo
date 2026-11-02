@@ -20,7 +20,7 @@ Fecha: 2026-11-01. «Implementada sin verificar» significa que se encontró el 
 | Contexto de navegador | Colector general ausente | Hay contrato ventana/URL; no se encontró extensión/native messaging ni collector automático de DOM/tab activo |
 | Widget Windows separado | Fuente inactiva | `widget.rs`/`widget.ts` no están conectados al runtime/build normal; la isla Tauri es la representación operativa existente |
 | Dictado manual | Implementada sin verificar por hardware | Dictado del chat/browser; disponibilidad depende del motor y permisos |
-| Dictado web al chat actual | Implementada; pruebas simuladas, publicación pendiente | Transcripción al borrador, texto/adjuntos conservados y envío manual por el mismo chat. Cambio de cuenta/selección/cierre cancela; sin llamadas a ejecutor separado en `/chat` y `/ai`. No certifica STT físico |
+| Dictado web al chat actual | Publicada; pruebas automatizadas y receptor real verificados, audio simulado | PR #32: transcripción al borrador, texto/adjuntos conservados y envío manual por el mismo chat. Cambio de cuenta/selección/cierre invalida resultados; sin ejecutor separado en `/chat` y `/ai`. QA con sesión: cero envíos/acciones/guardados al recibir dictado. No certifica STT físico |
 | Voz conversacional con VAD/interrupción | Parcial / planificada | Hay dictado y speech helpers; falta pipeline unificado medido ES/EN |
 | Wake word local | Ausente del flujo certificado | Candidato opcional; requiere consentimiento, modelo y presupuesto de CPU |
 | Control general de Windows por UI Automation | Ausente del flujo certificado | Preferir adaptadores API antes de introducir control visual |
