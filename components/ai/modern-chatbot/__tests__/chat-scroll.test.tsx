@@ -6,6 +6,7 @@ let mockChat: any
 jest.mock('../context', () => ({ useChatbot: () => mockChat }))
 jest.mock('../message', () => ({ Message: ({ message }: any) => <p>{message.content}</p> }))
 jest.mock('@/components/ai/novo-thinking-pill', () => ({ NovoThinkingPill: () => <div>Thinking</div> }))
+jest.mock('@/lib/i18n', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 
 describe('chat interaction while text streams', () => {
   let frames: Map<number, FrameRequestCallback>

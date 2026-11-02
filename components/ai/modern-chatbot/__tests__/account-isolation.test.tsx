@@ -34,7 +34,7 @@ describe('ChatbotProvider account isolation', () => {
     let conversationRead = 0
     const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
       const url = String(input)
-      if (url === '/api/ai-conversations') {
+      if (url === '/api/ai-conversations?view=summary') {
         conversationRead += 1
         return (conversationRead === 1 ? firstRead.promise : secondRead.promise)
       }

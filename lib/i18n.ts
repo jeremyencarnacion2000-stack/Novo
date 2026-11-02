@@ -6,6 +6,9 @@ type Language = 'en' | 'es' | 'fr' | 'de';
 
 const translations: Record<Language, Record<string, string>> = {
     en: {
+        'chat.history.loading': 'Loading conversation…',
+        'chat.history.error': 'Could not load the conversation.',
+        'chat.history.retry': 'Try again',
         // Settings - Appearance
         'settings.appearance.title': 'Appearance',
         'settings.appearance.desc': 'Customize the look and feel of Novo',
@@ -151,6 +154,9 @@ const translations: Record<Language, Record<string, string>> = {
         'taskDialog.notification.body': 'The task was added to your task list',
     },
     es: {
+        'chat.history.loading': 'Cargando conversación…',
+        'chat.history.error': 'No se pudo cargar la conversación.',
+        'chat.history.retry': 'Volver a intentar',
         // Settings - Appearance
         'settings.appearance.title': 'Apariencia',
         'settings.appearance.desc': 'Personaliza el aspecto de Novo',
@@ -295,6 +301,9 @@ const translations: Record<Language, Record<string, string>> = {
         'taskDialog.notification.body': 'La tarea se añadió a tu lista de tareas',
     },
     fr: {
+        'chat.history.loading': 'Chargement de la conversation…',
+        'chat.history.error': 'Impossible de charger la conversation.',
+        'chat.history.retry': 'Réessayer',
         // Settings - Appearance
         'settings.appearance.title': 'Apparence',
         'settings.appearance.desc': 'Personnaliser l\'apparence de Novo',
@@ -392,6 +401,9 @@ const translations: Record<Language, Record<string, string>> = {
         'taskDialog.notification.body': 'La tâche a été ajoutée à votre liste',
     },
     de: {
+        'chat.history.loading': 'Unterhaltung wird geladen…',
+        'chat.history.error': 'Die Unterhaltung konnte nicht geladen werden.',
+        'chat.history.retry': 'Erneut versuchen',
         // Settings - Appearance
         'settings.appearance.title': 'Aussehen',
         'settings.appearance.desc': 'Passen Sie das Erscheinungsbild von Novo an',
