@@ -1,6 +1,6 @@
 # Evolución de Novo
 
-Actualizado: 2026-11-01. Basado en la [auditoría actual](../architecture/CURRENT_STATE.md), sin sustituir los planes operativos previos.
+Actualizado: 2026-11-02. Basado en la [auditoría actual](../architecture/CURRENT_STATE.md), sin sustituir los planes operativos previos.
 
 | Etapa | Existente | Mejora / nueva capacidad | Dependencias y riesgo | Aceptación |
 | --- | --- | --- | --- | --- |
@@ -11,6 +11,6 @@ Actualizado: 2026-11-01. Basado en la [auditoría actual](../architecture/CURREN
 | 4. Seguimiento útil | Planner determinista, señales y claims de refresco | Scheduler certificado, memoria selectiva/retención y alertas relevantes | Inngest/cron, cuotas y fuentes conectadas | Un cambio de proyecto se incorpora una vez; ningún evento de escritorio dispara IA por sí solo |
 | 5. Continuidad | Registro de dispositivos, conversación compartida y Capacitor | Checkpoint de tarea y handoff con capacidades/offline | Consentimiento y revocación, conflictos de revisiones | Empezar en Windows y retomar en Android sin reconstruir información ni duplicar acciones |
 
-Primera entrega segura: trabajo oculto del Hub y cierre del cableado de Codex ya autorizado. El listado de conversaciones es la siguiente mejora de datos; requiere proteger todos los consumidores y la persistencia antes de cambiar el contrato. Frameworks nuevos, wake word continuo y control general del PC quedan sujetos a evidencia de utilidad y autorización específica.
+Entregas de base: trabajo oculto del Hub, recuperación parcial del contexto y respuesta Codex verificada en Companion 0.2.13. La siguiente entrega implementa el historial web bajo demanda, con protección de persistencia y cuenta; [evidencia y límites](../performance/2026-11-02-conversation-history.md). La convergencia de orquestadores y recuperación selectiva de contexto por intención permanecen pendientes. Frameworks nuevos, wake word continuo y control general del PC quedan sujetos a evidencia de utilidad y autorización específica.
 
 La [medición de interacción autenticada](../performance/2026-11-01-interaction-fluency.md) separa el estado publicado de los ajustes locales y enumera la aceptación pendiente por superficie. Priorizar la pintura de dashboard/Hoy y apertura móvil; el chat observado tiene un coste de frames muy inferior. No reducir el glass globalmente para uniformar números.

@@ -2,6 +2,16 @@
 jest.mock('@/lib/prisma',()=>({prisma:{aIConversation:{updateMany:jest.fn(),findFirst:jest.fn()}}}))
 import {mergeConversationMessages, canonicalConversationMessages, saveConversationRevision} from '../conversation-revision'
 import {prisma} from '@/lib/prisma'
+
+it('preserves a valid legacy per-message createdAt before falling back to conversation time', () => {
+  const messages = [
+    { role: 'user', content: 'Legacy question', createdAt: '2026-11-02T03:00:00Z' },
+    { role: 'assistant', content: 'Existing timestamp', timestamp: '2026-11-02T04:00:00Z', createdAt: '2026-11-02T03:00:00Z' },
+    { role: 'assistant', content: 'Invalid timestamp', timestamp: 'invalid', createdAt: '2026-11-02T05:00:00Z' },
+  ]
+  expect(canonicalConversationMessages('conv', messages, '2026-11-01T00:00:00Z').map(message => message.timestamp))
+    .toEqual(['2026-11-02T03:00:00.000Z', '2026-11-02T04:00:00.000Z', '2026-11-02T05:00:00.000Z'])
+})
 const message=(id:string,content=id)=>({id,role:'user' as const,content,timestamp:'2026-10-09T18:00:00Z'})
 beforeEach(()=>jest.clearAllMocks())
 it('merges by stable IDs retaining server-owned content on stale collisions',()=>{

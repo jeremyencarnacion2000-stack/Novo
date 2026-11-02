@@ -34,7 +34,7 @@ export function ModernChatbot({ onMobileClose }: ModernChatbotProps = {}) {
 }
 
 function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
-    const { createConversation, sendMessage, messages, streamingMessage, twinMode, setTwinMode, twinModeAvailable } = useChatbot();
+    const { createConversation, sendMessage, messages, streamingMessage, twinMode, setTwinMode, twinModeAvailable, historyStatus = 'ready', currentConversationId } = useChatbot();
     const { language } = useTranslation();
     const agentLabel = language === 'es' ? 'Twin Novo' : language === 'fr' ? 'Jumeau Novo' : language === 'de' ? 'Novo-Zwilling' : 'Novo Twin';
     const assistantLabel = language === 'es' ? 'Asistente' : language === 'fr' ? 'Assistant' : language === 'de' ? 'Assistent' : 'Assistant';
@@ -45,7 +45,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [isVoiceListening, setIsVoiceListening] = useState(false)
 
-    const isChatActive = messages.length > 0 || streamingMessage !== null
+    const isChatActive = messages.length > 0 || streamingMessage !== null || historyStatus !== 'ready'
 
     // The composer is one persistent element regardless of hero/chat state
     // (matching the PulseChat reference — a single floating input, not a
@@ -172,6 +172,8 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                             {/* New chat */}
                             <button
                                 onClick={createConversation}
+                                aria-label="Nuevo chat"
+                                disabled={historyStatus !== 'ready' && !currentConversationId}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white/50 hover:text-white hover:bg-white/[0.07] hover:border-white/15 text-xs font-medium transition-all duration-200"
                             >
                                 <Plus className="w-3.5 h-3.5" />
@@ -253,7 +255,7 @@ function ChatbotContent({ onMobileClose }: ModernChatbotProps) {
                     <div ref={composerRef} className="flex-shrink-0 z-20 relative">
                         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent pointer-events-none" />
                         <div className="relative px-3 sm:px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-4">
-                            <ChatInput variant="bottom" />
+                            <ChatInput variant="bottom" disabled={historyStatus !== 'ready'} />
                         </div>
                     </div>
                 </div>

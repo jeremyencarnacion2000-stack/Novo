@@ -78,6 +78,8 @@ export interface Conversation {
     id: string;
     title: string;
     messages: Message[];
+    /** False only for list metadata whose history has not been read yet. Never persisted. */
+    messagesLoaded?: boolean;
     createdAt: string;
     updatedAt: string;
     model?: string;
@@ -105,7 +107,7 @@ export interface ChatbotContextType {
     currentConversationId: string | null;
     setCurrentConversationId: (id: string | null) => void;
     createConversation: () => void;
-    deleteConversation: (id: string) => void;
+    deleteConversation: (id: string) => Promise<void>;
     updateConversation: (id: string, updates: Partial<Conversation>) => void;
 
     // Messages
@@ -141,6 +143,8 @@ export interface ChatbotContextType {
     streamingMessage: Message | null;
     statusMessage: string | null;
     error: string | null;
+    historyStatus: 'loading' | 'ready' | 'error';
+    retryHistoryLoad: () => void;
 }
 
 export interface FileAttachment {

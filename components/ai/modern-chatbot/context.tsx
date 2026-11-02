@@ -23,6 +23,28 @@ const SIDEBAR_KEY = 'modern-chatbot-sidebar-collapsed';
 const MODEL_KEY = 'modern-chatbot-selected-model';
 const TWIN_MODE_KEY = 'modern-chatbot-twin-mode';
 
+function formatConversation(conv: any): Conversation {
+    const messagesLoaded = Array.isArray(conv.messages);
+    return {
+        id: conv.id,
+        title: conv.title || 'Nueva conversación',
+        messages: messagesLoaded ? recoverInterruptedMailReviews(conv.messages
+            .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+            .map((m: any) => ({
+                ...m,
+                id: m.id || crypto.randomUUID(),
+                timestamp: m.timestamp || m.createdAt || conv.createdAt,
+                model: m.model || 'grok-beta',
+            }))) : [],
+        messagesLoaded,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+        model: conv.model || 'grok-beta',
+    };
+}
+
+const conversationSnapshot = (conv: Conversation) => JSON.stringify({ title: conv.title, messages: conv.messages, model: conv.model });
+
 // The assistant's own reply narrates actions as already done ("He creado tu
 // tarea") per the system prompt's "you simply DO things" rule, but the
 // generic confirmation card was gating EVERY action — including plain
@@ -42,11 +64,25 @@ const AUTO_EXECUTE_ACTION_TYPES = new Set([
 export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const { data: session, status: authStatus } = useSession();
     const chatbotStorageKey = session?.user?.id ? `user:${session.user.id}` : null;
+    const accountKeyRef = React.useRef(chatbotStorageKey);
     const accountGenerationRef = React.useRef(0);
     const accountAbortRef = React.useRef<AbortController | null>(null);
     const [hydratedChatbotKey, setHydratedChatbotKey] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+    const [currentConversationId, setSelectedConversationId] = useState<string | null>(null);
+    const selectionRef = React.useRef({ id: null as string | null, version: 0 });
+    const detailAbortRef = React.useRef<AbortController | null>(null);
+    const [historyAccountKey, setHistoryAccountKey] = useState<string | null>(null);
+    const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+    const [listRetry, setListRetry] = useState(0);
+    const [detailRetry, setDetailRetry] = useState(0);
+    const setCurrentConversationId = useCallback((id: string | null) => {
+        if (selectionRef.current.id === id) return;
+        detailAbortRef.current?.abort();
+        selectionRef.current = { id, version: selectionRef.current.version + 1 };
+        setHistoryLoadError(null);
+        setSelectedConversationId(id);
+    }, []);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
     const [artifactsPanelCollapsed, setArtifactsPanelCollapsed] = useState(true);
     // 'auto' lets the server's intent classifier route each message to the
@@ -117,10 +153,13 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // boundary before loading another user's conversations and cancel work
     // that could otherwise resolve after the session changed.
     useEffect(() => {
+        accountKeyRef.current = chatbotStorageKey;
         accountGenerationRef.current += 1;
         accountAbortRef.current?.abort();
         accountAbortRef.current = null;
         setHydratedChatbotKey(null);
+        setHistoryAccountKey(null);
+        setHistoryLoadError(null);
         setConversations([]);
         setCurrentConversationId(null);
         setStreamingMessage(null);
@@ -137,7 +176,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         justLoadedFromDbRef.current = false;
         savingRef.current.clear();
         dirtySaveRef.current.clear();
-    }, [authStatus, chatbotStorageKey]);
+    }, [authStatus, chatbotStorageKey, setCurrentConversationId]);
 
     // Load from database on mount. ChatbotProvider mounts app-wide (including
     // public /landing, /auth/* pages), so both fetches below wait for a real
@@ -151,43 +190,30 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
         async function loadConversations() {
             try {
-                const response = await fetch('/api/ai-conversations', { signal: controller.signal });
-                if (response.ok && !controller.signal.aborted && accountGenerationRef.current === generation) {
-                    const dbConversations = await response.json();
-                    if (!controller.signal.aborted && accountGenerationRef.current === generation && dbConversations.length > 0) {
-                        const formattedConversations: Conversation[] = dbConversations.map((conv: any) => {
-                            persistedRef.current.add(conv.id);
-                            return {
-                                id: conv.id,
-                                title: conv.title || 'Nueva conversación',
-                                messages: Array.isArray(conv.messages) ? conv.messages.map((m: any) => ({
-                                    id: m.id || crypto.randomUUID(),
-                                    role: m.role,
-                                    content: m.content,
-                                    timestamp: m.timestamp || m.createdAt || new Date().toISOString(),
-                                    model: m.model || 'grok-beta',
-                                    attachments: m.attachments,
-                                    blocks: m.blocks
-                                })) : [],
-                                createdAt: conv.createdAt,
-                                updatedAt: conv.updatedAt,
-                                model: conv.model || 'grok-beta'
-                            };
-                        });
-                        for (const conv of formattedConversations) {
-                            conv.messages = recoverInterruptedMailReviews(conv.messages);
-                            const remote = dbConversations.find((item: any) => item.id === conv.id);
-                            conversationRevisionsRef.current.set(conv.id, Number(remote?.revision ?? 0));
-                            savedConversationSnapshotsRef.current.set(conv.id, JSON.stringify({title:conv.title,messages:conv.messages,model:conv.model}));
-                        }
-                        justLoadedFromDbRef.current = true;
-                        setConversations(formattedConversations);
-                        const linkedConversation = new URLSearchParams(window.location.search).get('conversation');
-                        setCurrentConversationId(formattedConversations.some(conv => conv.id === linkedConversation) ? linkedConversation! : formattedConversations[0].id);
+                const response = await fetch('/api/ai-conversations?view=summary', { signal: controller.signal, cache: 'no-store' });
+                if (!response.ok) throw new Error('Conversation list unavailable');
+                const dbConversations = await response.json();
+                if (controller.signal.aborted || accountGenerationRef.current !== generation) return;
+                if (!Array.isArray(dbConversations)) throw new Error('Invalid conversation list');
+                const formattedConversations = dbConversations.map(formatConversation);
+                for (const [index, conv] of formattedConversations.entries()) {
+                    persistedRef.current.add(conv.id);
+                    if (conv.messagesLoaded) {
+                        conversationRevisionsRef.current.set(conv.id, Number(dbConversations[index].revision ?? 0));
+                        savedConversationSnapshotsRef.current.set(conv.id, conversationSnapshot(conv));
                     }
                 }
-            } catch (error) {
-                if (!controller.signal.aborted) console.error('Failed to load conversations from database:', error);
+                justLoadedFromDbRef.current = true;
+                conversationsRef.current = formattedConversations;
+                setConversations(formattedConversations);
+                setHistoryAccountKey(chatbotStorageKey);
+                const linkedConversation = new URLSearchParams(window.location.search).get('conversation');
+                setCurrentConversationId(formattedConversations.some(conv => conv.id === linkedConversation) ? linkedConversation! : formattedConversations[0]?.id ?? null);
+            } catch {
+                if (!controller.signal.aborted && accountGenerationRef.current === generation) {
+                    setHistoryLoadError('Conversation history unavailable');
+                    console.error('Failed to load conversation list.');
+                }
             }
         }
         loadConversations();
@@ -248,10 +274,51 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             });
 
         return () => controller.abort();
-    }, [authStatus, chatbotStorageKey]);
+    }, [authStatus, chatbotStorageKey, listRetry, setCurrentConversationId]);
+
+    useEffect(() => {
+        if (authStatus !== 'authenticated' || !chatbotStorageKey || historyAccountKey !== chatbotStorageKey || !currentConversationId) return;
+        const target = conversationsRef.current.find(conv => conv.id === currentConversationId);
+        if (!target || target.messagesLoaded !== false) return;
+        const controller = new AbortController();
+        detailAbortRef.current = controller;
+        const generation = accountGenerationRef.current;
+        const selection = selectionRef.current.version;
+        const stale = () => controller.signal.aborted || generation !== accountGenerationRef.current || selection !== selectionRef.current.version;
+        setHistoryLoadError(null);
+        void (async () => {
+            try {
+                const response = await fetch(`/api/ai-conversations/${encodeURIComponent(currentConversationId)}`, { signal: controller.signal, cache: 'no-store' });
+                if (!response.ok) throw new Error('Conversation detail unavailable');
+                const stored = await response.json();
+                if (stale()) return;
+                if (stored.id !== currentConversationId || !Array.isArray(stored.messages)) throw new Error('Invalid conversation detail');
+                const loaded = formatConversation(stored);
+                if (!conversationsRef.current.some(conv => conv.id === loaded.id)) return;
+                conversationRevisionsRef.current.set(loaded.id, Number(stored.revision ?? 0));
+                savedConversationSnapshotsRef.current.set(loaded.id, conversationSnapshot(loaded));
+                const next = conversationsRef.current.map(conv => conv.id === loaded.id ? loaded : conv);
+                conversationsRef.current = next;
+                setConversations(next);
+            } catch {
+                if (!stale()) {
+                    setHistoryLoadError('Conversation history unavailable');
+                    console.error('Failed to load conversation detail.');
+                }
+            }
+        })();
+        return () => controller.abort();
+    }, [authStatus, chatbotStorageKey, historyAccountKey, currentConversationId, detailRetry]);
+
+    const retryHistoryLoad = useCallback(() => {
+        if (accountKeyRef.current !== chatbotStorageKey) return;
+        setHistoryLoadError(null);
+        if (historyAccountKey !== chatbotStorageKey) setListRetry(value => value + 1);
+        else setDetailRetry(value => value + 1);
+    }, [historyAccountKey, chatbotStorageKey]);
 
     // Track which conversations are currently being saved to avoid duplicates
-    const savingRef = React.useRef<Set<string>>(new Set());
+    const savingRef = React.useRef<Map<string, Promise<void>>>(new Map());
     // A state update can arrive while its previous write is still in flight.
     // Remember that a newer snapshot exists so it is persisted immediately
     // after the current request, instead of being silently skipped.
@@ -260,18 +327,20 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const savedConversationSnapshotsRef = React.useRef<Map<string,string>>(new Map());
 
     const saveConversation = useCallback(async (conv: Conversation): Promise<void> => {
-        if (!chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        if (!chatbotStorageKey || accountKeyRef.current !== chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey) return;
+        if (conv.messagesLoaded === false || !conversationsRef.current.some(item => item.id === conv.id)) return;
         const generation = accountGenerationRef.current;
         const signal = accountAbortRef.current?.signal;
         const cleanId = conv.id.replace(/\/$/, '');
-        const snapshot = JSON.stringify({title:conv.title,messages:conv.messages,model:conv.model});
+        const snapshot = conversationSnapshot(conv);
         if(savedConversationSnapshotsRef.current.get(cleanId)===snapshot)return;
         if (savingRef.current.has(cleanId)) {
             dirtySaveRef.current.add(cleanId);
             return;
         }
 
-        savingRef.current.add(cleanId);
+        let finishSaving!: () => void;
+        savingRef.current.set(cleanId, new Promise<void>(resolve => { finishSaving = resolve; }));
         try {
             if (signal?.aborted || generation !== accountGenerationRef.current) return;
             const isPersisted = persistedRef.current.has(cleanId);
@@ -326,11 +395,12 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             if (!signal?.aborted) console.error('Failed to save conversation to database:', error);
         } finally {
-            savingRef.current.delete(cleanId);
+            if (generation === accountGenerationRef.current) savingRef.current.delete(cleanId);
             if (generation === accountGenerationRef.current && dirtySaveRef.current.delete(cleanId)) {
                 const latest = conversationsRef.current.find((item) => item.id === conv.id);
                 if (latest) void saveConversation(latest);
             }
+            finishSaving();
         }
     }, [chatbotStorageKey, hydratedChatbotKey]);
 
@@ -346,7 +416,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         if (conversations.length === 0) return;
 
         const conversationsToSave = conversations.filter(conv => (
-            conv.messages.length > 0 || conv.title !== 'Nueva conversación'
+            conv.messagesLoaded !== false && (conv.messages.length > 0 || conv.title !== 'Nueva conversación')
         ));
         const timeoutId = setTimeout(() => {
             for (const conv of conversationsToSave) void saveConversation(conv);
@@ -374,36 +444,45 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
     const currentConversation = conversations.find(c => c.id === currentConversationId);
     const messages = currentConversation?.messages || [];
+    const historyUnavailable = authStatus === 'loading' || authStatus === 'authenticated' && (
+        historyAccountKey !== chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey || currentConversation?.messagesLoaded === false
+    );
+    const historyStatus = historyUnavailable ? (historyLoadError ? 'error' : 'loading') : 'ready';
+    const canUseCurrentHistory = useCallback(() => accountKeyRef.current === chatbotStorageKey &&
+        hydratedChatbotKey === chatbotStorageKey && historyAccountKey === chatbotStorageKey && currentConversationId === selectionRef.current.id &&
+        conversationsRef.current.some(conv => conv.id === currentConversationId && conv.messagesLoaded !== false),
+    [chatbotStorageKey, hydratedChatbotKey, historyAccountKey, currentConversationId]);
 
     const createConversation = useCallback(() => {
+        if (!chatbotStorageKey || accountKeyRef.current !== chatbotStorageKey || historyAccountKey !== chatbotStorageKey) return;
         const newConv: Conversation = {
             id: crypto.randomUUID(),
             title: 'Nueva conversación',
             messages: [],
+            messagesLoaded: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             model: selectedModel
         };
-        setConversations(prev => [newConv, ...prev]);
+        const next = [newConv, ...conversationsRef.current];
+        conversationsRef.current = next;
+        setConversations(next);
         setCurrentConversationId(newConv.id);
-    }, [selectedModel]);
+    }, [selectedModel, chatbotStorageKey, historyAccountKey, setCurrentConversationId]);
 
     const deleteConversation = useCallback(async (id: string) => {
-        const previousConversationId = currentConversationId;
-        let removedConversation: Conversation | undefined;
-        let removedIndex = -1;
-
-        setConversations(prev => {
-            removedIndex = prev.findIndex(c => c.id === id);
-            removedConversation = prev[removedIndex];
-            const filtered = prev.filter(c => c.id !== id);
-            if (currentConversationId === id && filtered.length > 0) {
-                setCurrentConversationId(filtered[0].id);
-            } else if (filtered.length === 0) {
-                setCurrentConversationId(null);
-            }
-            return filtered;
-        });
+        const generation = accountGenerationRef.current;
+        const signal = accountAbortRef.current?.signal;
+        const previousConversationId = selectionRef.current.id;
+        const removedIndex = conversationsRef.current.findIndex(c => c.id === id);
+        const removedConversation = conversationsRef.current[removedIndex];
+        if (!removedConversation) return;
+        const pendingSave = savingRef.current.get(id);
+        const filtered = conversationsRef.current.filter(c => c.id !== id);
+        conversationsRef.current = filtered;
+        setConversations(filtered);
+        if (previousConversationId === id) setCurrentConversationId(filtered[0]?.id ?? null);
+        const selection = selectionRef.current.version;
 
         // Only the server knows whether this conversation was ever actually
         // persisted — deleting one that isn't (204/404 either way here since
@@ -413,35 +492,43 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         // "gone" while the row still existed in the DB — it just reappeared
         // on the next reload with no explanation.
         try {
+            // A late create must finish before its confirmed deletion reaches the server.
+            if (pendingSave) await pendingSave;
+            if (signal?.aborted || generation !== accountGenerationRef.current) return;
             const response = await fetch(`/api/ai-conversations/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE', signal,
             });
             if (!response.ok && response.status !== 404 && removedConversation) {
                 throw new Error(`Delete failed: ${response.status}`);
             }
-        } catch (error) {
-            console.error('Failed to delete conversation:', error);
-            if (removedConversation) {
-                const restored = removedConversation;
-                setConversations(prev => {
-                    const next = [...prev];
-                    next.splice(Math.min(removedIndex, next.length), 0, restored);
-                    return next;
-                });
-                setCurrentConversationId(previousConversationId);
-            }
+            if (signal?.aborted || generation !== accountGenerationRef.current) return;
+            persistedRef.current.delete(id);
+            conversationRevisionsRef.current.delete(id);
+            savedConversationSnapshotsRef.current.delete(id);
+        } catch {
+            if (signal?.aborted || generation !== accountGenerationRef.current) return;
+            console.error('Failed to delete conversation.');
+            const next = [...conversationsRef.current];
+            next.splice(Math.min(removedIndex, next.length), 0, removedConversation);
+            conversationsRef.current = next;
+            setConversations(next);
+            if (selection === selectionRef.current.version) setCurrentConversationId(previousConversationId);
             sileo.error({ title: 'Could not delete conversation', description: 'Please try again.' });
         }
-    }, [currentConversationId]);
+    }, [setCurrentConversationId]);
 
     const updateConversation = useCallback((id: string, updates: Partial<Conversation>) => {
-        setConversations(prev => prev.map(c =>
-            c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
-        ));
+        const next = conversationsRef.current.map(c =>
+            c.id === id && c.messagesLoaded !== false ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+        );
+        conversationsRef.current = next;
+        setConversations(next);
     }, []);
 
     const sendMessage = useCallback(async (content: string, files?: File[], webSearchEnabled?: boolean) => {
         if (!content.trim()) return;
+        if (!chatbotStorageKey || accountKeyRef.current !== chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey || historyAccountKey !== chatbotStorageKey) return;
+        if (currentConversationId !== selectionRef.current.id || currentConversationId && !canUseCurrentHistory()) return;
         if (sendInFlightRef.current) return;
         sendInFlightRef.current = true;
         const requestGeneration = accountGenerationRef.current;
@@ -455,6 +542,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 id: crypto.randomUUID(),
                 title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
                 messages: [],
+                messagesLoaded: true,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 model: selectedModel
@@ -1115,9 +1203,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
                 setStatusMessage(null);
             }
         }
-    }, [currentConversationId, selectedModel, twinMode]);
+    }, [currentConversationId, selectedModel, twinMode, chatbotStorageKey, hydratedChatbotKey, historyAccountKey, canUseCurrentHistory, setCurrentConversationId]);
 
     const confirmAction = useCallback(async (messageId: string, blockId: string) => {
+        if (!canUseCurrentHistory()) return;
         const conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) return;
 
@@ -1343,9 +1432,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         } finally {
             executingActionRef.current.delete(executionId);
         }
-    }, [conversations, currentConversationId, updateConversation]);
+    }, [conversations, currentConversationId, updateConversation, canUseCurrentHistory]);
 
     const cancelAction = useCallback((messageId: string, blockId: string) => {
+        if (!canUseCurrentHistory()) return;
         const conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) return;
 
@@ -1360,7 +1450,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             m.id === messageId ? { ...m, blocks: updatedBlocks } : m
         );
         updateConversation(currentConversationId!, { messages: updatedMessages });
-    }, [conversations, currentConversationId, updateConversation]);
+    }, [conversations, currentConversationId, updateConversation, canUseCurrentHistory]);
 
     // Called when the user fills in the mini clarification form (rendered when
     // the AI flags a creation request as ambiguous via REQUEST_INFO). Merges
@@ -1368,6 +1458,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     // the normal confirmation flow — the user still explicitly confirms the
     // completed action before anything is created.
     const submitClarification = useCallback((messageId: string, blockId: string, values: Record<string, any>) => {
+        if (!canUseCurrentHistory()) return;
         const conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) return;
 
@@ -1398,9 +1489,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
             m.id === messageId ? { ...m, blocks: updatedBlocks } : m
         );
         updateConversation(currentConversationId!, { messages: updatedMessages });
-    }, [conversations, currentConversationId, updateConversation]);
+    }, [conversations, currentConversationId, updateConversation, canUseCurrentHistory]);
 
     const editMessage = useCallback(async (messageId: string, newContent: string) => {
+        if (!canUseCurrentHistory()) return;
         if (!currentConversationId) return;
 
         const conversation = conversations.find(c => c.id === currentConversationId);
@@ -1420,9 +1512,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const previousMessages = conversation.messages.slice(0, messageIndex);
         updateConversation(currentConversationId, { messages: previousMessages });
         await sendMessage(newContent);
-    }, [conversations, currentConversationId, sendMessage, updateConversation]);
+    }, [conversations, currentConversationId, sendMessage, updateConversation, canUseCurrentHistory]);
 
     const retryMessage = useCallback(async (messageId: string) => {
+        if (!canUseCurrentHistory()) return;
         const messageIndex = messages.findIndex(m => m.id === messageId);
         if (messageIndex === -1 || messageIndex === 0) return;
 
@@ -1432,21 +1525,23 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         const newMessages = messages.slice(0, messageIndex);
         updateConversation(currentConversationId!, { messages: newMessages });
         await sendMessage(userMessage.content);
-    }, [messages, currentConversationId, sendMessage, updateConversation]);
+    }, [messages, currentConversationId, sendMessage, updateConversation, canUseCurrentHistory]);
 
     const likeMessage = useCallback((messageId: string) => {
+        if (!canUseCurrentHistory()) return;
         const updated = messages.map(m =>
             m.id === messageId ? { ...m, liked: !m.liked, disliked: false } : m
         );
         updateConversation(currentConversationId!, { messages: updated });
-    }, [messages, currentConversationId, updateConversation]);
+    }, [messages, currentConversationId, updateConversation, canUseCurrentHistory]);
 
     const dislikeMessage = useCallback((messageId: string) => {
+        if (!canUseCurrentHistory()) return;
         const updated = messages.map(m =>
             m.id === messageId ? { ...m, disliked: !m.disliked, liked: false } : m
         );
         updateConversation(currentConversationId!, { messages: updated });
-    }, [messages, currentConversationId, updateConversation]);
+    }, [messages, currentConversationId, updateConversation, canUseCurrentHistory]);
     const value: ChatbotContextType = {
         conversations,
         currentConversationId,
@@ -1477,7 +1572,9 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         isTyping,
         streamingMessage,
         statusMessage,
-        error
+        error,
+        historyStatus,
+        retryHistoryLoad,
     };
 
     return (

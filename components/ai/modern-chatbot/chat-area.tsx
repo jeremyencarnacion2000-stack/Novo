@@ -6,13 +6,15 @@ import { useChatbot } from './context';
 import { Message as ChatMessage } from './message';
 import { NovoThinkingPill } from '@/components/ai/novo-thinking-pill';
 import { shouldReduceNovoMotion } from '@/hooks/use-novo-motion-policy';
+import { useTranslation } from '@/lib/i18n';
 
 // Pure message list — index.tsx decides whether to show this or a hero, and
 // owns the single persistent composer + voice overlay (one input surface,
 // not a different one per view). This component only ever mounts once a
 // chat is active, so it has no empty-state branch of its own to keep in sync.
 export function ChatArea() {
-    const { messages, isLoading, streamingMessage, currentConversationId } = useChatbot();
+    const { messages, isLoading, streamingMessage, currentConversationId, historyStatus = 'ready', retryHistoryLoad } = useChatbot();
+    const { t } = useTranslation();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const prevLengthRef = useRef(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,17 @@ export function ChatArea() {
                 data-lenis-prevent
             >
                 <div className="w-full max-w-4xl mx-auto px-2 sm:px-6 pt-6 pb-8">
+                    {historyStatus === 'loading' && (
+                        <p role="status" className="py-8 text-center text-sm text-white/65">{t('chat.history.loading')}</p>
+                    )}
+                    {historyStatus === 'error' && (
+                        <div role="alert" className="py-8 text-center text-sm text-white/75">
+                            <p>{t('chat.history.error')}</p>
+                            <button type="button" onClick={retryHistoryLoad} className="mt-3 rounded-full bg-white/10 px-4 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                                {t('chat.history.retry')}
+                            </button>
+                        </div>
+                    )}
                     {messages.map((message) => (
                         <ChatMessage key={message.id} message={message} />
                     ))}

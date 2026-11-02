@@ -21,13 +21,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const summary = new URL(request.url).searchParams.get('view') === 'summary'
     const conversations = await prisma.aIConversation.findMany({
       where: { userId: session.user.id },
       orderBy: { updatedAt: 'desc' },
-      take: 200
+      take: 200,
+      ...(summary ? { select: { id: true, title: true, revision: true, createdAt: true, updatedAt: true } } : {}),
     })
 
-    return NextResponse.json(conversations)
+    return NextResponse.json(conversations, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     console.error('Error fetching AI conversations.')
     return NextResponse.json({
