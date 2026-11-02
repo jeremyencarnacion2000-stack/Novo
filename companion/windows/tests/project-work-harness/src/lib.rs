@@ -1,12 +1,20 @@
 #[path = "../../../src-tauri/src/project_work/codex.rs"]
 mod codex;
+#[path = "../../../src-tauri/src/codex_plan.rs"]
+mod codex_plan;
 #[path = "../../../src-tauri/src/project_work/process.rs"]
 mod process;
 #[path = "../../../src-tauri/src/project_work/protocol.rs"]
 mod protocol;
 #[path = "../../../src-tauri/src/project_work/workspace.rs"]
 mod workspace;
+mod integrations {
+    pub static PAUSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+}
 mod platform {
+    pub fn codex_candidates() -> Vec<std::path::PathBuf> {
+        Vec::new()
+    }
     pub fn no_console(cmd: &mut std::process::Command) -> &mut std::process::Command {
         cmd
     }
