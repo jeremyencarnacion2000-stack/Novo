@@ -107,7 +107,7 @@ export interface ChatbotContextType {
     currentConversationId: string | null;
     setCurrentConversationId: (id: string | null) => void;
     createConversation: () => void;
-    deleteConversation: (id: string) => void;
+    deleteConversation: (id: string) => Promise<void>;
     updateConversation: (id: string, updates: Partial<Conversation>) => void;
 
     // Messages

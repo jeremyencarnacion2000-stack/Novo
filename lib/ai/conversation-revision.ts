@@ -14,10 +14,13 @@ export const conversationMessagesSchema=z.array(z.object({
 
 export function canonicalConversationMessages(id:string,value:unknown,createdAt:string):Message[] {
   if(!Array.isArray(value))return []
-  return value.filter(m=>m && (m.role==='user'||m.role==='assistant') && typeof m.content==='string').map((m,index)=>({
-    ...m,id:typeof m.id==='string' && m.id ? m.id : `legacy-${createHash('sha256').update(`${id}:${index}:${m.role}:${m.content}`).digest('hex').slice(0,32)}`,
-    timestamp:typeof m.timestamp==='string' && Number.isFinite(Date.parse(m.timestamp)) ? new Date(m.timestamp).toISOString() : createdAt,
-  }))
+  return value.filter(m=>m && (m.role==='user'||m.role==='assistant') && typeof m.content==='string').map((m,index)=>{
+    const timestamp=[m.timestamp,m.createdAt].find(time=>typeof time==='string' && Number.isFinite(Date.parse(time)))
+    return {
+      ...m,id:typeof m.id==='string' && m.id ? m.id : `legacy-${createHash('sha256').update(`${id}:${index}:${m.role}:${m.content}`).digest('hex').slice(0,32)}`,
+      timestamp:timestamp!==undefined ? new Date(timestamp).toISOString() : createdAt,
+    }
+  })
 }
 
 export async function saveConversationRevision(userId:string,id:string,expectedRevision:number,messages:Message[],title?:string):Promise<{revision:number}> {

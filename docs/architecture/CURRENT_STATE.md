@@ -16,7 +16,7 @@ Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en
 | Persistencia | Prisma 5.22, PostgreSQL/Neon, transporte configurable; `lib/prisma.ts`, `lib/database-transport.ts` | Cuota gratuita y tamaño de lecturas son restricciones operativas |
 | Twin | Planner determinista, señales, procedencia, exclusiones, correcciones y outcomes; `lib/cognitive` | Código existente no demuestra utilidad/calibración longitudinal |
 | Memoria de proyectos | Identidad por repositorio/proyecto, carpetas/dispositivos, revisiones y tombstones; `lib/project-assistant` | Verificar identidad cruzada y actualización con servicios reales |
-| Chat web | `components/ai/modern-chatbot/context.tsx` → `/api/ai/stream` | Orquestación antigua separada del Companion |
+| Chat web | `components/ai/modern-chatbot/context.tsx` → `/api/ai/stream`; listado de metadatos y detalle seleccionado | Orquestación separada del Companion; historiales abiertos conservados en memoria, sin política nueva de expulsión |
 | Chat Companion | `/api/companion/chat` → `lib/ai/chat-service.ts` | Recibe mejoras de correo/proyectos que el chat web no comparte automáticamente |
 | Acciones | `lib/ai/executor.ts`, `/api/ai/execute`, scopes, auditoría e idempotencia; correo en `lib/gmail-message.ts` | Las escrituras externas deben conservar propuesta revisada y confirmación explícita |
 | Actividad | `lib/ai/activity.ts`, eventos secuenciados, cancelación y recuperación | Unificar consumidores sin perder arrendamientos ni estado terminal |

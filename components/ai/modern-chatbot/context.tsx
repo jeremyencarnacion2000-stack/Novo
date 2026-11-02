@@ -77,6 +77,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
     const [listRetry, setListRetry] = useState(0);
     const [detailRetry, setDetailRetry] = useState(0);
     const setCurrentConversationId = useCallback((id: string | null) => {
+        if (selectionRef.current.id === id) return;
         detailAbortRef.current?.abort();
         selectionRef.current = { id, version: selectionRef.current.version + 1 };
         setHistoryLoadError(null);
@@ -447,8 +448,10 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
         historyAccountKey !== chatbotStorageKey || hydratedChatbotKey !== chatbotStorageKey || currentConversation?.messagesLoaded === false
     );
     const historyStatus = historyUnavailable ? (historyLoadError ? 'error' : 'loading') : 'ready';
-    const canUseCurrentHistory = useCallback(() => accountKeyRef.current === chatbotStorageKey && currentConversationId === selectionRef.current.id &&
-        conversationsRef.current.some(conv => conv.id === currentConversationId && conv.messagesLoaded !== false), [chatbotStorageKey, currentConversationId]);
+    const canUseCurrentHistory = useCallback(() => accountKeyRef.current === chatbotStorageKey &&
+        hydratedChatbotKey === chatbotStorageKey && historyAccountKey === chatbotStorageKey && currentConversationId === selectionRef.current.id &&
+        conversationsRef.current.some(conv => conv.id === currentConversationId && conv.messagesLoaded !== false),
+    [chatbotStorageKey, hydratedChatbotKey, historyAccountKey, currentConversationId]);
 
     const createConversation = useCallback(() => {
         if (!chatbotStorageKey || accountKeyRef.current !== chatbotStorageKey || historyAccountKey !== chatbotStorageKey) return;

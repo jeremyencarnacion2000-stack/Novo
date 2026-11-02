@@ -1,6 +1,6 @@
 # Conversation History Loading Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Reduce chat startup transfers and database egress by listing metadata and fetching only the selected conversation, without losing messages, revisions or account isolation.
 
@@ -34,11 +34,11 @@
 
 **Interfaces:** `GET /api/ai-conversations?view=summary` returns only `id`, `title`, `createdAt`, `updatedAt`, `revision`; default GET retains its full response. Existing owned detail GET supplies messages, using the existing canonical message normalizer for legacy IDs/timestamps.
 
-- [ ] Add failing tests: summary DB projection excludes messages; owner/limit/order preserved; default GET remains compatible; unauthenticated reads do not query DB; detail normalizes legacy messages and preserves extensions/404.
-- [ ] Run the two route test files and observe the expected failures.
-- [ ] Implement the opt-in select and reuse canonicalConversationMessages for detail GET. Keep existing writes unchanged.
-- [ ] Run route tests, inspect failures, and verify whitespace.
-- [ ] Commit this independently compatible API change.
+- [x] Add failing tests: summary DB projection excludes messages; owner/limit/order preserved; default GET remains compatible; unauthenticated reads do not query DB; detail normalizes legacy messages and preserves extensions/404.
+- [x] Run the two route test files and observe the expected failures.
+- [x] Implement the opt-in select and reuse canonicalConversationMessages for detail GET. Keep existing writes unchanged.
+- [x] Run route tests, inspect failures, and verify whitespace.
+- [x] Commit this independently compatible API change.
 
 ## Task 2: selected detail with safe persistence and feedback
 
@@ -46,13 +46,13 @@
 
 **Interfaces:** `Conversation.messagesLoaded?: boolean` is false only for unread metadata placeholders; it is local UI state, never stored. Context adds `historyStatus: 'loading' | 'ready' | 'error'` and `retryHistoryLoad(): void`. The public selection setter and existing message/action methods remain compatible.
 
-- [ ] Add failing provider tests for one selected detail request, deferred errors/retry, selection/new-chat/deletion/account races, and no saves of unread or captured placeholder snapshots.
-- [ ] Add tests that loaded history preserves attachments/blocks/provenance and is included when sending; sending/editing/actions are blocked before hydration. Cover failed-delete rollback after account switch.
-- [ ] Request summaries, accept legacy full list responses during rollout, and fetch detail with an AbortController plus account/selection checks. Recover existing mail-review blocks and preserve all valid message extensions.
-- [ ] Guard saves using the captured conversation's loaded flag; never install an unread snapshot/revision as a saved history. Detail hydration records its snapshot without skipping unrelated pending saves.
-- [ ] Keep new local conversations loaded, protect updates/retry/actions, and prevent deleted/old-account rows from being restored by late work.
-- [ ] Render an accessible history-loading/error/retry state in the existing ChatArea; disable the composer while unavailable without remounting or clearing its draft. Preserve materials/motion and new-chat escape from a failed detail.
-- [ ] Run focused provider/UI/API tests and lint. Commit the working client migration.
+- [x] Add failing provider tests for one selected detail request, deferred errors/retry, selection/new-chat/deletion/account races, and no saves of unread or captured placeholder snapshots.
+- [x] Add tests that loaded history preserves attachments/blocks/provenance and is included when sending; sending/editing/actions are blocked before hydration. Cover failed-delete rollback after account switch.
+- [x] Request summaries, accept legacy full list responses during rollout, and fetch detail with an AbortController plus account/selection checks. Recover existing mail-review blocks and preserve all valid message extensions.
+- [x] Guard saves using the captured conversation's loaded flag; never install an unread snapshot/revision as a saved history. Detail hydration records its snapshot without skipping unrelated pending saves.
+- [x] Keep new local conversations loaded, protect updates/retry/actions, and prevent deleted/old-account rows from being restored by late work.
+- [x] Render an accessible history-loading/error/retry state in the existing ChatArea; disable the composer while unavailable without remounting or clearing its draft. Preserve materials/motion and new-chat escape from a failed detail.
+- [x] Run focused provider/UI/API tests and lint. Commit the working client migration.
 
 ## Task 3: measured verification and release
 

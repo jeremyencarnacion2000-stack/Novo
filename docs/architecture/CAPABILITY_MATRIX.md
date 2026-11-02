@@ -7,6 +7,7 @@ Fecha: 2026-11-01. «Implementada sin verificar» significa que se encontró el 
 | Navegación, Hub y Pomodoro | Pruebas aprobadas; publicada en producción | 11 pruebas de Hub y pruebas de navegación/foco/morph; panel inicial y contenido Pomodoro cerrados diferidos; PR #29 en producción |
 | Fluidez dentro de páginas | Mejoras publicadas; pendiente medición final por dispositivo | Dashboard/Hoy, chat, centro cognitivo y menú móvil observados con sesión real. CI completo aprobado; ver [mediciones y límites](../performance/2026-11-01-interaction-fluency.md). No se certifican 60 FPS |
 | Texto grande, contraste, transparencia, movimiento | Publicada; verificación de hardware parcial | Settings y política de movimiento cubiertos por pruebas; falta revisar todos los dispositivos reales |
+| Historial de chat bajo demanda | Implementado y probado; publicación/lectura real se registran por separado | Listado web de metadatos y detalle seleccionado; controles de carga/retry y protección de autosave/cuenta. Fixture: 4,500,381 → 55,850 bytes contando un detalle; no representa factura ni FPS |
 | Objetivo → plan → acción → outcome | Implementada sin verificar en esta sesión | `canonical-planner`, `action-state-machine`, `tests/novo-loop-isolated.e2e.ts` |
 | Memoria de proyectos local/GitHub/Vercel | Implementada sin verificar | `lib/project-assistant`; demostrar una identidad compartida con fuentes reales |
 | Contexto Twin con procedencia/exclusiones | Implementada sin verificar | `signal-ledger`, `ambient-twin-runtime`, `twin-context` |

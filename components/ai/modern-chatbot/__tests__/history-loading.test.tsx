@@ -22,11 +22,11 @@ async function settle() {
 async function advance(milliseconds = 2500) {
   await act(async () => { jest.advanceTimersByTime(milliseconds); for (let index = 0; index < 8; index++) await Promise.resolve() })
 }
-function setup(rows: unknown[] | (() => unknown[]), read: (id: string) => Promise<Response>, remove?: () => Promise<Response>) {
+function setup(rows: unknown[] | (() => unknown[]), read: (id: string) => Promise<Response>, remove?: () => Promise<Response>, billing = Promise.resolve(response({ plan: 'free' }))) {
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input, options) => {
     const url = String(input)
     const method = options?.method ?? 'GET'
-    if (url === '/api/billing/status') return Promise.resolve(response({ plan: 'free' }))
+    if (url === '/api/billing/status') return billing
     if (method === 'DELETE') return remove ? remove() : Promise.resolve(response({ success: true }))
     if (method === 'PUT' || method === 'POST' && url === '/api/ai-conversations') return Promise.resolve(response({ revision: 5 }))
     if (url === '/api/ai/stream') return Promise.resolve(response({ error: 'fixture unavailable' }, 503))
@@ -262,4 +262,45 @@ it('rejects stale new-chat and send callbacks when both accounts have an empty l
   act(() => oldCreate())
   expect(fetchMock.mock.calls.some(([url]) => url === '/api/ai/stream')).toBe(false)
   expect(result.current.conversations).toEqual([])
+})
+
+it('keeps a pending detail request when selecting the current conversation again', async () => {
+  const pending = deferred<Response>()
+  const { result, fetchMock } = setup([metadata('a')], () => pending.promise)
+  await settle()
+  act(() => result.current.setCurrentConversationId('a'))
+  pending.resolve(response(detail('a')))
+  await settle()
+  expect(result.current.historyStatus).toBe('ready')
+  expect(result.current.messages).toMatchObject([message('a')])
+  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/ai-conversations/a')).toHaveLength(1)
+})
+
+it('keeps the retry state when clicking the already selected failed conversation', async () => {
+  const { result } = setup([metadata('a')], async () => response({}, 500))
+  await settle()
+  expect(result.current.historyStatus).toBe('error')
+  act(() => result.current.setCurrentConversationId('a'))
+  await settle()
+  expect(result.current.historyStatus).toBe('error')
+})
+
+it.each(['edit', 'retry'])('preserves the full history when %s is requested before account hydration completes', async operation => {
+  const billing = deferred<Response>()
+  const history = [message('question'), { ...message('answer'), role: 'assistant' as const }, message('follow-up'), { ...message('reply'), role: 'assistant' as const }]
+  const { result, fetchMock } = setup([metadata('a')], async () => response({ ...detail('a'), messages: history }), undefined, billing.promise)
+  await settle()
+  expect(result.current.historyStatus).toBe('loading')
+  expect(result.current.messages).toMatchObject(history)
+  await act(async () => {
+    if (operation === 'edit') await result.current.editMessage('question', 'Edited question')
+    else await result.current.retryMessage('answer')
+  })
+  expect(result.current.messages).toMatchObject(history)
+  expect(fetchMock.mock.calls.some(([url]) => url === '/api/ai/stream')).toBe(false)
+  billing.resolve(response({ plan: 'free' }))
+  await settle()
+  await advance()
+  expect(writes(fetchMock)).toHaveLength(0)
+  expect(result.current.messages).toMatchObject(history)
 })
