@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../chat-input'
 
 const sendMessage = jest.fn().mockResolvedValue(undefined)
+let mockConversationId = 'chat-a'
 
 jest.mock('../context', () => ({
   useChatbot: () => ({
     sendMessage,
+    currentConversationId: mockConversationId,
     isLoading: false,
     twinMode: false,
     setTwinMode: jest.fn(),
@@ -22,7 +24,7 @@ jest.mock('@/components/billing/novo-paywall', () => ({ NovoPaywallDialog: () =>
 jest.mock('../glowing-orb', () => ({ GlowingOrb: () => null }))
 
 describe('ChatInput', () => {
-  beforeEach(() => sendMessage.mockClear())
+  beforeEach(() => { sendMessage.mockClear(); mockConversationId = 'chat-a' })
 
   it('delegates first-message conversation creation to sendMessage', async () => {
     const user = userEvent.setup()
@@ -63,5 +65,36 @@ describe('ChatInput', () => {
     expect(await screen.findByText('Herramientas')).toBeInTheDocument()
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByText('Herramientas')).not.toBeInTheDocument())
+  })
+
+  it('appends dictation to the current draft and keeps attachments until manual send', async () => {
+    const { container } = render(<ChatInput />)
+    const file = new File(['plan'], 'plan.txt', { type: 'text/plain' })
+    fireEvent.change(container.querySelector('input[type="file"]:last-of-type')!, { target: { files: [file] } })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Novo, ' } })
+    fireEvent(window, new CustomEvent('novo:voice-transcript', { detail: { text: 'revisa este plan' } }))
+    expect(screen.getByRole('textbox')).toHaveValue('Novo, revisa este plan')
+    expect(sendMessage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTitle('Enviar'))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('Novo, revisa este plan', [file], false))
+  })
+
+  it('ignores dictation while the selected history is unavailable', () => {
+    render(<ChatInput disabled />)
+    fireEvent(window, new CustomEvent('novo:voice-transcript', { detail: { text: 'No mezclar conversaciones' } }))
+    expect(screen.getByRole('textbox')).toHaveValue('')
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('cancels pending dictation when changing conversation', () => {
+    const cancel = jest.fn()
+    window.addEventListener('novo:voice-cancel', cancel)
+    try {
+      const view = render(<ChatInput />)
+      mockConversationId = 'chat-b'
+      view.rerender(<ChatInput />)
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: 'Dictar mensaje' })).toHaveAccessibleDescription('El dictado se añade al borrador. Revísalo antes de enviarlo.')
+    } finally { window.removeEventListener('novo:voice-cancel', cancel) }
   })
 })

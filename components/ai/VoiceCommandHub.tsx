@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mic,
@@ -192,6 +193,10 @@ function emitVoiceStream(stream: MediaStream | null) {
 
 export function VoiceCommandHub({ compact = false, className = '', headless = false }: VoiceCommandHubProps) {
   const { bioState } = useCognitiveEngine()
+  const { data: session } = useSession()
+  const accountId = session?.user?.id
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
 
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)
@@ -200,6 +205,10 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   const [lastTranscript, setLastTranscript] = useState('')
   const [history, setHistory] = useState<TranscriptEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
+
+  useEffect(() => {
+    if (headless && error) sileo.error({ title: 'No se pudo dictar', description: error, duration: 5000 })
+  }, [headless, error])
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -237,6 +246,14 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
     }
   }, [cancelRecording])
 
+  useEffect(() => {
+    cancelRecording()
+    setLastTranscript('')
+    setLastResult(null)
+    setHistory([])
+    setError(null)
+  }, [accountId, cancelRecording])
+
   const phase = bioState?.phase ?? 'LINEAR_EXECUTION'
   const phaseConfig = PHASE_CONFIG[phase]
   const PhaseIcon = phaseConfig.icon
@@ -244,10 +261,11 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   // ── Recording logic ──────────────────────────────────────────────────────
 
   const startRecording = useCallback(async () => {
-    if (requestingRef.current || mediaRecorderRef.current || processing) return
+    if (!accountRef.current || requestingRef.current || mediaRecorderRef.current || processing) return
+    const account = accountRef.current
     requestingRef.current = true
     const generation = ++generationRef.current
-    const current = () => mountedRef.current && generationRef.current === generation
+    const current = () => mountedRef.current && generationRef.current === generation && accountRef.current === account
     try {
       setError(null)
       setLastResult(null)
@@ -290,6 +308,12 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
             setError('No speech detected. Try again.')
             setProcessing(false)
             emitVoiceState('idle')
+            return
+          }
+
+          // Chat dictation uses the same reviewed tool path as typed messages.
+          if (headless) {
+            window.dispatchEvent(new CustomEvent('novo:voice-transcript', { detail: { text } }))
             return
           }
 
@@ -365,7 +389,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       setError('No se pudo abrir el micrófono. Revisa el permiso e inténtalo de nuevo.')
       emitVoiceState('idle')
     }
-  }, [bioState, processing])
+  }, [bioState, headless, processing])
 
   const stopRecording = useCallback(() => {
     // Releasing before a permission prompt resolves must never start a

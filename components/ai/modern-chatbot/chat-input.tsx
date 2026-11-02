@@ -127,11 +127,12 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputProps) {
     const {
-        sendMessage, isLoading,
+        sendMessage, isLoading, currentConversationId,
         twinMode, setTwinMode, twinModeAvailable,
         selectedModel, setSelectedModel, availableModels,
     } = useChatbot();
     const { toast } = useToast();
+    const dictationHintId = React.useId();
     const [input, setInput] = React.useState('');
     const [showMenu, setShowMenu] = React.useState(false);
     const toolsTriggerRef = React.useRef<HTMLButtonElement>(null);
@@ -165,6 +166,20 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const cameraInputRef = React.useRef<HTMLInputElement>(null);
     const photoInputRef = React.useRef<HTMLInputElement>(null);
+
+    React.useEffect(() => {
+        const receiveDictation = (event: Event) => {
+            const text = (event as CustomEvent<{ text?: unknown }>).detail?.text;
+            if (disabled || isLoading || typeof text !== 'string' || !text.trim()) return;
+            setInput(draft => [draft.trimEnd(), text.trim()].filter(Boolean).join(' '));
+            textareaRef.current?.focus();
+        };
+        window.addEventListener('novo:voice-transcript', receiveDictation);
+        return () => {
+            window.removeEventListener('novo:voice-transcript', receiveDictation);
+            window.dispatchEvent(new Event('novo:voice-cancel'));
+        };
+    }, [currentConversationId, disabled, isLoading]);
 
     // Sync state with central GeminiLiveOrb
     React.useEffect(() => {
@@ -376,10 +391,14 @@ export function ChatInput({ onSend, disabled, variant = 'bottom' }: ChatInputPro
                                 ? 'bg-primary/10 border-primary/30 text-primary'
                                 : 'bg-muted/60 border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted'
                                 }`}
-                            title="Asistente de voz"
+                            title={voiceState === 'listening' ? 'Detener dictado' : 'Dictar mensaje'}
+                            aria-label={voiceState === 'listening' ? 'Detener dictado' : 'Dictar mensaje'}
+                            aria-describedby={dictationHintId}
                         >
                             <Mic className="w-4 h-4" />
                         </button>
+
+                        <span id={dictationHintId} className="sr-only">El dictado se añade al borrador. Revísalo antes de enviarlo.</span>
 
                         {/* Send Button */}
                         <button

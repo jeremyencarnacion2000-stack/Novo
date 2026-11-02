@@ -62,8 +62,6 @@ const INTENT_PATTERNS: Array<{
       /(?:crea(?:r)?|añade?|agrega?|nueva?)\s+tarea[:\s]+(.+)/i,
       /(?:create|add|new)\s+task[:\s]+(.+)/i,
       /(?:recuérdame|recordarme|remind me)\s+(?:de\s+)?(.+)/i,
-      /tengo que\s+(.+)/i,
-      /necesito\s+(?:hacer\s+)?(.+)/i,
     ],
     deepWork: false,
   },
@@ -171,17 +169,6 @@ export function classifyIntent(text: string): VoiceIntent {
           confidence: 0.85,
         }
       }
-    }
-  }
-
-  // Fallback: try to detect task creation from any "need to do X" phrasing
-  const genericTaskMatch = normalized.match(/(.{5,80})/i)
-  if (genericTaskMatch && normalized.length > 5) {
-    return {
-      action: 'create_task',
-      entities: { raw_match: genericTaskMatch[1] },
-      rawText: normalized,
-      confidence: 0.45,  // Low confidence — may be wrong
     }
   }
 

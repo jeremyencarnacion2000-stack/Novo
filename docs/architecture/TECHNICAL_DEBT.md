@@ -19,6 +19,8 @@ Auditoría de código del 2026-11-01. La prioridad combina efecto sobre uso real
 
 No se alteran migraciones, credenciales, datos o planes de pago para cerrar deuda de interfaz. No reducir el material liquid glass globalmente para ocultar trabajo de componentes que ni siquiera están visibles.
 
+La entrada de voz de las rutas de chat se encamina al borrador y sólo se procesa al enviarlo; deja de usar el ejecutor aislado. El panel independiente conserva comandos explícitos y su convergencia sigue pendiente. Se elimina el fallback genérico que convertía una frase cualquiera en una tarea; no equivale a certificar todo el catálogo legado ni sus adaptadores de Calendar.
+
 ## Estado después de la primera entrega
 
 El coste inicial de paneles ocultos del Hub y el cableado del selector Codex se corrigieron y PR #29 se publicó en producción; ver el registro de pruebas. Se encontró y corrigió otro bloqueo al ejecutar Codex real: formato de permisos CLI y carga de documentos innecesaria para un chat textual. El runtime devuelve respuesta y el usuario la confirmó en la ventana de 0.2.13, con captura. El panel expandido se conserva después del primer uso para proteger borradores y geometría; no se afirma que todas sus suscripciones se suspendan al cerrarlo.
