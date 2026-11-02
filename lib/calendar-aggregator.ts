@@ -44,7 +44,8 @@ export class CalendarAggregator {
         userId: string,
         start: Date,
         end: Date,
-        sources?: string[]
+        sources?: string[],
+        onSourceUnavailable?: (source: string) => void,
     ): Promise<CalendarEvent[]> {
         const events: CalendarEvent[] = [];
 
@@ -57,7 +58,7 @@ export class CalendarAggregator {
             promises.push(this.getNovoEvents(userId, start, end));
         }
         if (enabledSources.includes('google')) {
-            promises.push(this.getGoogleEvents(userId, start, end));
+            promises.push(this.getGoogleEvents(userId, start, end, onSourceUnavailable));
         }
         if (enabledSources.includes('checklist')) {
             promises.push(this.getChecklistEvents(userId, start, end));
@@ -159,7 +160,8 @@ export class CalendarAggregator {
     private static async getGoogleEvents(
         userId: string,
         start: Date,
-        end: Date
+        end: Date,
+        onSourceUnavailable?: (source: string) => void,
     ): Promise<CalendarEvent[]> {
         try {
             const events = await calendarService.listEventsForUser(userId, start.toISOString(), 50, end.toISOString());
@@ -181,7 +183,8 @@ export class CalendarAggregator {
                     };
                 });
         } catch {
-            // Not connected via Google, or the token/API call failed — no Google events this run.
+            // Keep native calendar events while letting evidence consumers report a partial read.
+            onSourceUnavailable?.('google');
             return [];
         }
     }

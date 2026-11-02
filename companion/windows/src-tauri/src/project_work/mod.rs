@@ -6,6 +6,14 @@ mod protocol;
 mod transport;
 mod workspace;
 
+pub(crate) fn codex_chat_model() -> Result<String, String> {
+    Ok(codex::detect_chatgpt()?.model)
+}
+
+pub(crate) fn codex_chat_answer(prompt: String, cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<String, String> {
+    codex::chat_answer(&codex::detect_chatgpt()?, &prompt, cancel)
+}
+
 use protocol::Claim;
 use serde::Serialize;
 use serde_json::{json, Value};

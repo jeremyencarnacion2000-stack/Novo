@@ -46,7 +46,7 @@ describe('Twin Mode server-side gating', () => {
     });
     await POST(request as any);
 
-    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: false, includeGmail: false });
+    expect(buildUserContext).toHaveBeenCalledWith('user-1', expect.objectContaining({ twinMode: false, includeGmail: false }));
   });
 
   it('passes twinMode: true through to buildUserContext for a Pro-plan user who asked for it', async () => {
@@ -59,7 +59,20 @@ describe('Twin Mode server-side gating', () => {
     });
     await POST(request as any);
 
-    expect(buildUserContext).toHaveBeenCalledWith('user-1', { twinMode: true, includeGmail: false });
+    expect(buildUserContext).toHaveBeenCalledWith('user-1', expect.objectContaining({ twinMode: true, includeGmail: false }));
+  });
+
+  it('forwards the validated mailbox question, conversation and cancellation to Gmail context', async () => {
+    const { POST } = await import('../route');
+    const history = [{ role: 'user', content: 'Revisa mis correos recientes' }];
+    const request = new Request('http://localhost/api/ai/stream', {
+      method: 'POST', body: JSON.stringify({ message: 'Lee el segundo', history }),
+    });
+    await POST(request as any);
+    expect(buildUserContext).toHaveBeenCalledWith('user-1', expect.objectContaining({
+      includeGmail: true,
+      gmailRequest: { message: 'Lee el segundo', history, signal: request.signal },
+    }));
   });
 
   it('rejects malformed chat payloads before creating an activity run', async () => {

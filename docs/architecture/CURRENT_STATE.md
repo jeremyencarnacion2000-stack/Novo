@@ -1,0 +1,49 @@
+# Novo: estado real de la arquitectura
+
+Auditoría: 2026-11-01. Base inspeccionada: `cd0af5f`, con los cambios locales pendientes de Codex y accesibilidad. El checkout principal está en otro commit (`b47e8c8`); no se deben mezclar ni desplegar como si fueran iguales. Esta auditoría examina código y documentación; las pruebas nuevas y sus límites se registran en [IMPLEMENTATION_LOG](../engineering/IMPLEMENTATION_LOG.md).
+
+Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arquitectura objetivo](TARGET_ARCHITECTURE.md), [evaluación de ecosistema/voz](../research/ECOSYSTEM_EVALUATION.md), [hoja de ruta](../roadmap/NOVO_EVOLUTION.md) y [registro de cambios y evidencia](../engineering/IMPLEMENTATION_LOG.md).
+
+## Capas existentes
+
+| Capa | Implementación encontrada | Límite actual |
+| --- | --- | --- |
+| Experiencia | Next.js 16.3.5, React 19.2.8, Tailwind 4, Radix, Framer Motion; `app/client-layout.tsx`, `components/ContextHub.tsx` | Varios proveedores globales y paneles persistentes; medir la sesión autenticada, no extrapolar desde la landing |
+| Servidor | App Router en `app/api`, validación Zod en rutas recientes | Contratos y manejo de errores no uniformes en rutas antiguas |
+| Identidad | NextAuth JWT + adaptador Prisma, Google/Spotify/credenciales; `lib/auth.ts`, `lib/google-account.ts` | Consentimiento y renovación reales requieren validación con cuenta |
+| Persistencia | Prisma 5.22, PostgreSQL/Neon, transporte configurable; `lib/prisma.ts`, `lib/database-transport.ts` | Cuota gratuita y tamaño de lecturas son restricciones operativas |
+| Twin | Planner determinista, señales, procedencia, exclusiones, correcciones y outcomes; `lib/cognitive` | Código existente no demuestra utilidad/calibración longitudinal |
+| Memoria de proyectos | Identidad por repositorio/proyecto, carpetas/dispositivos, revisiones y tombstones; `lib/project-assistant` | Verificar identidad cruzada y actualización con servicios reales |
+| Chat web | `components/ai/modern-chatbot/context.tsx` → `/api/ai/stream` | Orquestación antigua separada del Companion |
+| Chat Companion | `/api/companion/chat` → `lib/ai/chat-service.ts` | Recibe mejoras de correo/proyectos que el chat web no comparte automáticamente |
+| Acciones | `lib/ai/executor.ts`, `/api/ai/execute`, scopes, auditoría e idempotencia; correo en `lib/gmail-message.ts` | Las escrituras externas deben conservar propuesta revisada y confirmación explícita |
+| Actividad | `lib/ai/activity.ts`, eventos secuenciados, cancelación y recuperación | Unificar consumidores sin perder arrendamientos ni estado terminal |
+| Trabajo en segundo plano | Inngest, crons Vercel, claims persistidos de refresco; `lib/inngest`, `vercel.json` | El despliegue/activación del scheduler no se certificó aquí |
+| Escritorio | Tauri 2 + Rust + TypeScript/Vite; `companion/windows` | Conexión de hooks, contexto autorizado y respuesta del modelo son capacidades distintas |
+| Móvil | Capacitor Android/iOS carga la aplicación HTTPS en `/app` | No equivale a un agente nativo con control del sistema |
+
+## Coucou
+
+Identificado: [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou), revisión declarada `a7bd575e90253673e7e08370a78f1261eb53ac2f`. `companion/windows/THIRD-PARTY-LICENSE.txt` conserva la licencia MIT y atribución a Louis Raillé. Novo sustituye los recursos de personaje/audio reservados. Mantener este aviso al distribuir. El manifiesto del Companion declara 0.2.12 y su README todavía menciona 0.2.10: hay deriva documental de versiones.
+
+Novo reutiliza ventana/isla, hooks de agentes, integraciones, preferencias y runtime nativo. Sobre esa base añade cuenta Novo, chat compartido, captura consentida, carpetas/contexto de trabajo, scopes y trabajo durable. No se encontró evidencia de un Windows Widget de Windows App SDK independiente: la superficie actual es el Companion Tauri.
+
+`widget.rs` y `widget.ts` contienen otra superficie pequeña, pero no están conectados al registro nativo ni a los inputs normales de Vite. Tampoco se encontró una extensión de navegador/native messaging: la forma `ChatContext::Window` no demuestra por sí misma captura automática de tabs/DOM. El runtime delegado Claude devuelve indisponible explícitamente; no anunciarlo como operativo.
+
+## Contexto, memoria y coste
+
+`lib/ai/context-builder.ts` reúne aproximadamente 18 fuentes por turno; incluye rutinas con relaciones anidadas sin límite equivalente al de otras fuentes. Un fallo en su `Promise.all` puede convertir contexto indisponible en valores vacíos. `lib/cognitive/ambient-twin-runtime.ts` realiza unas 15 lecturas; ya existen claims de refresco de 15 minutos que conviene reutilizar.
+
+La memoria de trabajo vive en turnos/contexto; señales/outcomes representan memoria episódica; preferencias y entidades de proyectos representan memoria semántica; skills de runtime y acciones representan memoria procedural. No constituyen todavía una política única de retención y borrado para todas las fuentes.
+
+El refresco de proyectos cada 15 minutos depende de Inngest. El cron de contexto ambiental configurado en Vercel es diario; son mecanismos distintos, y ninguno se certificó operativamente aquí.
+
+Hay clasificación determinista y routing, pero no una medición uniforme de tokens, coste y escalados en todos los streams. No añadir una llamada de IA para decidir si cada comando necesita IA.
+
+## Documentación previa que sigue siendo referencia
+
+- [Verdad del producto](../novo-product-truth.md): separar kernel real, producto parcial y demos.
+- [Control cognitivo](../novo-cognitive-control-plane.md) y [bucle ambiental](../novo-ambient-loop-architecture.md): contratos de planificación y permisos.
+- [Asistente operativo](../superpowers/specs/2026-10-14-active-assistant-operability.md) y [correo/continuidad](../superpowers/plans/2026-10-19-mail-companion-readiness.md).
+- [Recuperación de base gratuita](../operations/free-database-recovery.md): la fecha prevista de renovación no prueba recuperación real.
+- [Auditoría de rendimiento de octubre](../app-performance-audit-2026-10-08.md): verificó aislamiento de suscripciones; dejó pendiente la medición autenticada y el build de producción.

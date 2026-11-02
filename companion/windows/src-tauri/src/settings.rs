@@ -35,9 +35,8 @@ pub struct Settings {
     /// Show the Codex plan pill (5 h / weekly limits from `codex app-server`).
     /// Off by default; nothing is installed for it.
     pub show_codex_plan_in_notch: bool,
-    /// Who the chat talks to: "anthropic", a cloud provider of
-    /// openai_compat.rs ("openai", "google", "openrouter"), or a model server
-    /// of local_chat.rs ("ollama", "lmstudio", "custom"). Picked in the chat view.
+    /// "codex" opts the assistant into local plan chat; other values keep Novo
+    /// account chat and remain the legacy/advanced adapter's provider id.
     pub chat_provider: String,
     /// The model picked for each provider other than Anthropic (whose model is
     /// `model`), by provider id.

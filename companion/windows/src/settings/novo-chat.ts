@@ -12,6 +12,8 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   const permission=h('p',{class:'hint',hidden:true});
   const runtimes=h('div',{class:'hint',role:'status',text:t('Comprobando capacidades de este PC…')});
   const model=h('select',{'aria-label':t('Modelo de Novo')});
+  const source=h('select',{'aria-label':t("Response source")},h('option',{value:'novo',text:t("Novo account")}),h('option',{value:'codex',text:'ChatGPT Codex'}));
+  source.value=settings.chatProvider==='codex'?'codex':'novo';
   const twin=h('input',{type:'checkbox',checked:settings.novoTwinMode,'aria-label':t('Personalizar con mi Twin')});
   const connections=h('input',{type:'checkbox',checked:settings.novoLocalConnections,'aria-label':t('Consultar conexiones locales')});
   const folderList=h('div',{class:'novo-settings-folders'});
@@ -30,6 +32,10 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   }
   async function verify(){
     const attempt=++generation;
+    const local=settings.chatProvider==='codex';
+    accountOptions.hidden=local;
+    permission.hidden=true;
+    if(local){status.textContent=t("ChatGPT Codex uses your local Codex login. This session stays separate from your Novo history.");return;}
     try {
       const [account,models]=await Promise.all([Bridge.novoAccountStatus(),Bridge.novoChatModels().catch(()=>[])]);
       if(disposed||attempt!==generation)return;
@@ -43,15 +49,17 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
       model.disabled=!models.length;
     }catch{if(!disposed&&attempt===generation)status.textContent=t('No se pudo verificar la cuenta.');}
   }
+  source.addEventListener('change',()=>{settings.chatProvider=source.value==='codex'?'codex':'anthropic';void save().then(verify).catch(failure);});
   model.addEventListener('change',()=>{settings.novoChatModel=model.value;void save().catch(failure);});
   twin.addEventListener('change',()=>{settings.novoTwinMode=twin.checked;void save().catch(failure);});
   connections.addEventListener('change',()=>{settings.novoLocalConnections=connections.checked;void save().catch(failure);});
   const pick=h('button',{type:'button',text:t('Elegir carpetas')});
   pick.addEventListener('click',()=>{pick.disabled=true;void Bridge.contextFoldersPick().then(items=>{folders=normalize(items);drawFolders();}).catch(failure).finally(()=>{pick.disabled=false;});});
-  const section=h('section',{class:'novo-chat-preferences'},h('h2',{text:t('Tu asistente Novo')}),
-    status,permission,h('button',{type:'button',class:'novo-account-shortcut',text:t('Gestionar cuenta y permisos'),onclick:()=>void Bridge.openSettingsWindow('account')}),
+  const accountOptions=h('div',{},permission,h('button',{type:'button',class:'novo-account-shortcut',text:t('Gestionar cuenta y permisos'),onclick:()=>void Bridge.openSettingsWindow('account')}),
     h('div',{class:'row'},h('label',{text:t('Modelo de Novo')}),model),
-    h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})),
+    h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})));
+  const section=h('section',{class:'novo-chat-preferences'},h('h2',{text:t('Tu asistente Novo')}),
+    h('div',{class:'row'},h('label',{text:t("Response source")}),source),status,accountOptions,
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),
     h('button',{type:'button',text:t('Seguimiento y memoria de proyectos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/settings?tab=twin`);else failure();});}}),

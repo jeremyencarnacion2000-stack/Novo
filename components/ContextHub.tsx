@@ -771,6 +771,9 @@ const ContextHubComponent = () => {
   const { logHabit } = useCognitiveDispatch();
 
   const [hubState, setHubState] = useState<HubState>('idle');
+  // Retain the first opened panel so capture drafts and morph origins survive closing.
+  const [expandedMounted, setExpandedMounted] = useState(false);
+  useEffect(() => { if (hubState === 'expanded') setExpandedMounted(true); }, [hubState]);
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const [pomodoroMorphing, setPomodoroMorphing] = useState(false);
   const [activeTab, setActiveTab] = useState<HubTab>('focus');
@@ -1212,7 +1215,7 @@ const ContextHubComponent = () => {
             </motion.div>
           )}
           </AnimatePresence>
-          {(
+          {(expandedMounted || hubState === 'expanded') && (
             <motion.div
               key="expanded"
               data-hub-motion-panel

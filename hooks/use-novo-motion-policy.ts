@@ -6,22 +6,19 @@ export type NovoMotionMode = 'full' | 'reduced' | 'off'
 
 type MotionPolicyInput = {
   showAnimations: boolean
-  isMobile: boolean
   systemPrefersReducedMotion: boolean
 }
 
 /**
- * Novo owns the desktop motion preference. The operating-system preference is
- * still honoured on mobile, where long ambient motion has a larger comfort and
- * battery cost, while the in-app switch remains the universal hard stop.
+ * The in-app switch is the universal hard stop; the operating system's reduced
+ * motion preference applies on every screen size.
  */
 export function resolveNovoMotionMode({
   showAnimations,
-  isMobile,
   systemPrefersReducedMotion,
 }: MotionPolicyInput): NovoMotionMode {
   if (!showAnimations) return 'off'
-  if (isMobile && systemPrefersReducedMotion) return 'reduced'
+  if (systemPrefersReducedMotion) return 'reduced'
   return 'full'
 }
 
@@ -45,7 +42,6 @@ export function useNovoMotionPolicy(showAnimationsOverride?: boolean): NovoMotio
     return typeof document === 'undefined' || document.documentElement.dataset.animations !== 'false'
   })
   const [environment, setEnvironment] = useState(() => ({
-    isMobile: readMedia('(max-width: 767px)'),
     systemPrefersReducedMotion: readMedia('(prefers-reduced-motion: reduce)'),
   }))
 
@@ -65,20 +61,12 @@ export function useNovoMotionPolicy(showAnimationsOverride?: boolean): NovoMotio
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
-    const mobileQuery = window.matchMedia('(max-width: 767px)')
     const reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setEnvironment({
-      isMobile: mobileQuery.matches,
-      systemPrefersReducedMotion: reducedQuery.matches,
-    })
+    const update = () => setEnvironment({ systemPrefersReducedMotion: reducedQuery.matches })
 
     update()
-    mobileQuery.addEventListener?.('change', update)
     reducedQuery.addEventListener?.('change', update)
-    return () => {
-      mobileQuery.removeEventListener?.('change', update)
-      reducedQuery.removeEventListener?.('change', update)
-    }
+    return () => reducedQuery.removeEventListener?.('change', update)
   }, [])
 
   const mode = resolveNovoMotionMode({

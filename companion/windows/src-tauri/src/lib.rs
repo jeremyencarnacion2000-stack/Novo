@@ -462,6 +462,16 @@ async fn chat_send(
     chat::send(&app, &chat, &settings, query, context).await
 }
 
+#[tauri::command]
+async fn codex_chat_send(chat: State<'_, chat::CodexChat>, query: String) -> Result<ChatReply, String> {
+    chat.send(query).await
+}
+
+#[tauri::command]
+fn codex_chat_reset(chat: State<'_, chat::CodexChat>) {
+    chat.reset();
+}
+
 /// The models a provider offers, for the picker in the chat view. Only asked
 /// once the user picked that provider, and only with its key or address.
 #[tauri::command]
@@ -693,6 +703,7 @@ pub fn run() {
         })
         .manage(Pending::default())
         .manage(Chat::default())
+        .manage(chat::CodexChat::default())
         .manage(shortcuts::Registry::default())
         .manage(recap::load())
         .invoke_handler(tauri::generate_handler![
@@ -758,6 +769,8 @@ pub fn run() {
             approval_decline,
             log_line,
             chat_send,
+            codex_chat_send,
+            codex_chat_reset,
             chat_models,
             local_connect,
             local_set_key,

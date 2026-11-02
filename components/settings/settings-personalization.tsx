@@ -142,11 +142,47 @@ export function SettingsPersonalization() {
           <Row label={t('settings.compact.label')} description={t('settings.compact.desc')}>
             <LiquidSwitch checked={settings.compactMode} onCheckedChange={(checked) => updateSettings({ compactMode: checked })} />
           </Row>
+        </div>
+      </Section>
 
-          <Separator className="bg-foreground/[0.05]" />
-
+      <Section title={t('settings.accessibility.title')}>
+        <div className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.015] p-5 space-y-1">
+          <p className="pb-3 text-xs text-foreground/50">{t('settings.accessibility.desc')}</p>
           <Row label={t('settings.animations.label')} description={t('settings.animations.desc')}>
-            <LiquidSwitch checked={settings.showAnimations} onCheckedChange={(checked) => updateSettings({ showAnimations: checked })} />
+            <LiquidSwitch
+              aria-label={t('settings.animations.label')}
+              checked={settings.showAnimations}
+              onCheckedChange={(checked) => updateSettings({ showAnimations: checked })}
+            />
+          </Row>
+          <Row label={t('settings.accessibility.textSize.label')} description={t('settings.accessibility.textSize.desc')}>
+            <Select
+              value={settings.accessibilityTextScale}
+              onValueChange={(value: 'normal' | 'large' | 'larger') => updateSettings({ accessibilityTextScale: value })}
+            >
+              <SelectTrigger aria-label={t('settings.accessibility.textSize.label')} className="w-[118px] sm:w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">{t('settings.accessibility.textSize.normal')}</SelectItem>
+                <SelectItem value="large">{t('settings.accessibility.textSize.large')}</SelectItem>
+                <SelectItem value="larger">{t('settings.accessibility.textSize.larger')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </Row>
+          <Row label={t('settings.accessibility.contrast.label')} description={t('settings.accessibility.contrast.desc')}>
+            <LiquidSwitch
+              aria-label={t('settings.accessibility.contrast.label')}
+              checked={settings.accessibilityHighContrast}
+              onCheckedChange={(checked) => updateSettings({ accessibilityHighContrast: checked })}
+            />
+          </Row>
+          <Row label={t('settings.accessibility.transparency.label')} description={t('settings.accessibility.transparency.desc')}>
+            <LiquidSwitch
+              aria-label={t('settings.accessibility.transparency.label')}
+              checked={settings.accessibilityReduceTransparency}
+              onCheckedChange={(checked) => updateSettings({ accessibilityReduceTransparency: checked })}
+            />
           </Row>
         </div>
       </Section>

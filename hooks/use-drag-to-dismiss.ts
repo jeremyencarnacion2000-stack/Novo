@@ -54,7 +54,10 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
     if (!surface || !enabled) return
 
     let pointerId: number | null = null
-    let startedInScrollable = false
+    let scrollableAtStart: HTMLElement | null = null
+    let gestureOverlay: HTMLElement | null = null
+    let surfaceHeight = 1
+    let dragFrame: number | null = null
     let isDragging = false
     let startX = 0
     let startY = 0
@@ -77,8 +80,11 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
     }
 
     const clearGesture = () => {
+      if (dragFrame !== null) cancelAnimationFrame(dragFrame)
+      dragFrame = null
       pointerId = null
-      startedInScrollable = false
+      scrollableAtStart = null
+      gestureOverlay = null
       isDragging = false
       startX = 0
       startY = 0
@@ -86,6 +92,13 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       currentY = 0
       lastY = 0
       velocityY = 0
+    }
+
+    const paintDrag = () => {
+      const distance = Math.max(0, surfaceStartY + currentY - startY)
+      const progress = Math.min(1, distance / (surfaceHeight * 0.72))
+      gsap.set(surface, { y: distance })
+      if (gestureOverlay) gsap.set(gestureOverlay, { opacity: initialOverlayOpacity * (1 - progress) })
     }
 
     const restore = () => {
@@ -111,6 +124,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       // Desktop keeps the precision-first dialog behavior. On touch devices,
       // Pointer Events provide the same path for iOS, Android and Capacitor.
       if (!isMobile() || event.pointerType === 'mouse') return
+      if (pointerId !== null) return
       if (surface.dataset.modalMotionState && surface.dataset.modalMotionState !== 'open') return
 
       const target = event.target instanceof HTMLElement ? event.target : null
@@ -120,18 +134,20 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       if (scrollable && scrollable.scrollTop > 1) return
 
       pointerId = event.pointerId
-      startedInScrollable = Boolean(scrollable)
+      scrollableAtStart = scrollable
       isDragging = false
       startX = event.clientX
       startY = currentY = lastY = event.clientY
       lastTime = performance.now()
       velocityY = 0
       const overlay = getOverlay()
+      gestureOverlay = overlay
       // A running snap or dismiss can be grabbed again. Killing its tween and
       // reading the presented transform keeps the panel under the finger,
       // instead of jumping back to its logical resting position.
       gsap.killTweensOf(overlay ? [surface, overlay] : surface)
       surfaceStartY = Number(gsap.getProperty(surface, 'y')) || 0
+      surfaceHeight = Math.max(surface.getBoundingClientRect().height, 1)
       initialOverlayOpacity = Number.parseFloat(getComputedStyle(overlay ?? surface).opacity) || 1
 
       // Capture makes the panel stay connected to the finger even if it
@@ -158,10 +174,8 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
         isDragging = true
       }
 
-      if (startedInScrollable) {
-        const target = event.target instanceof HTMLElement ? event.target : null
-        const scrollable = target ? getScrollableAncestor(target, surface) : null
-        if (scrollable && scrollable.scrollTop > 1) {
+      if (scrollableAtStart) {
+        if (scrollableAtStart.scrollTop > 1) {
           restore()
           clearGesture()
           return
@@ -176,18 +190,27 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       lastY = currentY
       lastTime = now
 
-      const distance = Math.max(0, surfaceStartY + currentY - startY)
-      const height = Math.max(surface.getBoundingClientRect().height, 1)
-      const progress = Math.min(1, distance / (height * 0.72))
-      const overlay = getOverlay()
-
-      gsap.set(surface, { y: distance })
-      if (overlay) gsap.set(overlay, { opacity: initialOverlayOpacity * (1 - progress) })
+      if (dragFrame === null) dragFrame = requestAnimationFrame(() => {
+        dragFrame = null
+        paintDrag()
+      })
     }
 
     const onPointerEnd = (event: PointerEvent) => {
       if (pointerId !== event.pointerId) return
       try { surface.releasePointerCapture(event.pointerId) } catch {}
+      if (event.type === 'pointercancel') {
+        if (isDragging) restore()
+        clearGesture()
+        return
+      }
+      // The return controller must sample the final pointer position even
+      // when release arrives before the scheduled presentation frame.
+      if (dragFrame !== null) {
+        cancelAnimationFrame(dragFrame)
+        dragFrame = null
+        paintDrag()
+      }
 
       const distance = Math.max(0, surfaceStartY + currentY - startY)
       const shouldDismiss = isDragging && (
@@ -237,6 +260,7 @@ export function useDragToDismiss<T extends HTMLElement = HTMLDivElement>({
       surface.removeEventListener('pointermove', onPointerMove)
       surface.removeEventListener('pointerup', onPointerEnd)
       surface.removeEventListener('pointercancel', onPointerEnd)
+      clearGesture()
       gsap.killTweensOf(surface)
     }
   }, [enabled, element])

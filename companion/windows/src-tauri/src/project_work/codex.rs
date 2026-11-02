@@ -90,6 +90,92 @@ pub fn agent_args(workspace: &Path, model: &str, writable: bool) -> Result<Vec<S
     args.push("-".into());
     Ok(args)
 }
+
+fn chat_args(workspace: &Path, model: &str) -> Result<Vec<String>, String> {
+    let mut args = agent_args(workspace, model, false)?;
+    args.pop();
+    args.extend(["-c".into(), "forced_login_method=\"chatgpt\"".into(), "-".into()]);
+    Ok(args)
+}
+
+pub fn chat_answer(runtime: &Runtime, prompt: &str, cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<String, String> {
+    let workspace = std::env::temp_dir().join(format!(
+        "novo-codex-chat-{}",
+        uuid::Uuid::new_v4()
+    ));
+    fs::create_dir(&workspace).map_err(|_| "runtime_unavailable")?;
+    struct Cleanup(PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(workspace.clone());
+    let args = chat_args(&workspace, &runtime.model)?;
+    let output = super::process::run_guarded(
+        &runtime.cli,
+        &args,
+        Some(&workspace),
+        Some(prompt.as_bytes()),
+        90,
+        2 * 1024 * 1024,
+        cancel,
+    )?;
+    if !output.success {
+        return Err("execution_failed".into());
+    }
+    answer_from_jsonl(&output.bytes)
+}
+
+fn answer_from_jsonl(bytes: &[u8]) -> Result<String, String> {
+    if bytes.len() > 2 * 1024 * 1024 {
+        return Err("execution_failed".into());
+    }
+    let mut answer = None;
+    let mut started = false;
+    let mut completed = false;
+    for line in bytes.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()) {
+        if line.len() > 65536 {
+            return Err("execution_failed".into());
+        }
+        let event: serde_json::Value =
+            serde_json::from_slice(line).map_err(|_| "execution_failed")?;
+        match event["type"].as_str() {
+            Some("thread.started") => {
+                if started
+                    || !event["thread_id"]
+                        .as_str()
+                        .is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                {
+                    return Err("execution_failed".into());
+                }
+                started = true;
+            }
+            Some("item.completed") if started && event["item"]["type"] == "agent_message" => {
+                if let Some(text) = event["item"]["text"]
+                    .as_str()
+                    .filter(|text| !text.trim().is_empty())
+                {
+                    answer = Some(text.trim().to_string());
+                }
+            }
+            Some("turn.completed") => {
+                if !started || completed {
+                    return Err("execution_failed".into());
+                }
+                completed = true;
+            }
+            Some("turn.failed") | Some("error") => return Err("execution_failed".into()),
+            Some(_) => {}
+            None => return Err("execution_failed".into()),
+        }
+    }
+    if started && completed {
+        answer.ok_or_else(|| "execution_failed".into())
+    } else {
+        Err("execution_failed".into())
+    }
+}
 #[derive(Clone)]
 pub struct Runtime {
     pub cli: PathBuf,
@@ -97,6 +183,13 @@ pub struct Runtime {
     pub version: String,
 }
 pub fn detect() -> Result<Runtime, String> {
+    detect_auth(false)
+}
+pub fn detect_chatgpt() -> Result<Runtime, String> {
+    detect_auth(true)
+}
+
+fn detect_auth(require_chatgpt: bool) -> Result<Runtime, String> {
     if !cfg!(windows) {
         return Err("unsupported_sandbox".into());
     }
@@ -160,17 +253,23 @@ pub fn detect() -> Result<Runtime, String> {
         {
             continue;
         }
+        if require_chatgpt {
+            if !crate::codex_plan::uses_chatgpt_login(&cli) {
+                return Err("runtime_unavailable".into());
+            }
+        } else {
         let doctor = process::capture(
             &cli,
             &["doctor".into(), "--json".into()],
             None,
-            10,
+            30,
             128 * 1024,
         )?;
         let health: serde_json::Value =
             serde_json::from_slice(&doctor.bytes).map_err(|_| "runtime_unavailable")?;
         if health["checks"]["auth.credentials"]["status"] != "ok" {
             continue;
+        }
         }
         let version = process::capture(&cli, &["--version".into()], None, 10, 512)?;
         return Ok(Runtime {
@@ -239,7 +338,7 @@ pub fn system_node() -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod permission_tests {
-    use super::permission_args;
+    use super::{answer_from_jsonl, permission_args};
     use std::path::Path;
 
     #[test]
@@ -256,5 +355,36 @@ mod permission_tests {
         assert!(settings.iter().any(|setting| setting.contains("**/credentials*")));
         assert!(settings.iter().any(|setting| setting.contains("**/auth.json")));
         assert!(!settings.contains(&"windows.sandbox=\"mxc\""));
+    }
+
+    #[test]
+    fn codex_chat_is_read_only() {
+        let args = super::chat_args(Path::new("C:/Users/Angel/temp"), "gpt-5-codex").unwrap();
+        let settings: Vec<_> = args
+            .windows(2)
+            .filter_map(|pair| (pair[0] == "-c").then_some(pair[1].as_str()))
+            .collect();
+        assert!(settings.iter().any(|setting| setting.ends_with("=\"read\"")));
+        assert!(!settings.iter().any(|setting| setting.ends_with("=\"write\"")));
+        assert!(settings.contains(&"permissions.novo.network.enabled=false"));
+        assert!(settings.contains(&"forced_login_method=\"chatgpt\""));
+        let project = super::agent_args(Path::new("C:/Users/Angel/temp"), "gpt-5-codex", true).unwrap();
+        assert!(!project.iter().any(|argument| argument.contains("forced_login_method")));
+    }
+
+    #[test]
+    fn chat_returns_only_the_completed_assistant_message() {
+        let events = br#"{"type":"thread.started","thread_id":"thread_1"}
+{"type":"item.completed","item":{"type":"command_execution","command":"ignored"}}
+{"type":"item.completed","item":{"type":"agent_message","text":"  Hola, Angel.  "}}
+{"type":"turn.completed"}
+"#;
+        assert_eq!(answer_from_jsonl(events).unwrap(), "Hola, Angel.");
+    }
+
+    #[test]
+    fn chat_rejects_failed_or_incomplete_turns() {
+        assert!(answer_from_jsonl(br#"{"type":"turn.completed"}"#).is_err());
+        assert!(answer_from_jsonl(br#"{"type":"turn.failed"}"#).is_err());
     }
 }
