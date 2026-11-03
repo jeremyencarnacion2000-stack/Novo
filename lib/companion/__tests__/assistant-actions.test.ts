@@ -8,7 +8,7 @@ import {requireActiveCompanionDevice} from '../devices'
 import {prepareAssistantAction,decideAssistantAction,listPendingAssistantActions} from '../assistant-actions'
 import {createHash} from 'node:crypto'
 
-const actor={userId:'owner',clientId:'novo-client',grantId:'grant',scopes:new Set(['tasks:write','tasks:read'])}
+const actor={userId:'owner',clientId:'novo-client',grantId:'grant',scopes:new Set(['tasks:write','tasks:read']),expiresAt:2_000_000_000}
 const deviceId='cd78b30e-93ca-4bd0-893a-a3f709b2f105'
 const requestId='c8edb8e3-96ec-43df-8ae6-ec2993edc3f8'
 const operation={type:'task.create' as const,title:'Enviar propuesta',priority:'medium' as const}

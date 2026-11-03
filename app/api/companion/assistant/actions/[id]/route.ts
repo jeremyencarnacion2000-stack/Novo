@@ -5,7 +5,7 @@ import {decideAssistantAction,getAssistantAction} from '@/lib/companion/assistan
 
 export const dynamic='force-dynamic'
 
-export async function GET(request:Request,context:RouteContext<'/api/companion/assistant/actions/[id]'>){
+export async function GET(request:Request,context:{params:Promise<{id:string}>}){
   try{
     const actor=await requireCompanionOAuth(request,['device:connect','tasks:write'])
     const deviceId=request.headers.get('X-Novo-Device-Id')
@@ -15,7 +15,7 @@ export async function GET(request:Request,context:RouteContext<'/api/companion/a
   }catch(error){return companionErrorResponse(error)}
 }
 
-export async function POST(request:Request,context:RouteContext<'/api/companion/assistant/actions/[id]'>){
+export async function POST(request:Request,context:{params:Promise<{id:string}>}){
   try{
     const actor=await requireCompanionOAuth(request,['device:connect','tasks:write'])
     const deviceId=request.headers.get('X-Novo-Device-Id')
