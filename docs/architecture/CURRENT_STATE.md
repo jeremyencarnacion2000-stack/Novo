@@ -53,3 +53,7 @@ Hay clasificación determinista y routing, pero no una medición uniforme de tok
 - [Asistente operativo](../superpowers/specs/2026-10-14-active-assistant-operability.md) y [correo/continuidad](../superpowers/plans/2026-10-19-mail-companion-readiness.md).
 - [Recuperación de base gratuita](../operations/free-database-recovery.md): la fecha prevista de renovación no prueba recuperación real.
 - [Auditoría de rendimiento de octubre](../app-performance-audit-2026-10-08.md): verificó aislamiento de suscripciones; dejó pendiente la medición autenticada y el build de producción.
+
+## Continuación: salida de voz
+
+El candidato del Companion añade reproducción nativa Microsoft, selector de voz, selección automática de español y lectura automática opcional. Helena está instalada y la síntesis en memoria funciona en este Windows. El usuario puede detener la respuesta desde el chat; cambiar contexto invalida el audio pendiente. La escucha «Novo», Whisper/Silero y el ciclo conversacional manos libres siguen pendientes; el trabajo de TTS no los declara completados. Se reconstruyeron los instaladores NSIS/MSI 0.2.14 con esta revisión; la instalación y las pruebas audibles siguen pendientes.

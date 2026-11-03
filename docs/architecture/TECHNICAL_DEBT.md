@@ -36,3 +36,7 @@ La [medición autenticada de fluidez](../performance/2026-11-01-interaction-flue
 El contexto compartido ya conserva lecturas parciales y declara campos desconocidos; el chat web reenvía pregunta/historial al lector de correo. Siguen existiendo dos orquestaciones y un contexto preventivo amplio por turno. La carga inicial de historiales web cambia a recuperación seleccionada; no confundir esta mejora con un presupuesto global de tokens o una migración completa del chat compartido.
 
 En el worktree actual, las acciones de tareas ya usan almacenamiento durable e idempotencia y los comandos de ventana sólo usan apps permitidas por el usuario. La migración está preparada, no desplegada; no publicar la ruta de escritura antes de aplicarla y verificarla. El dictado de Companion queda opt-in y puede depender de servicio externo; wake word, STT offline y TTS no están incluidos.
+
+## Voz local: límites que quedan abiertos
+
+La reproducción Windows dispone de cancelación por solicitud y corte al bloquear/desconectar la sesión. Falta medir su latencia real y comprobar altavoces/dispositivo de salida y comportamiento de bloqueo físico. Las voces se instalan como componentes oficiales de Windows, no se incluyen en el instalador. Permanece pendiente el trabajador de captura/STT, versiones/licencias/hashes de whisper.cpp/Silero, gramática «Novo», corpus ES/EN y piloto de falsos positivos; no habilitar escucha permanente sin superar la aceptación.

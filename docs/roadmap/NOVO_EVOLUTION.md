@@ -16,3 +16,7 @@ Entregas de base: trabajo oculto del Hub, recuperación parcial del contexto, re
 Actualización local 2026-11-03: el Companion ya contiene una base incremental de tareas aprobables y control acotado de ventanas Windows, además de consentimiento persistente para dictado que pueda salir del dispositivo. El plan completo de voz no está listo: no se ha incorporado detector «Novo», whisper.cpp/Silero ni TTS, y no se ha medido en el PC. La escucha continua seguirá deshabilitada hasta pasar sus criterios de aceptación. La migración del registro de acciones debe aplicarse antes de desplegar estas rutas de escritura.
 
 La [medición de interacción autenticada](../performance/2026-11-01-interaction-fluency.md) separa el estado publicado de los ajustes locales y enumera la aceptación pendiente por superficie. Priorizar la pintura de dashboard/Hoy y apertura móvil; el chat observado tiene un coste de frames muy inferior. No reducir el glass globalmente para uniformar números.
+
+## Próximo tramo del Companion
+
+La salida hablada local queda implementada en el candidato: Windows Microsoft, español automático, selección de voz, control de leer/detener y opt-in de lectura automática. Sigue la validación física de audio/cancelación. Después se abordará un solo trabajador de captura + whisper.cpp/Silero con recursos fijados y verificados; la espera «Novo» se mantendrá deshabilitada hasta superar su piloto. Las confirmaciones de escrituras continúan siendo visuales y nunca se aceptarán desde el audio.

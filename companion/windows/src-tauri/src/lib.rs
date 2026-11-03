@@ -17,6 +17,7 @@ mod project_work;
 mod query_context;
 mod desktop;
 mod desktop_apps;
+mod voice;
 mod files;
 mod github;
 mod hooks;
@@ -709,6 +710,9 @@ pub fn run() {
         .manage(recap::load())
         .manage(desktop_apps::WindowRegistry::default())
         .invoke_handler(tauri::generate_handler![
+            voice::voice_choices,
+            voice::voice_speak,
+            voice::voice_stop,
             companion::companion_status,
             novo_account::novo_account_status,
             novo_chat::novo_chat_models,

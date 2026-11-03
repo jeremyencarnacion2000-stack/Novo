@@ -17,6 +17,9 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   const twin=h('input',{type:'checkbox',checked:settings.novoTwinMode,'aria-label':t('Personalizar con mi Twin')});
   const connections=h('input',{type:'checkbox',checked:settings.novoLocalConnections,'aria-label':t('Consultar conexiones locales')});
   const voiceConsent=h('input',{type:'checkbox',checked:settings.voiceCloudConsent,'aria-label':t('Allow'),'aria-description':t('The speech service may process audio outside Novo. Novo receives only the text you send.')});
+  const spokenReplies=h('input',{type:'checkbox',checked:settings.voiceSpokenReplies,'aria-label':t("Read replies aloud")});
+  const localVoice=h('select',{'aria-label':t("Windows voice")},h('option',{value:'',text:t("Spanish (automatic)")}));
+  const localVoiceStatus=h('p',{class:'hint',role:'status',text:t("Audio is generated on this PC.")});
   const folderList=h('div',{class:'novo-settings-folders'});
   const desktopApps=h('div',{class:'novo-desktop-apps'});
   const desktopStatus=h('p',{class:'hint',role:'status'});
@@ -71,6 +74,14 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     const next=voiceConsent.checked;settings.voiceCloudConsent=next;
     void save().catch(()=>{settings.voiceCloudConsent=!next;voiceConsent.checked=!next;failure();});
   });
+  spokenReplies.addEventListener('change',()=>{
+    const previous=settings.voiceSpokenReplies;settings.voiceSpokenReplies=spokenReplies.checked;
+    void save().catch(()=>{settings.voiceSpokenReplies=previous;spokenReplies.checked=previous;failure();});
+  });
+  localVoice.addEventListener('change',()=>{
+    const previous=settings.voiceLocalVoiceId;settings.voiceLocalVoiceId=localVoice.value;
+    void save().catch(()=>{settings.voiceLocalVoiceId=previous;localVoice.value=previous;failure();});
+  });
   const pick=h('button',{type:'button',text:t('Elegir carpetas')});
   pick.addEventListener('click',()=>{pick.disabled=true;void Bridge.contextFoldersPick().then(items=>{folders=normalize(items);drawFolders();}).catch(failure).finally(()=>{pick.disabled=false;});});
   const accountOptions=h('div',{},permission,h('button',{type:'button',class:'novo-account-shortcut',text:t('Gestionar cuenta y permisos'),onclick:()=>void Bridge.openSettingsWindow('account')}),
@@ -78,6 +89,8 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})));
   const section=h('section',{class:'novo-chat-preferences'},h('h2',{text:t('Tu asistente Novo')}),
     h('h2',{text:t('Voz y privacidad')}),
+    h('label',{class:'row'},spokenReplies,h('span',{text:t("Read replies aloud")})),
+    h('div',{class:'row'},h('label',{text:t("Windows voice")}),localVoice),localVoiceStatus,
     h('label',{class:'row'},voiceConsent,h('span',{text:t('Allow')})),
     h('p',{class:'hint',text:t('The speech service may process audio outside Novo. Novo receives only the text you send.')}),
     h('div',{class:'row'},h('label',{text:t("Response source")}),source),status,accountOptions,
@@ -90,6 +103,12 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo reconoce repositorios y proyectos de Vercel y sincroniza sus nombres y estado. Las rutas y claves se quedan en este PC. Puedes quitar el acceso en cualquier momento.')}),
     folderList,h('div',{class:'row'},pick,folderStatus));
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});
+  void Bridge.voiceChoices().then(items=>{
+    if(disposed)return;const voices=Array.isArray(items)?items:[];
+    for(const voice of voices)localVoice.append(h('option',{value:voice.id,text:voice.name}));
+    localVoice.value=settings.voiceLocalVoiceId??'';
+    if(!voices.some(voice=>voice.spanish)&&!settings.voiceLocalVoiceId)localVoiceStatus.textContent=t("No local Spanish voice. Install one in Windows Settings → Time & language → Speech.");
+  }).catch(()=>{if(disposed)return;localVoice.disabled=true;localVoiceStatus.textContent=t("Local speech is unavailable. Check your Windows voice settings.");});
   void Bridge.desktopAppCatalog().then(items=>{if(!disposed)drawDesktopApps(items);}).catch(()=>{if(!disposed)desktopStatus.textContent=t('No se pudo consultar la lista local de apps.');});
   void Bridge.projectWorkRuntimes().then(items=>{if(disposed)return;clear(runtimes);for(const item of items)runtimes.append(h('p',{text:runtimeLabel(item)}));}).catch(()=>{if(!disposed)runtimes.textContent=t('No se pudieron verificar las capacidades de este PC.');});
   void onEvent('novo-account-changed',()=>void verify()).then(stop=>{if(disposed)stop();else unsubscribe=stop;});

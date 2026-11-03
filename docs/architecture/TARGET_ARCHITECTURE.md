@@ -38,3 +38,9 @@ Primer paso de voz implementado en las rutas de chat: captura existente → tran
 ## Fronteras que deben conservarse
 
 Todo contenido recuperado es dato no confiable. El modelo propone; Zod y el servidor validan. Scopes, ownership, idempotencia y auditoría se aplican también a comandos de voz. Las acciones consecuentes requieren confirmación explícita. Una fuente temporalmente caída debe aparecer como indisponible, no como vacía. El rendimiento no justifica omitir revocación ni controles de cuenta.
+
+## Salida hablada del Companion
+
+`LocalSpeech` controla una solicitud UUID de reproducción en cada vista. Novo y Codex comparten el control de leer/detener; la lectura automática requiere opt-in y cargar el historial no la activa. Cambiar cuenta, conversación, proveedor, abandonar el chat o comenzar dictado cancela la lectura y descarta eventos tardíos.
+
+Un trabajador nativo SAPI conserva los objetos COM en un único hilo. El catálogo devuelve nombres e identificadores opacos de voces Microsoft; las rutas del registro permanecen en Windows. La cola está acotada, las cancelaciones se registran antes de encolarse y cada solicitud se vuelve a comprobar antes de hablar. La reproducción se purga si la sesión Windows se bloquea/desconecta o no se puede verificar. `SPF_IS_NOT_XML` fuerza texto literal. En espera el trabajador bloquea su cola sin sondeo periódico.

@@ -36,3 +36,13 @@ Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el 
 | Framework adicional de agentes/memoria | No necesario ahora | Ya hay planner, executor y memoria; evitar duplicarlos |
 
 No se certificó como «completa y verificada» una capacidad externa por mera presencia de código. Los fixtures/demo se mantienen fuera de la evidencia de uso real.
+
+## Reproducción local de respuestas — candidato Companion
+
+| Capacidad | Estado y evidencia |
+| --- | --- |
+| Voz Microsoft española | Helena instalada en este PC mediante Windows; síntesis fija en memoria comprobada sin altavoces |
+| Leer/detener respuesta en Novo y Codex | Implementado en fuente, con identidad de solicitud y cancelación al cambiar contexto |
+| Lectura automática | Opt-in desactivado por defecto; el historial cargado permanece silencioso |
+| Micrófono / wake word / STT local | No se activaron; implementación y piloto físico pendientes |
+| Cancelación ≤250 ms y calidad audible | Objetivos pendientes de medición; no se deducen de pruebas simuladas |

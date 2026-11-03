@@ -48,6 +48,8 @@ pub struct Settings {
     pub desktop_allowed_apps: Vec<String>,
     /// Explicit opt-in because browser speech recognition may process audio online.
     pub voice_cloud_consent: bool,
+    pub voice_local_voice_id: String,
+    pub voice_spoken_replies: bool,
     /// Addresses of the model servers once connected; empty means not connected.
     pub ollama_url: String,
     pub lmstudio_url: String,
@@ -135,6 +137,8 @@ impl Default for Settings {
             novo_local_connections: true,
             desktop_allowed_apps: Vec::new(),
             voice_cloud_consent: false,
+            voice_local_voice_id: String::new(),
+            voice_spoken_replies: false,
             ollama_url: String::new(),
             lmstudio_url: String::new(),
             custom_url: String::new(),

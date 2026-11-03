@@ -54,3 +54,27 @@ Las cifras de whisper.cpp proceden de su [tabla de memoria](https://github.com/g
 ## Siguiente experimento, sin framework adicional
 
 Reutilizar el dictado manual y el executor autorizado. Capturar un corpus pequeño consentido ES/EN (silencio, ruido, interrupciones); comparar browser contra un único modelo multilingüe pequeño de whisper.cpp. Medir arranque, tiempo al primer texto/audio, p50/p95, RAM, CPU, errores de transcripción, falsos cortes y cancelación. Sólo después elegir VAD/TTS. Guardar métricas sin audio o texto privado por defecto. La adaptación por hardware requiere esas medidas; no se declara implementada por esta investigación.
+
+## Continuación — voz local y selección de repositorios
+
+La síntesis del Companion usa las voces Microsoft instaladas mediante SAPI y la dependencia Windows existente. No se distribuyen voces, pesos ni otro runtime. En este PC se instaló `Language.TextToSpeech~~~es-ES~0.0.1.0` mediante Windows, sin reinicio; Helena apareció en el catálogo y sintetizó 188.686 bytes de una frase fija en memoria, sin salida por altavoces. Esto prueba disponibilidad del motor, no calidad audible ni latencia de cancelación.
+
+La navegación /browse falló con `ERR_CERT_DATE_INVALID`; se conservó la validación TLS y se contrastaron después las fuentes públicas mediante la API de repositorios de GitHub. Los hallazgos nuevos y las referencias figuran al final de este documento. A partir de las fuentes ya documentadas: whisper.cpp con Silero sigue siendo la siguiente integración de STT local; debe fijar binario, licencia y hashes antes de distribuirlo. OpenWakeWord exige un modelo de «Novo» y licencia de pesos adecuada. Leon y Pipecat aportan separación de entrada, diálogo y acción; se adapta su patrón con el catálogo existente. UFO orienta observación/verificación de Windows; el control permanece limitado a las apps permitidas. Kokoro se comparará contra Helena sólo si mejora calidad dentro del presupuesto de memoria. No se instalaron esos frameworks ni sus modelos.
+
+Se adaptó la separación de reproducción/cancelación: el audio no puede autorizar acciones, ejecutar SSML ni cargar audio desde rutas/URLs; las respuestas se entregan a Windows como texto literal.
+
+## Fuentes públicas contrastadas con la API de GitHub
+
+La API oficial de GitHub funcionó mediante `gh api` después del fallo de /browse. Se leyeron los README y metadatos públicos; no se ejecutó código de los repositorios.
+
+| Fuente | Hallazgo verificado | Aplicación en Novo |
+| --- | --- | --- |
+| [whisper.cpp v1.9.5](https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.5) | Commit `d1be6fde11ac6e0407606b4e42fe72d34add8037`; esa release no adjunta binarios. [b5454](https://github.com/ggml-org/whisper.cpp/releases/tag/b5454) publica `whisper-bin-x64.zip` (8.928.640 bytes), digest declarado `sha256:6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb` | Base de STT local. Elegir fuente estable fijada o binario concreto; falta descargar/verificar localmente antes de integrarlo |
+| [whisper.cpp VAD](https://github.com/ggml-org/whisper.cpp#voice-activity-detection-vad) | El README documenta `--vad`, modelo adicional y Silero `v6.2.0`, con descarga Windows | Reutilizar el VAD del mismo trabajador; modelo y hash se fijan por separado del ejecutable |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Código Apache-2.0; Rust, Windows, ASR streaming/offline, keyword spotting y Silero VAD documentados | Candidato de comparación si Whisper excede presupuesto. No se confirmó un modelo de keyword spotting en español ni se instaló el runtime |
+| [OpenWakeWord](https://github.com/dscripka/openWakeWord#license) | Código Apache-2.0; los modelos incluidos usan CC BY-NC-SA 4.0 y el README declara soporte inglés | No incluir esos pesos en Novo comercial; «Novo» necesita un modelo adecuado y derechos de distribución verificables |
+| [Decibri](https://github.com/decibri/decibri) | La referencia antigua redirige a `decibri/decibri.cpp`, cuyo README deriva a la reescritura Rust. El repo actual declara Apache-2.0, captura/reproducción multiplataforma y VAD opcional; explica límites de telemetría ONNX en Windows | Evaluar captura y buffering sin copiar la edición Node antigua; no activar ONNX/VAD por defecto ni añadirlo sin medir huella y revisar esas condiciones |
+| [Pipecat](https://github.com/pipecat-ai/pipecat) | Python, pipelines componibles, transportes y procesamiento de audio documentados | Mantener en Novo las separaciones de captura, respuesta y acción; no añadir un proceso Python para la salida de voz |
+| [Kokoro](https://github.com/hexgrad/kokoro) | README: modelo de 82M, idioma español `e` y pesos Apache; fonetización/paquete propios | Comparar calidad/latencia contra Helena antes de considerar sustitución; sin instalación en esta revisión |
+
+Los digests de GitHub anteriores son metadatos del proveedor, no hashes comprobados sobre un archivo descargado. Esta revisión añade candidatos y decisiones concretas; el único cambio instalado fuera del worktree fue el componente oficial de voz española de Windows.

@@ -7,6 +7,7 @@ import { h, svg, clear } from './dom';
 import { ICONS } from './icons';
 import { renderMarkdown } from './markdown';
 import type { ViewHost } from './views';
+import { buildReplySpeech } from './reply-speech';
 
 // Finish a disposed view's reset before a replacement session can send.
 let resetQueue: Promise<void> = Promise.resolve();
@@ -21,6 +22,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   let generation = 0;
   let busy = false;
   let ready = false;
+  const playback=buildReplySpeech(()=>dictation.cancel());
   const status = h('div', { class: 'novo-chat-error', role: 'status', 'aria-live': 'polite' });
   const log = h('div', { class: 'chat-log' });
   const file = h('div', { class: 'novo-unshared-file' });
@@ -29,8 +31,8 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   const mic = h('button', { type: 'button', class: 'novo-voice-button', 'aria-label': t("Start dictation"), title: t("The speech service may process audio outside Novo. Novo receives only the text you send.") }, svg(ICONS.mic, 14));
   const fresh = h('button', { class: 'novo-chat-link', text: t("Start a new chat"), onclick: () => void reset() });
   const settings = h('button', { type: 'button', class: 'novo-chat-settings', 'aria-label': t("Settings"), onclick: () => void Bridge.openSettingsWindow('assistant') }, svg(ICONS.gear, 12));
-  const header = h('div', { class: 'novo-chat-heading' }, h('span', { text: 'ChatGPT Codex' }), fresh, settings);
-  const body = h('div', { class: 'chat-body novo-chat-body' }, header, file, log, status, h('div', { class: 'chat-bar' }, input, mic, send));
+  const header = h('div', { class: 'novo-chat-heading' }, h('span', { text: 'ChatGPT Codex' }), fresh, playback.el, settings);
+  const body = h('div', { class: 'chat-body novo-chat-body' }, header, file, log, status, playback.status, h('div', { class: 'chat-bar' }, input, mic, send));
   const el = h('div', { class: 'view' }, h('div', { class: 'card wash chat-card' }, body));
   const dictation = new SpeechDictation({
     transcript(text) { input.value = text; controls(); },
@@ -50,6 +52,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   let stopSettings:(()=>void)|null=null;
   void onEvent<Settings>('settings-changed',settings=>{
     State.settings={...State.settings,...settings};
+    playback.settingsChanged();
     if(settings.voiceCloudConsent!==true)dictation.cancel();
   }).then(stop=>{if(disposed)stop();else stopSettings=stop;});
 
@@ -60,6 +63,8 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   }
   function draw() {
     if (disposed) return;
+    const replies=messages.filter(m=>m.role==='assistant');
+    playback.update('codex:'+generation,replies[replies.length-1]?.content??'');
     clear(log);
     for (const message of messages) {
       const content = h('div', { class: message.role === 'user' ? 'bubble' : 'reply' });
@@ -76,6 +81,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
     onHeightChange();
   }
   async function reset() {
+    playback.stop();
     const attempt = ++generation;
     ready = false;
     busy = false;
@@ -91,6 +97,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
     if (dictation.isListening) { dictation.stop(); return; }
     const query = input.value.trim();
     if (!query || !ready || busy || disposed) return;
+    playback.stop();
     const attempt = generation;
     messages.push({ id: messages.length, role: 'user', content: query });
     input.value = '';
@@ -102,6 +109,8 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
       const reply = await Bridge.codexChatSend(query);
       if (disposed || attempt !== generation) return;
       messages.push({ id: messages.length, role: 'assistant', content: reply.text });
+      playback.update('codex:'+generation,reply.text);
+      playback.readReply();
       Sound.play('finish');
     } catch (error) {
       if (disposed || attempt !== generation) return;
@@ -116,6 +125,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   }
   send.addEventListener('click', () => void submit());
   mic.addEventListener('click', () => {
+    playback.stop();
     if (dictation.isListening) { dictation.stop(); return; }
     if (!State.settings.voiceCloudConsent) {
       status.textContent = t(N_("Voice dictation is off. Enable it in Novo Settings → Assistant to allow the speech service to process audio."));
@@ -137,6 +147,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
     ++generation;
     stopSettings?.();
     dictation.dispose();
+    playback.dispose();
     State.stateOverride = null;
     void resetSession().catch(() => {});
     window.removeEventListener('beforeunload', stop);
@@ -144,6 +155,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   window.addEventListener('beforeunload', stop);
   void reset();
   return { el, sync() {
+    if(State.view!=='prompt')playback.stop();
     const name = State.droppedFile?.name ?? '';
     file.textContent = name ? `${name} · archivo local, no compartido` : '';
     file.hidden = !name;

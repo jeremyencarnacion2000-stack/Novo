@@ -130,6 +130,8 @@ export interface Settings {
   desktopAllowedApps: string[];
   /** Explicit opt-in because browser speech recognition may process audio online. */
   voiceCloudConsent: boolean;
+  voiceLocalVoiceId: string;
+  voiceSpokenReplies: boolean;
   /** Model server addresses once connected; empty means not connected. */
   ollamaUrl: string;
   lmstudioUrl: string;
@@ -182,6 +184,8 @@ export const DEFAULT_SETTINGS: Settings = {
   novoLocalConnections: true,
   desktopAllowedApps: [],
   voiceCloudConsent: false,
+  voiceLocalVoiceId: '',
+  voiceSpokenReplies: false,
   ollamaUrl: "",
   lmstudioUrl: "",
   customUrl: "",
