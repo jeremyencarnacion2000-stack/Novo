@@ -57,3 +57,5 @@ Hay clasificación determinista y routing, pero no una medición uniforme de tok
 ## Continuación: salida de voz
 
 El candidato del Companion añade reproducción nativa Microsoft, selector de voz, selección automática de español y lectura automática opcional. Helena está instalada y la síntesis en memoria funciona en este Windows. El usuario puede detener la respuesta desde el chat; cambiar contexto invalida el audio pendiente. La escucha «Novo», Whisper/Silero y el ciclo conversacional manos libres siguen pendientes; el trabajo de TTS no los declara completados. Se reconstruyeron los instaladores NSIS/MSI 0.2.14 con esta revisión; la instalación y las pruebas audibles siguen pendientes.
+
+La base correcta de Novo quedó identificada en `shiny-firefly-37692190/main`. La migración de solicitudes de acción ya está aplicada por Prisma y verificada; la rama temporal de prueba fue eliminada con aprobación del usuario. El servidor compatible está preparado para publicación.
