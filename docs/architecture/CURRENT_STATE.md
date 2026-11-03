@@ -8,6 +8,8 @@ Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en
 
 PR #31 (`b882c82`) publicada y verificada con la sesión autorizada: listado de 75 metadatos sin mensajes, detalle bajo demanda y ninguna escritura de historiales por lectura. PR #32 (`80bcc3a`) publica el dictado al borrador del chat con envío manual, cancelación por cuenta/selección y aviso de error sanitizado. CI final: tipos, lint, 329 suites / 1349 pruebas / dos snapshots aprobados. Vercel READY y alias canónico comprobados; la sesión real recibe una transcripción simulada sin ejecutar, enviar ni guardar nada. No se certifica el micrófono físico. [Evaluación y adaptación del ecosistema](../research/ECOSYSTEM_EVALUATION.md).
 
+Actualización local 2026-11-03: Companion incorpora un catálogo determinista para tareas y estado cognitivo, propuestas de tarea con aprobación dentro del Companion y controles nativos acotados de ventanas Windows. La autorización del dispositivo anuncia capacidades nuevas sólo a clientes v2; clientes anteriores conservan su contrato. Dictado web y Companion requieren consentimiento explícito antes de usar reconocimiento que podría enviar audio fuera de Novo. La migración aditiva aún no está aplicada y ningún cambio de producción está certificado por esta actualización. Wake word, STT local, TTS y la calibración física siguen pendientes; la escucha continua permanece apagada.
+
 ## Capas existentes
 
 | Capa | Implementación encontrada | Límite actual |
@@ -51,3 +53,9 @@ Hay clasificación determinista y routing, pero no una medición uniforme de tok
 - [Asistente operativo](../superpowers/specs/2026-10-14-active-assistant-operability.md) y [correo/continuidad](../superpowers/plans/2026-10-19-mail-companion-readiness.md).
 - [Recuperación de base gratuita](../operations/free-database-recovery.md): la fecha prevista de renovación no prueba recuperación real.
 - [Auditoría de rendimiento de octubre](../app-performance-audit-2026-10-08.md): verificó aislamiento de suscripciones; dejó pendiente la medición autenticada y el build de producción.
+
+## Continuación: salida de voz
+
+El candidato del Companion añade reproducción nativa Microsoft, selector de voz, selección automática de español y lectura automática opcional. Helena está instalada y la síntesis en memoria funciona en este Windows. El usuario puede detener la respuesta desde el chat; cambiar contexto invalida el audio pendiente. La escucha «Novo», Whisper/Silero y el ciclo conversacional manos libres siguen pendientes; el trabajo de TTS no los declara completados. Se reconstruyeron los instaladores NSIS/MSI 0.2.14 con esta revisión; la instalación y las pruebas audibles siguen pendientes.
+
+La base correcta de Novo quedó identificada en `shiny-firefly-37692190/main`. La migración de solicitudes de acción ya está aplicada por Prisma y verificada; la rama temporal de prueba fue eliminada con aprobación del usuario. El servidor compatible está preparado para publicación.

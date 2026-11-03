@@ -3,7 +3,7 @@ import { validateMcpBearerToken } from '@/lib/mcp/auth'
 import {prisma} from '@/lib/prisma'
 import {CompanionError, requireCompanionOAuth} from '@/lib/companion/auth'
 import {requireActiveCompanionDevice} from '@/lib/companion/devices'
-import {companionAuthorizationSchema, companionCapabilities} from '@/lib/companion/contracts'
+import {companionAuthorizationSchema,companionCapabilities,legacyCompanionAuthorizationSchema} from '@/lib/companion/contracts'
 import {companionErrorResponse} from '@/lib/companion/http'
 import {requireCompanionChatEnabled} from '@/lib/companion/feature'
 
@@ -28,9 +28,15 @@ export async function GET(request: Request) {
       const user = await prisma.user.findUnique({where:{id:actor.userId}, select:{id:true, name:true}})
       if (!user) throw new CompanionError(401, 'unauthorized')
       const capabilities = companionCapabilities(actor.scopes)
-      return NextResponse.json(companionAuthorizationSchema.parse({version:1,
-        state:device && capabilities.aiChat ? 'connected' : 'permission_required',
-        user:{id:user.id, displayName:user.name}, device, capabilities}), {headers:{'Cache-Control':'no-store'}})
+      const capabilitiesVersion2=request.headers.get('X-Novo-Capabilities-Version')==='2'
+      const hasNewGrants=capabilities.taskRead&&capabilities.taskWrite&&capabilities.desktopRead&&capabilities.desktopControl
+      const base={version:1 as const,state:device&&capabilities.aiChat&&(!capabilitiesVersion2||hasNewGrants)?'connected' as const:'permission_required' as const,
+        user:{id:user.id,displayName:user.name},device}
+      if(capabilitiesVersion2){
+        return NextResponse.json(companionAuthorizationSchema.parse({...base,capabilities}),{headers:{'Cache-Control':'no-store'}})
+      }
+      const {taskRead:_taskRead,taskWrite:_taskWrite,desktopRead:_desktopRead,desktopControl:_desktopControl,...legacyCapabilities}=capabilities
+      return NextResponse.json(legacyCompanionAuthorizationSchema.parse({...base,capabilities:legacyCapabilities}),{headers:{'Cache-Control':'no-store'}})
     }
     const hasCompanionPermission = COMPANION_SCOPES.some((scope) => scopes.includes(scope))
     if (!hasCompanionPermission) {

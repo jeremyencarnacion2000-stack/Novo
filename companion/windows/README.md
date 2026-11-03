@@ -1,8 +1,17 @@
 # Novo Companion para Windows
 
-Versión preparada: **0.2.13**.
+Versión preparada: **0.2.14**.
 
-[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.13/Novo-Companion-Windows-0.2.13-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.13/Novo-Companion-Windows-0.2.13.msi)
+[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.14/Novo-Companion-Windows-0.2.14-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.14/Novo-Companion-Windows-0.2.14.msi)
+
+## Novedades de 0.2.14
+
+- Consulta tus tareas y el estado disponible del Twin desde el chat. Crear una tarea prepara una propuesta: sólo se guarda después de aprobarla visualmente en el Companion.
+- Controla las apps elegidas en Configuración → Asistente: abrir, enfocar, minimizar, maximizar y restaurar. Vuelve a conectar la cuenta para autorizar los nuevos permisos; las rutas y títulos de ventanas permanecen en el PC.
+- Lee y detén respuestas de Novo y Codex con voces Microsoft de Windows. La lectura automática se activa de forma opcional en Asistente → Voz y privacidad; abrir el historial permanece en silencio.
+- La selección automática busca una voz local española. Si falta, instala una desde Configuración de Windows → Hora e idioma → Voz, o elige otra voz disponible. El instalador no incluye ni distribuye paquetes de voz de Microsoft.
+- Cambiar cuenta o conversación, iniciar dictado, salir del chat o bloquear Windows detiene la lectura. Las confirmaciones de escritura continúan siendo visuales.
+- El dictado sigue siendo manual y revisable, con permiso independiente para el servicio que procesa audio. Activación «Novo» y reconocimiento local Whisper/Silero siguen pendientes de implementación y medición física.
 
 ## Novedades de 0.2.13
 

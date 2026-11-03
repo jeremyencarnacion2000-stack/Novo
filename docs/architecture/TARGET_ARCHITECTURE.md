@@ -33,8 +33,14 @@ Adaptadores existentes: Gmail, Calendar, proyectos, MCP, runtime local
 4. Integrar workflows nativos concretos mediante API de aplicación/sistema. UI Automation sólo cuando falte un contrato estructurado, con permiso por capacidad.
 5. Handoff con identidad de tarea, checkpoint mínimo y capacidades del dispositivo; no copiar automáticamente toda la conversación o disco.
 
-Primer paso de voz implementado en las rutas de chat: captura existente → transcripción → borrador actual → envío manual → herramientas/confirmaciones del chat. El panel independiente todavía conserva su ejecutor de comandos explícitos; no se declara terminada la convergencia de todos los modos de voz.
+Primer paso de voz implementado en las rutas de chat: captura existente → transcripción → borrador actual → envío manual → herramientas/confirmaciones del chat. En Companion el reconocimiento requiere ahora consentimiento local explícito porque puede procesar audio fuera de Novo. Los comandos de texto y dictado llegan al mismo envío; tareas requieren una propuesta guardada y aprobación visual. El control de escritorio se mantiene local y usa operaciones Windows permitidas. No se declara terminado el wake word, STT offline, TTS, escucha conversacional ni la convergencia completa.
 
 ## Fronteras que deben conservarse
 
 Todo contenido recuperado es dato no confiable. El modelo propone; Zod y el servidor validan. Scopes, ownership, idempotencia y auditoría se aplican también a comandos de voz. Las acciones consecuentes requieren confirmación explícita. Una fuente temporalmente caída debe aparecer como indisponible, no como vacía. El rendimiento no justifica omitir revocación ni controles de cuenta.
+
+## Salida hablada del Companion
+
+`LocalSpeech` controla una solicitud UUID de reproducción en cada vista. Novo y Codex comparten el control de leer/detener; la lectura automática requiere opt-in y cargar el historial no la activa. Cambiar cuenta, conversación, proveedor, abandonar el chat o comenzar dictado cancela la lectura y descarta eventos tardíos.
+
+Un trabajador nativo SAPI conserva los objetos COM en un único hilo. El catálogo devuelve nombres e identificadores opacos de voces Microsoft; las rutas del registro permanecen en Windows. La cola está acotada, las cancelaciones se registran antes de encolarse y cada solicitud se vuelve a comprobar antes de hablar. La reproducción se purga si la sesión Windows se bloquea/desconecta o no se puede verificar. `SPF_IS_NOT_XML` fuerza texto literal. En espera el trabajador bloquea su cola sin sondeo periódico.

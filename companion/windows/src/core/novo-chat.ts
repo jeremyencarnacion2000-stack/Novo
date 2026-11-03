@@ -3,12 +3,13 @@ export type NovoAccountState = 'demo'|'authorization_pending'|'verifying'|'conne
 export interface NovoAuthorization {
   version: 1; state: string; user: {id:string;displayName:string|null};
   device: {id:string;name:string;platform:string;connectedAt:string;lastVerifiedAt:string;revokedAt:string|null;scopes:string[]}|null;
-  capabilities: {deviceConnect:boolean;aiChat:boolean;twinRead:boolean;integrationsRead:boolean;activityRead:boolean;activityWrite:boolean;workContextRead:boolean;workContextWrite:boolean};
+  capabilities: {deviceConnect:boolean;aiChat:boolean;twinRead:boolean;integrationsRead:boolean;activityRead:boolean;activityWrite:boolean;workContextRead:boolean;workContextWrite:boolean;taskRead:boolean;taskWrite:boolean;desktopRead:boolean;desktopControl:boolean};
 }
 export interface NativeAccountStatus {state:NovoAccountState;authorization:NovoAuthorization|null;lastVerifiedAt:string|null;revocationPending:boolean}
 export interface NovoChatModel {id:string;label:string;allowsTwinMode:boolean}
 export interface ConversationSummary {id:string;title:string;updatedAt:string;revision:number}
 export interface AccountConversation extends ConversationSummary {messages:{id:string;role:'user'|'assistant'|'system';content:string;timestamp:string}[]}
+export interface NovoAssistantAction {id:string;requestId:string;type:'task.create';title:string;priority:'low'|'medium'|'high';status:'proposed'|'succeeded'|'rejected'|'expired';revision:number;expiresAt:string;approvedAt:string|null;completedAt:string|null;result:unknown|null}
 export interface ProjectHint {source:'folder'|'github'|'vercel';name:string;repository?:string;vercelProjectId?:string}
 export interface NovoLocalContext {text:string;folders:string[];matchedFiles:number;projectHints?:ProjectHint[];connections?:{github?:string;vercel?:string;codex?:string}}
 export interface CompanionChatRequest {requestId:string;conversationId:string|null;conversationRevision:number|null;message:string;model:string;twinMode:boolean;localContext?:string;projectHints?:ProjectHint[];localConnections?:NovoLocalContext['connections']}
@@ -46,6 +47,8 @@ export interface NovoChatApi {
   novoConversationGet(id:string):Promise<AccountConversation>;
   novoChatStart(input:CompanionChatRequest):Promise<void>;
   novoChatCancel(requestId:string):Promise<void>;
+  novoAssistantActions?():Promise<NovoAssistantAction[]>;
+  decideAssistantAction?(id:string,revision:number,decision:'confirm'|'deny'):Promise<NovoAssistantAction>;
   contextSearch?(query:string):Promise<NovoLocalContext>;
 }
 type Subscription = <T>(name:string,callback:(value:T)=>void)=>Promise<()=>void>;
@@ -53,10 +56,11 @@ export interface NovoChatState {
   account:NativeAccountStatus|null;models:NovoChatModel[];conversations:ConversationSummary[];
   conversation:AccountConversation|null;activeRequestId:string|null;liveText:string;pendingMessage:string;
   contextFilesUsed:number;
+  assistantActions:NovoAssistantAction[]; actionBusyId:string|null; actionError:string|null;
   phase:'idle'|'loading'|'thinking'|'streaming';error:NovoSafeError|null;
 }
 export class NovoChatController {
-  readonly state:NovoChatState={account:null,models:[],conversations:[],conversation:null,activeRequestId:null,liveText:'',pendingMessage:'',contextFilesUsed:0,phase:'idle',error:null};
+  readonly state:NovoChatState={account:null,models:[],conversations:[],conversation:null,activeRequestId:null,liveText:'',pendingMessage:'',contextFilesUsed:0,assistantActions:[],actionBusyId:null,actionError:null,phase:'idle',error:null};
   private api:NovoChatApi;private changed:()=>void;private generation=0;private selection=0;
   private disposed=false;private unlisten:(()=>void)[]=[];private cooldownUntil=0;
   private metadata:Extract<CompanionChatEvent,{type:'metadata'}>|null=null;
@@ -82,7 +86,7 @@ export class NovoChatController {
   private resetAccount(){
     if(this.accountRetry!==null){clearTimeout(this.accountRetry);this.accountRetry=null;}
     const request=this.state.activeRequestId;++this.generation;++this.selection;
-    Object.assign(this.state,{account:null,models:[],conversations:[],conversation:null,activeRequestId:null,liveText:'',pendingMessage:'',phase:'idle',error:null});
+    Object.assign(this.state,{account:null,models:[],conversations:[],conversation:null,activeRequestId:null,liveText:'',pendingMessage:'',assistantActions:[],actionBusyId:null,actionError:null,phase:'idle',error:null});
     this.metadata=null;this.terminal=null;this.streamError=null;this.cooldownUntil=0;
     if(request)void this.api.novoChatCancel(request).catch(()=>{});
     this.notify();
@@ -99,6 +103,7 @@ export class NovoChatController {
       if(account.state==='connected' && !account.revocationPending && account.authorization?.capabilities.aiChat){
         const [models,conversations]=await Promise.all([this.api.novoChatModels(),this.api.novoConversations()]);
         if(!this.isCurrent(generation))return;this.state.models=models;this.state.conversations=conversations;
+        await this.refreshAssistantActions(generation);
       } else {this.state.conversation=null;}
     } catch(error){if(this.isCurrent(generation)){
       this.state.error=safeNovoError(error);
@@ -134,6 +139,25 @@ export class NovoChatController {
     }
     this.notify();
   }
+  private async refreshAssistantActions(generation=this.generation){
+    if(!this.api.novoAssistantActions||this.state.account?.authorization?.capabilities.taskWrite!==true){this.state.assistantActions=[];return;}
+    try{
+      const current=await this.api.novoAssistantActions();if(!this.isCurrent(generation))return;
+      const finished=this.state.assistantActions.filter(action=>action.status!=='proposed').slice(-5);
+      const byId=new Map([...finished,...current].map(action=>[action.id,action]));
+      this.state.assistantActions=[...byId.values()];
+    }catch{/* Pending action recovery must not block chat. */}
+  }
+  async decideAssistantAction(id:string,revision:number,decision:'confirm'|'deny'){
+    if(!this.api.decideAssistantAction||this.state.actionBusyId)return;
+    const generation=this.generation;this.state.actionBusyId=id;this.state.actionError=null;this.notify();
+    try{
+      const action=await this.api.decideAssistantAction(id,revision,decision);if(!this.isCurrent(generation))return;
+      this.state.assistantActions=this.state.assistantActions.map(current=>current.id===id?action:current);
+      await this.refreshAssistantActions(generation);
+    }catch(error){if(this.isCurrent(generation))this.state.actionError=safeNovoError(error).message;}
+    finally{if(this.isCurrent(generation)){this.state.actionBusyId=null;this.notify();}}
+  }
   private streamResult(){return {metadata:this.metadata,terminal:this.terminal,error:this.streamError};}
   async send(message:string,model:string,twinMode:boolean):Promise<void> {
     await this.ready;
@@ -167,6 +191,7 @@ export class NovoChatController {
       if(!this.isCurrent(generation))return;
       this.state.conversation=saved;this.state.pendingMessage='';this.state.liveText='';
       const list=await this.api.novoConversations();if(this.isCurrent(generation))this.state.conversations=list;
+      await this.refreshAssistantActions(generation);
     } catch(error){
       if(!this.isCurrent(generation))return;this.state.error=safeNovoError(error);
       if(['expired','revoked','permission_required'].includes(this.state.error.code)){

@@ -35,6 +35,9 @@ webview2-com = "0.39"
 wv2_core = { package = "windows-core", version = "0.62" }
 windows = { version = "0.61", features = [
   "Win32_Foundation",
+  "Win32_Media_Speech",
+  "Win32_System_Com",
+  "Win32_System_RemoteDesktop",
   "Win32_Security",
   "Win32_Security_Authorization",
   # "Open terminal": the relay's process tree leads to the session's window.

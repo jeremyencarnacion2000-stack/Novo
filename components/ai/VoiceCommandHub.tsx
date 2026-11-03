@@ -7,9 +7,9 @@
  *
  * Features:
  *  • Hold-to-record button with real-time waveform animation
- *  • Whisper transcription → VoiceExecutor pipeline
+ *  • Whisper transcription → reviewed chat draft
  *  • Cognitive phase badge (phase-aware feedback)
- *  • Result message with action confirmation / deferral notice
+ *  • No transcript is sent or executed automatically
  *  • Transcript history (last 5 commands)
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -21,9 +21,7 @@ import {
   Mic,
   MicOff,
   Brain,
-  CheckCircle2,
   AlertCircle,
-  Clock,
   Zap,
   Activity,
   ChevronDown,
@@ -31,8 +29,6 @@ import {
 } from 'lucide-react'
 import { useCognitiveEngine } from '@/lib/cognitive-context'
 import { whisperAPI } from '@/lib/whisper'
-import { executeVoiceCommand, type VoiceExecutionResult } from '@/lib/voice-executor'
-import { eventBus } from '@/lib/events/event-bus'
 import { sileo } from '@/lib/sileo-bell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,7 +36,6 @@ import { sileo } from '@/lib/sileo-bell'
 interface TranscriptEntry {
   id: string
   text: string
-  result: VoiceExecutionResult
   timestamp: Date
 }
 
@@ -116,57 +111,6 @@ function WaveformBars({ isActive }: { isActive: boolean }) {
   )
 }
 
-// ─── Result Card ──────────────────────────────────────────────────────────────
-
-function ResultCard({ result, text }: { result: VoiceExecutionResult; text: string }) {
-  const isDeferred = result.deferred
-  const isSuccess = result.success && !isDeferred
-  const isError = !result.success
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={`
-        relative rounded-2xl border p-4 backdrop-blur-xl overflow-hidden
-        ${isDeferred
-          ? 'bg-amber-950/40 border-amber-500/30'
-          : isError
-          ? 'bg-red-950/40 border-red-500/30'
-          : 'bg-emerald-950/40 border-emerald-500/30'}
-      `}
-    >
-      {/* Transcript */}
-      <p className="text-xs text-foreground/40 mb-2 font-mono tracking-wide">
-        "{text}"
-      </p>
-
-      {/* Status row */}
-      <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 shrink-0">
-          {isDeferred ? (
-            <Clock className="h-4 w-4 text-amber-400" />
-          ) : isError ? (
-            <AlertCircle className="h-4 w-4 text-red-400" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          )}
-        </div>
-        <p className="text-sm text-foreground/85 leading-relaxed">{result.message}</p>
-      </div>
-
-      {/* Deferral notice */}
-      {isDeferred && result.deferredReason && (
-        <p className="mt-2 text-xs text-amber-400/70 pl-6.5 leading-relaxed">
-          {result.deferredReason}
-        </p>
-      )}
-    </motion.div>
-  )
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface VoiceCommandHubProps {
@@ -191,17 +135,23 @@ function emitVoiceStream(stream: MediaStream | null) {
   window.dispatchEvent(new CustomEvent('novo:voice-stream-change', { detail: { stream } }))
 }
 
+function cloudVoiceConsentKey(accountId: string) { return `novo:cloud-voice-consent:${accountId}` }
+function readCloudVoiceConsent(accountId: string | undefined) {
+  if (!accountId || typeof window === 'undefined') return false
+  try { return window.localStorage.getItem(cloudVoiceConsentKey(accountId)) === 'yes' } catch { return false }
+}
+
 export function VoiceCommandHub({ compact = false, className = '', headless = false }: VoiceCommandHubProps) {
   const { bioState } = useCognitiveEngine()
   const { data: session } = useSession()
   const accountId = session?.user?.id
+  const [cloudVoiceConsent, setCloudVoiceConsent] = useState(() => readCloudVoiceConsent(accountId))
   const accountRef = useRef(accountId)
   accountRef.current = accountId
 
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastResult, setLastResult] = useState<VoiceExecutionResult | null>(null)
   const [lastTranscript, setLastTranscript] = useState('')
   const [history, setHistory] = useState<TranscriptEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -247,9 +197,9 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
   }, [cancelRecording])
 
   useEffect(() => {
+    setCloudVoiceConsent(readCloudVoiceConsent(accountId))
     cancelRecording()
     setLastTranscript('')
-    setLastResult(null)
     setHistory([])
     setError(null)
   }, [accountId, cancelRecording])
@@ -262,13 +212,17 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
 
   const startRecording = useCallback(async () => {
     if (!accountRef.current || requestingRef.current || mediaRecorderRef.current || processing) return
+    if (!cloudVoiceConsent) {
+      sileo.warning({title:'Autoriza el dictado',description:'El audio se enviará a OpenAI para transcribirlo. Activa esa opción en el panel de voz antes de grabar.',duration:6000})
+      window.dispatchEvent(new Event('open-voice-command-hub'))
+      return
+    }
     const account = accountRef.current
     requestingRef.current = true
     const generation = ++generationRef.current
     const current = () => mountedRef.current && generationRef.current === generation && accountRef.current === account
     try {
       setError(null)
-      setLastResult(null)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       if (!current()) { stream.getTracks().forEach(track => track.stop()); return }
       requestingRef.current = false
@@ -302,8 +256,6 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         try {
           const text = await whisperAPI.transcribeAudio(blob)
           if (!current()) return
-          setLastTranscript(text)
-
           if (!text.trim()) {
             setError('No speech detected. Try again.')
             setProcessing(false)
@@ -311,64 +263,10 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
             return
           }
 
-          // Chat dictation uses the same reviewed tool path as typed messages.
-          if (headless) {
-            window.dispatchEvent(new CustomEvent('novo:voice-transcript', { detail: { text } }))
-            return
-          }
-
-          if (!bioState) {
-            setError('The cognitive engine is still starting. Try again in a moment.')
-            setProcessing(false)
-            emitVoiceState('idle')
-            return
-          }
-
-          const result = await executeVoiceCommand(text, bioState)
-          if (!current()) return
-          setLastResult(result)
-
-          setHistory(prev => [
-            { id: Date.now().toString(), text, result, timestamp: new Date() },
-            ...prev.slice(0, 4),
-          ])
-
-          // Trigger Sileo physics-based spring notification toast
-          if (result.success) {
-            if (result.deferred) {
-              sileo.warning({
-                title: 'Comando Diferido',
-                description: result.message,
-                duration: 5000,
-              })
-            } else {
-              sileo.success({
-                title: 'Comando Ejecutado',
-                description: result.message,
-                duration: 5000,
-              })
-            }
-          } else {
-            sileo.error({
-              title: 'Error de Comando',
-              description: result.message || 'Error al procesar el comando de voz.',
-              duration: 5000,
-            })
-          }
-
-          // Dispatch to Central Cognitive Event Bus (behavioral telemetry)
-          eventBus.dispatch('VoiceCommandExecuted', {
-            text,
-            action: result.action,
-            success: result.success,
-            deferred: result.deferred ?? false,
-            phase: bioState?.phase,
-          }, { path: typeof window !== 'undefined' ? window.location.pathname : undefined })
-
-          // Dispatch legacy window event so other modules can react
-          window.dispatchEvent(new CustomEvent('voice-command-executed', {
-            detail: { text, result, phase: bioState?.phase }
-          }))
+          setLastTranscript(text)
+          // The chat owns the draft; dictation never sends or executes it.
+          window.dispatchEvent(new CustomEvent('novo:voice-transcript', { detail: { text } }))
+          setHistory(prev => [{ id: Date.now().toString(), text, timestamp: new Date() }, ...prev.slice(0, 4)])
         } catch (err: any) {
           if (current()) setError('No pudimos procesar el audio. Revisa el micrófono e inténtalo de nuevo.')
         } finally {
@@ -389,7 +287,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
       setError('No se pudo abrir el micrófono. Revisa el permiso e inténtalo de nuevo.')
       emitVoiceState('idle')
     }
-  }, [bioState, headless, processing])
+  }, [cloudVoiceConsent, processing])
 
   const stopRecording = useCallback(() => {
     // Releasing before a permission prompt resolves must never start a
@@ -456,7 +354,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  if (headless || !bioState) return null
+  if (headless) return null
 
   if (compact) {
     return (
@@ -464,6 +362,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         {...holdControls}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.94 }}
+        disabled={processing || !cloudVoiceConsent}
         className={`
           relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white
           bg-gradient-to-r ${phaseConfig.gradient} ${phaseConfig.glow}
@@ -487,8 +386,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         `}>
           <PhaseIcon className="h-3 w-3" />
           {phaseConfig.label}
-          <span className="opacity-60">·</span>
-          <span className="tabular-nums">{bioState.attentionScore}% attn</span>
+          {bioState && <><span className="opacity-60">·</span><span className="tabular-nums">{bioState.attentionScore}% attn</span></>}
         </div>
 
         {history.length > 0 && (
@@ -516,7 +414,7 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
           }
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.96 }}
-          disabled={processing}
+          disabled={processing || !cloudVoiceConsent}
           className={`
             relative w-20 h-20 rounded-full flex items-center justify-center
             bg-gradient-to-br ${phaseConfig.gradient}
@@ -554,18 +452,32 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
         {/* Waveform */}
         <WaveformBars isActive={recording} />
 
+        <label className="flex max-w-sm items-start gap-2 text-xs text-foreground/55">
+          <input type="checkbox" checked={cloudVoiceConsent} disabled={recording || processing} onChange={(event) => {
+            const enabled=event.currentTarget.checked
+            try {
+              if(!accountId)throw new Error('account_required')
+              if(enabled)window.localStorage.setItem(cloudVoiceConsentKey(accountId), 'yes')
+              else window.localStorage.removeItem(cloudVoiceConsentKey(accountId))
+              setCloudVoiceConsent(enabled)
+              if(!enabled)cancelRecording()
+            } catch { setError('No se pudo guardar la opción de privacidad en este dispositivo.') }
+          }} />
+          <span>Entiendo y autorizo enviar el audio a OpenAI para transcribirlo. Novo recibe el texto; el audio no se guarda aquí.</span>
+        </label>
+
         {/* Status text */}
         <p className="text-xs text-foreground/50 tracking-wide">
           {processing
             ? 'Thinking...'
             : recording
             ? 'Listening — release to process'
-            : 'Hold to speak  ·  or press Space'}
+            : cloudVoiceConsent ? 'Hold to dictate  ·  or press Space' : 'Autoriza la transcripción para usar el micrófono'}
         </p>
       </div>
 
       {/* Cognitive hint for fatigue */}
-      {(phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE') && (
+      {bioState && (phase === 'SYNAPTIC_FATIGUE' || phase === 'REDUCED_CAPACITY_MODE') && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 py-3">
           <p className="text-xs text-amber-300/80 leading-relaxed">
             <span className="font-semibold">Recovery Mode</span> — Deep work tasks will be
@@ -589,8 +501,12 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
           </motion.div>
         )}
 
-        {lastResult && !error && (
-          <ResultCard key={lastResult.action + lastTranscript} result={lastResult} text={lastTranscript} />
+        {lastTranscript && !error && (
+          <motion.div key={lastTranscript} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} className="rounded-xl border border-foreground/10 bg-foreground/5 px-4 py-3">
+            <p className="text-xs text-foreground/50 mb-1">Transcripción añadida al chat</p>
+            <p className="text-sm text-foreground/80">{lastTranscript}</p>
+            <p className="text-xs text-foreground/45 mt-2">Revísala y pulsa enviar cuando esté lista.</p>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -603,14 +519,14 @@ export function VoiceCommandHub({ compact = false, className = '', headless = fa
             exit={{ opacity: 0, height: 0 }}
             className="flex flex-col gap-2 overflow-hidden"
           >
-            <p className="text-xs text-foreground/30 uppercase tracking-widest">Recent commands</p>
+            <p className="text-xs text-foreground/30 uppercase tracking-widest">Dictado reciente</p>
             {history.map(entry => (
               <div
                 key={entry.id}
                 className="rounded-xl border border-foreground/8 bg-foreground/4 px-3 py-2.5"
               >
                 <p className="text-xs text-foreground/50 font-mono mb-1">"{entry.text}"</p>
-                <p className="text-xs text-foreground/65">{entry.result.message}</p>
+                <p className="text-xs text-foreground/65">Añadido al chat para revisar antes de enviarlo.</p>
                 <p className="text-[10px] text-foreground/25 mt-1">
                   {entry.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </p>

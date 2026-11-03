@@ -1,4 +1,4 @@
-import { Bridge, onEvent, type NovoContextFolder } from '../core/bridge';
+import { Bridge, onEvent, type DesktopAppChoice, type NovoContextFolder } from '../core/bridge';
 import { accountLabel } from '../core/novo-chat';
 import { runtimeLabel } from '../core/project-work';
 import type { Settings } from '../core/state';
@@ -16,7 +16,13 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   source.value=settings.chatProvider==='codex'?'codex':'novo';
   const twin=h('input',{type:'checkbox',checked:settings.novoTwinMode,'aria-label':t('Personalizar con mi Twin')});
   const connections=h('input',{type:'checkbox',checked:settings.novoLocalConnections,'aria-label':t('Consultar conexiones locales')});
+  const voiceConsent=h('input',{type:'checkbox',checked:settings.voiceCloudConsent,'aria-label':t('Allow'),'aria-description':t('The speech service may process audio outside Novo. Novo receives only the text you send.')});
+  const spokenReplies=h('input',{type:'checkbox',checked:settings.voiceSpokenReplies,'aria-label':t("Read replies aloud")});
+  const localVoice=h('select',{'aria-label':t("Windows voice")},h('option',{value:'',text:t("Spanish (automatic)")}));
+  const localVoiceStatus=h('p',{class:'hint',role:'status',text:t("Audio is generated on this PC.")});
   const folderList=h('div',{class:'novo-settings-folders'});
+  const desktopApps=h('div',{class:'novo-desktop-apps'});
+  const desktopStatus=h('p',{class:'hint',role:'status'});
   const folderStatus=h('p',{class:'hint',role:'status'});
   let folders:NovoContextFolder[]=[];
   const normalize=(items:unknown):NovoContextFolder[]=>Array.isArray(items)?items:[];
@@ -29,6 +35,17 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
       folderList.append(h('div',{class:'row'},h('span',{text:folder.name}),h('span',{class:'spacer'}),remove));
     }
     folderStatus.textContent=folders.length?`${folders.length} ${t('carpetas elegidas')}`:t('Todavía no elegiste carpetas.');
+  }
+  function drawDesktopApps(items:DesktopAppChoice[]){
+    clear(desktopApps);
+    for(const app of items){
+      const input=h('input',{type:'checkbox',checked:app.allowed,disabled:!app.available,'aria-label':`${t('Permitir a Novo controlar')} ${app.name}`});
+      input.addEventListener('change',()=>{input.disabled=true;void Bridge.desktopAppAllowedSet(app.id,input.checked).then(allowed=>{
+        settings.desktopAllowedApps=allowed;drawDesktopApps(items.map(item=>item.id===app.id?{...item,allowed:allowed.includes(item.id)}:item));
+      }).catch(()=>{input.checked=app.allowed;input.disabled=!app.available;desktopStatus.textContent=t('No se pudo guardar el permiso local.');});});
+      desktopApps.append(h('label',{class:'row'},input,h('span',{text:app.name}),h('span',{class:'spacer'}),h('span',{class:'hint',text:app.available?'':t('No instalada')})));
+    }
+    if(items.length===0)desktopApps.append(h('p',{class:'hint',text:t('No se pudo consultar la lista local de apps.')}));
   }
   async function verify(){
     const attempt=++generation;
@@ -53,21 +70,46 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   model.addEventListener('change',()=>{settings.novoChatModel=model.value;void save().catch(failure);});
   twin.addEventListener('change',()=>{settings.novoTwinMode=twin.checked;void save().catch(failure);});
   connections.addEventListener('change',()=>{settings.novoLocalConnections=connections.checked;void save().catch(failure);});
+  voiceConsent.addEventListener('change',()=>{
+    const next=voiceConsent.checked;settings.voiceCloudConsent=next;
+    void save().catch(()=>{settings.voiceCloudConsent=!next;voiceConsent.checked=!next;failure();});
+  });
+  spokenReplies.addEventListener('change',()=>{
+    const previous=settings.voiceSpokenReplies;settings.voiceSpokenReplies=spokenReplies.checked;
+    void save().catch(()=>{settings.voiceSpokenReplies=previous;spokenReplies.checked=previous;failure();});
+  });
+  localVoice.addEventListener('change',()=>{
+    const previous=settings.voiceLocalVoiceId;settings.voiceLocalVoiceId=localVoice.value;
+    void save().catch(()=>{settings.voiceLocalVoiceId=previous;localVoice.value=previous;failure();});
+  });
   const pick=h('button',{type:'button',text:t('Elegir carpetas')});
   pick.addEventListener('click',()=>{pick.disabled=true;void Bridge.contextFoldersPick().then(items=>{folders=normalize(items);drawFolders();}).catch(failure).finally(()=>{pick.disabled=false;});});
   const accountOptions=h('div',{},permission,h('button',{type:'button',class:'novo-account-shortcut',text:t('Gestionar cuenta y permisos'),onclick:()=>void Bridge.openSettingsWindow('account')}),
     h('div',{class:'row'},h('label',{text:t('Modelo de Novo')}),model),
     h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})));
   const section=h('section',{class:'novo-chat-preferences'},h('h2',{text:t('Tu asistente Novo')}),
+    h('h2',{text:t('Voz y privacidad')}),
+    h('label',{class:'row'},spokenReplies,h('span',{text:t("Read replies aloud")})),
+    h('div',{class:'row'},h('label',{text:t("Windows voice")}),localVoice),localVoiceStatus,
+    h('label',{class:'row'},voiceConsent,h('span',{text:t('Allow')})),
+    h('p',{class:'hint',text:t('The speech service may process audio outside Novo. Novo receives only the text you send.')}),
     h('div',{class:'row'},h('label',{text:t("Response source")}),source),status,accountOptions,
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),
     h('button',{type:'button',text:t('Seguimiento y memoria de proyectos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/settings?tab=twin`);else failure();});}}),
     h('h2',{text:t('Trabajos delegados')}),h('p',{class:'hint',text:t('Activa reglas por proyecto en Seguimiento y memoria. Cada regla elige un PC y una carpeta. Seguir un proyecto no autoriza ejecutar cambios.')}),runtimes,
     h('button',{type:'button',text:t('Ver estado de los trabajos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/activity`);else failure();}).catch(failure);}}),
+    h('h2',{text:t('Control de apps de este PC')}),h('p',{class:'hint',text:t('Elige las apps que Novo podrá abrir y manejar al pedirlo. Las rutas y títulos de ventanas permanecen en este dispositivo. Debes volver a conectar el Companion para otorgar estos permisos.')}),desktopApps,desktopStatus,
     h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo reconoce repositorios y proyectos de Vercel y sincroniza sus nombres y estado. Las rutas y claves se quedan en este PC. Puedes quitar el acceso en cualquier momento.')}),
     folderList,h('div',{class:'row'},pick,folderStatus));
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});
+  void Bridge.voiceChoices().then(items=>{
+    if(disposed)return;const voices=Array.isArray(items)?items:[];
+    for(const voice of voices)localVoice.append(h('option',{value:voice.id,text:voice.name}));
+    localVoice.value=settings.voiceLocalVoiceId??'';
+    if(!voices.some(voice=>voice.spanish)&&!settings.voiceLocalVoiceId)localVoiceStatus.textContent=t("No local Spanish voice. Install one in Windows Settings → Time & language → Speech.");
+  }).catch(()=>{if(disposed)return;localVoice.disabled=true;localVoiceStatus.textContent=t("Local speech is unavailable. Check your Windows voice settings.");});
+  void Bridge.desktopAppCatalog().then(items=>{if(!disposed)drawDesktopApps(items);}).catch(()=>{if(!disposed)desktopStatus.textContent=t('No se pudo consultar la lista local de apps.');});
   void Bridge.projectWorkRuntimes().then(items=>{if(disposed)return;clear(runtimes);for(const item of items)runtimes.append(h('p',{text:runtimeLabel(item)}));}).catch(()=>{if(!disposed)runtimes.textContent=t('No se pudieron verificar las capacidades de este PC.');});
   void onEvent('novo-account-changed',()=>void verify()).then(stop=>{if(disposed)stop();else unsubscribe=stop;});
   return {el:section,dispose:()=>{disposed=true;++generation;unsubscribe?.();}};

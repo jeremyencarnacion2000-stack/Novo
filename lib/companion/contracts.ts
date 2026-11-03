@@ -4,15 +4,21 @@ import {projectHintSchema,localConnectionsSchema} from '@/lib/ai/project-links'
 export const companionCapabilitiesSchema = z.object({
   deviceConnect:z.boolean(), aiChat:z.boolean(), twinRead:z.boolean(),
   integrationsRead:z.boolean(), activityRead:z.boolean(), activityWrite:z.boolean(),
-  workContextRead:z.boolean(), workContextWrite:z.boolean(),
+  workContextRead:z.boolean(), workContextWrite:z.boolean(), taskRead:z.boolean(), taskWrite:z.boolean(),
+  desktopRead:z.boolean(), desktopControl:z.boolean(),
 }).strict()
 export type CompanionCapabilities = z.infer<typeof companionCapabilitiesSchema>
+
+export const legacyCompanionCapabilitiesSchema=z.object({deviceConnect:z.boolean(),aiChat:z.boolean(),twinRead:z.boolean(),
+  integrationsRead:z.boolean(),activityRead:z.boolean(),activityWrite:z.boolean(),workContextRead:z.boolean(),workContextWrite:z.boolean()}).strict()
 
 export function companionCapabilities(scopes: ReadonlySet<string>): CompanionCapabilities {
   return {deviceConnect:scopes.has('device:connect'), aiChat:scopes.has('ai:chat'),
     twinRead:scopes.has('twin:read'), integrationsRead:scopes.has('integrations:read'),
     activityRead:scopes.has('device:activity:read'), activityWrite:scopes.has('device:activity:write'),
-    workContextRead:scopes.has('device:work-context:read'), workContextWrite:scopes.has('device:work-context:write')}
+    workContextRead:scopes.has('device:work-context:read'), workContextWrite:scopes.has('device:work-context:write'),
+    taskRead:scopes.has('tasks:read'), taskWrite:scopes.has('tasks:write'),
+    desktopRead:scopes.has('device:desktop:read'), desktopControl:scopes.has('device:desktop:control')}
 }
 
 export const companionDeviceViewSchema = z.object({
@@ -21,6 +27,10 @@ export const companionDeviceViewSchema = z.object({
   revokedAt:z.string().datetime().nullable(), scopes:z.array(z.string().max(120)),
 }).strict()
 export type CompanionDeviceView = z.infer<typeof companionDeviceViewSchema>
+
+export const legacyCompanionAuthorizationSchema=z.object({version:z.literal(1),state:z.enum(['connected','permission_required','revoked']),
+  user:z.object({id:z.string().min(1),displayName:z.string().nullable()}).strict(),device:companionDeviceViewSchema.nullable(),
+  capabilities:legacyCompanionCapabilitiesSchema}).strict()
 
 export const companionAuthorizationSchema = z.object({
   version:z.literal(1), state:z.enum(['connected', 'permission_required', 'revoked']),

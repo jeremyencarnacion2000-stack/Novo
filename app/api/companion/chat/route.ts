@@ -9,6 +9,9 @@ import {assertNovoChatModelAllowed} from '@/lib/ai/chat-catalog'
 import {streamNovoChat,parseNovoChatInput,normalizeHistory} from '@/lib/ai/chat-service'
 import {releaseUserChatLease} from '@/lib/ai/chat-lease'
 import {emailProposalSchema,type EmailProposal} from '@/lib/gmail-message'
+import {prisma} from '@/lib/prisma'
+import {matchAssistantCommand} from '@/lib/assistant/command-catalog'
+import {prepareAssistantAction} from '@/lib/companion/assistant-actions'
 
 export const maxDuration=180
 const encoder=new TextEncoder()
@@ -36,6 +39,33 @@ export async function POST(request:Request):Promise<Response> {
     if(claim.kind==='replay')return replay(claim.events)
     claimed={userId:actor.userId,requestId:input.requestId}
     const conversation=await getCompanionConversation(actor.userId,claim.conversationId)
+    const command=matchAssistantCommand(input.message)
+    if(command){
+      let text:string
+      if(command.type==='task.create'){
+        await prepareAssistantAction(actor,deviceId!,input.requestId,{type:'task.create',title:command.title})
+        text=`Te propongo crear la tarea «${command.title}». Revísala y pulsa «Aprobar» aquí en el Companion para guardarla.`
+      }else if(command.type==='task.list'){
+        if(!actor.scopes.has('tasks:read'))throw new CompanionError(403,'permission_required')
+        const tasks=await prisma.task.findMany({where:{userId:actor.userId,status:{in:['todo','in-progress']}},
+          orderBy:[{priority:'desc'},{updatedAt:'desc'}],take:5,select:{title:true,status:true,priority:true,dueDate:true}})
+        text=tasks.length?`Entre tus tareas pendientes: ${tasks.map(task=>task.title).join('; ')}.`:'No tienes tareas pendientes.'
+      }else{
+        if(!actor.scopes.has('twin:read'))throw new CompanionError(403,'twin_permission_required')
+        const snapshot=await prisma.userCognitiveSnapshot.findUnique({where:{userId:actor.userId},select:{focusTimeToday:true,productivityScore:true,fatigueEstimate:true,overdueTasks:true,updatedAt:true}})
+        text=snapshot?`Último estado guardado (${snapshot.updatedAt.toLocaleString('es-BO')}): fatiga registrada ${snapshot.fatigueEstimate}; puntuación de productividad ${snapshot.productivityScore}; ${snapshot.focusTimeToday} minutos de foco registrados y ${snapshot.overdueTasks} tareas vencidas.`:'Aún no hay una lectura cognitiva guardada para mostrar.'
+      }
+      const current=await requireCompanionOAuth(request,['device:connect','ai:chat'])
+      if(current.userId!==actor.userId||current.grantId!==actor.grantId||current.clientId!==actor.clientId)throw new CompanionError(401,'unauthorized')
+      await requireActiveCompanionDevice(current,deviceId)
+      const complete=await finishCompanionTurn(actor.userId,input.requestId,{text,modelId:'novo-command-catalog-v1'})
+      await releaseUserChatLease(actor.userId,input.requestId)
+      claimed=null
+      return replay([
+        {type:'metadata',requestId:input.requestId,conversationId:claim.conversationId,revision:claim.revision,userMessageId:claim.userMessageId},
+        {type:'delta',requestId:input.requestId,text},complete,
+      ])
+    }
     const history=normalizeHistory(conversation.messages.filter(m=>m.id!==claim.userMessageId))
     const serviceInput=parseNovoChatInput({message:input.message,model:input.model,twinMode:input.twinMode,history,localContext:input.localContext,projectHints:input.projectHints,localConnections:input.localConnections})!
     const abort=new AbortController()

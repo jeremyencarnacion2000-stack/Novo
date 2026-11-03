@@ -16,6 +16,8 @@ mod workspace_catalog;
 mod project_work;
 mod query_context;
 mod desktop;
+mod desktop_apps;
+mod voice;
 mod files;
 mod github;
 mod hooks;
@@ -706,7 +708,11 @@ pub fn run() {
         .manage(chat::CodexChat::default())
         .manage(shortcuts::Registry::default())
         .manage(recap::load())
+        .manage(desktop_apps::WindowRegistry::default())
         .invoke_handler(tauri::generate_handler![
+            voice::voice_choices,
+            voice::voice_speak,
+            voice::voice_stop,
             companion::companion_status,
             novo_account::novo_account_status,
             novo_chat::novo_chat_models,
@@ -714,6 +720,8 @@ pub fn run() {
             novo_chat::novo_conversation_get,
             novo_chat::novo_chat_start,
             novo_chat::novo_chat_cancel,
+            novo_chat::novo_assistant_actions,
+            novo_chat::novo_assistant_action_decide,
             companion::companion_capture_set,
             companion::companion_pause_set,
             companion::companion_exclusions_set,
@@ -804,6 +812,11 @@ pub fn run() {
             desktop::desktop_mochi_fly_out,
             desktop::desktop_mochi_fly_home,
             desktop::desktop_mochi_set_asleep,
+            desktop_apps::desktop_app_catalog,
+            desktop_apps::desktop_app_allowed_set,
+            desktop_apps::desktop_app_open,
+            desktop_apps::desktop_app_windows,
+            desktop_apps::desktop_window_action,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

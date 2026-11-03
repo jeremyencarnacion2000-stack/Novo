@@ -22,8 +22,10 @@ export function CognitiveNavigationUtilities() {
   }, [activeOverlay])
   useEffect(() => {
     const toggleVoice = () => activeOverlay === 'voice' ? closeOverlay() : openOverlay('voice')
+    const openVoice = () => openOverlay('voice')
     window.addEventListener('toggle-voice-command-hub', toggleVoice)
-    return () => window.removeEventListener('toggle-voice-command-hub', toggleVoice)
+    window.addEventListener('open-voice-command-hub', openVoice)
+    return () => { window.removeEventListener('toggle-voice-command-hub', toggleVoice); window.removeEventListener('open-voice-command-hub', openVoice) }
   }, [activeOverlay, closeOverlay, openOverlay])
   return <>
     <CommandPaletteOnDemand />
@@ -31,7 +33,7 @@ export function CognitiveNavigationUtilities() {
     <Dialog open={activeOverlay === 'voice'} onOpenChange={(open) => { if (!open) closeOverlay() }} onExitComplete={restoreMobileNavigationFocus}>
       <DialogContent motionPreset="anchored" mobilePresentation="sheet" className="max-w-sm border-foreground/10 bg-background/95 p-5 backdrop-blur-xl">
         <DialogTitle>Habla con Novo</DialogTitle>
-        <DialogDescription>Graba un comando y revisa el resultado aquí.</DialogDescription>
+        <DialogDescription>Dicta una pregunta o instrucción. El audio se envía a OpenAI para transcribirlo; Novo añade el texto al chat y espera a que lo revises y envíes.</DialogDescription>
         <VoiceCommandHub />
       </DialogContent>
     </Dialog>

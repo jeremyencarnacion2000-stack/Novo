@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeDom } from './fakedom.mjs';
-import { calls, internals, sent } from './tauri.mjs';
+import { calls, emit, internals, sent } from './tauri.mjs';
 
 installFakeDom();
 const { buildPrompt } = await import('../src/views/chat.ts');
@@ -110,6 +110,7 @@ test('Codex dictation fills the draft and never submits automatically', async ()
     abort() { this.onend?.(); }
   };
   try {
+    State.settings.voiceCloudConsent = true;
     view = buildPrompt(() => {});
     await flush();
     const input = view.el.querySelector('.chat-input');
@@ -119,8 +120,29 @@ test('Codex dictation fills the draft and never submits automatically', async ()
     assert.equal(input.value, 'Ayúdame con Novo');
     assert.equal(sent('codex_chat_send').length, 0);
     assert.equal(recognition.lang, 'es-BO');
+    emit('settings-changed', { voiceCloudConsent: false });
+    assert.equal(view.el.querySelector('.novo-chat-body').classList.contains('voice-listening'), false);
   } finally {
     if (previous) globalThis.SpeechRecognition = previous;
     else delete globalThis.SpeechRecognition;
+  }
+});
+
+test('Assistant settings keeps cloud speech consent off until opted in', async () => {
+  const settings = { ...DEFAULT_SETTINGS };
+  let saves = 0;
+  view = novoChatSection(settings, async () => { saves++; });
+  try {
+    const consent = view.el.find('INPUT').find(element => element.getAttribute('aria-description')?.includes('speech service may process audio'));
+    assert.ok(consent);
+    assert.equal(Boolean(consent.checked), false);
+    consent.checked = true;
+    consent.fire('change');
+    await flush();
+    assert.equal(settings.voiceCloudConsent, true);
+    assert.equal(saves, 1);
+  } finally {
+    view.dispose();
+    view = null;
   }
 });

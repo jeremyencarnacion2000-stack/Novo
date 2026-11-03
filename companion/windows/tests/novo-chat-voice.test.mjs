@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installFakeDom } from "./fakedom.mjs";
-import { calls, internals } from "./tauri.mjs";
+import { calls, emit, internals } from "./tauri.mjs";
 
 installFakeDom();
 const { buildPrompt } = await import("../src/views/chat.ts");
@@ -32,7 +32,9 @@ class FakeRecognition {
 test("Novo chat dictation fills the active draft and waits for the user to send", async () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "SpeechRecognition");
   globalThis.SpeechRecognition = FakeRecognition;
+  FakeRecognition.latest = undefined;
   calls.length = 0;
+  State.settings.voiceCloudConsent = true;
   const view = buildPrompt(() => {});
   const input = view.el.querySelector(".chat-input");
   const mic = view.el.querySelector(".novo-voice-button");
@@ -60,9 +62,50 @@ test("Novo chat dictation fills the active draft and waits for the user to send"
   }
 });
 
+test("voice dictation stays off until the user grants cloud speech consent", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "SpeechRecognition");
+  globalThis.SpeechRecognition = FakeRecognition;
+  FakeRecognition.latest = undefined;
+  calls.length = 0;
+  State.settings.voiceCloudConsent = false;
+  const view = buildPrompt(() => {});
+  try {
+    view.el.querySelector(".novo-voice-button").fire("click");
+    assert.equal(FakeRecognition.latest, undefined);
+    assert.match(view.el.querySelector(".novo-voice-status").textContent, /Voice dictation is off/);
+    assert.equal(calls.some(call => call.cmd === "novo_chat_start"), false);
+  } finally {
+    view.dispose();
+    if (descriptor) Object.defineProperty(globalThis, "SpeechRecognition", descriptor);
+    else delete globalThis.SpeechRecognition;
+  }
+});
+
+test("revoking speech consent stops an active Novo dictation", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "SpeechRecognition");
+  globalThis.SpeechRecognition = FakeRecognition;
+  State.settings.voiceCloudConsent = true;
+  const view = buildPrompt(() => {});
+  try {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    view.el.querySelector(".novo-voice-button").fire("click");
+    const recognition = FakeRecognition.latest;
+    assert.equal(State.stateOverride, "listening");
+    emit("settings-changed", { voiceCloudConsent: false });
+    assert.equal(recognition.stopped, 0);
+    assert.equal(State.stateOverride, null);
+    assert.equal(view.el.querySelector(".novo-chat-body").classList.contains("voice-listening"), false);
+  } finally {
+    view.dispose();
+    if (descriptor) Object.defineProperty(globalThis, "SpeechRecognition", descriptor);
+    else delete globalThis.SpeechRecognition;
+  }
+});
+
 test("unsupported speech recognition explains why dictation cannot start", () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "SpeechRecognition");
   delete globalThis.SpeechRecognition;
+  State.settings.voiceCloudConsent = true;
   const view = buildPrompt(() => {});
   try {
     view.el.querySelector(".novo-voice-button").fire("click");
