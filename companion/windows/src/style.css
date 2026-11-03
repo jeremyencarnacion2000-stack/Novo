@@ -987,6 +987,18 @@ input[type="range"]::-webkit-slider-thumb {
   padding-left: 32px;
 }
 
+.novo-action-list { display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; }
+.novo-action-list[hidden] { display:none; }
+.novo-action-card { padding:9px 11px; border:1px solid rgba(255,255,255,.12); border-radius:12px; background:rgba(255,255,255,.055); }
+.novo-action-title { color:var(--ink); font:500 12px var(--font); overflow-wrap:anywhere; }
+.novo-action-description,.novo-action-error { color:var(--dim-3); font:400 11px var(--font); margin-top:3px; }
+.novo-action-error { color:#fca5a5; }
+.novo-action-controls { display:flex; gap:6px; margin-top:8px; }
+.novo-action-controls button { border:0; border-radius:999px; padding:5px 10px; font:500 11px var(--font); cursor:pointer; }
+.novo-action-approve { background:rgba(16,185,129,.22); color:#9ae6c4; }
+.novo-action-deny { background:rgba(255,255,255,.09); color:var(--ink-2); }
+.novo-action-controls button:disabled { opacity:.55; cursor:wait; }
+
 .bubble {
   background: rgba(255, 255, 255, 0.13);
   border-radius: 12px;

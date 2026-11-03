@@ -27,7 +27,7 @@ const OAUTH_CLIENT_SCOPES_KEY: &str = "novo-oauth-client-scopes";
 const OAUTH_REVOCATIONS_KEY: &str = "novo-oauth-pending-revocations";
 const OAUTH_STAGED_KEY: &str = "novo-oauth-staged-authorization";
 const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
-const COMPANION_OAUTH_SCOPES: &str = "device:connect ai:chat twin:read projects:read device:activity:read device:activity:write device:work-context:read device:work-context:write integrations:read device:work:read device:work:execute";
+const COMPANION_OAUTH_SCOPES: &str = "device:connect ai:chat twin:read projects:read tasks:read tasks:write device:desktop:read device:desktop:control device:activity:read device:activity:write device:work-context:read device:work-context:write integrations:read device:work:read device:work:execute";
 const IDLE_AFTER_SECONDS: u64 = 300;
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -842,6 +842,7 @@ pub async fn companion_connect(shared: State<'_, Shared>, origin: String, token:
     // Check account identity and permissions before registering the device.
     let preflight=client.get(format!("{safe_origin}/api/companion/authorization"))
         .bearer_auth(&candidate).header("X-Novo-Authorization-Preflight","1")
+        .header("X-Novo-Capabilities-Version","2")
         .send().await.map_err(|_|"connection_unavailable".to_string())?;
     let authorization:crate::novo_account::CompanionAuthorization=crate::novo_account::read_json(preflight,65536).await.map_err(|error|error.code)?;
     authorization.validate_preflight().map_err(|error|error.code)?;
@@ -856,6 +857,7 @@ pub async fn companion_connect(shared: State<'_, Shared>, origin: String, token:
     // response alone, before reporting the account as connected locally.
     let verified=client.get(format!("{safe_origin}/api/companion/authorization"))
         .bearer_auth(&candidate).header("X-Novo-Device-Id",&device_id)
+        .header("X-Novo-Capabilities-Version","2")
         .send().await.map_err(|_|"connection_unavailable".to_string())?;
     let verified:crate::novo_account::CompanionAuthorization=crate::novo_account::read_json(verified,65536).await.map_err(|error|error.code)?;
     verified.validate(&device_id).map_err(|error|error.code)?;
@@ -1128,7 +1130,7 @@ pub async fn companion_authorization_poll(app:AppHandle,shared: State<'_, Shared
         // Verify candidate owner and capabilities BEFORE the registry switches
         // the grant. The final registry acknowledgment itself is authoritative;
         // no fallible second network call can discard an already-bound grant.
-        let preflight_response=client.get(format!("{}/api/companion/authorization",pending.api_origin)).bearer_auth(&credentials.access_token).header("X-Novo-Authorization-Preflight","1").send().await.map_err(|_|crate::novo_account::SafeError::new("offline"))?;
+        let preflight_response=client.get(format!("{}/api/companion/authorization",pending.api_origin)).bearer_auth(&credentials.access_token).header("X-Novo-Authorization-Preflight","1").header("X-Novo-Capabilities-Version","2").send().await.map_err(|_|crate::novo_account::SafeError::new("offline"))?;
         let mut authorization:crate::novo_account::CompanionAuthorization=crate::novo_account::read_json(preflight_response,65536).await?;
         if authorization.version!=1 || authorization.user.id.is_empty() || authorization.user.id.len()>200 || authorization.device.is_some() || !authorization.capabilities.device_connect || !authorization.capabilities.ai_chat {return Err(crate::novo_account::SafeError::new("permission_required"));}
         if shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).authorization_attempt!=pending.attempt {return Err(crate::novo_account::SafeError::new("cancelled"));}

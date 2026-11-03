@@ -3548,6 +3548,17 @@
    "pt-BR": "O serviço de voz pode processar o áudio fora do Novo. O Novo recebe apenas o texto que você enviar.",
    "ru": "Сервис распознавания может обрабатывать аудио вне Novo. Novo получает только отправленный вами текст.",
    "id": "Layanan suara dapat memproses audio di luar Novo. Novo hanya menerima teks yang Anda kirim."
+  },
+  "Voice dictation is off. Enable it in Novo Settings → Assistant to allow the speech service to process audio.": {
+   "zh-Hans": "语音听写已关闭。请在 Novo 设置 → 助手中启用，以允许语音服务处理音频。",
+   "hi": "वॉइस डिक्टेशन बंद है। वाक् सेवा को ऑडियो प्रोसेस करने की अनुमति देने के लिए Novo सेटिंग → Assistant में इसे चालू करें।",
+   "es": "El dictado está desactivado. Actívalo en Configuración de Novo → Asistente para permitir que el servicio de voz procese el audio.",
+   "ar": "الإملاء الصوتي متوقف. فعّله من إعدادات Novo ← المساعد للسماح لخدمة الصوت بمعالجة التسجيل.",
+   "fr": "La dictée vocale est désactivée. Activez-la dans Paramètres Novo → Assistant pour autoriser le service vocal à traiter l’audio.",
+   "bn": "ভয়েস ডিক্টেশন বন্ধ। ভয়েস পরিষেবাকে অডিও প্রক্রিয়া করার অনুমতি দিতে Novo সেটিংস → Assistant-এ এটি চালু করুন।",
+   "pt-BR": "O ditado por voz está desativado. Ative-o em Configurações do Novo → Assistente para permitir que o serviço processe o áudio.",
+   "ru": "Голосовая диктовка выключена. Включите её в настройках Novo → Ассистент, чтобы разрешить обработку аудио голосовому сервису.",
+   "id": "Dikte suara nonaktif. Aktifkan di Pengaturan Novo → Asisten agar layanan suara dapat memproses audio."
   }
  }
 }

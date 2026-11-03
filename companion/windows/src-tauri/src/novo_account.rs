@@ -123,6 +123,14 @@ pub struct Capabilities {
     pub work_context_read: bool,
     #[serde(default)]
     pub work_context_write: bool,
+    #[serde(default)]
+    pub task_read: bool,
+    #[serde(default)]
+    pub task_write: bool,
+    #[serde(default)]
+    pub desktop_read: bool,
+    #[serde(default)]
+    pub desktop_control: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -160,6 +168,10 @@ impl CompanionAuthorization {
             || self.state != "permission_required"
             || !self.capabilities.device_connect
             || !self.capabilities.ai_chat
+            || !self.capabilities.task_read
+            || !self.capabilities.task_write
+            || !self.capabilities.desktop_read
+            || !self.capabilities.desktop_control
         {
             return Err(SafeError::new("permission_required"));
         }
@@ -198,6 +210,10 @@ impl CompanionAuthorization {
         if self.state != "connected"
             || !self.capabilities.device_connect
             || !self.capabilities.ai_chat
+            || !self.capabilities.task_read
+            || !self.capabilities.task_write
+            || !self.capabilities.desktop_read
+            || !self.capabilities.desktop_control
         {
             return Err(SafeError::new("permission_required"));
         }
@@ -512,6 +528,7 @@ pub async fn verify_account(shared: &Shared) -> Result<CompanionAuthorization, S
         let authorization: CompanionAuthorization = access.send_json(client(15)?
             .get(format!("{}/api/companion/authorization", access.origin))
             .bearer_auth(&access.token)
+            .header("X-Novo-Capabilities-Version", "2")
             .header("X-Novo-Device-Id", &access.device_id), 65536).await?;
         authorization.validate(&access.device_id)?;
         Ok::<_, SafeError>(authorization)
@@ -601,6 +618,10 @@ mod tests {
         assert!(!capabilities.activity_read);
         assert!(!capabilities.work_context_read);
         assert!(!capabilities.work_context_write);
+        assert!(!capabilities.task_read);
+        assert!(!capabilities.task_write);
+        assert!(!capabilities.desktop_read);
+        assert!(!capabilities.desktop_control);
     }
 
     #[test]
@@ -619,6 +640,10 @@ mod tests {
                 activity_read: false,
                 work_context_read: false,
                 work_context_write: false,
+                task_read: true,
+                task_write: true,
+                desktop_read: true,
+                desktop_control: true,
             },
         };
         assert!(preflight.validate_preflight().is_ok());

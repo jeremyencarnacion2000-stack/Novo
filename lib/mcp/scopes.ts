@@ -5,6 +5,8 @@
 export const MCP_SCOPE_DESCRIPTIONS: Record<string, string> = {
   'device:connect':     'Vincular este dispositivo con Novo Companion',
   'ai:chat':            'Usar el chat de IA de Novo Companion',
+  'device:desktop:read': 'Consultar las aplicaciones y ventanas visibles en este PC desde Novo Companion',
+  'device:desktop:control': 'Abrir o cambiar de ventana entre aplicaciones elegidas en este PC',
   'device:activity:read': 'Leer los resúmenes de actividad compartidos desde el dispositivo',
   'tasks:read':         'Leer tus tareas',
   'projects:read':      'Leer tus proyectos de Novo y relacionarlos con repositorios y despliegues',

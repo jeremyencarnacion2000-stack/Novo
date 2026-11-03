@@ -62,6 +62,7 @@ model User {
   companionActivityDailySummaries CompanionActivityDailySummary[]
   companionWorkContext CompanionWorkContext?
   companionChatTurns CompanionChatTurn[]
+  assistantActionRequests AssistantActionRequest[]
   userChatLease UserChatLease?
   routines      Routine[]
   projects      Project[]
@@ -1740,6 +1741,7 @@ model CompanionDevice {
   workCapabilities String[] @default([])
   workLastSeenAt DateTime?
   chatTurns       CompanionChatTurn[]
+  assistantActions AssistantActionRequest[] @relation("AssistantActionDevice")
 
   @@unique([userId, deviceId])
   @@index([userId, revokedAt, connectedAt])
@@ -1794,6 +1796,35 @@ model CompanionChatTurn {
   @@index([userId, status])
   @@index([expiresAt])
   @@map("companion_chat_turns")
+}
+
+// A validated, short-lived proposal prepared by Novo and executed once only
+// after an explicit decision from its bound Companion device.
+model AssistantActionRequest {
+  id             String   @id @default(cuid())
+  requestId      String   @unique @db.Uuid
+  userId         String
+  deviceId       String   @db.Uuid
+  clientId       String
+  grantId        String
+  operation      Json
+  fingerprint    String
+  status         String   @default("proposed") // proposed|approved|rejected|succeeded|failed|expired
+  revision       Int      @default(1)
+  expiresAt      DateTime
+  approvedAt     DateTime?
+  completedAt    DateTime?
+  result         Json?
+  safeErrorCode  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device         CompanionDevice @relation("AssistantActionDevice", fields: [userId, deviceId], references: [userId, deviceId], onDelete: Cascade)
+
+  @@unique([userId, deviceId, clientId, requestId])
+  @@index([userId, deviceId, status, expiresAt])
+  @@index([expiresAt])
+  @@map("assistant_action_requests")
 }
 
 model UserChatLease {

@@ -116,6 +116,64 @@ async fn account_get<T: serde::de::DeserializeOwned>(
     }
     Ok(result)
 }
+async fn account_post<T: serde::de::DeserializeOwned>(
+    shared: &Shared,
+    path: &[&str],
+    body: &impl Serialize,
+    limit: usize,
+) -> Result<T, SafeError> {
+    verify_account(shared).await?;
+    let access=access_context(shared).await?;
+    let mut url=reqwest::Url::parse(&access.origin).map_err(|_|SafeError::new("unavailable"))?;
+    {let mut segments=url.path_segments_mut().map_err(|_|SafeError::new("unavailable"))?;for part in path{segments.push(part);}}
+    let result=access.send_json(client(15)?.post(url).bearer_auth(&access.token)
+        .header("X-Novo-Device-Id",&access.device_id).json(body),limit).await?;
+    if shared.novo_account.lock().unwrap_or_else(std::sync::PoisonError::into_inner).epoch!=access.epoch{return Err(SafeError::new("cancelled"));}
+    Ok(result)
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct AssistantAction {
+    pub id:String,pub request_id:String,pub r#type:String,pub title:String,pub priority:String,pub status:String,
+    pub revision:u64,pub expires_at:chrono::DateTime<chrono::Utc>,pub approved_at:Option<chrono::DateTime<chrono::Utc>>,
+    pub completed_at:Option<chrono::DateTime<chrono::Utc>>,pub result:Option<serde_json::Value>,
+}
+impl AssistantAction {
+    fn validate(&self)->Result<(),SafeError>{
+        if self.id.is_empty()||self.id.len()>32||!self.id.bytes().all(|b|b.is_ascii_alphanumeric())
+            ||uuid::Uuid::parse_str(&self.request_id).is_err()||self.r#type!="task.create"
+            ||self.title.trim().is_empty()||self.title.chars().count()>180
+            ||!["low","medium","high"].contains(&self.priority.as_str())
+            ||!["proposed","succeeded","rejected","expired"].contains(&self.status.as_str())||self.revision==0
+        {return Err(SafeError::new("unavailable"))} Ok(())
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AssistantActions {actions:Vec<AssistantAction>}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AssistantActionResponse {action:AssistantAction}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct AssistantActionDecision {revision:u64,decision:String}
+
+#[tauri::command]
+pub async fn novo_assistant_actions(shared:State<'_,Shared>)->Result<Vec<AssistantAction>,SafeError>{
+    let result:AssistantActions=account_get(&shared,&["api","companion","assistant","actions"],64*1024).await?;
+    if result.actions.len()>20{return Err(SafeError::new("unavailable"))}
+    for action in &result.actions{action.validate()?;if action.status!="proposed"{return Err(SafeError::new("unavailable"))}}
+    Ok(result.actions)
+}
+#[tauri::command]
+pub async fn novo_assistant_action_decide(shared:State<'_,Shared>,id:String,revision:u64,decision:String)->Result<AssistantAction,SafeError>{
+    if id.is_empty()||id.len()>32||!id.bytes().all(|b|b.is_ascii_alphanumeric())||revision==0||!["confirm","deny"].contains(&decision.as_str())
+    {return Err(SafeError::new("invalid_request"))}
+    let path=["api","companion","assistant","actions",id.as_str()];
+    let result:AssistantActionResponse=account_post(&shared,&path,&AssistantActionDecision{revision,decision},16*1024).await?;
+    result.action.validate()?;Ok(result.action)
+}
 #[tauri::command]
 pub async fn novo_chat_models(shared: State<'_, Shared>) -> Result<Vec<NovoChatModel>, SafeError> {
     let result: Models = account_get(&shared, &["api", "companion", "models"], 65536).await?;

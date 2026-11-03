@@ -44,6 +44,10 @@ pub struct Settings {
     pub novo_chat_model: String,
     pub novo_twin_mode: bool,
     pub novo_local_connections: bool,
+    /// Apps that Novo may open or control through the local desktop commands.
+    pub desktop_allowed_apps: Vec<String>,
+    /// Explicit opt-in because browser speech recognition may process audio online.
+    pub voice_cloud_consent: bool,
     /// Addresses of the model servers once connected; empty means not connected.
     pub ollama_url: String,
     pub lmstudio_url: String,
@@ -129,6 +133,8 @@ impl Default for Settings {
             novo_chat_model: "auto".into(),
             novo_twin_mode: true,
             novo_local_connections: true,
+            desktop_allowed_apps: Vec::new(),
+            voice_cloud_consent: false,
             ollama_url: String::new(),
             lmstudio_url: String::new(),
             custom_url: String::new(),

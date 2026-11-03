@@ -7,7 +7,7 @@ import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
-import { safeNovoError, type NativeAccountStatus, type NovoChatModel, type ConversationSummary, type AccountConversation, type CompanionChatRequest, type NovoLocalContext } from './novo-chat';
+import { safeNovoError, type NativeAccountStatus, type NovoChatModel, type ConversationSummary, type AccountConversation, type CompanionChatRequest, type NovoLocalContext, type NovoAssistantAction } from './novo-chat';
 import type { NovoWorkContextInput } from './novo-work-context';
 
 export interface NovoWorkContext {
@@ -20,6 +20,8 @@ export interface NovoWorkContext {
   canClear: boolean;
 }
 export interface NovoContextFolder {id:string;name:string}
+export interface DesktopAppChoice {id:string;name:string;available:boolean;allowed:boolean}
+export interface DesktopWindowChoice {id:string;appId:string;title:string;minimized:boolean;maximized:boolean}
 export interface LocalProjectArtifact {id:string;summary:string;baseCommit:string|null;changedPaths:string[];verificationStatus:'passed'|'failed'|'not_run'|null;modifiedAt:string|null;workspaceReady:boolean;patchReady:boolean}
 
 export const IS_TAURI =
@@ -93,6 +95,11 @@ export const Bridge = {
   openSettingsWindow: (section?:'account'|'assistant'|'connections'|'desktop') => call<void>("open_settings_window",{section:section??null}),
   openNovo: () => call<void>("companion_panel_open"),
   novoAccountStatus: () => IS_TAURI ? novoCall<NativeAccountStatus>('novo_account_status') : Promise.resolve<NativeAccountStatus>({state:'demo',authorization:null,lastVerifiedAt:null,revocationPending:false}),
+  desktopAppCatalog: () => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog'),
+  desktopAppAllowedSet: (appId:string,enabled:boolean) => callOrThrow<string[]>('desktop_app_allowed_set',{appId,enabled}),
+  desktopAppOpen: (appId:string) => callOrThrow<void>('desktop_app_open',{appId}),
+  desktopAppWindows: (appId:string) => callOrThrow<DesktopWindowChoice[]>('desktop_app_windows',{appId}),
+  desktopWindowAction: (windowId:string,action:'focus'|'minimize'|'maximize'|'restore') => callOrThrow<void>('desktop_window_action',{windowId,action}),
   novoChatModels: () => novoCall<NovoChatModel[]>('novo_chat_models'),
   projectWorkRuntimes: () => novoCall<import('./project-work').ProjectWorkRuntime[]>('project_work_runtimes'),
   projectWorkArtifacts: () => callOrThrow<LocalProjectArtifact[]>('project_work_artifacts'),
@@ -101,6 +108,8 @@ export const Bridge = {
   novoConversationGet: (id:string) => novoCall<AccountConversation>('novo_conversation_get',{id}),
   novoChatStart: (input:CompanionChatRequest) => novoCall<void>('novo_chat_start',{input}),
   novoChatCancel: (requestId:string) => novoCall<void>('novo_chat_cancel',{requestId}),
+  novoAssistantActions: () => novoCall<NovoAssistantAction[]>('novo_assistant_actions'),
+  decideAssistantAction: (id:string,revision:number,decision:'confirm'|'deny') => novoCall<NovoAssistantAction>('novo_assistant_action_decide',{id,revision,decision}),
   novoWorkContextGet: () => novoCall<{context:NovoWorkContext|null}>('companion_work_context_get'),
   novoWorkContextSave: (input:NovoWorkContextInput) => novoCall<{context:NovoWorkContext}>('companion_work_context_save',{input}),
   novoWorkContextClear: () => novoCall<{cleared:boolean}>('companion_work_context_clear'),

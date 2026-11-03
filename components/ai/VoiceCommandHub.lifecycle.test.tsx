@@ -34,6 +34,7 @@ describe('voice panel cancellation', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockAccountId = 'account-a'
+    localStorage.setItem('novo:cloud-voice-consent:account-a','yes')
     recorders = []
     Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
     Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: Recorder })
@@ -123,14 +124,31 @@ describe('voice panel cancellation', () => {
     } finally { window.removeEventListener('novo:voice-transcript', transcript) }
   })
 
-  it('preserves the standalone command panel executor', async () => {
+  it('places a standalone transcript in the chat for review without executing it', async () => {
     ;(whisperAPI.transcribeAudio as jest.Mock).mockResolvedValue('cómo está mi energía')
-    ;(executeVoiceCommand as jest.Mock).mockResolvedValue({ success: true, action: 'cognitive_status', message: 'Estado actual', deferred: false })
-    render(<VoiceCommandHub />)
-    fireEvent.keyDown(document.body, { code: 'Space', key: ' ' })
-    await screen.findByText('Listening — release to process')
-    fireEvent.keyUp(document.body, { code: 'Space', key: ' ' })
-    await waitFor(() => expect(executeVoiceCommand).toHaveBeenCalledTimes(1))
+    const transcript = jest.fn()
+    window.addEventListener('novo:voice-transcript', transcript)
+    try {
+      render(<VoiceCommandHub />)
+      fireEvent.keyDown(document.body, { code: 'Space', key: ' ' })
+      await screen.findByText('Listening — release to process')
+      fireEvent.keyUp(document.body, { code: 'Space', key: ' ' })
+      await screen.findByText('Transcripción añadida al chat')
+      expect(transcript).toHaveBeenCalledTimes(1)
+      expect(executeVoiceCommand).not.toHaveBeenCalled()
+    } finally { window.removeEventListener('novo:voice-transcript', transcript) }
+  })
+
+  it('requires explicit consent before asking for microphone access', async () => {
+    localStorage.removeItem('novo:cloud-voice-consent:account-a')
+    const openPanel=jest.fn()
+    window.addEventListener('open-voice-command-hub',openPanel)
+    try {
+      render(<VoiceCommandHub headless />)
+      toggle()
+      expect(getUserMedia).not.toHaveBeenCalled()
+      expect(openPanel).toHaveBeenCalledTimes(1)
+    } finally { window.removeEventListener('open-voice-command-hub',openPanel) }
   })
 
   it('shows a retryable error when chat dictation fails without executing anything', async () => {

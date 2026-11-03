@@ -1,8 +1,8 @@
-import { Bridge } from '../core/bridge';
-import { State, type ChatMessage } from '../core/state';
+import { Bridge, onEvent } from '../core/bridge';
+import { State, type ChatMessage, type Settings } from '../core/state';
 import { SpeechDictation } from '../core/speech-dictation';
 import { Sound } from '../core/sound';
-import { t } from '../i18n/i18n';
+import { N_, t } from '../i18n/i18n';
 import { h, svg, clear } from './dom';
 import { ICONS } from './icons';
 import { renderMarkdown } from './markdown';
@@ -47,6 +47,11 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
       status.textContent = kind === 'unavailable' ? t("Speech recognition is not available on this device.") : kind === 'permission' ? t("Microphone access was denied. Allow it in your device settings.") : kind === 'no-speech' ? t("No speech was detected. Try again.") : t("Voice dictation failed. Try again.");
     },
   }, undefined, 'es-BO');
+  let stopSettings:(()=>void)|null=null;
+  void onEvent<Settings>('settings-changed',settings=>{
+    State.settings={...State.settings,...settings};
+    if(settings.voiceCloudConsent!==true)dictation.cancel();
+  }).then(stop=>{if(disposed)stop();else stopSettings=stop;});
 
   function controls() {
     send.disabled = !ready || busy || dictation.isListening;
@@ -110,7 +115,16 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
     }
   }
   send.addEventListener('click', () => void submit());
-  mic.addEventListener('click', () => dictation.isListening ? dictation.stop() : dictation.start(input.value));
+  mic.addEventListener('click', () => {
+    if (dictation.isListening) { dictation.stop(); return; }
+    if (!State.settings.voiceCloudConsent) {
+      status.textContent = t(N_("Voice dictation is off. Enable it in Novo Settings → Assistant to allow the speech service to process audio."));
+      void Bridge.openSettingsWindow('assistant');
+      return;
+    }
+    status.textContent = '';
+    dictation.start(input.value);
+  });
   input.addEventListener('keydown', event => {
     const key = (event as KeyboardEvent).key;
     if (key === 'Enter') { event.preventDefault(); void submit(); }
@@ -121,6 +135,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
     if (disposed) return;
     disposed = true;
     ++generation;
+    stopSettings?.();
     dictation.dispose();
     State.stateOverride = null;
     void resetSession().catch(() => {});

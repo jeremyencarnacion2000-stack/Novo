@@ -1,6 +1,6 @@
 # Matriz de capacidades
 
-Fecha: 2026-11-01. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
 
 | Capacidad | Estado observado | Evidencia / validación pendiente |
 | --- | --- | --- |
@@ -14,6 +14,8 @@ Fecha: 2026-11-01. «Implementada sin verificar» significa que se encontró el 
 | Gmail: búsqueda, cuerpo completo, propuesta de envío | Lectura real web confirmada tras renovar; envío sin probar | Google rechazaba el grant guardado; el usuario completó la renovación. La pregunta real sobre MESCyT devuelve mensajes concretos, fechas y contenido, con Gmail como fuente. No se envió correo; web/Companion aún tienen orquestaciones distintas |
 | Acciones con permisos, auditoría, retry seguro | Implementada sin verificar externamente | Executor/MCP y esquemas; verificar cada adaptador con cuenta de prueba |
 | Chat cuenta Novo en Companion | Implementada sin verificar en vivo | `NovoChatController`, `novo_chat_start`, `/api/companion/chat` |
+| Comandos directos de tareas y estado Twin en Companion | Código local con pruebas dirigidas | Listar tareas y snapshot cognitivo usan lecturas por propietario; crear tarea prepara `AssistantActionRequest` y sólo la confirmación visual crea el recurso. La migración aún no está aplicada |
+| Control local de apps Windows | Código local, limitado a apps allowlisted | Catálogo inicial: Chrome, Edge, Firefox, VS Code, Bloc de notas y Explorador. Abrir/enfocar/minimizar/maximizar/restaurar; scopes por separado; exe, rutas y HWND quedan locales. Falta verificarlo en el Windows del usuario |
 | Elegir Codex con plan ChatGPT | Verificada: runtime y respuesta en ventana instalada | Release 0.2.13 instalada; el usuario confirma respuesta y aporta captura de «hola» contestado en ChatGPT Codex. Sonda de producción: `NOVO_OK` en 8.5–11.7 s. CI: 261 pruebas de app, 30 de hooks y 19 del harness aprobadas. No carga documentos/herramientas locales ni hereda transportes del padre; Twin/historial Novo no se transfieren automáticamente. Resto de interacción/hardware todavía parcial |
 | Hooks de Codex/Claude y aprobaciones | Implementada sin verificar con evento real | `companion/windows/hook`, configuración de hooks; instalar no garantiza recibir eventos |
 | Carpetas autorizadas y contexto de agentes | Implementada sin verificar en vivo | Runtime de workspace/work-context, exclusiones y scopes |
@@ -21,9 +23,11 @@ Fecha: 2026-11-01. «Implementada sin verificar» significa que se encontró el 
 | Widget Windows separado | Fuente inactiva | `widget.rs`/`widget.ts` no están conectados al runtime/build normal; la isla Tauri es la representación operativa existente |
 | Dictado manual | Implementada sin verificar por hardware | Dictado del chat/browser; disponibilidad depende del motor y permisos |
 | Dictado web al chat actual | Publicada; pruebas automatizadas y receptor real verificados, audio simulado | PR #32: transcripción al borrador, texto/adjuntos conservados y envío manual por el mismo chat. Cambio de cuenta/selección/cierre invalida resultados; sin ejecutor separado en `/chat` y `/ai`. QA con sesión: cero envíos/acciones/guardados al recibir dictado. No certifica STT físico |
+| Dictado manual en Companion | Código local con consentimiento explícito | El permiso local está apagado por defecto y el motor de voz del navegador no inicia hasta permitirlo en Configuración; sigue siendo un servicio que puede procesar audio fuera de Novo, no STT offline |
 | Voz conversacional con VAD/interrupción | Parcial / planificada | Hay dictado y speech helpers; falta pipeline unificado medido ES/EN |
-| Wake word local | Ausente del flujo certificado | Candidato opcional; requiere consentimiento, modelo y presupuesto de CPU |
-| Control general de Windows por UI Automation | Ausente del flujo certificado | Preferir adaptadores API antes de introducir control visual |
+| Wake word local «Novo» | No implementada | No activar escucha continua hasta integrar detector local y aprobar medición física de falsos positivos, CPU, memoria y latencia |
+| Voz de respuesta y conversación manos libres | No implementada | No se incorporó TTS, VAD ni bucle de escucha; el modo disponible sigue siendo dictado manual revisable |
+| Control general de Windows por UI Automation | No implementado; controles nativos acotados sí están en código | No hay automatización de formularios, shell, cierre de procesos ni UI Automation general |
 | Diagnóstico/preparación de arreglo de proyecto | Implementada; ejecución de código sin certificar en este Windows 10 | `project_work`, workspace aislado, proceso limitado, artefactos. El aislamiento legacy requiere lectura raíz que Novo no concede; no confundir una respuesta textual Codex con automatización local de código |
 | Sincronización y revocación de dispositivo | Implementada sin verificar en vivo | Token/scopes, registro de dispositivo, revalidación al terminar turno |
 | Continuidad de tarea offline entre dispositivos | No demostrada / planificada | Conversaciones/observaciones compartidas no prueban handoff offline |

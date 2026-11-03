@@ -116,6 +116,17 @@ describe('GET /api/companion/authorization', () => {
     expect(requireActiveCompanionDevice).toHaveBeenCalledWith(actor, deviceId)
     expect(JSON.stringify(body)).not.toMatch(/grantId|clientId|access_token/)
   })
+  it('returns expanded capabilities only to a client that explicitly requests v2', async () => {
+    const deviceId='cd78b30e-93ca-4bd0-893a-a3f709b2f105'
+    const scopes=['device:connect','ai:chat','twin:read','tasks:read','tasks:write','device:desktop:read','device:desktop:control']
+    ;(validateMcpBearerToken as jest.Mock).mockResolvedValue({ok:true,kind:'oauth',userId:'owner',authInfo:{scopes}})
+    ;(requireCompanionOAuth as jest.Mock).mockResolvedValue({userId:'owner',clientId:'novo',grantId:'grant',scopes:new Set(scopes)})
+    ;(requireActiveCompanionDevice as jest.Mock).mockResolvedValue({id:deviceId,name:'Novo PC',platform:'windows',connectedAt:'2026-11-03T00:00:00.000Z',lastVerifiedAt:'2026-11-03T00:00:00.000Z',revokedAt:null,scopes})
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({id:'owner',name:'Account'})
+    const response=await GET(new Request('https://novo.test/api/companion/authorization',{headers:{'X-Novo-Device-Id':deviceId,'X-Novo-Capabilities-Version':'2'}}))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({state:'connected',capabilities:{taskRead:true,taskWrite:true,desktopRead:true,desktopControl:true}})
+  })
   it('a new grant with a revoked device is never reported as connected', async () => {
     ;(validateMcpBearerToken as jest.Mock).mockResolvedValue({ok:true, kind:'oauth', userId:'owner', authInfo:{scopes:['device:connect', 'ai:chat']}})
     ;(requireCompanionOAuth as jest.Mock).mockResolvedValue({userId:'owner'})

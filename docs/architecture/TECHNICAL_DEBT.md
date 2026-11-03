@@ -16,6 +16,8 @@ Auditoría de código del 2026-11-01. La prioridad combina efecto sobre uso real
 | Resuelta | Versiones del Companion divergían entre README y manifiesto | Release 0.2.13, manifiestos, guía y ejecutable instalado alineados | CI Windows y versión de archivo instalada comprobados |
 | P2 | Instalación limpia falla en validación de peers por lockfile | Reproducir con la política npm del repo; reparar lock en cambio dedicado si procede | `npm ci` reproducible en CI y equipo limpio; sin resolver versiones arbitrarias |
 | P3 | Recursos de voz locales y automatización general todavía sin calibrar | Prototipos optativos medidos en Windows real, reutilizando autorización | ES/EN, latencia, RAM/CPU, interrupción y licencias de modelos verificadas |
+| P1 | La conversación de voz del Companion todavía no tiene activación ni respuesta hablada | Mantener dictado manual con consentimiento y no fingir escucha local; integrar detector/STT/TTS sólo con licencias y métricas reales | Cumplir corpus, falsos positivos, CPU/RAM, p95 y cancelación del plan en hardware del usuario |
+| P2 | Control local limitado a seis apps conocidas | Verificar permisos y resultados en Windows; ampliar catálogo sólo si el selector inicial no cubre el uso | Enfocar/abrir y cambios de ventana confirmados en PC real; multi-ventana requiere selección |
 
 No se alteran migraciones, credenciales, datos o planes de pago para cerrar deuda de interfaz. No reducir el material liquid glass globalmente para ocultar trabajo de componentes que ni siquiera están visibles.
 
@@ -32,3 +34,5 @@ La migración de historiales ya distingue explícitamente el detalle cargado. Lo
 La [medición autenticada de fluidez](../performance/2026-11-01-interaction-fluency.md) confirma un coste alto de pintura en dashboard/Hoy y apertura del menú móvil. Publicadas las correcciones de grandes filtros de color de Ahora, tarjetas duplicadas, muestreo por evento del gesto y scroll/parsing del chat. La inspección DOM en producción confirma degradados sin filtro y ausencia de tarjetas anidadas. Falta medir de nuevo en hardware móvil: no declarar 60 FPS ni atribuir toda la lentitud a la navegación.
 
 El contexto compartido ya conserva lecturas parciales y declara campos desconocidos; el chat web reenvía pregunta/historial al lector de correo. Siguen existiendo dos orquestaciones y un contexto preventivo amplio por turno. La carga inicial de historiales web cambia a recuperación seleccionada; no confundir esta mejora con un presupuesto global de tokens o una migración completa del chat compartido.
+
+En el worktree actual, las acciones de tareas ya usan almacenamiento durable e idempotencia y los comandos de ventana sólo usan apps permitidas por el usuario. La migración está preparada, no desplegada; no publicar la ruta de escritura antes de aplicarla y verificarla. El dictado de Companion queda opt-in y puede depender de servicio externo; wake word, STT offline y TTS no están incluidos.

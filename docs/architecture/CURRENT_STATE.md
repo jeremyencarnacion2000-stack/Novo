@@ -8,6 +8,8 @@ Actualización de entrega: PR #29 integrada en `main` (`c37432f`) y publicada en
 
 PR #31 (`b882c82`) publicada y verificada con la sesión autorizada: listado de 75 metadatos sin mensajes, detalle bajo demanda y ninguna escritura de historiales por lectura. PR #32 (`80bcc3a`) publica el dictado al borrador del chat con envío manual, cancelación por cuenta/selección y aviso de error sanitizado. CI final: tipos, lint, 329 suites / 1349 pruebas / dos snapshots aprobados. Vercel READY y alias canónico comprobados; la sesión real recibe una transcripción simulada sin ejecutar, enviar ni guardar nada. No se certifica el micrófono físico. [Evaluación y adaptación del ecosistema](../research/ECOSYSTEM_EVALUATION.md).
 
+Actualización local 2026-11-03: Companion incorpora un catálogo determinista para tareas y estado cognitivo, propuestas de tarea con aprobación dentro del Companion y controles nativos acotados de ventanas Windows. La autorización del dispositivo anuncia capacidades nuevas sólo a clientes v2; clientes anteriores conservan su contrato. Dictado web y Companion requieren consentimiento explícito antes de usar reconocimiento que podría enviar audio fuera de Novo. La migración aditiva aún no está aplicada y ningún cambio de producción está certificado por esta actualización. Wake word, STT local, TTS y la calibración física siguen pendientes; la escucha continua permanece apagada.
+
 ## Capas existentes
 
 | Capa | Implementación encontrada | Límite actual |
