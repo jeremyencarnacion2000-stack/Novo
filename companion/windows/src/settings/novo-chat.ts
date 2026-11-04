@@ -17,6 +17,9 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   const twin=h('input',{type:'checkbox',checked:settings.novoTwinMode,'aria-label':t('Personalizar con mi Twin')});
   const connections=h('input',{type:'checkbox',checked:settings.novoLocalConnections,'aria-label':t('Consultar conexiones locales')});
   const voiceConsent=h('input',{type:'checkbox',checked:settings.voiceCloudConsent,'aria-label':t('Allow'),'aria-description':t('The speech service may process audio outside Novo. Novo receives only the text you send.')});
+  const inputMode=h('select',{'aria-label':t("Voice input")},h('option',{value:'local',text:t("Local · Spanish and English")}),h('option',{value:'cloud',text:t("Connected speech service")}),h('option',{value:'off',text:t("Off")}));
+  inputMode.value=settings.voiceInputMode??'local';
+  const cloudConsent=h('div',{hidden:inputMode.value!=='cloud'},h('label',{class:'row'},voiceConsent,h('span',{text:t('Allow')})),h('p',{class:'hint',text:t('The speech service may process audio outside Novo. Novo receives only the text you send.')}));
   const spokenReplies=h('input',{type:'checkbox',checked:settings.voiceSpokenReplies,'aria-label':t("Read replies aloud")});
   const localVoice=h('select',{'aria-label':t("Windows voice")},h('option',{value:'',text:t("Spanish (automatic)")}));
   const localVoiceStatus=h('p',{class:'hint',role:'status',text:t("Audio is generated on this PC.")});
@@ -74,6 +77,12 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     const next=voiceConsent.checked;settings.voiceCloudConsent=next;
     void save().catch(()=>{settings.voiceCloudConsent=!next;voiceConsent.checked=!next;failure();});
   });
+  inputMode.addEventListener('change',()=>{
+    const previous=settings.voiceInputMode;
+    settings.voiceInputMode=inputMode.value==='cloud'?'cloud':inputMode.value==='off'?'off':'local';
+    cloudConsent.hidden=settings.voiceInputMode!=='cloud';
+    void save().catch(()=>{settings.voiceInputMode=previous;inputMode.value=previous;cloudConsent.hidden=previous!=='cloud';failure();});
+  });
   spokenReplies.addEventListener('change',()=>{
     const previous=settings.voiceSpokenReplies;settings.voiceSpokenReplies=spokenReplies.checked;
     void save().catch(()=>{settings.voiceSpokenReplies=previous;spokenReplies.checked=previous;failure();});
@@ -89,10 +98,10 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('label',{class:'row'},twin,h('span',{text:t('Personalizar con mi Twin')})));
   const section=h('section',{class:'novo-chat-preferences'},h('h2',{text:t('Tu asistente Novo')}),
     h('h2',{text:t('Voz y privacidad')}),
+    h('div',{class:'row'},h('label',{text:t("Voice input")}),inputMode),
+    h('p',{class:'hint',text:t("Local dictation starts only when you press the microphone. Review the text before sending. Audio stays on this PC; low memory stops recognition.")}),cloudConsent,
     h('label',{class:'row'},spokenReplies,h('span',{text:t("Read replies aloud")})),
     h('div',{class:'row'},h('label',{text:t("Windows voice")}),localVoice),localVoiceStatus,
-    h('label',{class:'row'},voiceConsent,h('span',{text:t('Allow')})),
-    h('p',{class:'hint',text:t('The speech service may process audio outside Novo. Novo receives only the text you send.')}),
     h('div',{class:'row'},h('label',{text:t("Response source")}),source),status,accountOptions,
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),

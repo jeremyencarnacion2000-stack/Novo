@@ -7,6 +7,23 @@ installFakeDom();
 const { buildPrompt } = await import("../src/views/chat.ts");
 const { State } = await import("../src/core/state.ts");
 
+test('Novo uses native local dictation without granting cloud consent', async () => {
+  calls.length=0;State.settings.voiceInputMode='local';State.settings.voiceCloudConsent=false;
+  const view=buildPrompt(()=>{});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  try {
+    const input=view.el.querySelector('.chat-input');input.value='Revisar';
+    view.el.querySelector('.novo-voice-button').fire('click');
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const call=calls.find(([name])=>name==='voice_input_start');assert.ok(call);
+    emit('novo-voice-input',{requestId:call[1].requestId,state:'processing'});
+    assert.match(view.el.querySelector('.novo-voice-status').textContent,/Transcribing/);
+    emit('novo-voice-input',{requestId:call[1].requestId,state:'finished',text:'los proyectos'});
+    assert.equal(input.value,'Revisar los proyectos');
+    assert.equal(calls.some(([name])=>name==='novo_chat_start'),false);
+  } finally {view.dispose();State.settings.voiceInputMode='cloud';}
+});
+
 class FakeRecognition {
   static latest;
   constructor() {

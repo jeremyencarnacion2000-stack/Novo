@@ -551,6 +551,7 @@ fn poll_delay(interval: u64, slow_down: bool, retry_after: Option<&str>, now: Da
     interval.max(retry).max(5).min(86400)
 }
 fn stop_local_account(settings: &mut settings::Settings, account: &mut crate::novo_account::AccountRuntime) {
+    crate::voice_input::cancel_all();
     settings.companion_capture_enabled = false;
     settings.companion_capture_paused = false;
     settings.companion_revocation_pending = true;
@@ -913,6 +914,7 @@ pub async fn companion_authorization_start(
     reconnect: Option<bool>,
     device_name: Option<String>,
 ) -> Result<DeviceAuthorizationPrompt, String> {
+    crate::voice_input::cancel_all();
     let _auth_guard = shared.companion_auth_lock.lock().await;
     if staged_authorization_pending(){return Err("authorization_pending".into());}
     if load_old_revocations()?.len()>=4{return Err("revocation_pending".into());}

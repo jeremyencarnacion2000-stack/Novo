@@ -8,6 +8,10 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VoiceInputMode { #[default] Local, Cloud, Off }
+
 /// A field the file lacks takes its value from `Default`, so a settings.json
 /// written by an older build still loads, whatever has been added since.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +52,7 @@ pub struct Settings {
     pub desktop_allowed_apps: Vec<String>,
     /// Explicit opt-in because browser speech recognition may process audio online.
     pub voice_cloud_consent: bool,
+    pub voice_input_mode: VoiceInputMode,
     pub voice_local_voice_id: String,
     pub voice_spoken_replies: bool,
     /// Addresses of the model servers once connected; empty means not connected.
@@ -137,6 +142,7 @@ impl Default for Settings {
             novo_local_connections: true,
             desktop_allowed_apps: Vec::new(),
             voice_cloud_consent: false,
+            voice_input_mode: VoiceInputMode::Local,
             voice_local_voice_id: String::new(),
             voice_spoken_replies: false,
             ollama_url: String::new(),
@@ -427,6 +433,7 @@ mod tests {
   "novoLocalConnections": false,
   "desktopAllowedApps": ["notepad"],
   "voiceCloudConsent": true,
+  "voiceInputMode": "local",
   "voiceLocalVoiceId": "windows-voice-test",
   "voiceSpokenReplies": true,
   "ollamaUrl": "http://127.0.0.1:11434",
@@ -487,6 +494,7 @@ mod tests {
             "novoLocalConnections": true,
             "desktopAllowedApps": [],
             "voiceCloudConsent": false,
+            "voiceInputMode": "local",
             "voiceLocalVoiceId": "",
             "voiceSpokenReplies": false,
             "ollamaUrl": "",
@@ -678,6 +686,7 @@ mod tests {
             ("novoLocalConnections", json!([])),
             ("desktopAllowedApps", json!("notepad")),
             ("voiceCloudConsent", json!("yes")),
+            ("voiceInputMode", json!("unsupported")),
             ("voiceLocalVoiceId", json!(false)),
             ("voiceSpokenReplies", json!(1)),
             ("companionCaptureEnabled", json!("yes")),
@@ -921,6 +930,7 @@ mod tests {
                 "novoLocalConnections",
                 "desktopAllowedApps",
                 "voiceCloudConsent",
+                "voiceInputMode",
                 "voiceLocalVoiceId",
                 "voiceSpokenReplies",
                 "ollamaUrl",

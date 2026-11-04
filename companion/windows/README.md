@@ -50,10 +50,13 @@ Requisitos: Node.js, Rust, herramientas de compilación de Windows y WebView2. E
 npm ci
 npm run build
 npm test
+node scripts/voice-resources.mjs
 npm run pack
 ```
 
 Los instaladores se generan en `release/`. No se guardan en Git: se publican como archivos de GitHub Releases. Credenciales, preferencias, carpetas personales y archivos compilados quedan fuera del repositorio.
+
+El dictado del Companion 0.2.16 usa whisper.cpp y Silero locales. Descarga recursos fijados por versión y SHA-256; la voz solo se captura al pulsar el micrófono, el texto queda en el borrador para revisión y el envío sigue siendo manual. La nube requiere consentimiento separado. La activación por voz «Novo» y la validación física de precisión, memoria, latencia y falsas activaciones siguen pendientes; no hay escucha permanente.
 
 ## Estado de las comprobaciones
 

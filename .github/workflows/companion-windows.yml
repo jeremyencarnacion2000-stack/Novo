@@ -23,6 +23,8 @@ jobs:
           node-version: '24'
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
+      - name: Download and verify local speech resources
+        run: node scripts/voice-resources.mjs
       - name: Frontend checks
         run: node --import ./tests/setup.mjs --test --test-concurrency=1 "tests/**/*.test.mjs"
       - name: Build registered hook resource

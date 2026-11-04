@@ -111,6 +111,7 @@ test('Codex dictation fills the draft and never submits automatically', async ()
   };
   try {
     State.settings.voiceCloudConsent = true;
+    State.settings.voiceInputMode = 'cloud';
     view = buildPrompt(() => {});
     await flush();
     const input = view.el.querySelector('.chat-input');
@@ -141,6 +142,29 @@ test('Assistant settings keeps cloud speech consent off until opted in', async (
     await flush();
     assert.equal(settings.voiceCloudConsent, true);
     assert.equal(saves, 1);
+  } finally {
+    view.dispose();
+    view = null;
+  }
+});
+
+test('Assistant settings default to local voice and require separate consent for connected speech', async () => {
+  const settings = { ...DEFAULT_SETTINGS };
+  let saves = 0;
+  view = novoChatSection(settings, async () => { saves++; });
+  try {
+    const mode = view.el.find('SELECT').find(element => element.getAttribute('aria-label') === 'Voice input');
+    assert.ok(mode);
+    assert.equal(mode.value, 'local');
+    assert.equal(view.el.textContent.includes('only when you press the microphone'), true);
+    assert.equal(Boolean(view.el.find('INPUT').find(element => element.getAttribute('aria-description')?.includes('speech service may process audio')).checked), false);
+    mode.value = 'cloud';
+    mode.fire('change');
+    await flush();
+    assert.equal(settings.voiceInputMode, 'cloud');
+    assert.equal(saves, 1);
+    assert.equal(view.el.textContent.includes('speech service may process audio outside Novo'), true);
+    assert.equal(Boolean(view.el.find('INPUT').find(element => element.getAttribute('aria-description')?.includes('speech service may process audio')).checked), false);
   } finally {
     view.dispose();
     view = null;
