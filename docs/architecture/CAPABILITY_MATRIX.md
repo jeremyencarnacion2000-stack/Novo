@@ -13,9 +13,9 @@ Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el 
 | Contexto Twin con procedencia/exclusiones | Implementada sin verificar | `signal-ledger`, `ambient-twin-runtime`, `twin-context` |
 | Gmail: búsqueda, cuerpo completo, propuesta de envío | Lectura real web confirmada tras renovar; envío sin probar | Google rechazaba el grant guardado; el usuario completó la renovación. La pregunta real sobre MESCyT devuelve mensajes concretos, fechas y contenido, con Gmail como fuente. No se envió correo; web/Companion aún tienen orquestaciones distintas |
 | Acciones con permisos, auditoría, retry seguro | Implementada sin verificar externamente | Executor/MCP y esquemas; verificar cada adaptador con cuenta de prueba |
-| Chat cuenta Novo en Companion | Implementada sin verificar en vivo | `NovoChatController`, `novo_chat_start`, `/api/companion/chat` |
-| Comandos directos de tareas y estado Twin en Companion | Servidor publicado y Companion 0.2.14 instalado; aceptación con cuenta pendiente | Migración aplicada y verificada, con prueba sintética de idempotencia y propiedad. Listar tareas y snapshot cognitivo filtran propietario; crear tarea requiere aprobación visual. La conexión antigua necesita reautorización |
-| Control local de apps Windows | Instalado, limitado a apps elegidas | Catálogo inicial: Chrome, Edge, Firefox, VS Code, Bloc de notas y Explorador. Abrir/enfocar/minimizar/maximizar/restaurar; scopes separados; exe, rutas y HWND quedan locales. Falta reautorizar y verificar ventanas reales |
+| Chat cuenta Novo en Companion | Cuenta OAuth verificada; turno real pendiente | 0.2.15 instalado; usuario confirma conexión y el servidor verifica el dispositivo con los permisos nuevos. No equivale a probar una respuesta del chat de cuenta |
+| Comandos directos de tareas y estado Twin en Companion | Servidor publicado, 0.2.15 instalado y permisos reales verificados; acciones pendientes | Migración aplicada, con prueba sintética de idempotencia y propiedad. Listar tareas y snapshot cognitivo filtran propietario; crear tarea requiere aprobación visual. La cuenta ya está reautorizada |
+| Control local de apps Windows | Instalado y reautorizado, limitado a apps elegidas | Catálogo inicial: Chrome, Edge, Firefox, VS Code, Bloc de notas y Explorador. Abrir/enfocar/minimizar/maximizar/restaurar; scopes separados; exe, rutas y HWND quedan locales. Falta verificar operaciones de ventana reales |
 | Elegir Codex con plan ChatGPT | Verificada: runtime y respuesta en ventana instalada | Release 0.2.13 instalada; el usuario confirma respuesta y aporta captura de «hola» contestado en ChatGPT Codex. Sonda de producción: `NOVO_OK` en 8.5–11.7 s. CI: 261 pruebas de app, 30 de hooks y 19 del harness aprobadas. No carga documentos/herramientas locales ni hereda transportes del padre; Twin/historial Novo no se transfieren automáticamente. Resto de interacción/hardware todavía parcial |
 | Hooks de Codex/Claude y aprobaciones | Implementada sin verificar con evento real | `companion/windows/hook`, configuración de hooks; instalar no garantiza recibir eventos |
 | Carpetas autorizadas y contexto de agentes | Implementada sin verificar en vivo | Runtime de workspace/work-context, exclusiones y scopes |
@@ -30,7 +30,7 @@ Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el 
 | Conversación manos libres | No implementada | Faltan captura nativa, STT/VAD y bucle de escucha; el dictado disponible es manual revisable |
 | Control general de Windows por UI Automation | No implementado; controles nativos acotados sí están en código | No hay automatización de formularios, shell, cierre de procesos ni UI Automation general |
 | Diagnóstico/preparación de arreglo de proyecto | Implementada; ejecución de código sin certificar en este Windows 10 | `project_work`, workspace aislado, proceso limitado, artefactos. El aislamiento legacy requiere lectura raíz que Novo no concede; no confundir una respuesta textual Codex con automatización local de código |
-| Sincronización y revocación de dispositivo | Implementada sin verificar en vivo | Token/scopes, registro de dispositivo, revalidación al terminar turno |
+| Sincronización y revocación de dispositivo | Vinculación y revalidación verificadas; revocación pendiente | Registro activo con 15 scopes y revalidaciones reales 200 tras reconectar en 0.2.15. No acredita todavía toda la sincronización ni revocación de un dispositivo activo |
 | Continuidad de tarea offline entre dispositivos | No demostrada / planificada | Conversaciones/observaciones compartidas no prueban handoff offline |
 | Proactividad determinista | Cron cloud observado; eficacia por proyecto pendiente | Workflow programado cada 15 minutos; run `41378587708` procesa 63 cuentas sin fallo del lote. No demuestra que todos los conectores estén sanos ni que cada proyecto se actualice |
 | Presupuesto/coste por tarea completada | Parcial | Métricas en algunas llamadas; faltan streams y planning de correo |
@@ -38,7 +38,7 @@ Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el 
 
 No se certificó como «completa y verificada» una capacidad externa por mera presencia de código. Los fixtures/demo se mantienen fuera de la evidencia de uso real.
 
-## Reproducción local de respuestas — Companion 0.2.14 instalado
+## Reproducción local de respuestas — conservada en Companion 0.2.15
 
 | Capacidad | Estado y evidencia |
 | --- | --- |
