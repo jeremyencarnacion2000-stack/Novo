@@ -27,7 +27,8 @@ Global constraints: no microphone starts on installation or launch; one bounded 
 
 ## Task 4: Review, package and record evidence
 
-- Run native Windows CI and full Companion regression checks; review the whole diff independently before publishing.
-- Bundle only verified CPU resources and licenses; version the release, preserve preferences, publish compatible server first only if needed, then install the Companion.
-- Update the seven existing status documents with observed results and pending physical acceptance. Do not claim hands-free voice or wake-word accuracy.
-- Expected: release hashes and installed version match; microphone remains inactive until a user action.
+- [x] Run native Windows CI and full Companion regression checks. CI generated the Windows packages; a separate review and physical acceptance remain before publication.
+- [x] Bundle only verified CPU resources and licenses; Windows CI run [41781602456](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/41781602456) generated EXE/MSI from `e4259e6`. The CI artifacts are not a public release and have not been installed.
+- [ ] Publish only after review and physical acceptance; then install the Companion while preserving preferences. No compatible server change is needed for this dictation delivery.
+- [x] Update the seven existing status documents with observed results and pending physical acceptance. Do not claim hands-free voice or wake-word accuracy.
+- Expected: release hashes and installed version match after publication/installation; microphone remains inactive until a user action.
