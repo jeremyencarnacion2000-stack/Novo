@@ -41,3 +41,7 @@ Las acciones de tareas publicadas usan almacenamiento durable e idempotencia y l
 ## Voz local: límites que quedan abiertos
 
 La reproducción Windows dispone de cancelación por solicitud y corte al bloquear/desconectar la sesión. Falta medir su latencia real y comprobar altavoces/dispositivo de salida y comportamiento de bloqueo físico. Las voces se instalan como componentes oficiales de Windows, no se incluyen en el instalador. El trabajador de captura/STT y los recursos verificados están instalados como 0.2.16; quedan pruebas físicas con corpus ES/EN y mediciones de latencia/memoria. La gramática «Novo» y el piloto de falsos positivos siguen pendientes; no habilitar escucha permanente sin superar la aceptación.
+
+## Desarrollo de asistencia de escritorio — 2026-11-04
+
+La limitación de seis apps y el cambio a exclusiones están resueltos en la rama de desarrollo `codex/companion-desktop-flow`, con prueba nativa real, pero pendientes de empaquetar/instalar y aceptación visual. Se corrigieron presupuesto de contexto que dejaba fuera ClickHome, corrupción que podía abrir permisos, IDs que cambiaban con el ejecutable y guardados rápidos de permisos. Permanecen lectura de títulos sin control como flujo independiente, recibos durables tras reinicio y micrófono físico. [Evidencia](../engineering/2026-11-04-desktop-assistance-evidence.md).

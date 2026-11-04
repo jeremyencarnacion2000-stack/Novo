@@ -47,3 +47,7 @@ No se certificó como «completa y verificada» una capacidad externa por mera p
 | Lectura automática | Opt-in desactivado por defecto; el historial cargado permanece silencioso |
 | Micrófono manual / STT local / wake word | Dictado local implementado y empaquetado en CI; hardware pendiente / wake word no implementada | Modelo y binario fijados/verificados; todavía no se ha capturado audio real ni medido calidad, consumo o latencia |
 | Cancelación ≤250 ms y calidad audible | Objetivos pendientes de medición; no se deducen de pruebas simuladas |
+
+## Desarrollo de asistencia de escritorio — 2026-11-04
+
+Desarrollo de asistencia de escritorio: catálogo dinámico, exclusiones, permisos locales independientes y continuidad de proyecto implementados en `codex/companion-desktop-flow`. Verificados cuenta real, 73 apps, ventana de Codex, controles de Bloc de notas, contexto ClickHome y una respuesta real del chat. Dictado comprobado mediante transcripción inyectada y Enviar; micrófono físico pendiente. La 0.2.16 instalada conserva su comportamiento previo hasta instalar otra candidata. [Evidencia](../engineering/2026-11-04-desktop-assistance-evidence.md).

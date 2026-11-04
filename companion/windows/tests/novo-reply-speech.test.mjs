@@ -15,7 +15,8 @@ async function fixture(deferred=false){
     if(cmd==='novo_chat_models')return [{id:'auto',label:'Auto',allowsTwinMode:false}];
     if(cmd==='novo_conversations')return [{id:'history-'+account,title:'History '+account,revision:1,updatedAt:''}];
     if(cmd==='novo_conversation_get')return {id:args.id,revision:2,messages:[{id:'reply',role:'assistant',content:account==='b'?'Private history B':'Fresh server answer'}]};
-    if(cmd==='desktop_app_catalog')return [{id:'chrome',name:'Chrome',available:true,allowed:true}];
+    if(cmd==='desktop_app_catalog')return [{id:'chrome',name:'Chrome',available:true,allowed:true,canOpen:true,canControl:true,canRead:false}];
+    if(cmd==='desktop_app_open')return {kind:'opened'};
     if(cmd==='novo_chat_start'){
       if(deferred)return new Promise(resolve=>finish=resolve);
       const requestId=args.input.requestId;

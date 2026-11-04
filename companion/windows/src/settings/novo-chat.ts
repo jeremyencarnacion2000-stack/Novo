@@ -39,16 +39,30 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     }
     folderStatus.textContent=folders.length?`${folders.length} ${t('carpetas elegidas')}`:t('Todavía no elegiste carpetas.');
   }
+  let catalog:DesktopAppChoice[]=[];const savingApps=new Set<string>();
+  const appSearch=h('input',{type:'search',placeholder:t("Search installed apps"),'aria-label':t("Search installed apps")});
+  appSearch.addEventListener('input',()=>drawDesktopApps(catalog));
+  const refreshApps=h('button',{type:'button',text:t("Refresh apps"),onclick:()=>{refreshApps.disabled=true;void Bridge.desktopAppCatalog(true).then(items=>{if(!disposed)drawDesktopApps(items);}).catch(()=>{desktopStatus.textContent=t('No se pudo consultar la lista local de apps.');}).finally(()=>{refreshApps.disabled=false;});}});
+  desktopApps.style.maxHeight='320px';desktopApps.style.overflowY='auto';
   function drawDesktopApps(items:DesktopAppChoice[]){
-    clear(desktopApps);
-    for(const app of items){
-      const input=h('input',{type:'checkbox',checked:app.allowed,disabled:!app.available,'aria-label':`${t('Permitir a Novo controlar')} ${app.name}`});
-      input.addEventListener('change',()=>{input.disabled=true;void Bridge.desktopAppAllowedSet(app.id,input.checked).then(allowed=>{
-        settings.desktopAllowedApps=allowed;drawDesktopApps(items.map(item=>item.id===app.id?{...item,allowed:allowed.includes(item.id)}:item));
-      }).catch(()=>{input.checked=app.allowed;input.disabled=!app.available;desktopStatus.textContent=t('No se pudo guardar el permiso local.');});});
-      desktopApps.append(h('label',{class:'row'},input,h('span',{text:app.name}),h('span',{class:'spacer'}),h('span',{class:'hint',text:app.available?'':t('No instalada')})));
+    catalog=items;clear(desktopApps);
+    for(const app of items.filter(item=>item.name.toLocaleLowerCase().includes(appSearch.value.toLocaleLowerCase()))){
+      const row=h('div',{'aria-label':app.name});const controls:HTMLInputElement[]=[];
+      row.append(h('strong',{text:app.name}));
+      for(const [key,label,value] of [['open',t("Open"),app.canOpen],['control',t("Control windows"),app.canControl],['read',t("Read window titles"),app.canRead]] as const){
+        const input=h('input',{type:'checkbox',checked:value,disabled:!app.available||savingApps.has(app.id),'aria-label':`${label}: ${app.name}`});
+        input.addEventListener('change',()=>{
+          if(savingApps.has(app.id))return;savingApps.add(app.id);controls.forEach(control=>{control.disabled=true;});
+          const permissions={open:app.canOpen,control:app.canControl,read:app.canRead,[key]:input.checked};
+          void Bridge.desktopAppPermissionsSet(app.id,permissions).then(result=>{
+            savingApps.delete(app.id);if(disposed)return;settings.desktopPolicy=result.policy;drawDesktopApps(catalog.map(item=>item.id===app.id?result.app:item));
+          }).catch(()=>{savingApps.delete(app.id);if(disposed)return;drawDesktopApps(catalog);desktopStatus.textContent=t('No se pudo guardar el permiso local.');});
+        });
+        controls.push(input);row.append(h('label',{class:'row'},input,h('span',{text:label})));
+      }
+      desktopApps.append(row);
     }
-    if(items.length===0)desktopApps.append(h('p',{class:'hint',text:t('No se pudo consultar la lista local de apps.')}));
+    desktopStatus.textContent=items.length?`${items.length} ${t("Installed apps")}`:t('No se pudo consultar la lista local de apps.');
   }
   async function verify(){
     const attempt=++generation;
@@ -108,7 +122,7 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('button',{type:'button',text:t('Seguimiento y memoria de proyectos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/settings?tab=twin`);else failure();});}}),
     h('h2',{text:t('Trabajos delegados')}),h('p',{class:'hint',text:t('Activa reglas por proyecto en Seguimiento y memoria. Cada regla elige un PC y una carpeta. Seguir un proyecto no autoriza ejecutar cambios.')}),runtimes,
     h('button',{type:'button',text:t('Ver estado de los trabajos'),onclick:()=>{void Bridge.novoAccountStatus().then(account=>{const origin=account?.authorization?settings.companionApiOrigin:null;if(origin)void Bridge.openUrl(`${origin}/activity`);else failure();}).catch(failure);}}),
-    h('h2',{text:t('Control de apps de este PC')}),h('p',{class:'hint',text:t('Elige las apps que Novo podrá abrir y manejar al pedirlo. Las rutas y títulos de ventanas permanecen en este dispositivo. Debes volver a conectar el Companion para otorgar estos permisos.')}),desktopApps,desktopStatus,
+    h('h2',{text:t('Control de apps de este PC')}),h('p',{class:'hint',text:t("Installed apps can be opened and controlled when you ask. Turn off either permission to exclude an app. Reading window titles is separate and starts off; this never grants reading app contents.")}),appSearch,refreshApps,desktopApps,desktopStatus,
     h('h2',{text:t('Carpetas para dar contexto')}),h('p',{class:'hint',text:t('Elige dónde trabajas. Novo reconoce repositorios y proyectos de Vercel y sincroniza sus nombres y estado. Las rutas y claves se quedan en este PC. Puedes quitar el acceso en cualquier momento.')}),
     folderList,h('div',{class:'row'},pick,folderStatus));
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});

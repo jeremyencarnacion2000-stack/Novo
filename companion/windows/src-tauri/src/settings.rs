@@ -50,6 +50,8 @@ pub struct Settings {
     pub novo_local_connections: bool,
     /// Apps that Novo may open or control through the local desktop commands.
     pub desktop_allowed_apps: Vec<String>,
+    #[serde(deserialize_with="crate::desktop_apps::deserialize_policy")]
+    pub desktop_policy: crate::desktop_apps::DesktopPolicy,
     /// Explicit opt-in because browser speech recognition may process audio online.
     pub voice_cloud_consent: bool,
     pub voice_input_mode: VoiceInputMode,
@@ -141,6 +143,7 @@ impl Default for Settings {
             novo_twin_mode: true,
             novo_local_connections: true,
             desktop_allowed_apps: Vec::new(),
+            desktop_policy: Default::default(),
             voice_cloud_consent: false,
             voice_input_mode: VoiceInputMode::Local,
             voice_local_voice_id: String::new(),
@@ -212,7 +215,7 @@ fn parse(bytes: &[u8]) -> Option<Settings> {
     // PowerShell 5 and Notepad write a UTF-8 BOM, and serde_json refuses it.
     let text = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     if text.iter().all(u8::is_ascii_whitespace) {
-        return Some(Settings::default());
+        return Some(desktop_closed_defaults());
     }
     let Value::Object(fields) = serde_json::from_slice(text).ok()? else {
         return None;
@@ -252,6 +255,9 @@ fn unusable_field(key: &str) -> String {
 /// Only a file that is not there means "start from the defaults" with nothing
 /// more to do. One that cannot be read, or cannot be used, also gives the
 /// defaults, but it still holds what the user had: it is kept, not written over.
+fn desktop_closed_defaults()->Settings {
+    let mut settings=Settings::default();settings.desktop_policy.deny_all=true;settings
+}
 fn load_from(path: &Path) -> Settings {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
@@ -259,7 +265,7 @@ fn load_from(path: &Path) -> Settings {
         Err(err) => {
             note(format!("can't read {}: {err} — using the defaults", path.display()));
             protect(path);
-            return Settings::default();
+            return desktop_closed_defaults();
         }
     };
     parse(&bytes).unwrap_or_else(|| {
@@ -274,7 +280,7 @@ fn load_from(path: &Path) -> Settings {
                 protect(path);
             }
         }
-        Settings::default()
+        desktop_closed_defaults()
     })
 }
 
@@ -432,6 +438,7 @@ mod tests {
   "novoTwinMode": false,
   "novoLocalConnections": false,
   "desktopAllowedApps": ["notepad"],
+  "desktopPolicy": {"denyAll":false,"entries":{}},
   "voiceCloudConsent": true,
   "voiceInputMode": "local",
   "voiceLocalVoiceId": "windows-voice-test",
@@ -493,6 +500,7 @@ mod tests {
             "novoTwinMode": true,
             "novoLocalConnections": true,
             "desktopAllowedApps": [],
+            "desktopPolicy": {"denyAll":false,"entries":{}},
             "voiceCloudConsent": false,
             "voiceInputMode": "local",
             "voiceLocalVoiceId": "",
@@ -531,6 +539,12 @@ mod tests {
         assert_eq!(shown(settings), expected);
     }
 
+    fn assert_recovery_defaults(settings:&Settings){
+        let mut expected=Settings::default();expected.desktop_policy.deny_all=true;
+        let mut expected=shown(&expected);expected["companionDeviceId"]=json!(settings.companion_device_id);
+        assert_eq!(shown(settings),expected);
+    }
+
     /// A fresh directory of our own, and the settings.json it will hold.
     fn scratch(name: &str) -> (PathBuf, PathBuf) {
         let dir = std::env::temp_dir()
@@ -561,6 +575,18 @@ mod tests {
     }
 
     // ── Reading ───────────────────────────────────────────────────────────────
+    #[test]
+    fn damaged_existing_settings_do_not_reenable_desktop_access(){
+        let (dir,file)=scratch("desktop-closed");
+        assert!(load_from(&file).desktop_policy.permissions("app").open);
+        for bytes in [b" ".as_slice(),br#"{"desktopPolicy":{"#.as_slice()]{
+            std::fs::write(&file,bytes).unwrap();
+            assert!(!load_from(&file).desktop_policy.permissions("app").open);
+        }
+        std::fs::remove_file(&file).unwrap();std::fs::create_dir(&file).unwrap();
+        assert!(!load_from(&file).desktop_policy.permissions("app").control);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn a_missing_file_is_the_defaults_and_is_not_created() {
@@ -575,7 +601,7 @@ mod tests {
         let (dir, file) = scratch("empty");
         for nothing in [&b""[..], &b" \r\n\t "[..]] {
             std::fs::write(&file, nothing).unwrap();
-            assert_defaults(&load_from(&file));
+            assert_recovery_defaults(&load_from(&file));
         }
         assert_eq!(names(&dir), ["settings.json"]);
         let _ = std::fs::remove_dir_all(&dir);
@@ -728,7 +754,7 @@ mod tests {
         ] {
             let (dir, file) = scratch(name);
             std::fs::write(&file, bad).unwrap();
-            assert_defaults(&load_from(&file));
+            assert_recovery_defaults(&load_from(&file));
             assert_eq!(kept(&dir, "corrupt"), [bad.to_vec()], "{name}");
             let _ = std::fs::remove_dir_all(&dir);
         }
@@ -754,7 +780,7 @@ mod tests {
         // A directory in the file's place: a read error that is not "not found".
         let (dir, file) = scratch("unreadable");
         std::fs::create_dir(&file).unwrap();
-        assert_defaults(&load_from(&file));
+        assert_recovery_defaults(&load_from(&file));
         assert_eq!(names(&dir), ["settings.json"]);
         assert!(file.is_dir());
         let _ = std::fs::remove_dir_all(&dir);
@@ -775,7 +801,7 @@ mod tests {
         std::fs::write(&file, CUSTOM).unwrap();
         let lock = locked(&file);
         let loaded = load_from(&file);
-        assert_defaults(&loaded);
+        assert_recovery_defaults(&loaded);
         drop(lock);
 
         save_to(&file, &loaded).unwrap();
@@ -929,6 +955,7 @@ mod tests {
                 "novoTwinMode",
                 "novoLocalConnections",
                 "desktopAllowedApps",
+                "desktopPolicy",
                 "voiceCloudConsent",
                 "voiceInputMode",
                 "voiceLocalVoiceId",
