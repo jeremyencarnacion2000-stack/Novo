@@ -46,12 +46,14 @@ export async function validateMcpBearerToken(req: Request): Promise<McpAuthResul
   const provider = getOidcProvider()
   const accessToken = await provider.AccessToken.find(token)
   if (!accessToken || !accessToken.isValid || !accessToken.accountId) {
+    console.error('[oauth/validation] Access token missing, expired or without account.')
     return { ok: false, status: 401, error: 'invalid_token', description: 'Token is invalid, expired, or revoked' }
   }
 
   const resource = getMcpResourceUri()
   const aud = Array.isArray(accessToken.aud) ? accessToken.aud : [accessToken.aud].filter(Boolean)
   if (!aud.includes(resource)) {
+    console.error('[oauth/validation] Access token audience mismatch.')
     return {
       ok: false,
       status: 401,

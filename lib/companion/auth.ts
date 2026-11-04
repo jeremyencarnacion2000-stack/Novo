@@ -33,13 +33,17 @@ export async function requireCompanionOAuth(request: Request, requiredScopes: re
       if (!validated.tokenId || !validated.userId) throw new CompanionError(401, 'unauthorized')
       return {userId:validated.userId, clientId, grantId:`pat:${validated.tokenId}`, scopes, expiresAt}
     }
-    if (!validated.grantId) throw new CompanionError(401, 'unauthorized')
+    if (!validated.grantId) {
+      console.error('[companion/validation] Access token has no grant identifier.')
+      throw new CompanionError(401, 'unauthorized')
+    }
 
     // AccessToken.isValid only proves the token model's lifetime. Confirm its
     // persisted grant still exists and belongs to this account AND this client.
     const {getOidcProvider} = await import('@/lib/mcp/oidc-provider')
     const grant = await getOidcProvider().Grant.find(validated.grantId)
     if (!grant?.isValid || grant.accountId !== validated.userId || grant.clientId !== clientId) {
+      console.error('[companion/validation] Persisted grant rejected:', !grant ? 'missing' : !grant.isValid ? 'expired' : 'principal_mismatch')
       throw new CompanionError(401, 'unauthorized')
     }
     return {userId:validated.userId, clientId, grantId:validated.grantId, scopes, expiresAt}
