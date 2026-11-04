@@ -14,6 +14,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "test": "jest",
+    "test:oidc-bundles": "node scripts/verify-oidc-bundles.mjs",
     "test:db:guard": "node scripts/validate-test-db.mjs",
     "validate:e2e:isolated": "node scripts/validate-isolated-e2e-environment.mjs",
     "db:migrate:test": "node scripts/run-isolated-db-command.mjs npx prisma migrate deploy",
