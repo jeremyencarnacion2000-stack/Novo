@@ -540,75 +540,94 @@ mod physical_acceptance {
         fs::create_dir(&directory).expect("could not create private speech request directory");
         let files = Files(directory);
         fs::write(files.0.join("recording.wav"), wav(&samples).unwrap()).unwrap();
-        let mut args: Vec<String> = [
-            "--no-gpu",
-            "--threads",
-            "2",
-            "--processors",
-            "1",
-            "--language",
-            "auto",
-            "--vad",
-            "--no-prints",
-            "--output-json-full",
-            "--temperature",
-            "0",
-            "--temperature-inc",
-            "0",
-            "--logprob-thold",
-            "-0.65",
-            "--no-speech-thold",
-            "0.6",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        for (flag, path) in [
-            ("--model", resources.join("ggml-tiny-q5_1.bin")),
-            ("--vad-model", resources.join("ggml-silero-v6.2.0.bin")),
-            ("--file", files.0.join("recording.wav")),
-            ("--output-file", files.0.join("result")),
+        let mut fast_accepted = false;
+        for (variant, model_language, threads, beam) in [
+            ("current", "auto", "2", "5"),
+            ("fixed-fast", language, "4", "1"),
         ] {
-            args.push(flag.into());
-            args.push(path.to_string_lossy().into_owned());
-        }
-        let started = Instant::now();
-        let output = crate::project_work::process::run_guarded(
-            &resources.join("whisper-cli.exe"),
-            &args,
-            Some(resources),
-            None,
-            60,
-            64 * 1024,
-            request.cancelled.clone(),
-        )
-        .expect("local Whisper/Silero process failed");
-        let inference_ms = started.elapsed().as_millis();
-        assert!(
-            output.success,
-            "local Whisper/Silero process returned an error"
-        );
-        let result = fs::read(files.0.join("result.json")).unwrap();
-        let value: Value = serde_json::from_slice(&result).unwrap();
-        let detected_language = value["result"]["language"].as_str().unwrap_or("missing");
-        let probabilities: Vec<f64> = value["transcription"]
-            .as_array()
+            let mut args: Vec<String> = [
+                "--no-gpu",
+                "--threads",
+                threads,
+                "--processors",
+                "1",
+                "--beam-size",
+                beam,
+                "--language",
+                model_language,
+                "--vad",
+                "--no-prints",
+                "--output-json-full",
+                "--temperature",
+                "0",
+                "--temperature-inc",
+                "0",
+                "--logprob-thold",
+                "-0.65",
+                "--no-speech-thold",
+                "0.6",
+            ]
             .into_iter()
-            .flatten()
-            .flat_map(|segment| segment["tokens"].as_array().into_iter().flatten())
-            .filter(|token| token["id"].as_u64().is_some_and(|id| id < 50257))
-            .filter_map(|token| token["p"].as_f64().filter(|p| *p > 0.0 && *p <= 1.0))
+            .map(String::from)
             .collect();
-        let confidence = (!probabilities.is_empty()).then(|| {
-            (probabilities.iter().map(|p| p.ln()).sum::<f64>() / probabilities.len() as f64).exp()
-        });
-        let status = match transcript(&result) {
-            Ok(text) if normalized(&text).contains(&normalized(phrase)) => "accepted".into(),
-            Ok(_) => "mismatch".into(),
-            Err(code) => code,
-        };
-        println!("VOICE MODEL: expected={language}, detected={detected_language}, lexical_tokens={}, confidence={confidence:?}, audio_ms={audio_ms}, capture_ms={capture_ms}, inference_ms={inference_ms}, status={status}; transcript withheld", probabilities.len());
-        status == "accepted"
+            for (flag, path) in [
+                ("--model", resources.join("ggml-tiny-q5_1.bin")),
+                ("--vad-model", resources.join("ggml-silero-v6.2.0.bin")),
+                ("--file", files.0.join("recording.wav")),
+                ("--output-file", files.0.join("result")),
+            ] {
+                args.push(flag.into());
+                args.push(path.to_string_lossy().into_owned());
+            }
+            let started = Instant::now();
+            let output = crate::project_work::process::run_guarded(
+                &resources.join("whisper-cli.exe"),
+                &args,
+                Some(resources),
+                None,
+                60,
+                64 * 1024,
+                request.cancelled.clone(),
+            )
+            .expect("local Whisper/Silero process failed");
+            let inference_ms = started.elapsed().as_millis();
+            assert!(
+                output.success,
+                "local Whisper/Silero process returned an error"
+            );
+            let result = fs::read(files.0.join("result.json")).unwrap();
+            let value: Value = serde_json::from_slice(&result).unwrap();
+            let detected_language = value["result"]["language"].as_str().unwrap_or("missing");
+            let segments = value["transcription"].as_array();
+            let raw_text = segments
+                .into_iter()
+                .flatten()
+                .filter_map(|segment| segment["text"].as_str())
+                .collect::<String>();
+            let phrase_match = normalized(&raw_text).contains(&normalized(phrase));
+            let probabilities: Vec<f64> = segments
+                .into_iter()
+                .flatten()
+                .flat_map(|segment| segment["tokens"].as_array().into_iter().flatten())
+                .filter(|token| token["id"].as_u64().is_some_and(|id| id < 50257))
+                .filter_map(|token| token["p"].as_f64().filter(|p| *p > 0.0 && *p <= 1.0))
+                .collect();
+            let confidence = (!probabilities.is_empty()).then(|| {
+                (probabilities.iter().map(|p| p.ln()).sum::<f64>() / probabilities.len() as f64)
+                    .exp()
+            });
+            let status = match transcript(&result) {
+                Ok(text) if phrase_match && normalized(&text).contains(&normalized(phrase)) => {
+                    "accepted".to_string()
+                }
+                Ok(_) => "mismatch".to_string(),
+                Err(code) if phrase_match => format!("{code}_phrase_match"),
+                Err(code) => code,
+            };
+            println!("VOICE MODEL: variant={variant}, expected={language}, detected={detected_language}, lexical_tokens={}, phrase_match={phrase_match}, confidence={confidence:?}, audio_ms={audio_ms}, capture_ms={capture_ms}, inference_ms={inference_ms}, status={status}; transcript withheld", probabilities.len());
+            fast_accepted |= variant == "fixed-fast" && status == "accepted";
+        }
+        fast_accepted
     }
 
     #[test]

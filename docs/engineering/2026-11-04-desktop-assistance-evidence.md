@@ -50,6 +50,8 @@ El usuario confirmó que pronunció ambas frases completas. El micrófono de Win
 | Memoria | Pico de working set muestreado: 150.9 MiB, sondeo cada 25 ms. No es el máximo de memoria comprometida del sistema. |
 | Cancelación | Seis repeticiones posteriores: 19, 23, 32, 36, 36 y 44 ms; todas bajo 250 ms. Una ejecución previa tardó 10 518 ms y falló el límite; el outlier no se oculta y p95 no se declara aprobado. |
 
+En una comparación posterior, cada nueva captura se procesó con el modo actual (`auto`, 2 hilos, beam 5) y con `es/en` fijado (4 hilos, beam 1). Ambas configuraciones dieron cero segmentos para las muestras españolas e inglesas. Al no existir transcripción evaluable, las latencias de 383–536 ms de esa comparación no certifican reconocimiento ni rendimiento con habla; la única muestra inglesa con tokens sigue siendo la de baja confianza descrita arriba.
+
 El equipo reporta 4 procesadores lógicos y 3.39 GiB de RAM visible. Una primera ejecución sin frase se excluyó porque el usuario confirmó que aún no había hablado. La prueba con ambas frases no cumplió idioma/confianza ni latencia: el factor de tiempo real observado en inglés fue ~6.5. No se ejecutó ninguna acción desde voz. No se puede afirmar precisión ES/EN, latencia objetivo ≤3 s ni p95 de cancelación con estas muestras.
 
 ## Verificación automatizada y límites
