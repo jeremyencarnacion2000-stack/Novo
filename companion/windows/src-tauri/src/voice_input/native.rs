@@ -368,6 +368,8 @@ struct Recording {
 }
 impl Drop for Recording {
     fn drop(&mut self) {
+        #[cfg(test)]
+        let started = Instant::now();
         unsafe {
             if let Some(handle) = self.handle {
                 let _ = waveInReset(handle);
@@ -382,11 +384,17 @@ impl Drop for Recording {
             }
             let _ = CloseHandle(self.event);
         }
+        #[cfg(test)]
+        eprintln!("MIC CLEANUP {} ms", started.elapsed().as_millis());
     }
 }
 fn record(request: &Request) -> Result<Vec<i16>, String> {
     unsafe {
+        #[cfg(test)]
+        let started = Instant::now();
         let event = CreateEventW(None, false, false, None).map_err(|_| "microphone_unavailable")?;
+        #[cfg(test)]
+        eprintln!("MIC EVENT {} ms", started.elapsed().as_millis());
         let mut recording = Recording {
             handle: None,
             event,
@@ -415,6 +423,8 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
         {
             return Err("microphone_unavailable".into());
         }
+        #[cfg(test)]
+        eprintln!("MIC OPEN {} ms", started.elapsed().as_millis());
         recording.handle = Some(handle);
         for _ in 0..3 {
             let mut buffer = Box::new([0i16; 1600]);
@@ -434,17 +444,23 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
                 return Err("microphone_unavailable".into());
             }
         }
+        #[cfg(test)]
+        eprintln!("MIC PREPARED {} ms", started.elapsed().as_millis());
         if request.cancelled.load(Ordering::SeqCst) {
             return Err("cancelled".into());
         }
         if waveInStart(handle) != 0 {
             return Err("microphone_unavailable".into());
         }
+        #[cfg(test)]
+        eprintln!("MIC STARTED {} ms", started.elapsed().as_millis());
         let started = Instant::now();
         let mut samples = Vec::with_capacity(MAX_SAMPLES);
         let mut gate = SignalGate::default();
         'capture: while started.elapsed() < Duration::from_secs(20) && samples.len() < MAX_SAMPLES {
             if request.cancelled.load(Ordering::SeqCst) {
+                #[cfg(test)]
+                eprintln!("MIC SAW CANCEL {} ms", started.elapsed().as_millis());
                 return Err("cancelled".into());
             }
             if request.finish.load(Ordering::SeqCst) {
@@ -481,5 +497,160 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
             return Err("no_speech".into());
         }
         Ok(samples)
+    }
+}
+
+#[cfg(test)]
+mod physical_acceptance {
+    use super::*;
+    use std::io::Write;
+
+    fn normalized(value: &str) -> String {
+        value
+            .chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect()
+    }
+
+    fn recognize_phrase(resources: &Path, phrase: &str, language: &str) -> bool {
+        let request = Request {
+            id: uuid::Uuid::new_v4().to_string(),
+            cancelled: Arc::new(AtomicBool::new(false)),
+            finish: AtomicBool::new(false),
+            done: AtomicBool::new(false),
+            reason: Mutex::new(None),
+        };
+        print!("MIC CAPTURE ({language}) starts in 4 seconds: say ‘{phrase}’; silence stops capture.\n");
+        let _ = std::io::stdout().flush();
+        std::thread::sleep(Duration::from_secs(4));
+        let started = Instant::now();
+        let samples = record(&request).expect("physical microphone capture failed");
+        let capture_ms = started.elapsed().as_millis();
+        let audio_ms = samples.len() as u128 * 1000 / 16_000;
+        assert!(
+            memory_ready(available_memory()),
+            "insufficient available memory for local speech"
+        );
+
+        let root = crate::platform::local_dir().join("voice-requests");
+        crate::platform::ensure_private_dir(&root)
+            .expect("could not prepare private speech temp directory");
+        let directory = root.join(&request.id);
+        fs::create_dir(&directory).expect("could not create private speech request directory");
+        let files = Files(directory);
+        fs::write(files.0.join("recording.wav"), wav(&samples).unwrap()).unwrap();
+        let mut args: Vec<String> = [
+            "--no-gpu",
+            "--threads",
+            "2",
+            "--processors",
+            "1",
+            "--language",
+            "auto",
+            "--vad",
+            "--no-prints",
+            "--output-json-full",
+            "--temperature",
+            "0",
+            "--temperature-inc",
+            "0",
+            "--logprob-thold",
+            "-0.65",
+            "--no-speech-thold",
+            "0.6",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        for (flag, path) in [
+            ("--model", resources.join("ggml-tiny-q5_1.bin")),
+            ("--vad-model", resources.join("ggml-silero-v6.2.0.bin")),
+            ("--file", files.0.join("recording.wav")),
+            ("--output-file", files.0.join("result")),
+        ] {
+            args.push(flag.into());
+            args.push(path.to_string_lossy().into_owned());
+        }
+        let started = Instant::now();
+        let output = crate::project_work::process::run_guarded(
+            &resources.join("whisper-cli.exe"),
+            &args,
+            Some(resources),
+            None,
+            60,
+            64 * 1024,
+            request.cancelled.clone(),
+        )
+        .expect("local Whisper/Silero process failed");
+        let inference_ms = started.elapsed().as_millis();
+        assert!(
+            output.success,
+            "local Whisper/Silero process returned an error"
+        );
+        let result = fs::read(files.0.join("result.json")).unwrap();
+        let value: Value = serde_json::from_slice(&result).unwrap();
+        let detected_language = value["result"]["language"].as_str().unwrap_or("missing");
+        let probabilities: Vec<f64> = value["transcription"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .flat_map(|segment| segment["tokens"].as_array().into_iter().flatten())
+            .filter(|token| token["id"].as_u64().is_some_and(|id| id < 50257))
+            .filter_map(|token| token["p"].as_f64().filter(|p| *p > 0.0 && *p <= 1.0))
+            .collect();
+        let confidence = (!probabilities.is_empty()).then(|| {
+            (probabilities.iter().map(|p| p.ln()).sum::<f64>() / probabilities.len() as f64).exp()
+        });
+        let status = match transcript(&result) {
+            Ok(text) if normalized(&text).contains(&normalized(phrase)) => "accepted".into(),
+            Ok(_) => "mismatch".into(),
+            Err(code) => code,
+        };
+        println!("VOICE MODEL: expected={language}, detected={detected_language}, lexical_tokens={}, confidence={confidence:?}, audio_ms={audio_ms}, capture_ms={capture_ms}, inference_ms={inference_ms}, status={status}; transcript withheld", probabilities.len());
+        status == "accepted"
+    }
+
+    #[test]
+    #[ignore = "Manual physical microphone acceptance; requires the user to speak two phrases"]
+    fn physical_microphone_whisper_silero_es_en() {
+        let resources = crate::platform::local_dir().join("voice");
+        assert!(
+            resources.join("whisper-cli.exe").is_file(),
+            "installed Whisper resources missing"
+        );
+        let es = recognize_phrase(
+            &resources,
+            "Novo, abre Codex y continuemos con ClickHome",
+            "es",
+        );
+        let en = recognize_phrase(
+            &resources,
+            "Novo, open Codex and continue with ClickHome",
+            "en",
+        );
+        assert!(es, "Spanish physical recognition did not pass");
+        assert!(en, "English physical recognition did not pass");
+    }
+
+    #[test]
+    #[ignore = "Manual physical microphone cancellation check"]
+    fn physical_microphone_cancel_stops_capture() {
+        let request = Arc::new(Request {
+            id: uuid::Uuid::new_v4().to_string(),
+            cancelled: Arc::new(AtomicBool::new(false)),
+            finish: AtomicBool::new(false),
+            done: AtomicBool::new(false),
+            reason: Mutex::new(None),
+        });
+        let capture = request.clone();
+        let worker = std::thread::spawn(move || record(&capture));
+        std::thread::sleep(Duration::from_millis(500));
+        let started = Instant::now();
+        request.cancelled.store(true, Ordering::SeqCst);
+        assert!(matches!(worker.join().unwrap(), Err(ref code) if code == "cancelled"));
+        let elapsed_ms = started.elapsed().as_millis();
+        println!("VOICE CANCEL RESULT: cancellation completed in {elapsed_ms} ms");
+        assert!(elapsed_ms <= 250, "microphone cancellation exceeded 250 ms");
     }
 }

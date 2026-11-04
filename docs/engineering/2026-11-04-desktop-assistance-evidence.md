@@ -1,61 +1,76 @@
-# Asistencia de escritorio: evidencia de desarrollo
+# Asistencia de escritorio: evidencia de aceptación
 
-Fecha: 2026-11-04. Base: Companion 0.2.16, commit `ea7b2d6`. Rama: `codex/companion-desktop-flow`. El ejecutable instalado continúa en 0.2.16; estos cambios de desarrollo no se han instalado ni publicado en producción.
+Fecha: 2026-11-04. PR #41 sigue en borrador. Rama `codex/companion-desktop-flow`, código base instalado 0.2.16. El ejecutable instalado sigue en 0.2.16; no se instaló el candidato ni se publicó o fusionó nada.
 
-## Flujo implementado
+## Estado del candidato
 
-La misma entrada Enviar usada por texto y dictado manual reconoce «Novo, abre Visual Studio Code y continuemos con ClickHome». Resuelve una app registrada por nombre o alias exacto, verifica la cuenta y los permisos locales, ejecuta la apertura y espera una ventana observable. Después consulta el contexto autorizado del proyecto una vez. Si falta evidencia o hay dos proyectos locales con el mismo nombre, pide información. Con evidencia, entrega la continuación y el contexto preparado al `NovoChatController` existente; respeta modelo, conversación, Twin y permisos disponibles. No hay otro orquestador ni llamada al modelo para abrir/controlar apps.
+- `npm run tauri build` generó EXE NSIS y MSI de 0.2.17. Versiones internas del ejecutable: 0.2.17. Ambos instaladores son **NotSigned**.
+- Paquetes y SHA-256 en `companion/windows/.tmp/candidates/0.2.17/manifest.json`. El candidato sigue local y sin instalar.
+- La copia de reversión en `rollback-0.2.16/` conserva binarios y 16 recursos de voz verificados (52.75 MB). Excluye configuración, tokens, bandeja de entrada, proyectos, actividad y registros. Los ajustes actuales permanecen en `%APPDATA%` y no se copiaron.
+- Se compararon tamaño y SHA-256 de los 16 recursos de voz de la rama con la instalación 0.2.16: coincidieron todos.
 
-Windows no tiene VS Code disponible en este PC. El usuario eligió usar lo existente y confirmó que sólo usa Codex por espacio. La orden de VS Code devuelve app ausente; no sustituye silenciosamente su destino. La prueba de apertura se realizó con Codex y la de cambios de ventana con Bloc de notas.
+## Flujo de escritorio implementado
+
+La misma entrada Enviar usada por texto y dictado manual reconoce «Novo, abre Visual Studio Code y continuemos con ClickHome». Resuelve una app registrada por nombre o alias exacto, verifica cuenta y permisos locales, ejecuta la apertura y espera una ventana observable. Después consulta una vez el contexto autorizado del proyecto. Sin evidencia o con raíces ambiguas, pide información. Con evidencia, reutiliza el `NovoChatController`, conversación, modelo y permisos existentes. No hay un segundo orquestador ni una llamada al modelo para abrir/controlar apps.
+
+En este PC no está instalado VS Code. El usuario indicó que usa Codex por falta de espacio. No se instaló VS Code. La prueba nativa encontró Codex ya abierto y devolvió `already_open` sin enfocarlo ni cambiar el chat. Bloc de notas se usó para comprobar cambios de ventana reales.
 
 ## Catálogo y permisos
 
-- AppsFolder de Windows se consulta mediante un único programa fijo, sin perfil, oculto y acotado a 8 s/1 MiB/1024 entradas. Reutiliza el ejecutor protegido existente. Caché de 60 s y actualización manual en configuración.
-- Acepta ejecutables canónicos registrados y apps empaquetadas con identidad válida; documentos, scripts y accesos cuyos ejecutables desaparecieron quedan fuera. No descubre ejecutables portables sin registro.
-- Rutas, argumentos, identidad de lanzamiento y HWND permanecen en Rust. La interfaz recibe IDs opacos, nombres y permisos. Los IDs de apps registradas siguen su registro Windows, no el directorio de versión del ejecutable. Los accesos equivalentes al mismo ejecutable se agrupan y comparten la comprobación más restrictiva de sus permisos.
-- Apertura y control local están habilitados por defecto, con exclusiones editables por app. Leer títulos de ventanas comienza apagado. Esto no concede lectura del contenido de las aplicaciones.
-- Los cambios de política sólo se aceptan desde la ventana de configuración. Guardar preferencias generales no puede reemplazar la política. El comando legado comparte la misma comprobación. Un archivo existente ilegible, truncado o vacío bloquea los permisos de escritorio; una instalación sin archivo usa los valores iniciales generales.
-- Se verifica la cuenta real antes de actuar y la política se comprueba al ejecutar. Se reutilizan las identidades/cancelación de solicitudes de cuenta. Los identificadores de ventana vencen a los 30 s y se vuelve a comprobar la identidad del proceso antes del cambio.
-- El servidor compatible conserva el scope remoto `device:desktop:control` para abrir/controlar. Los permisos locales de apertura, control y lectura son independientes; un scope remoto exclusivo de apertura requerirá otra versión de protocolo.
+- AppsFolder de Windows se consulta mediante un ejecutable fijo, oculto y limitado a 8 s, 1 MiB y 1024 entradas. Caché de 60 s y actualización manual en configuración.
+- Acepta ejecutables canónicos registrados y apps empaquetadas con identidad válida. Documentos, scripts y accesos cuyo ejecutable desapareció se excluyen; no descubre ejecutables portátiles no registrados.
+- Rutas, argumentos, identidad de lanzamiento y HWND permanecen en Rust. La interfaz recibe IDs opacos, nombres y permisos. Accesos equivalentes al mismo ejecutable comparten la política más restrictiva.
+- Apertura y control locales comienzan habilitados con exclusiones editables; leer títulos comienza apagado y no da acceso al contenido de las aplicaciones.
+- Sólo configuración puede cambiar la política. El comando legado aplica las mismas comprobaciones. Configuración corrupta o vacía bloquea permisos; cada acción revalida cuenta y exclusiones. Los HWND caducan en 30 s y se comprueba de nuevo la identidad del proceso.
+- Apertura, control y lectura local están separados. El servidor aún agrupa abrir/controlar en `device:desktop:control`; un permiso remoto de sólo apertura requiere otro protocolo.
 
-## Pruebas reales en este Windows
+## Pruebas de Windows y cuenta
 
 | Comprobación | Resultado observado |
 | --- | --- |
-| Cuenta | Verificación real con permiso de control de escritorio concedido |
-| Catálogo | 73 aplicaciones utilizables; Antigravity rechazado porque su ejecutable registrado ya no existe |
-| Codex | Identidad empaquetada observada; apertura devuelve `already_open` sin enfocar ni cambiar el chat del usuario |
-| Bloc de notas | Ventana observada; minimizar, maximizar y restaurar verificados por Windows; sin cerrar procesos |
-| Lectura | Títulos ocultos cuando la lectura no está autorizada; no se registraron títulos ni contenido |
-| Identidad y exclusión | Un HWND de Bloc de notas rechazado como destino de otra app; apertura de Codex bloqueada tras excluirla en la política temporal de la prueba |
-| ClickHome | Una identidad de proyecto autorizada y 12 archivos con fragmentos relacionados |
-| Orquestación real | Una continuación real completada por `/api/companion/chat`: 226 caracteres y pregunta de aclaración presente; sin registrar el contenido privado |
-| Twin | El catálogo real del modelo no permite `twinMode` en la cuenta actual; la continuación respeta ese límite |
+| Cuenta | Verificación real con permiso remoto de control concedido |
+| Catálogo | 73 apps utilizables; Antigravity rechazado porque su ejecutable registrado ya no existe |
+| Codex | App identificada, `already_open`; no se enfocó ni se manipuló el chat |
+| Bloc de notas | Minimizar, maximizar y restaurar observados por Windows; ningún proceso se cerró |
+| Lectura y exclusión | Títulos ocultos sin permiso; Codex bloqueado por exclusión temporal; HWND de Bloc de notas rechazado como destino de otra app |
+| ClickHome | 1 identidad de proyecto autorizada y 12 archivos con fragmentos relacionados |
+| Chat real | `/api/companion/chat` completó una respuesta de 12 856 caracteres e incluyó una pregunta; no se evaluó semánticamente ni se guardó su contenido |
+| Twin | El modelo actual de la cuenta no permite `twinMode`; el chat respetó `allowsTwinMode:false` |
 
-La primera comprobación de ClickHome falló: una carpeta anterior agotaba el presupuesto global. La regresión con una carpeta ajena grande falló antes de corregirlo; ahora se prioriza la raíz elegida cuyo nombre aparece en la consulta y sus archivos antes de recorrer subdirectorios. La primera sonda de chat forzaba Twin y recibió 403; se corrigió la sonda para usar las capacidades reales del modelo, sin cambiar planes ni permisos.
+Las pruebas de texto inyectado confirman que dictar sólo prepara el borrador y que Enviar usa el mismo ejecutor; no se abre una app antes de Enviar. La consulta de contexto, la acción Windows y el chat real se probaron en sondas distintas, no como un único recorrido visual de principio a fin.
 
-## Verificación automatizada
+## Micrófono real, Whisper y Silero
 
-- Frontend completo: 426 pruebas aprobadas. TypeScript/Vite: compilación aprobada. Suite nativa: 278 aprobadas y 4 sondas manuales excluidas del recorrido habitual. Las tres sondas de escritorio/contexto/chat se ejecutaron aparte; la de voz Microsoft no se repitió.
-- Se comprobó con una transcripción inyectada en el receptor real del compositor que no se abre ninguna app antes de Enviar; después usa el mismo ejecutor. Esta prueba no certifica micrófono ni reconocimiento físico.
-- Pruebas de exclusiones, nombres ambiguos, cancelación antes de apertura, respuesta nativa válida, contexto ausente, reutilización de contexto sin otra búsqueda, configuración corrupta, persistencia de identidad tras actualizar el ejecutable y guardados rápidos de permisos.
-- Revisión independiente: cuatro hallazgos importantes reproducidos con pruebas antes del arreglo y corregidos. La verificación no se presenta como un benchmark de todas las apps.
+El usuario confirmó que pronunció ambas frases completas. El micrófono de Windows se abrió y cerró; el audio y los archivos JSON temporales se eliminaron. No se imprimió ni conservó la transcripción.
 
-Comandos nativos reales (manuales, excluidos de CI habitual):
+| Muestra | Resultado observado |
+| --- | --- |
+| Español: «Novo, abre Codex y continuemos con ClickHome» | 4.8 s capturados; el resultado no tuvo segmentos léxicos y la validación dio `no_speech`. No aprobada. |
+| Inglés: «Novo, open Codex and continue with ClickHome» | Idioma detectado `en`, 8 tokens léxicos, confianza geométrica 0.218 (<0.5); validación `speech_uncertain`. Inferencia 12 367 ms para 1.9 s de audio. No aprobada. |
+| Memoria | Pico de working set muestreado: 150.9 MiB, sondeo cada 25 ms. No es el máximo de memoria comprometida del sistema. |
+| Cancelación | Seis repeticiones posteriores: 19, 23, 32, 36, 36 y 44 ms; todas bajo 250 ms. Una ejecución previa tardó 10 518 ms y falló el límite; el outlier no se oculta y p95 no se declara aprobado. |
+
+El equipo reporta 4 procesadores lógicos y 3.39 GiB de RAM visible. Una primera ejecución sin frase se excluyó porque el usuario confirmó que aún no había hablado. La prueba con ambas frases no cumplió idioma/confianza ni latencia: el factor de tiempo real observado en inglés fue ~6.5. No se ejecutó ninguna acción desde voz. No se puede afirmar precisión ES/EN, latencia objetivo ≤3 s ni p95 de cancelación con estas muestras.
+
+## Verificación automatizada y límites
+
+- Frontend: 426 pruebas aprobadas; TypeScript/Vite compila.
+- Suite nativa tras los cambios: 278 aprobadas, 0 fallidas y 6 ignoradas, incluidas dos sondas físicas. El formato Rust del archivo cambiado pasa; `cargo fmt --all -- --check` falla por diferencias de formato preexistentes en otros archivos del workspace, que no se reformatearon.
+- Regresiones cubren exclusiones, nombres ambiguos, cancelación previa a apertura, contexto ausente/reutilizado, configuración corrupta, identificadores persistentes y cambios rápidos de permisos. Cuatro hallazgos de revisión se reprodujeron y corrigieron.
+- Las llamadas reales de ClickHome y chat se ejecutaron en la cuenta autorizada. Sin una prueba de voz aceptada, no se certifica dictado→borrador→Enviar→intención→acción→resultado→Twin en una sola interacción.
+- La captura visual de la ventana de Companion falló dos veces por timeout de Windows. La aceptación visual/responsive/accesible no se completó.
+- No se reinició la aplicación para comprobar recuperación integral. Los recibos durables de acciones tras reinicio siguen pendientes; las pruebas automatizadas no sustituyen un reinicio real.
+- Abrir Codex no equivale a ejecutar una tarea dentro de Codex. No hay herramientas locales habilitadas en el adaptador Codex.
+- Activación por palabra «Novo», conversación manos libres, otras apps empaquetadas, lectura de contenido de apps y UI Automation no están aceptadas ni implementadas.
+
+Pruebas manuales nativas realizadas:
 
 ```powershell
 cargo test --lib -p novo-companion real_windows_editor_and_notepad --locked -j1 -- --ignored --nocapture
 cargo test --lib -p novo-companion real_clickhome_authorized_context --locked -j1 -- --ignored --nocapture
 cargo test --lib -p novo-companion real_clickhome_continuation --locked -j1 -- --ignored --nocapture
+cargo test --lib -p novo-companion physical_microphone_whisper_silero_es_en --locked -j1 -- --ignored --nocapture
+cargo test --lib -p novo-companion physical_microphone_cancel_stops_capture --locked -j1 -- --ignored --nocapture
 ```
 
-## Pendiente y decisiones de alcance
-
-- Dictado físico ES/EN, ruido, latencia, consumo y cancelación medidos con micrófono. No se activó el micrófono en estas pruebas.
-- Activación «Novo» y conversación manos libres. El prefijo escrito/dictado no instala un detector de palabra de activación.
-- Verificación visual, responsive y accesibilidad de la nueva lista en la ventana nativa, y ensayo completo por el usuario tras empaquetar/instalar una candidata.
-- Apps empaquetadas distintas de Codex y restricciones de foco de Windows pueden requerir más compatibilidad; no se anuncia éxito si Windows no confirma la ventana.
-- Lectura de títulos sin permiso de control todavía no tiene un recorrido independiente en `desktop_app_windows`; la operación actual se usa para elegir destinos de control y oculta títulos sin permiso de lectura. Leer contenidos y UI Automation general no están implementados.
-- El chat con plan Codex conserva su aislamiento y no recibe herramientas locales. Abrir la app Codex es una operación de escritorio distinta de ejecutar trabajo dentro de ella.
-- No se hizo una evaluación semántica independiente de la respuesta del modelo; sí se observaron finalización y pregunta de aclaración. No se certifica que el Twin conozca la próxima tarea de ClickHome.
-- No se publicó ni mezcló a producción. Los recibos durables de escritorio tras reinicio siguen pendientes; la apertura evita repetir una app con ventana ya observable, sin afirmar recuperación completa.
+**Decisión:** conservar 0.2.17 como paquete local de diagnóstico; no instalarlo ni marcarlo listo. Resolver el rechazo y la latencia de voz, repetir calibración física, completar el recorrido unido y la revisión visual/reinicio antes de cambiar el estado del PR. No publicar ni fusionar sin autorización.
