@@ -42,7 +42,8 @@ const nextConfig = {
     ],
   },
   // ponytail: --webpack flag required for prod builds on Windows; Turbopack native binary segfaults
-  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma'],
+  // OIDC uses model constructor names for session lookup across Pages/App bundles.
+  serverExternalPackages: ['bcrypt', '@prisma/client', 'prisma', 'oidc-provider'],
   // Optimize for Vercel serverless functions
   poweredByHeader: false,
   async headers() {
