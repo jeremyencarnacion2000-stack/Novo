@@ -5,6 +5,8 @@ export function authorizationPollFailure(error:unknown):string|null {
       return 'Novo rechazó la verificación de esa autorización. No se guardó como una conexión válida.';
     case 'authorization_not_pending':
       return 'El intento ya terminó. Puedes iniciar una conexión nueva; no hay una autorización pendiente que verificar.';
+    case 'reconnect_required':
+      return 'Este PC ya está vinculado a la cuenta. Inicia una conexión nueva y confirma actualizar su acceso anterior.';
     case 'credential_store_unavailable':
       return 'La autorización no pudo completar su guardado protegido en Windows. Verifica la cuenta para recuperar el estado.';
     case 'settings_unavailable':case 'settings_save_failed':

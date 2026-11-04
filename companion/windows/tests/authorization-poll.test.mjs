@@ -10,6 +10,7 @@ test('a rejected candidate stops polling before it becomes a misleading missing-
 });
 test('finished attempts and protected-storage failures have distinct explanations',()=>{
   assert.match(authorizationPollFailure('authorization_not_pending'),/intento ya terminó/);
+  assert.match(authorizationPollFailure('reconnect_required'),/PC ya está vinculado/);
   assert.match(authorizationPollFailure('credential_store_unavailable'),/guardado protegido/);
   for(const code of ['settings_unavailable','settings_save_failed'])assert.match(authorizationPollFailure(code),/ajustes/);
 });
