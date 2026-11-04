@@ -18,6 +18,7 @@ mod query_context;
 mod desktop;
 mod desktop_apps;
 mod voice;
+mod voice_input;
 mod files;
 mod github;
 mod hooks;
@@ -96,6 +97,7 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
+    voice_input::cancel_all();
     let (screen_changed, autostart_changed, shortcuts_changed) = {
         let mut current = shared.settings.lock().unwrap();
         let screen_changed = current.screen != settings.screen;
@@ -713,6 +715,9 @@ pub fn run() {
             voice::voice_choices,
             voice::voice_speak,
             voice::voice_stop,
+            voice_input::voice_input_start,
+            voice_input::voice_input_finish,
+            voice_input::voice_input_cancel,
             companion::companion_status,
             novo_account::novo_account_status,
             novo_chat::novo_chat_models,
@@ -819,6 +824,7 @@ pub fn run() {
             desktop_apps::desktop_window_action,
         ])
         .setup(move |app| {
+            voice_input::initialize();
             let handle = app.handle().clone();
             tray::build(&handle)?;
             // Before the island: see create_settings_window.

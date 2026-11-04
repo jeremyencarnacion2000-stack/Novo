@@ -3,6 +3,11 @@ use serde::Serialize;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+#[cfg(windows)]
+pub(crate) fn session_unlocked() -> bool {
+    native::unlocked()
+}
+
 #[derive(Default)]
 struct Cancellations {
     ids: VecDeque<String>,
@@ -273,7 +278,7 @@ mod native {
         Ok(found)
     }
     // Fail closed on locked, disconnected or unqueryable Windows sessions.
-    fn unlocked() -> bool {
+    pub(super) fn unlocked() -> bool {
         unsafe {
             let mut ptr = PWSTR::null();
             let mut len = 0;

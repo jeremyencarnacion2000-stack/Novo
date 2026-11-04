@@ -1,6 +1,6 @@
 # Matriz de capacidades
 
-Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
 
 | Capacidad | Estado observado | Evidencia / validación pendiente |
 | --- | --- | --- |
@@ -23,8 +23,8 @@ Fecha: 2026-11-03. «Implementada sin verificar» significa que se encontró el 
 | Widget Windows separado | Fuente inactiva | `widget.rs`/`widget.ts` no están conectados al runtime/build normal; la isla Tauri es la representación operativa existente |
 | Dictado manual | Implementada sin verificar por hardware | Dictado del chat/browser; disponibilidad depende del motor y permisos |
 | Dictado web al chat actual | Publicada; pruebas automatizadas y receptor real verificados, audio simulado | PR #32: transcripción al borrador, texto/adjuntos conservados y envío manual por el mismo chat. Cambio de cuenta/selección/cierre invalida resultados; sin ejecutor separado en `/chat` y `/ai`. QA con sesión: cero envíos/acciones/guardados al recibir dictado. No certifica STT físico |
-| Dictado manual en Companion | Instalado con consentimiento explícito; audio físico pendiente | El permiso local está apagado por defecto y el motor de voz del navegador no inicia hasta permitirlo en Configuración; sigue siendo un servicio que puede procesar audio fuera de Novo, no STT offline |
-| Voz conversacional con VAD/interrupción | Parcial / planificada | Hay dictado y speech helpers; falta pipeline unificado medido ES/EN |
+| Dictado manual en Companion | Implementado en candidata 0.2.16; audio físico pendiente | whisper.cpp/Silero locales, modo local por defecto, límites de duración/memoria, texto al borrador y envío manual; modo nube separado con consentimiento explícito. La versión instalada sigue siendo 0.2.15 |
+| Voz conversacional con VAD/interrupción | Parcial / planificada | El STT local usa VAD durante dictado manual; falta conversación manos libres y medición real ES/EN |
 | Wake word local «Novo» | No implementada | No activar escucha continua hasta integrar detector local y aprobar medición física de falsos positivos, CPU, memoria y latencia |
 | Voz de respuesta | Implementada e instalada; síntesis española en memoria verificada | Windows Microsoft, español automático, leer/detener y lectura automática opcional en Novo/Codex. Falta comprobar audio audible y latencia de cancelación |
 | Conversación manos libres | No implementada | Faltan captura nativa, STT/VAD y bucle de escucha; el dictado disponible es manual revisable |
@@ -45,5 +45,5 @@ No se certificó como «completa y verificada» una capacidad externa por mera p
 | Voz Microsoft española | Helena instalada en este PC mediante Windows; síntesis fija en memoria comprobada sin altavoces |
 | Leer/detener respuesta en Novo y Codex | Instalado, con identidad de solicitud y cancelación al cambiar contexto; botón observado en la ventana actualizada |
 | Lectura automática | Opt-in desactivado por defecto; el historial cargado permanece silencioso |
-| Micrófono / wake word / STT local | No se activaron; implementación y piloto físico pendientes |
+| Micrófono manual / STT local / wake word | Código local implementado en candidata 0.2.16; hardware pendiente / wake word no implementada | Modelo y binario fijados/verificados; todavía no se ha capturado audio real ni medido calidad, consumo o latencia |
 | Cancelación ≤250 ms y calidad audible | Objetivos pendientes de medición; no se deducen de pruebas simuladas |

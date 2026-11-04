@@ -18,7 +18,7 @@ import { State, type ChatMessage, type Settings } from "../core/state";
 import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 import { NovoChatController } from '../core/novo-chat';
-import { SpeechDictation } from "../core/speech-dictation";
+import { CompanionDictation, dictationMessage } from "../core/companion-dictation";
 import {parseDesktopCommand,type DesktopWindowAction} from '../core/desktop-command';
 import { buildCodexPrompt } from './codex-chat';
 import { buildReplySpeech } from './reply-speech';
@@ -327,7 +327,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
 /** The signed-in Novo account and server history remain independent of local plan chat. */
 function buildAccountPrompt(onHeightChange: () => void): ViewHost {
-  let dictation: SpeechDictation | null = null;
+  let dictation: CompanionDictation | null = null;
   const playback=buildReplySpeech(()=>dictation?.cancel());
   const conversations=buildChoiceMenu('novo-conversations',t('Conversación de Novo'),value=>{++speechTurn;playback.stop();localExchange=null;localWindows=[];void controller.selectConversation(value);},open=>{body.classList.toggle('history-open',open);});
   const settingsButton=h('button',{type:'button',class:'novo-chat-settings','aria-label':tl('Configuración del chat'),title:tl('Configuración del chat'),onclick:()=>void Bridge.openSettingsWindow('assistant')},svg(ICONS.gear,12));
@@ -355,7 +355,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   let speechTurn=0;let speechAccount='';
   const currentSpeechTurn=(turn:number)=>!disposed&&turn===speechTurn&&State.view==='prompt';
   let stopSettings:(()=>void)|null=null;
-  dictation=new SpeechDictation({
+  dictation=new CompanionDictation({
     transcript(text){input.value=text;send.disabled=!controller.canSend||Boolean(dictation?.isListening);},
     listening(active){
       body.classList.toggle('voice-listening',active);
@@ -368,13 +368,14 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       State.stateOverride=active?"listening":null;
       State.notify();
       send.disabled=!controller.canSend||active;
+      input.disabled=active||localBusy||Boolean(controller.state.activeRequestId);
       onHeightChange();
     },
+    processing(){voiceStatus.textContent=t("Transcribing on this PC…");voiceStatus.hidden=false;State.stateOverride='thinking';State.notify();onHeightChange();},
     error(kind){
-      const message=kind==="unavailable"?t(N_("Speech recognition is not available on this device.")):kind==="permission"?t(N_("Microphone access was denied. Allow it in your device settings.")):kind==="no-speech"?t(N_("No speech was detected. Try again.")):t(N_("Voice dictation failed. Try again."));
-      voiceStatus.textContent=t(message);voiceStatus.hidden=false;voiceStatus.dataset.error='true';onHeightChange();
+      voiceStatus.textContent=dictationMessage(kind);voiceStatus.hidden=false;voiceStatus.dataset.error='true';onHeightChange();
     },
-  }, undefined, "es-BO");
+  });
   const controller=new NovoChatController({...Bridge,contextSearch:async query=>{
     const context=await Bridge.contextSearch(query);
     if(State.settings.novoLocalConnections){
@@ -388,19 +389,19 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   void onEvent<Settings>('settings-changed',settings=>{
     State.settings={...State.settings,...settings};
     playback.settingsChanged();
-    if(settings.voiceCloudConsent!==true)dictation?.cancel();
+    dictation?.cancel();
   }).then(stop=>{if(disposed)stop();else stopSettings=stop;});
 
   function draw() {
     if(disposed)return;
     const state=controller.state;const busy=state.activeRequestId!==null;
     const accountKey=state.account?.state==='connected'?state.account.authorization?.user.id??'':'';
-    if(accountKey!==speechAccount){speechAccount=accountKey;++speechTurn;playback.stop();localExchange=null;localWindows=[];}
+    if(accountKey!==speechAccount){speechAccount=accountKey;++speechTurn;playback.stop();dictation?.cancel();localExchange=null;localWindows=[];}
     const replies=(state.conversation?.messages??[]).filter(m=>m.role==='assistant');
     playback.update(state.account?.state==='connected'?`${state.account.authorization?.user.id}/${state.conversation?.id??''}`:'',localExchange?.response??replies[replies.length-1]?.content??'');
     connect.hidden=state.account?.state==='connected'||state.phase==='loading';
     conversations.setOptions([{value:'',label:t('Nueva conversación')},...state.conversations.map(c=>({value:c.id,label:c.title}))],state.conversation?.id??'',busy||localBusy||state.phase==='loading');
-    send.disabled=!controller.canSend||Boolean(dictation?.isListening)||localBusy;input.disabled=busy||localBusy;cancel.hidden=!busy;voiceButton.disabled=busy||localBusy;
+    send.disabled=!controller.canSend||Boolean(dictation?.isListening)||localBusy;input.disabled=busy||localBusy||Boolean(dictation?.isListening);cancel.hidden=!busy;voiceButton.disabled=busy||localBusy;
     error.textContent=state.error?.message??(state.phase==='loading'?'Verificando cuenta…':'');
     error.hidden=!error.textContent;
     if(renderedConversation!==state.conversation||renderedPending!==state.pendingMessage||renderedActive!==state.activeRequestId){
@@ -488,7 +489,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   voiceButton.addEventListener('click',()=>{
     playback.stop();
     if(dictation?.isListening){dictation.stop();return;}
-    if(!State.settings.voiceCloudConsent){
+    if(State.settings.voiceInputMode==='cloud'&&!State.settings.voiceCloudConsent){
       voiceStatus.textContent=t('Voice dictation is off. Enable it in Novo Settings → Assistant to allow the speech service to process audio.');
       voiceStatus.hidden=false;voiceStatus.dataset.error='true';
       void Bridge.openSettingsWindow('assistant');
@@ -503,7 +504,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   const stop=()=>{if(disposed)return;disposed=true;stopSettings?.();dictation?.dispose();playback.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
   window.addEventListener('beforeunload',stop);
   void controller.loadAccount();
-  return {el,sync(){syncFile();if(State.view!=='prompt'){++speechTurn;playback.stop();}},focus:()=>input.focus(),dispose:stop};
+  return {el,sync(){syncFile();if(State.view!=='prompt'){++speechTurn;playback.stop();dictation?.cancel();}},focus:()=>input.focus(),dispose:stop};
 }
 
 // Explicit legacy fixture/advanced adapter; never a fallback for Novo account errors.

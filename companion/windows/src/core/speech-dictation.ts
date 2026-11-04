@@ -1,4 +1,4 @@
-export type DictationError = "unavailable" | "permission" | "no-speech" | "failed";
+export type DictationError = "unavailable" | "permission" | "no-speech" | "failed" | "memory" | "resources" | "uncertain" | "disabled" | "busy" | "session" | "consent";
 
 interface RecognitionAlternativeLike { transcript: string }
 interface RecognitionResultLike { 0?: RecognitionAlternativeLike }

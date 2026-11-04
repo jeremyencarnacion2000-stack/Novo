@@ -3585,45 +3585,45 @@
   "Speech recognition is not available on this device.": {
    "zh-Hans": "此设备不支持语音识别。",
    "hi": "इस डिवाइस पर वाक् पहचान उपलब्ध नहीं है।",
-   "es": "El reconocimiento de voz no está disponible en este dispositivo.",
+   "es": "Este dispositivo no admite reconocimiento de voz.",
    "ar": "التعرّف على الكلام غير متاح على هذا الجهاز.",
    "fr": "La reconnaissance vocale n’est pas disponible sur cet appareil.",
-   "bn": "এই ডিভাইসে বক্তৃতা শনাক্তকরণ উপলভ্য নয়।",
-   "pt-BR": "O reconhecimento de fala não está disponível neste dispositivo.",
-   "ru": "Распознавание речи недоступно на этом устройстве.",
+   "bn": "এই ডিভাইসে ভয়েস শনাক্তকরণ উপলব্ধ নেই।",
+   "pt-BR": "O reconhecimento de voz não está disponível neste dispositivo.",
+   "ru": "На этом устройстве распознавание речи недоступно.",
    "id": "Pengenalan suara tidak tersedia di perangkat ini."
   },
   "Microphone access was denied. Allow it in your device settings.": {
-   "zh-Hans": "麦克风访问被拒绝。请在设备设置中允许访问。",
-   "hi": "माइक्रोफ़ोन की अनुमति नहीं मिली। डिवाइस सेटिंग में इसे अनुमति दें।",
-   "es": "Se denegó el acceso al micrófono. Permítelo en la configuración del dispositivo.",
-   "ar": "تم رفض الوصول إلى الميكروفون. اسمح به من إعدادات الجهاز.",
-   "fr": "L’accès au micro a été refusé. Autorisez-le dans les réglages de l’appareil.",
-   "bn": "মাইক্রোফোনে প্রবেশাধিকার দেওয়া হয়নি। ডিভাইস সেটিংসে অনুমতি দিন।",
-   "pt-BR": "O acesso ao microfone foi negado. Permita-o nas configurações do dispositivo.",
+   "zh-Hans": "麦克风权限被拒绝。请在设备设置中允许使用麦克风。",
+   "hi": "माइक्रोफ़ोन की अनुमति अस्वीकार की गई। डिवाइस सेटिंग में अनुमति दें।",
+   "es": "Se denegó el acceso al micrófono. Permítelo en los ajustes del dispositivo.",
+   "ar": "تم رفض الوصول إلى الميكروفون. اسمح به في إعدادات الجهاز.",
+   "fr": "L’accès au microphone a été refusé. Autorisez-le dans les réglages de l’appareil.",
+   "bn": "মাইক্রোফোন ব্যবহারের অনুমতি নেই। ডিভাইস সেটিংসে অনুমতি দিন।",
+   "pt-BR": "O acesso ao microfone foi negado. Autorize-o nas configurações do dispositivo.",
    "ru": "Доступ к микрофону запрещён. Разрешите его в настройках устройства.",
-   "id": "Akses mikrofon ditolak. Izinkan di setelan perangkat Anda."
+   "id": "Akses mikrofon ditolak. Izinkan di pengaturan perangkat."
   },
   "No speech was detected. Try again.": {
-   "zh-Hans": "没有检测到语音。请重试。",
+   "zh-Hans": "未检测到语音，请重试。",
    "hi": "कोई आवाज़ नहीं मिली। फिर कोशिश करें।",
    "es": "No se detectó voz. Inténtalo de nuevo.",
    "ar": "لم يتم اكتشاف كلام. حاول مرة أخرى.",
-   "fr": "Aucune parole détectée. Réessayez.",
+   "fr": "Aucune voix détectée. Réessayez.",
    "bn": "কোনো কথা শনাক্ত হয়নি। আবার চেষ্টা করুন।",
    "pt-BR": "Nenhuma fala foi detectada. Tente novamente.",
    "ru": "Речь не обнаружена. Попробуйте ещё раз.",
    "id": "Tidak ada ucapan yang terdeteksi. Coba lagi."
   },
   "Voice dictation failed. Try again.": {
-   "zh-Hans": "语音听写失败。请重试。",
+   "zh-Hans": "语音听写失败，请重试。",
    "hi": "वॉइस डिक्टेशन विफल हुआ। फिर कोशिश करें।",
-   "es": "Falló el dictado por voz. Inténtalo de nuevo.",
-   "ar": "تعذّر الإملاء الصوتي. حاول مرة أخرى.",
+   "es": "Falló el dictado de voz. Inténtalo de nuevo.",
+   "ar": "فشل الإملاء الصوتي. حاول مرة أخرى.",
    "fr": "La dictée vocale a échoué. Réessayez.",
    "bn": "ভয়েস ডিক্টেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
    "pt-BR": "O ditado por voz falhou. Tente novamente.",
-   "ru": "Голосовой ввод не сработал. Попробуйте ещё раз.",
+   "ru": "Не удалось выполнить голосовую диктовку. Попробуйте ещё раз.",
    "id": "Dikte suara gagal. Coba lagi."
   },
   "The speech service may process audio outside Novo. Novo receives only the text you send.": {
@@ -3647,6 +3647,138 @@
    "pt-BR": "O ditado por voz está desativado. Ative-o em Configurações do Novo → Assistente para permitir que o serviço processe o áudio.",
    "ru": "Голосовая диктовка выключена. Включите её в настройках Novo → Ассистент, чтобы разрешить обработку аудио голосовому сервису.",
    "id": "Dikte suara nonaktif. Aktifkan di Pengaturan Novo → Asisten agar layanan suara dapat memproses audio."
+  },
+  "Voice stopped because Windows is locked or unavailable.": {
+   "zh-Hans": "Windows 已锁定或不可用，语音已停止。",
+   "hi": "Windows लॉक या अनुपलब्ध होने के कारण आवाज़ रुक गई।",
+   "es": "La voz se detuvo porque Windows está bloqueado o no está disponible.",
+   "ar": "توقّف الصوت لأن Windows مقفل أو غير متاح.",
+   "fr": "La voix s’est arrêtée car Windows est verrouillé ou indisponible.",
+   "bn": "Windows লক বা অনুপলব্ধ থাকায় ভয়েস বন্ধ হয়েছে।",
+   "pt-BR": "A voz parou porque o Windows está bloqueado ou indisponível.",
+   "ru": "Голос остановлен, потому что Windows заблокирована или недоступна.",
+   "id": "Suara dihentikan karena Windows terkunci atau tidak tersedia."
+  },
+  "Another microphone request is still stopping. Try again in a moment.": {
+   "zh-Hans": "麦克风仍在停止，请稍后重试。",
+   "hi": "माइक्रोफ़ोन अभी बंद हो रहा है। थोड़ी देर बाद फिर कोशिश करें।",
+   "es": "El micrófono todavía se está deteniendo. Inténtalo en un momento.",
+   "ar": "ما زال الميكروفون قيد الإيقاف. حاول مرة أخرى بعد قليل.",
+   "fr": "Le microphone est en cours d’arrêt. Réessayez dans un instant.",
+   "bn": "মাইক্রোফোনটি এখনও বন্ধ হচ্ছে। একটু পরে আবার চেষ্টা করুন।",
+   "pt-BR": "O microfone ainda está parando. Tente novamente em instantes.",
+   "ru": "Микрофон ещё останавливается. Повторите попытку чуть позже.",
+   "id": "Mikrofon masih berhenti. Coba lagi sebentar lagi."
+  },
+  "Connected speech service": {
+   "zh-Hans": "联网语音服务",
+   "hi": "कनेक्टेड वाक् सेवा",
+   "es": "Servicio de voz conectado",
+   "ar": "خدمة كلام متصلة",
+   "fr": "Service vocal connecté",
+   "bn": "সংযুক্ত ভয়েস পরিষেবা",
+   "pt-BR": "Serviço de voz conectado",
+   "ru": "Подключённая служба распознавания речи",
+   "id": "Layanan suara terhubung"
+  },
+  "Off": {
+   "zh-Hans": "关闭",
+   "hi": "बंद",
+   "es": "Desactivado",
+   "ar": "متوقف",
+   "fr": "Désactivé",
+   "bn": "বন্ধ",
+   "pt-BR": "Desativado",
+   "ru": "Выкл.",
+   "id": "Nonaktif"
+  },
+  "Local dictation starts only when you press the microphone. Review the text before sending. Audio stays on this PC; low memory stops recognition.": {
+   "zh-Hans": "本地听写仅在点击麦克风时启动。发送前请检查文本。音频保留在此电脑；内存不足时识别会停止。",
+   "hi": "स्थानीय डिक्टेशन केवल माइक्रोफ़ोन दबाने पर शुरू होता है। भेजने से पहले पाठ जाँचें। ऑडियो इसी PC पर रहता है; कम मेमोरी पर पहचान रुक जाती है।",
+   "es": "El dictado local comienza sólo al pulsar el micrófono. Revisa el texto antes de enviarlo. El audio se queda en este PC; si falta memoria, se detiene el reconocimiento.",
+   "ar": "يبدأ الإملاء المحلي عند الضغط على الميكروفون فقط. راجع النص قبل الإرسال. يبقى الصوت على هذا الكمبيوتر؛ ويتوقف التعرّف عند انخفاض الذاكرة.",
+   "fr": "La dictée locale démarre uniquement lorsque vous appuyez sur le micro. Relisez le texte avant l’envoi. L’audio reste sur ce PC ; la reconnaissance s’arrête si la mémoire manque.",
+   "bn": "স্থানীয় ডিক্টেশন শুধু মাইক্রোফোন চাপলে শুরু হয়। পাঠানোর আগে লেখা দেখুন। অডিও এই PC-তেই থাকে; মেমোরি কম হলে শনাক্তকরণ থেমে যায়।",
+   "pt-BR": "O ditado local começa apenas quando você toca no microfone. Revise o texto antes de enviar. O áudio fica neste PC; se faltar memória, o reconhecimento para.",
+   "ru": "Локальная диктовка запускается только после нажатия на микрофон. Проверьте текст перед отправкой. Аудио остаётся на этом ПК; при нехватке памяти распознавание останавливается.",
+   "id": "Dikte lokal dimulai hanya saat Anda menekan mikrofon. Periksa teks sebelum mengirim. Audio tetap di PC ini; pengenalan berhenti jika memori tidak cukup."
+  },
+  "Local speech files are missing or damaged. Reinstall Novo Companion.": {
+   "zh-Hans": "本地语音文件缺失或损坏。请重新安装 Novo Companion。",
+   "hi": "स्थानीय वाक् फ़ाइलें मौजूद नहीं हैं या क्षतिग्रस्त हैं। Novo Companion फिर से इंस्टॉल करें।",
+   "es": "Faltan archivos de voz local o están dañados. Reinstala Novo Companion.",
+   "ar": "ملفات الصوت المحلية مفقودة أو تالفة. أعد تثبيت Novo Companion.",
+   "fr": "Les fichiers vocaux locaux sont absents ou endommagés. Réinstallez Novo Companion.",
+   "bn": "স্থানীয় ভয়েস ফাইল নেই বা ক্ষতিগ্রস্ত। Novo Companion আবার ইনস্টল করুন।",
+   "pt-BR": "Os arquivos de voz local estão ausentes ou danificados. Reinstale o Novo Companion.",
+   "ru": "Локальные голосовые файлы отсутствуют или повреждены. Переустановите Novo Companion.",
+   "id": "File suara lokal tidak ada atau rusak. Instal ulang Novo Companion."
+  },
+  "Voice input is off. Choose an input mode in Settings → Assistant.": {
+   "zh-Hans": "语音输入已关闭。请在“设置 → 助手”中选择输入模式。",
+   "hi": "वॉइस इनपुट बंद है। सेटिंग → असिस्टेंट में इनपुट मोड चुनें।",
+   "es": "La entrada de voz está desactivada. Elige un modo en Configuración → Asistente.",
+   "ar": "إدخال الصوت متوقف. اختر نمط إدخال من الإعدادات ← المساعد.",
+   "fr": "La saisie vocale est désactivée. Choisissez un mode dans Paramètres → Assistant.",
+   "bn": "ভয়েস ইনপুট বন্ধ। সেটিংস → Assistant-এ একটি মোড বেছে নিন।",
+   "pt-BR": "A entrada de voz está desligada. Escolha um modo em Configurações → Assistente.",
+   "ru": "Голосовой ввод выключен. Выберите режим в Настройки → Ассистент.",
+   "id": "Input suara nonaktif. Pilih mode di Pengaturan → Asisten."
+  },
+  "Local · Spanish and English": {
+   "zh-Hans": "本地 · 西班牙语和英语",
+   "hi": "स्थानीय · स्पेनिश और अंग्रेज़ी",
+   "es": "Local · español e inglés",
+   "ar": "محلي · الإسبانية والإنجليزية",
+   "fr": "Local · espagnol et anglais",
+   "bn": "স্থানীয় · স্প্যানিশ ও ইংরেজি",
+   "pt-BR": "Local · espanhol e inglês",
+   "ru": "Локально · испанский и английский",
+   "id": "Lokal · Spanyol dan Inggris"
+  },
+  "Not enough free memory for local speech. Close other apps and try again.": {
+   "zh-Hans": "本地语音可用内存不足。请关闭其他应用后重试。",
+   "hi": "स्थानीय वाक् के लिए पर्याप्त खाली मेमोरी नहीं है। अन्य ऐप बंद करके फिर कोशिश करें।",
+   "es": "Falta memoria libre para reconocer la voz en este PC. Cierra otras apps e inténtalo de nuevo.",
+   "ar": "لا توجد ذاكرة كافية للتعرّف المحلي على الكلام. أغلق التطبيقات الأخرى وحاول مجددًا.",
+   "fr": "Mémoire insuffisante pour la reconnaissance locale. Fermez d’autres applications et réessayez.",
+   "bn": "স্থানীয় ভয়েস শনাক্তকরণের জন্য মেমোরি কম। অন্য অ্যাপ বন্ধ করে আবার চেষ্টা করুন।",
+   "pt-BR": "Memória insuficiente para reconhecimento local. Feche outros apps e tente novamente.",
+   "ru": "Недостаточно свободной памяти для локального распознавания. Закройте другие приложения и повторите попытку.",
+   "id": "Memori bebas tidak cukup untuk pengenalan lokal. Tutup aplikasi lain lalu coba lagi."
+  },
+  "I could not understand that clearly. Please try again.": {
+   "zh-Hans": "没有听清楚，请重试。",
+   "hi": "मैं ठीक से समझ नहीं पाया। कृपया फिर कोशिश करें।",
+   "es": "No pude entenderlo con claridad. Inténtalo de nuevo.",
+   "ar": "لم أتمكن من فهم ذلك بوضوح. حاول مرة أخرى.",
+   "fr": "Je n’ai pas bien compris. Veuillez réessayer.",
+   "bn": "আমি স্পষ্টভাবে বুঝতে পারিনি। আবার চেষ্টা করুন।",
+   "pt-BR": "Não consegui entender com clareza. Tente novamente.",
+   "ru": "Не удалось точно распознать речь. Попробуйте ещё раз.",
+   "id": "Saya tidak menangkap ucapan dengan jelas. Silakan coba lagi."
+  },
+  "Voice input": {
+   "zh-Hans": "语音输入",
+   "hi": "वॉइस इनपुट",
+   "es": "Entrada de voz",
+   "ar": "إدخال الصوت",
+   "fr": "Saisie vocale",
+   "bn": "ভয়েস ইনপুট",
+   "pt-BR": "Entrada de voz",
+   "ru": "Голосовой ввод",
+   "id": "Input suara"
+  },
+  "Transcribing on this PC…": {
+   "zh-Hans": "正在此电脑上转写…",
+   "hi": "इस PC पर आवाज़ लिखी जा रही है…",
+   "es": "Transcribiendo en este PC…",
+   "ar": "جارٍ تحويل الكلام إلى نص على هذا الكمبيوتر…",
+   "fr": "Transcription en cours sur ce PC…",
+   "bn": "এই PC-তে কথার লেখা তৈরি হচ্ছে…",
+   "pt-BR": "Transcrevendo neste PC…",
+   "ru": "Распознавание речи на этом ПК…",
+   "id": "Mentranskripsikan di PC ini…"
   }
  }
 }

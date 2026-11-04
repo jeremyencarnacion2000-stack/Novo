@@ -31,7 +31,7 @@ export async function prepareVoiceResources() {
   const binaries = extracted.filter(name => /(^|[\\/])(whisper-cli\.exe|whisper\.dll|ggml(?:-base|-cpu-[a-z0-9]+)?\.dll)$/.test(name));
   for (const name of binaries) await copyFile(join(cache, 'extracted', name), join(dest, name.split(/[\\/]/).pop()));
   for (const asset of lock.downloads.filter(asset => asset.name !== 'whisper.zip')) await copyFile(join(cache, asset.name), join(dest, asset.name));
-  await copyFile(join(root, 'VOICE-LICENSES.txt'), join(dest, 'VOICE-LICENSES.txt'));
+  await writeFile(join(dest, 'VOICE-LICENSES.txt'), (await readFile(join(root, 'VOICE-LICENSES.txt'), 'utf8')).replaceAll('\r\n', '\n'));
   const files = [];
   for (const name of (await readdir(dest)).sort()) {
     if (!(await stat(join(dest, name))).isFile()) throw new Error('Unexpected speech resource');

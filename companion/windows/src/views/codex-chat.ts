@@ -1,6 +1,6 @@
 import { Bridge, onEvent } from '../core/bridge';
 import { State, type ChatMessage, type Settings } from '../core/state';
-import { SpeechDictation } from '../core/speech-dictation';
+import { CompanionDictation, dictationMessage } from '../core/companion-dictation';
 import { Sound } from '../core/sound';
 import { N_, t } from '../i18n/i18n';
 import { h, svg, clear } from './dom';
@@ -34,7 +34,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   const header = h('div', { class: 'novo-chat-heading' }, h('span', { text: 'ChatGPT Codex' }), fresh, playback.el, settings);
   const body = h('div', { class: 'chat-body novo-chat-body' }, header, file, log, status, playback.status, h('div', { class: 'chat-bar' }, input, mic, send));
   const el = h('div', { class: 'view' }, h('div', { class: 'card wash chat-card' }, body));
-  const dictation = new SpeechDictation({
+  const dictation = new CompanionDictation({
     transcript(text) { input.value = text; controls(); },
     listening(active) {
       body.classList.toggle('voice-listening', active);
@@ -45,20 +45,19 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
       State.notify();
       controls();
     },
-    error(kind) {
-      status.textContent = kind === 'unavailable' ? t("Speech recognition is not available on this device.") : kind === 'permission' ? t("Microphone access was denied. Allow it in your device settings.") : kind === 'no-speech' ? t("No speech was detected. Try again.") : t("Voice dictation failed. Try again.");
-    },
-  }, undefined, 'es-BO');
+    processing(){status.textContent=t("Transcribing on this PC…");State.stateOverride='thinking';State.notify();},
+    error(kind) { status.textContent = dictationMessage(kind); },
+  });
   let stopSettings:(()=>void)|null=null;
   void onEvent<Settings>('settings-changed',settings=>{
     State.settings={...State.settings,...settings};
     playback.settingsChanged();
-    if(settings.voiceCloudConsent!==true)dictation.cancel();
+    dictation.cancel();
   }).then(stop=>{if(disposed)stop();else stopSettings=stop;});
 
   function controls() {
     send.disabled = !ready || busy || dictation.isListening;
-    input.disabled = busy || !ready;
+    input.disabled = busy || !ready || dictation.isListening;
     mic.disabled = busy || !ready;
   }
   function draw() {
@@ -127,7 +126,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   mic.addEventListener('click', () => {
     playback.stop();
     if (dictation.isListening) { dictation.stop(); return; }
-    if (!State.settings.voiceCloudConsent) {
+    if (State.settings.voiceInputMode==='cloud'&&!State.settings.voiceCloudConsent) {
       status.textContent = t(N_("Voice dictation is off. Enable it in Novo Settings → Assistant to allow the speech service to process audio."));
       void Bridge.openSettingsWindow('assistant');
       return;
@@ -155,7 +154,7 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   window.addEventListener('beforeunload', stop);
   void reset();
   return { el, sync() {
-    if(State.view!=='prompt')playback.stop();
+    if(State.view!=='prompt'){playback.stop();dictation.cancel();}
     const name = State.droppedFile?.name ?? '';
     file.textContent = name ? `${name} · archivo local, no compartido` : '';
     file.hidden = !name;

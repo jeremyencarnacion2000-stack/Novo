@@ -33,7 +33,7 @@ Adaptadores existentes: Gmail, Calendar, proyectos, MCP, runtime local
 4. Integrar workflows nativos concretos mediante API de aplicación/sistema. UI Automation sólo cuando falte un contrato estructurado, con permiso por capacidad.
 5. Handoff con identidad de tarea, checkpoint mínimo y capacidades del dispositivo; no copiar automáticamente toda la conversación o disco.
 
-Primer paso de voz implementado en las rutas de chat: captura existente → transcripción → borrador actual → envío manual → herramientas/confirmaciones del chat. En Companion el reconocimiento requiere consentimiento local explícito porque puede procesar audio fuera de Novo. Los comandos de texto y dictado llegan al mismo envío; tareas requieren una propuesta guardada y aprobación visual. El control de escritorio se mantiene local y usa operaciones Windows permitidas. TTS Microsoft local está implementado e instalado; no se declaran terminados wake word, STT offline, escucha conversacional ni la convergencia completa.
+Primer paso de voz implementado en las rutas de chat: captura existente → transcripción → borrador actual → envío manual → herramientas/confirmaciones del chat. La candidata Companion 0.2.16 usa whisper.cpp/Silero locales al pulsar el micrófono; el modo nube es una elección separada con consentimiento. Los comandos de texto y dictado llegan al mismo envío; tareas requieren una propuesta guardada y aprobación visual. El control de escritorio se mantiene local y usa operaciones Windows permitidas. TTS Microsoft local está implementado e instalado; no se declaran terminados wake word, escucha conversacional ni la convergencia completa. La calidad y el rendimiento del nuevo STT requieren validación física antes de publicarlo.
 
 ## Fronteras que deben conservarse
 

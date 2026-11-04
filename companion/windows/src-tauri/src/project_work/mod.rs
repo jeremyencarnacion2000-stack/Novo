@@ -1,7 +1,7 @@
 //! Durable work is independent of chat turns. Credentials stay on this PC.
 mod claude;
 mod codex;
-mod process;
+pub(crate) mod process;
 mod protocol;
 mod transport;
 mod workspace;

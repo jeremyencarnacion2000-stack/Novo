@@ -2,6 +2,8 @@
 
 Auditoría: 2026-11-01. Base inspeccionada: `cd0af5f`, con los cambios locales pendientes de Codex y accesibilidad. El checkout principal está en otro commit (`b47e8c8`); no se deben mezclar ni desplegar como si fueran iguales. Esta auditoría examina código y documentación; las pruebas nuevas y sus límites se registran en [IMPLEMENTATION_LOG](../engineering/IMPLEMENTATION_LOG.md).
 
+Actualización 2026-11-04: en la rama `codex/companion-local-voice`, Companion 0.2.16 incorpora dictado manual offline para español/inglés mediante whisper.cpp/Silero fijados y verificados. Pasan 417 pruebas del frontend, el build TypeScript/Vite y 4 pruebas nativas enfocadas. La versión instalada sigue siendo 0.2.15; no se empaquetó ni instaló 0.2.16 y falta probar micrófono, latencia y consumo en el PC.
+
 Entrega: [capacidades](CAPABILITY_MATRIX.md), [deuda](TECHNICAL_DEBT.md), [arquitectura objetivo](TARGET_ARCHITECTURE.md), [evaluación de ecosistema/voz](../research/ECOSYSTEM_EVALUATION.md), [hoja de ruta](../roadmap/NOVO_EVOLUTION.md) y [registro de cambios y evidencia](../engineering/IMPLEMENTATION_LOG.md).
 
 Entrega actual verificada (2026-11-03): [Companion 0.2.15](https://github.com/jeremyencarnacion2000-stack/Novo/releases/tag/companion-v0.2.15) publicado e instalado. El usuario confirmó la reconexión; el servidor confirmó emisión del token, verificación, registro del PC y verificaciones posteriores con HTTP 200. El dispositivo está activo con 15 scopes, incluidos chat, tareas y escritorio. Los ajustes conservaron exactamente su contenido tras instalar y reiniciar, antes de reautorizar. Esto acredita la conexión; no certifica todavía tareas, ventanas o micrófono de extremo a extremo.

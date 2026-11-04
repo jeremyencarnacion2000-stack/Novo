@@ -163,3 +163,11 @@ PR #37 se integró como `2c5ea2a7fb7cc04d40b67d69c84847ff258fc866`. El workflow 
 Se instaló el EXE de ese workflow con salida cero. El proceso declara 0.2.15 y el archivo de ajustes conservó exactamente su hash tras instalar y reiniciar, antes de reautorizar; hay copia local previa. El usuario aprobó la conexión y confirmó que conectó. Los registros muestran token 200, preflight 200, registro de dispositivo 200 y verificaciones posteriores 200. La base confirma registro activo renovado, 15 scopes y todos los permisos requeridos de chat, tareas y escritorio. No se imprimieron credenciales ni se sustituyó manualmente el registro remoto.
 
 La aceptación acredita la reconexión. No se ejecutaron todavía tareas o cambios de ventana reales ni se probó micrófono/audio físico; activación «Novo» y STT local siguen pendientes.
+
+## 2026-11-04 — dictado local manual, candidata 0.2.16
+
+- Se fijaron y verificaron por tamaño/SHA-256 whisper.cpp b5454, tiny q5_1 multilingüe, Silero VAD 6.2.0, DLLs y avisos de licencia. Los recursos generados quedan fuera de Git; el workflow Windows ahora los prepara y verifica antes de compilar el instalador.
+- El Companion captura audio sólo por acción del usuario, hasta 20 segundos; para tras 1.2 s de silencio y cancela al cambiar permisos, bloquear la sesión o caer la memoria libre bajo 512 MiB. Antes de cargar el motor exige 912 MiB disponibles. El audio temporal se elimina al terminar y al iniciar la app.
+- El transcriptor acepta sólo es/en y JSON acotado con texto y confianza suficientes. Novo y Codex insertan el resultado en el borrador activo; no envían ni crean tareas automáticamente. Nube y modo apagado son opciones explícitas; nube requiere consentimiento independiente.
+- Verificación local: Companion frontend 417/417, TypeScript/Vite correcto, cuatro pruebas nativas de audio/silencio/memoria/parser correctas y recursos completos con sus hashes. La versión está alineada como 0.2.16 en npm, Tauri y Cargo.
+- No se abrió el micrófono ni se calibró voz real. No se generó/instaló el instalador: había 754 MiB libres, por debajo del umbral seguro de 912 MiB para ejecutar STT. La activación «Novo», precisión ES/EN, latencia, CPU/memoria bajo audio real y la operación de ventana siguen sin aceptación física; 0.2.15 continúa como versión instalada.
