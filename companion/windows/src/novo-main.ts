@@ -4,6 +4,7 @@ import { DEVELOPER_CONTEXT_REFRESH_INTERVAL_MS, shouldRefreshDeveloperContext, s
 import { Bridge, onEvent, type NovoWorkContext } from './core/bridge';
 import { accountLabel, type NativeAccountStatus } from './core/novo-chat';
 import { normalizeNovoWorkContextInput } from './core/novo-work-context';
+import { authorizationPollFailure } from './core/authorization-poll';
 
 type Signal = { sourceRef: string; signalType: string; label: string; observedAt: string; reliability: string };
 type LocalSummary = { deviceId: string; enabled: boolean; paused: boolean; apiOrigin: string; tokenPresent: boolean; accountConnected: boolean; excludedApplications: string[]; activeMinutesToday: number; appMinutesToday: Record<string, number>; queuedEvents: number };
@@ -289,9 +290,10 @@ function scheduleAuthorizationPoll(delaySeconds: number) {
         render();
         return;
       }
-      if (reason.includes("credential_store_unavailable") || reason.includes("settings_save_failed") || reason.includes("authorization_not_pending")) {
+      const terminalMessage=authorizationPollFailure(error);
+      if (terminalMessage) {
         authorizationPrompt = null;
-        message = 'No se pudo completar la verificación protegida. Verifica la cuenta antes de iniciar otra autorización.';
+        message = terminalMessage;
         await refreshAccount();
         render();
         return;
