@@ -4,6 +4,8 @@ import { DEVELOPER_CONTEXT_REFRESH_INTERVAL_MS, shouldRefreshDeveloperContext, s
 import { Bridge, onEvent, type NovoWorkContext } from './core/bridge';
 import { accountLabel, type NativeAccountStatus } from './core/novo-chat';
 import { normalizeNovoWorkContextInput } from './core/novo-work-context';
+import { authorizationPollFailure } from './core/authorization-poll';
+import { requestCompanionAuthorization } from './core/authorization-start';
 
 type Signal = { sourceRef: string; signalType: string; label: string; observedAt: string; reliability: string };
 type LocalSummary = { deviceId: string; enabled: boolean; paused: boolean; apiOrigin: string; tokenPresent: boolean; accountConnected: boolean; excludedApplications: string[]; activeMinutesToday: number; appMinutesToday: Record<string, number>; queuedEvents: number };
@@ -289,9 +291,10 @@ function scheduleAuthorizationPoll(delaySeconds: number) {
         render();
         return;
       }
-      if (reason.includes("credential_store_unavailable") || reason.includes("settings_save_failed") || reason.includes("authorization_not_pending")) {
+      const terminalMessage=authorizationPollFailure(error);
+      if (terminalMessage) {
         authorizationPrompt = null;
-        message = 'No se pudo completar la verificación protegida. Verifica la cuenta antes de iniciar otra autorización.';
+        message = terminalMessage;
         await refreshAccount();
         render();
         return;
@@ -387,9 +390,10 @@ async function action(name?: string) {
     const origin = root?.querySelector<HTMLInputElement>("#novo-origin")?.value.trim() ?? "";
     if (!/^https:\/\//i.test(origin)) { message = "Por seguridad, la dirección debe usar HTTPS."; render(); return; }
     deviceName=root?.querySelector<HTMLInputElement>('#novo-device-name')?.value.trim()||'Novo PC';
-    if(local.tokenPresent && !confirm('¿Actualizar la conexión de este dispositivo? Confirma la cuenta y los permisos en el navegador. El historial pendiente no se enviará a otra cuenta.'))return;
     try {
-      authorizationPrompt = await invoke<DeviceAuthorizationPrompt>("companion_authorization_start", { origin,deviceName,reconnect:local.tokenPresent });
+      const prompt=await requestCompanionAuthorization({origin,deviceName},message=>confirm(message),options=>invoke<DeviceAuthorizationPrompt>('companion_authorization_start',options));
+      if(!prompt)return;
+      authorizationPrompt = prompt;
       message = "Confirma el acceso en la página segura de Novo.";
       render();
       scheduleAuthorizationPoll(authorizationPrompt.intervalSeconds);

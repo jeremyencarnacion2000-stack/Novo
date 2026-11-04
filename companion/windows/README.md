@@ -1,8 +1,14 @@
 # Novo Companion para Windows
 
-Versión preparada: **0.2.14**.
+Versión preparada: **0.2.15**.
 
-[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.14/Novo-Companion-Windows-0.2.14-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.14/Novo-Companion-Windows-0.2.14.msi)
+[Descargar el instalador](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.15/Novo-Companion-Windows-0.2.15-setup.exe) · [Alternativa MSI](https://github.com/jeremyencarnacion2000-stack/Novo/releases/download/companion-v0.2.15/Novo-Companion-Windows-0.2.15.msi)
+
+## Novedades de 0.2.15
+
+- Permite volver a vincular este PC cuando Novo conserva su registro y la credencial local ya no está disponible. Antes de iniciar el navegador, confirma expresamente la sustitución del acceso anterior y la pausa de sus trabajos.
+- Distingue rechazos de autorización, intentos terminados y fallos del guardado protegido. Un rechazo definitivo no se reintenta hasta convertirse en un aviso engañoso de Windows.
+- Conserva ajustes, carpetas, hooks, Codex y voz local de 0.2.14. La corrección del servidor mantiene la validación de sesión, propietario, grant y permisos.
 
 ## Novedades de 0.2.14
 
