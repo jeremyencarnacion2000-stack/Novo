@@ -5,6 +5,7 @@ import argparse
 import ctypes as c
 from ctypes import wintypes as w
 import hashlib
+import io
 import json
 import math
 from pathlib import Path
@@ -19,6 +20,73 @@ from array import array
 
 ROOT = Path(__file__).resolve().parents[1]
 FLOOR = 512 * 1024**2
+
+def engine_stages(text):
+    if len(text) > 65536: return {}
+    keys={'load':'model_load_ms','mel':'mel_ms','encode':'encode_ms','decode':'decode_ms',
+        'sample':'sample_ms','batchd':'batch_decode_ms','prompt':'prompt_ms','total':'engine_total_ms'}
+    result={}
+    for line in text.splitlines():
+        match=re.match(r'whisper_print_timings:\s*(\w+) time =\s*(\S+) ms',line)
+        if match and match[1] in keys: key,value=keys[match[1]],match[2]
+        else:
+            match=re.match(r'whisper_vad_detect_speech_no_reset: vad time =\s*(\S+) ms',line)
+            if not match: continue
+            key,value='vad_ms',match[1]
+        try: value=float(value)
+        except ValueError: continue
+        if math.isfinite(value) and 0<=value<=60000: result[key]=value
+    return result
+
+def bounded_context(audio_ms):
+    if not math.isfinite(audio_ms) or not 0<audio_ms<=20000: raise ValueError('Invalid calibration duration')
+    return min(1500,max(128,math.ceil((audio_ms+500)/2560)*128))
+
+def recognition_metrics(value, expected):
+    segments=value.get('transcription',[]);valid=isinstance(segments,list) and 0<len(segments)<=128
+    text='';probabilities=[]
+    if valid:
+        for segment in segments:
+            if not isinstance(segment,dict) or not isinstance(segment.get('text'),str) or not isinstance(segment.get('tokens'),list): valid=False;break
+            text+=(' ' if text else '')+segment['text'].strip()
+            for token in segment['tokens']:
+                if not isinstance(token,dict) or type(token.get('id')) is not int or token['id']<0: valid=False;continue
+                if token['id']>=50257: continue
+                p=token.get('p')
+                if type(p) not in (float,int) or not math.isfinite(p) or not 0<=p<=1: valid=False;continue
+                if p<.1: valid=False
+                probabilities.append(p)
+    confidence=math.exp(sum(math.log(p) for p in probabilities)/len(probabilities)) if probabilities and min(probabilities)>0 else 0
+    if len(text)>6000 or any(ord(ch)<32 and not ch.isspace() for ch in text): valid=False;text=''
+    return dict(text=text,detected_language=value.get('result',{}).get('language'),confidence=confidence,
+        passes_confidence_gate=bool(valid and text and probabilities and len(probabilities)<=2048 and confidence>=.5 and value.get('result',{}).get('language') in ('es','en')),
+        exact_phrase=words(expected)==words(text),**word_errors(expected,text))
+
+def prefix_wav(data, milliseconds):
+    if not 0<milliseconds<=20000 or len(data)>1024**2: raise ValueError('Invalid prefix input')
+    with wave.open(io.BytesIO(data),'rb') as wav:
+        if (wav.getframerate(),wav.getnchannels(),wav.getsampwidth())!=(16000,1,2): raise ValueError('Expected PCM16 mono 16 kHz')
+        frames=wav.readframes(min(wav.getnframes(),milliseconds*16))
+    output=io.BytesIO()
+    with wave.open(output,'wb') as wav:
+        wav.setparams((1,2,16000,0,'NONE','not compressed'));wav.writeframes(frames)
+    return output.getvalue()
+
+def loaded_backends(text):
+    return [name for name in ('CPU','BLAS','CUDA','Vulkan','OpenVINO') if 'loaded '+name+' backend' in text]
+
+def verify_resources(resources, lock):
+    # Diagnostic-only plugins from the pinned b5454 BLAS archive; production lock stays unchanged.
+    extras=[{'name':'ggml-blas.dll','size':55296,'sha256':'3f33cc13fa48f75ea929422b9f25f4e722be9249035e709f08c3b65c13e0b088'},
+        {'name':'libopenblas.dll','size':51126150,'sha256':'4c7fb23e900bd637cf771ad4ae3d1b51112a897385906433f2f1e58fe053ff70'}]
+    files=lock['files']+[item for item in extras if (resources/item['name']).exists()]
+    allowed={item['name'] for item in files}
+    if any(path.name not in allowed or not path.is_file() for path in resources.iterdir()):raise ValueError('Unexpected voice resource')
+    for item in files:
+        path=resources/item['name']
+        with path.open('rb') as stream:
+            if path.stat().st_size!=item['size'] or hashlib.file_digest(stream,'sha256').hexdigest()!=item['sha256']:
+                raise ValueError('Voice resource integrity mismatch')
 
 
 class Memory(c.Structure):
@@ -134,17 +202,15 @@ def capture(audio, device, seconds):
             api.waveInClose(handle)
 
 
-def compare(audio, language, expected, resources, directory, model_name='tiny', profile='baseline'):
+def compare(audio, language, expected, resources, directory, model_name='tiny', profile='baseline', repeats=1, models_dir=None):
     lock = json.loads((ROOT / 'voice-resources.lock.json').read_text(encoding='utf-8'))
-    for item in lock['files']:
-        path = resources / item['name']
-        if path.stat().st_size != item['size'] or hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
-            raise ValueError('Voice resource integrity mismatch')
+    verify_resources(resources,lock)
     expected_hashes = {'tiny':'818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7',
         'base':'422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898',
-        'small':'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'}
-    model_root = resources if model_name == 'tiny' else ROOT/'.tmp'/'voice-calibration'
-    model = model_root/('ggml-'+model_name+'-q5_1.bin')
+        'small':'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb',
+        'tiny-q8':'c2085835d3f50733e2ff6e4b41ae8a2b8d8110461e18821b09a15c40c42d1cca'}
+    model_root = resources if model_name == 'tiny' else models_dir or ROOT/'.tmp'/'voice-calibration'
+    model = model_root/('ggml-tiny-q8_0.bin' if model_name=='tiny-q8' else 'ggml-'+model_name+'-q5_1.bin')
     with model.open('rb') as stream:
         model_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
     if model_hash != expected_hashes[model_name]:
@@ -163,17 +229,46 @@ def compare(audio, language, expected, resources, directory, model_name='tiny', 
         variants = [('context-'+str(context), language, True, 1, 4,
             ['--prompt', 'Novo, Codex, ClickHome.', '--vad-speech-pad-ms', '150', '--audio-ctx', str(context)])
             for context in (512, 256, 128) if report['pcm']['audio_ms'] <= context*20]
-    for name, lang, vad, beam, threads, extra in variants:
+    if profile in ('performance','screen'):
+        context=['--audio-ctx',str(bounded_context(report['pcm']['audio_ms']))]
+        variants=[('baseline',language,True,5,2,[]),('bounded-context',language,True,5,2,context)]
+        if profile=='performance': variants += [
+            ('one-thread',language,True,5,1,[]),('four-threads',language,True,5,4,[]),
+            ('greedy-four',language,True,1,4,[]),('bounded-fast',language,True,1,4,context),
+            ('padded-merged-vad',language,True,5,2,['--vad-speech-pad-ms','150','--vad-min-silence-duration-ms','300']),
+            ('no-vad',language,False,5,2,[]),('flash-off',language,True,5,2,['--no-flash-attn']),
+            ('gpu-auto',language,True,5,2,[])]
+    if profile=='resident': variants=[('resident',language,True,5,2,['--max-context','0'])]
+    if profile=='incremental':
+        variants=[('prefix-'+str(ms),language,True,5,2,['--audio-ctx',str(bounded_context(ms))])
+            for ms in (1000,2000) if ms<report['pcm']['audio_ms']]
+        variants.append(('final',language,True,5,2,['--audio-ctx',str(bounded_context(report['pcm']['audio_ms']))]))
+    report.update(profile=profile,repeats=repeats,cold_warm_note='Fresh model processes; OS file cache uncontrolled and resource hashing warms files. Resident profile reuses one model without text context.')
+    variants=[(name,lang,vad,beam,threads,extra,iteration) for name,lang,vad,beam,threads,extra in variants
+        for iteration in range(1,2 if profile=='resident' else repeats+1)]
+    for configuration, lang, vad, beam, threads, extra, iteration in variants:
+        name=configuration+'-run-'+str(iteration)
         free = available_memory()
         if free < FLOOR + 400 * 1024**2:
             item = {'variant': name, 'status': 'insufficient_memory', 'free_mib':free/1024**2}
             report['variants'].append(item); print(json.dumps(item), flush=True); break
         output = directory / name
-        args = [str(resources / 'whisper-cli.exe'), '--no-gpu', '--threads', str(threads), '--processors', '1',
+        input_audio=audio
+        if configuration.startswith('prefix-'):
+            input_audio=directory/(name+'.wav')
+            input_audio.write_bytes(prefix_wav(audio.read_bytes(),int(configuration.split('-')[1])))
+        args = [str(resources / 'whisper-cli.exe')] + ([] if configuration=='gpu-auto' else ['--no-gpu']) + ['--threads', str(threads), '--processors', '1',
             '--beam-size', str(beam), '--language', lang, '--output-json-full', '--temperature', '0',
             '--temperature-inc', '0', '--logprob-thold', '-0.65', '--no-speech-thold', '0.6',
-            '--model', str(model), '--file', str(audio), '--output-file', str(output)] + extra
+            '--model', str(model), '--file', str(input_audio), '--output-file', str(output)] + extra
         if vad: args += ['--vad', '--vad-model', str(resources / 'ggml-silero-v6.2.0.bin')]
+        outputs=[output.with_suffix('.json')]
+        if profile=='resident':
+            for index in range(1,repeats):
+                destination=directory/('resident-'+str(index))
+                args+=['--file',str(audio),'--output-file',str(destination)]
+                outputs.append(destination.with_suffix('.json'))
+        completed_files={}
         started = time.monotonic(); peak = 0; minimum_free = available_memory(); status = 'completed'
         with output.with_suffix('.stderr').open('wb') as stderr, output.with_suffix('.stdout').open('wb') as stdout:
             process = subprocess.Popen(args, cwd=resources, stdout=stdout, stderr=stderr, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -181,27 +276,46 @@ def compare(audio, language, expected, resources, directory, model_name='tiny', 
                 metrics = ProcessMemory(); metrics.size = c.sizeof(metrics)
                 c.windll.psapi.GetProcessMemoryInfo(w.HANDLE(process._handle), c.byref(metrics), metrics.size)
                 peak = max(peak, metrics.peak_ws); minimum_free = min(minimum_free, available_memory())
+                for path in outputs:
+                    if path.name in completed_files or not path.exists() or path.stat().st_size>256*1024: continue
+                    try: json.loads(path.read_text(encoding='utf-8'))
+                    except (ValueError,OSError): continue
+                    completed_files[path.name]=round((time.monotonic()-started)*1000)
                 if minimum_free < FLOOR or time.monotonic() - started > 60:
                     status = 'memory_guard' if minimum_free < FLOOR else 'timeout'; process.kill(); process.wait(); break
                 time.sleep(.025)
         item = {'variant': name, 'status': status, 'elapsed_ms': round((time.monotonic()-started)*1000),
             'peak_working_set_mib': peak/1024**2, 'minimum_free_mib': minimum_free/1024**2, 'exit_code': process.returncode,
             'cpu_ms':cpu_time_ms(process), 'threads':threads,'beam':beam,'language':lang,'vad':vad,'extra':extra}
+        item.update(configuration=configuration,iteration=iteration,fresh_process=True,partial_hypothesis_only=configuration.startswith('prefix-'))
+        if item['cpu_ms'] is not None:
+            item['average_cpu_core_equivalents']=item['cpu_ms']/max(1,item['elapsed_ms'])
+            import os
+            item['average_machine_cpu_percent']=100*item['average_cpu_core_equivalents']/max(1,os.cpu_count() or 1)
+        if profile=='resident':
+            results=[];ready=[]
+            for path in outputs:
+                try:
+                    if path.stat().st_size>256*1024: raise ValueError('Oversized output')
+                    value=json.loads(path.read_text(encoding='utf-8'))
+                    results.append(recognition_metrics(value,expected));ready.append(completed_files.get(path.name,item['elapsed_ms']))
+                except (OSError,ValueError): results.append({'passes_confidence_gate':False,'status':'missing_or_invalid_output'});ready.append(None)
+            item['resident_results']=results
+            item['result_ready_ms']=ready
+            item['resident_intervals_ms']=[None if value is None else value-(ready[i-1] or 0) if i else value for i,value in enumerate(ready)]
+            item['readiness_resolution_ms']=25
         result_path = output.with_suffix('.json')
         if status == 'completed' and process.returncode == 0 and result_path.exists() and result_path.stat().st_size <= 256*1024:
             value = json.loads(result_path.read_text(encoding='utf-8'))
-            segments = value.get('transcription', [])
-            text = ' '.join(segment.get('text', '').strip() for segment in segments).strip()
-            probabilities = [token.get('p', 0) for segment in segments for token in segment.get('tokens', []) if token.get('id', 50257) < 50257]
-            confidence = math.exp(sum(math.log(max(p, 1e-20)) for p in probabilities)/len(probabilities)) if probabilities else 0
-            item.update(text=text, detected_language=value.get('result', {}).get('language'), confidence=confidence,
-                passes_confidence_gate=bool(text and probabilities and min(probabilities)>=.1 and confidence>=.5 and value.get('result', {}).get('language') in ('es','en')),
-                exact_phrase=words(expected)==words(text),
-                **word_errors(expected, text))
+            item.update(recognition_metrics(value,expected))
         item['vad_diagnostics'] = [line for line in output.with_suffix('.stderr').read_text(encoding='utf-8', errors='replace').splitlines()
             if re.search(r'VAD segment|Final speech segments|vad time|Including segment', line)][:20]
         item['inference_timings'] = [line for line in output.with_suffix('.stderr').read_text(encoding='utf-8', errors='replace').splitlines()
             if 'whisper_print_timings:' in line][:12]
+        diagnostic=output.with_suffix('.stderr').read_text(encoding='utf-8',errors='replace')
+        item['stages_ms']=engine_stages(diagnostic)
+        item['loaded_backends']=loaded_backends(diagnostic)
+        item['backend_features']={key:int(value) for key,value in re.findall(r'\b(AVX|AVX2|FMA|F16C|SSE3|SSSE3|VULKAN|BLAS|OPENVINO|CUDA)\s*=\s*([01])',diagnostic)}
         report['variants'].append(item); print(json.dumps(item, ensure_ascii=False), flush=True)
     return report
 
@@ -213,8 +327,10 @@ def main():
     parser.add_argument('--language', choices=['es','en']); parser.add_argument('--expected')
     parser.add_argument('--resources', type=Path, default=ROOT/'resources'/'voice')
     parser.add_argument('--report', type=Path); parser.add_argument('--keep-audio', type=Path)
-    parser.add_argument('--model', choices=['tiny','base','small'], default='tiny')
-    parser.add_argument('--profile', choices=['baseline','tune','context'], default='baseline')
+    parser.add_argument('--model', choices=['tiny','tiny-q8','base','small'], default='tiny')
+    parser.add_argument('--profile', choices=['baseline','tune','context','performance','screen','resident','incremental'], default='baseline')
+    parser.add_argument('--repeats',type=int,choices=range(1,6),default=1)
+    parser.add_argument('--models-dir',type=Path,default=ROOT/'.tmp'/'voice-calibration')
     parser.add_argument('--self-test', action='store_true'); args = parser.parse_args()
     if args.self_test:
         assert word_errors('Mañana abre Codex', 'manana abre codex')['wer'] == 0
@@ -233,14 +349,14 @@ def main():
             except ValueError: pass
             else: raise AssertionError('Oversized calibration audio was accepted')
         print('Self-check passed'); return
-    if not args.language or not args.expected or not args.report or (not args.audio and not args.capture): parser.error('Audio/capture, language, expected and report are required')
+    if not args.language or args.expected is None or not args.report or (not args.audio and not args.capture): parser.error('Audio/capture, language, expected and report are required')
     with tempfile.TemporaryDirectory(prefix='novo-voice-', dir=ROOT/'.tmp') as folder:
         directory = Path(folder); audio = args.audio.resolve() if args.audio else directory/'capture.wav'
         if args.capture:
             if available_memory() < FLOOR + 400*1024**2: raise RuntimeError('At least 912 MiB free required')
             print('Capture starts after the spoken cue in 10 seconds. Speak only the displayed test phrase.', flush=True); time.sleep(10)
             capture(audio, args.device, args.seconds)
-        report = compare(audio, args.language, args.expected, args.resources.resolve(), directory, args.model, args.profile)
+        report = compare(audio, args.language, args.expected, args.resources.resolve(), directory, args.model, args.profile,args.repeats,args.models_dir.resolve())
         args.report.parent.mkdir(parents=True, exist_ok=True); args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
         if args.capture and args.keep_audio: args.keep_audio.write_bytes(audio.read_bytes())
 
