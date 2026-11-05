@@ -7,7 +7,7 @@ import { ICONS } from './icons';
 
 export function buildReplySpeech(beforeSpeak:()=>void) {
   const labels={read:N_("Read latest reply"),stop:N_("Stop speaking")};
-  let text='';let context='';let voice=State.settings.voiceLocalVoiceId;let disposed=false;
+  let text='';let context='';let voice=State.settings.voiceLocalVoiceId;let automatic=State.settings.voiceSpokenReplies;let disposed=false;
   const button=h('button',{type:'button',class:'novo-chat-settings novo-reply-speech','aria-label':t(labels.read),disabled:true},svg(ICONS.speakerOn,12));
   const status=h('div',{class:'novo-voice-status',role:'status',hidden:true});
   const speech=new LocalSpeech(Bridge,onEvent,draw);
@@ -28,7 +28,7 @@ export function buildReplySpeech(beforeSpeak:()=>void) {
   return {el:button,status,
     update(key:string,content:string){if(key!==context){context=key;speech.stop();}text=key?content:'';draw();},
     readReply(force=false){if((force||State.settings.voiceSpokenReplies)&&State.view==='prompt')play();},
-    settingsChanged(){if(voice!==State.settings.voiceLocalVoiceId||!State.settings.voiceSpokenReplies)speech.stop();voice=State.settings.voiceLocalVoiceId;},
+    settingsChanged(){if(voice!==State.settings.voiceLocalVoiceId||(automatic&&!State.settings.voiceSpokenReplies))speech.stop();voice=State.settings.voiceLocalVoiceId;automatic=State.settings.voiceSpokenReplies;},
     stop:()=>speech.stop(),
     dispose(){if(disposed)return;speech.dispose();disposed=true;},
   };
