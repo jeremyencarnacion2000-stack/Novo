@@ -196,6 +196,8 @@ mod native {
         text: String,
         voice_id: String,
     ) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        let metric_id = id.clone();
         let (tx, rx) = oneshot::channel();
         dispatch(Command::Speak {
             app,
@@ -204,9 +206,16 @@ mod native {
             voice_id,
             reply: tx,
         })?;
-        rx.await.map_err(|_| "speech_unavailable".to_string())?
+        let result = rx.await.map_err(|_| "speech_unavailable".to_string())?;
+        crate::log::line(format!(
+            "voice-tts {}",
+            serde_json::json!({"requestId":metric_id,"operation":"start_ack","elapsedMs":started.elapsed().as_millis(),"ok":result.is_ok()})
+        ));
+        result
     }
     pub async fn stop(id: String) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        let metric_id = id.clone();
         // Mark before enqueueing: cancellation wins even when a start arrives late.
         cancellations().cancel(id.clone());
         if WORKER.get().is_none() {
@@ -214,7 +223,12 @@ mod native {
         }
         let (tx, rx) = oneshot::channel();
         dispatch(Command::Stop(id, tx))?;
-        rx.await.map_err(|_| "speech_unavailable".into())
+        let result = rx.await.map_err(|_| "speech_unavailable".into());
+        crate::log::line(format!(
+            "voice-tts {}",
+            serde_json::json!({"requestId":metric_id,"operation":"stop_ack","elapsedMs":started.elapsed().as_millis(),"ok":result.is_ok()})
+        ));
+        result
     }
     #[derive(Clone, Serialize)]
     #[serde(rename_all = "camelCase")]

@@ -19,6 +19,7 @@ mod desktop;
 mod desktop_apps;
 mod voice;
 mod voice_input;
+mod voice_metrics;
 mod files;
 mod github;
 mod hooks;

@@ -65,3 +65,22 @@ test('off mode never opens a microphone and cloud mode still requires consent', 
   assert.equal(calls.some(([name]) => name === 'voice_input_start'), false);
   input.dispose();
 });
+
+test('draft delivery records only bounded timing metadata after the current final transcript', async () => {
+  State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local' }; calls.length = 0;
+  const texts = [];
+  const input = new CompanionDictation({transcript:text=>texts.push(text),listening(){},error:assert.fail});
+  await tick(); input.start(''); await tick();
+  const requestId=calls.find(([name])=>name==='voice_input_start')[1].requestId;
+  emit('novo-voice-input',{requestId,state:'finished',text:'private spoken request',emittedAtMs:Date.now()-40});
+  await tick();
+  assert.deepEqual(texts,['private spoken request']);
+  const record=calls.find(([name])=>name==='log_line');
+  assert.ok(record,'the final draft must have delivery timing');
+  assert.ok(!record[1].message.includes('private spoken request'));
+  const measured=JSON.parse(record[1].message.replace(/^voice-draft /,''));
+  assert.equal(measured.requestId,requestId);
+  assert.ok(measured.deliveryMs>=40&&measured.deliveryMs<60000);
+  assert.ok(measured.requestToDraftMs>=0);
+  input.dispose();
+});
