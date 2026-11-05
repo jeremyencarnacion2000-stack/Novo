@@ -65,6 +65,8 @@ def pcm_metrics(audio):
     with wave.open(str(audio), 'rb') as wav:
         if (wav.getframerate(), wav.getnchannels(), wav.getsampwidth()) != (16000, 1, 2):
             raise ValueError('Expected 16 kHz mono PCM16')
+        if not 0 < wav.getnframes() <= 320000:
+            raise ValueError('Calibration audio must be between 0 and 20 seconds')
         samples = array('h', wav.readframes(wav.getnframes()))
     if not samples:
         raise ValueError('Empty recording')
@@ -132,33 +134,40 @@ def capture(audio, device, seconds):
             api.waveInClose(handle)
 
 
-def compare(audio, language, expected, resources, directory, base=False, tune=False, context_sweep=False):
+def compare(audio, language, expected, resources, directory, model_name='tiny', profile='baseline'):
     lock = json.loads((ROOT / 'voice-resources.lock.json').read_text(encoding='utf-8'))
     for item in lock['files']:
         path = resources / item['name']
         if path.stat().st_size != item['size'] or hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
             raise ValueError('Voice resource integrity mismatch')
-    model = ROOT/'.tmp'/'voice-calibration'/'ggml-base-q5_1.bin' if base else resources/'ggml-tiny-q5_1.bin'
-    model_hash = hashlib.sha256(model.read_bytes()).hexdigest()
-    if base and model_hash != '422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898':
-        raise ValueError('Diagnostic Base model integrity mismatch')
+    expected_hashes = {'tiny':'818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7',
+        'base':'422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898',
+        'small':'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'}
+    model_root = resources if model_name == 'tiny' else ROOT/'.tmp'/'voice-calibration'
+    model = model_root/('ggml-'+model_name+'-q5_1.bin')
+    with model.open('rb') as stream:
+        model_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
+    if model_hash != expected_hashes[model_name]:
+        raise ValueError('Diagnostic model integrity mismatch')
     report = {'language': language, 'expected': expected, 'model':model.name, 'model_sha256':model_hash,
         'pcm': pcm_metrics(audio), 'variants': []}
     variants = [('current', 'auto', True, 5, 2, []), ('fixed-language', language, True, 5, 2, []),
             ('without-vad', language, False, 5, 2, []), ('greedy', language, False, 1, 2, [])]
-    if tune:
+    if profile == 'tune':
         vocabulary = ['--prompt', 'Novo, Codex, ClickHome.']
         variants = [('fixed-untrimmed', language, False, 5, 2, []),
             ('vocabulary', language, False, 5, 2, vocabulary),
             ('padded-vad', language, True, 5, 2, vocabulary + ['--vad-speech-pad-ms', '150']),
             ('fast-vocabulary', language, False, 1, 4, vocabulary)]
-    if context_sweep:
+    if profile == 'context':
         variants = [('context-'+str(context), language, True, 1, 4,
             ['--prompt', 'Novo, Codex, ClickHome.', '--vad-speech-pad-ms', '150', '--audio-ctx', str(context)])
-            for context in (512, 256)]
+            for context in (512, 256, 128) if report['pcm']['audio_ms'] <= context*20]
     for name, lang, vad, beam, threads, extra in variants:
-        if available_memory() < FLOOR + 400 * 1024**2:
-            report['variants'].append({'variant': name, 'status': 'insufficient_memory'}); break
+        free = available_memory()
+        if free < FLOOR + 400 * 1024**2:
+            item = {'variant': name, 'status': 'insufficient_memory', 'free_mib':free/1024**2}
+            report['variants'].append(item); print(json.dumps(item), flush=True); break
         output = directory / name
         args = [str(resources / 'whisper-cli.exe'), '--no-gpu', '--threads', str(threads), '--processors', '1',
             '--beam-size', str(beam), '--language', lang, '--output-json-full', '--temperature', '0',
@@ -204,13 +213,25 @@ def main():
     parser.add_argument('--language', choices=['es','en']); parser.add_argument('--expected')
     parser.add_argument('--resources', type=Path, default=ROOT/'resources'/'voice')
     parser.add_argument('--report', type=Path); parser.add_argument('--keep-audio', type=Path)
-    parser.add_argument('--base', action='store_true'); parser.add_argument('--tune', action='store_true')
-    parser.add_argument('--context-sweep', action='store_true')
+    parser.add_argument('--model', choices=['tiny','base','small'], default='tiny')
+    parser.add_argument('--profile', choices=['baseline','tune','context'], default='baseline')
     parser.add_argument('--self-test', action='store_true'); args = parser.parse_args()
     if args.self_test:
         assert word_errors('Mañana abre Codex', 'manana abre codex')['wer'] == 0
         assert word_errors('open Codex now', 'open now')['wer'] == 1/3
         assert c.sizeof(Memory) == 64 and c.sizeof(ProcessMemory) in (40, 72)
+        with tempfile.TemporaryDirectory() as folder:
+            audio = Path(folder)/'test.wav'
+            with wave.open(str(audio),'wb') as wav:
+                wav.setparams((1,2,16000,0,'NONE','not compressed'))
+                wav.writeframes(array('h',[1000]*1600).tobytes())
+            measured = pcm_metrics(audio)
+            assert measured['audio_ms'] == 100 and measured['peak'] == 1000 and measured['clipped_ratio'] == 0
+            with wave.open(str(audio),'wb') as wav:
+                wav.setparams((1,2,16000,0,'NONE','not compressed')); wav.writeframes(bytes(21*32000))
+            try: pcm_metrics(audio)
+            except ValueError: pass
+            else: raise AssertionError('Oversized calibration audio was accepted')
         print('Self-check passed'); return
     if not args.language or not args.expected or not args.report or (not args.audio and not args.capture): parser.error('Audio/capture, language, expected and report are required')
     with tempfile.TemporaryDirectory(prefix='novo-voice-', dir=ROOT/'.tmp') as folder:
@@ -219,7 +240,7 @@ def main():
             if available_memory() < FLOOR + 400*1024**2: raise RuntimeError('At least 912 MiB free required')
             print('Capture starts after the spoken cue in 10 seconds. Speak only the displayed test phrase.', flush=True); time.sleep(10)
             capture(audio, args.device, args.seconds)
-        report = compare(audio, args.language, args.expected, args.resources.resolve(), directory, args.base, args.tune, args.context_sweep)
+        report = compare(audio, args.language, args.expected, args.resources.resolve(), directory, args.model, args.profile)
         args.report.parent.mkdir(parents=True, exist_ok=True); args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
         if args.capture and args.keep_audio: args.keep_audio.write_bytes(audio.read_bytes())
 

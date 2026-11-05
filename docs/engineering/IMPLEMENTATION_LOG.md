@@ -1,5 +1,17 @@
 # Registro de implementación
 
+## 2026-11-05 — Estado de candidata y control de texto/lector
+
+La candidata 0.2.17 `c64098a` se compiló e instaló con autorización: instalador salida 0, versión/hash del ejecutable y 16 recursos verificados. Preferencias idénticas antes del primer lanzamiento; después se cambió únicamente idioma a `es` con respaldo local. Se conserva reversión 0.2.16. El botón real volvió a rechazar «abre Codex»: PCM 2,3 s, RMS −39,96 dBFS, proceso 7 904,7 ms y 150,9 MiB. Small diagnóstico recuperó el texto correcto a 27 963 ms pero confianza 0,182; no se incorporó. El primer ensayo de contexto se detuvo por memoria insuficiente; al repetirlo con margen reconoció la misma frase a 12 370 ms y confianza 0,565, todavía fuera de latencia. Ningún ajuste diagnóstico se instaló.
+
+El usuario confirmó la acción al escribir «abre Codex» y Enviar; la interfaz mostró «Listo, puse Codex al frente». Tras rectificar el primer aviso de fallo, confirmó que la lectura del chat funciona. No se certifican interrupción física ni circuito completo desde micrófono. Una prueba nueva reprodujo que guardar otros ajustes cortaba la lectura manual con lectura automática apagada; el componente compartido se corrige sin cambiar consentimiento. Prueba roja/verde, 14 dirigidas, **433/433 frontend** y TypeScript/Vite pasan. Este último cambio aún no está instalado. PR #41 sigue en borrador; sin merge ni publicación. [Informe y métricas](2026-11-04-voice-calibration.md).
+
+## 2026-11-04 — Calibración de voz desde `d981ad6`
+
+Se hicieron tres intentos hablados con micrófono Realtek y un control de ambiente que el usuario confirmó sin habla; este último no se cuenta en precisión EN. El usuario escuchó su primera grabación ES completa y a velocidad normal y confirmó frases SAPI de Helena es-ES y David en-US claras en altavoces. Tiny falla idioma/nombres; Base diagnóstico recupera una orden inglesa pero tarda 7–10 s. El vocabulario puede devolver nombres con confianza alta y orden incorrecta; no se adoptó. Reducir contexto acelera pero vuelve a introducir errores. [Método y métricas](2026-11-04-voice-calibration.md).
+
+`c64098a` corrige dos problemas reproducidos: buffers desordenados tras una consulta atrasada y aviso de escucha antes de abrir el micrófono. Añade elección local Auto/es/en y conserva borrador/Enviar, límites y nube opt-in. Pasan 432 pruebas frontend, 279 nativas, 20 dirigidas, build TypeScript/Vite y formato de captura. Los 21 archivos de reversión y los instaladores originales 0.2.16 se cotejaron con sus hashes de CI. El usuario autorizó compilar/instalar candidata local; todavía no se certifica el circuito unido ni se publica o fusiona nada. Kokoro/Piper sólo se evaluaron documentalmente; no se instalaron motores TTS adicionales.
+
 ## 2026-11-01 — Auditoría y primera entrega incremental
 
 Solicitud: reducir pesadez y evolucionar el Cognitive OS conservando el producto. Base: worktree `companion-accessibility`, `cd0af5f`. Se preservan 14 archivos de cambios locales de Codex/accesibilidad de la sesión anterior y el checkout principal con sus modificaciones propias.

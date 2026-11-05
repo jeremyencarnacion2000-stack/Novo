@@ -1,6 +1,6 @@
 # Asistencia de escritorio: evidencia de aceptación
 
-Fecha: 2026-11-04. PR #41 sigue en borrador. Rama `codex/companion-desktop-flow`, código base instalado 0.2.16. El ejecutable instalado sigue en 0.2.16; no se instaló el candidato ni se publicó o fusionó nada.
+Registro inicial: 2026-11-04, base instalada 0.2.16. Actualización al 2026-11-05: candidata **0.2.17 `c64098a` instalada con autorización** y rollback cotejado. El usuario confirmó apertura/enfoque de Codex por texto y lector audible del chat. El micrófono español sigue fallando; no se certifica el recorrido unido con Twin. PR #41 sigue en borrador, sin publicar ni fusionar. [Calibración posterior, paquetes y límites actuales](2026-11-04-voice-calibration.md). Los apartados siguientes conservan la evidencia del candidato inicial y sus pruebas anteriores.
 
 ## Estado del candidato
 
