@@ -1,6 +1,8 @@
 # Matriz de capacidades
 
-Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+Fecha: 2026-11-05. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+
+Voz: [140 ejecuciones automáticas y candidata `2b91b0d`](../engineering/2026-11-05-voice-optimization.md). Los ajustes rápidos pierden fiabilidad; no están habilitados en producto. Instrumentación y corrección del lector pasan CI, pero aún no están instaladas. Corpus humano/circuito unido/interrupción física siguen pendientes; la instalación actual es `c64098a`.
 
 | Capacidad | Estado observado | Evidencia / validación pendiente |
 | --- | --- | --- |
@@ -15,7 +17,7 @@ Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el 
 | Acciones con permisos, auditoría, retry seguro | Implementada sin verificar externamente | Executor/MCP y esquemas; verificar cada adaptador con cuenta de prueba |
 | Chat cuenta Novo en Companion | Cuenta OAuth verificada en 0.2.15; candidata 0.2.17 instalada; turno de chat pendiente | El usuario confirmó la conexión y el servidor verificó el dispositivo con los permisos nuevos. No se revalidó un turno de chat tras actualizar |
 | Comandos directos de tareas y estado Twin en Companion | Servidor publicado y candidata Companion 0.2.17 instalada; tareas con datos reales pendientes | Migración aplicada, con prueba sintética de idempotencia y propiedad. Listar tareas y snapshot cognitivo filtran propietario; crear tarea requiere aprobación visual. La conexión se autorizó en 0.2.15; falta aceptación extremo a extremo |
-| Control local de apps Windows | Implementado para lista de seis apps; no habilitado en la configuración local actual | Chrome, Edge, Firefox, VS Code, Bloc de notas y Explorador. Abrir/enfocar/minimizar/maximizar/restaurar; scopes separados; exe, rutas y HWND quedan locales. `desktopAllowedApps` está vacío en este PC. El usuario pide pasar a catálogo general con lista de exclusión; aún no implementado. Falta probar operaciones reales |
+| Control local de apps Windows | Catálogo general y exclusiones instalados en candidata `c64098a`; apertura/enfoque de Codex por texto confirmada | Abrir/enfocar/minimizar/maximizar/restaurar con permisos separados de apertura/control/lectura; rutas y HWND quedan locales. Recuperación tras reinicio, matriz completa de permisos/exclusiones y circuito desde voz/Twin aún sin aceptación física completa |
 | Elegir Codex con plan ChatGPT | Verificada: runtime y respuesta en ventana instalada | Release 0.2.13 instalada; el usuario confirma respuesta y aporta captura de «hola» contestado en ChatGPT Codex. Sonda de producción: `NOVO_OK` en 8.5–11.7 s. CI: 261 pruebas de app, 30 de hooks y 19 del harness aprobadas. No carga documentos/herramientas locales ni hereda transportes del padre; Twin/historial Novo no se transfieren automáticamente. Resto de interacción/hardware todavía parcial |
 | Hooks de Codex/Claude y aprobaciones | Implementada sin verificar con evento real | `companion/windows/hook`, configuración de hooks; instalar no garantiza recibir eventos |
 | Carpetas autorizadas y contexto de agentes | Implementada sin verificar en vivo | Runtime de workspace/work-context, exclusiones y scopes |

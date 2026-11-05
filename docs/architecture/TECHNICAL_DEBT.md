@@ -1,5 +1,7 @@
 # Deuda técnica priorizada
 
+Actualización de voz 2026-11-05: [comparación automática y candidata](../engineering/2026-11-05-voice-optimization.md). Se instrumentaron captura/STT/entrega y acuses SAPI sin contenido privado. La candidata `2b91b0d` pasa CI; no instalada. Quedan P1: fiabilidad de nombres/órdenes ES/EN, medición física del circuito, interrupción audible y margen de almacenamiento. Contexto corto/Q8/BLAS/residencia no justifican cambiar valores predeterminados con los resultados actuales. Los tiempos de acuse de API no cierran la deuda de interrupción física.
+
 Auditoría de código del 2026-11-01. La prioridad combina efecto sobre uso real, coste y riesgo; no es un benchmark de producción.
 
 | Prioridad | Hallazgo | Cambio mínimo recomendado | Criterio de cierre |
