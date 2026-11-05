@@ -12,6 +12,15 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 #[serde(rename_all = "lowercase")]
 pub enum VoiceInputMode { #[default] Local, Cloud, Off }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VoiceInputLanguage { #[default] Auto, Es, En }
+impl VoiceInputLanguage {
+    pub(crate) fn code(self) -> &'static str {
+        match self { Self::Auto => "auto", Self::Es => "es", Self::En => "en" }
+    }
+}
+
 /// A field the file lacks takes its value from `Default`, so a settings.json
 /// written by an older build still loads, whatever has been added since.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +64,7 @@ pub struct Settings {
     /// Explicit opt-in because browser speech recognition may process audio online.
     pub voice_cloud_consent: bool,
     pub voice_input_mode: VoiceInputMode,
+    pub voice_input_language: VoiceInputLanguage,
     pub voice_local_voice_id: String,
     pub voice_spoken_replies: bool,
     /// Addresses of the model servers once connected; empty means not connected.
@@ -146,6 +156,7 @@ impl Default for Settings {
             desktop_policy: Default::default(),
             voice_cloud_consent: false,
             voice_input_mode: VoiceInputMode::Local,
+            voice_input_language: VoiceInputLanguage::Auto,
             voice_local_voice_id: String::new(),
             voice_spoken_replies: false,
             ollama_url: String::new(),
@@ -441,6 +452,7 @@ mod tests {
   "desktopPolicy": {"denyAll":false,"entries":{}},
   "voiceCloudConsent": true,
   "voiceInputMode": "local",
+  "voiceInputLanguage": "es",
   "voiceLocalVoiceId": "windows-voice-test",
   "voiceSpokenReplies": true,
   "ollamaUrl": "http://127.0.0.1:11434",
@@ -503,6 +515,7 @@ mod tests {
             "desktopPolicy": {"denyAll":false,"entries":{}},
             "voiceCloudConsent": false,
             "voiceInputMode": "local",
+            "voiceInputLanguage": "auto",
             "voiceLocalVoiceId": "",
             "voiceSpokenReplies": false,
             "ollamaUrl": "",
@@ -713,6 +726,7 @@ mod tests {
             ("desktopAllowedApps", json!("notepad")),
             ("voiceCloudConsent", json!("yes")),
             ("voiceInputMode", json!("unsupported")),
+            ("voiceInputLanguage", json!("fr")),
             ("voiceLocalVoiceId", json!(false)),
             ("voiceSpokenReplies", json!(1)),
             ("companionCaptureEnabled", json!("yes")),
@@ -958,6 +972,7 @@ mod tests {
                 "desktopPolicy",
                 "voiceCloudConsent",
                 "voiceInputMode",
+                "voiceInputLanguage",
                 "voiceLocalVoiceId",
                 "voiceSpokenReplies",
                 "ollamaUrl",

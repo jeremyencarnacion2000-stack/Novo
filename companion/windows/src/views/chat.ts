@@ -359,6 +359,11 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   let stopSettings:(()=>void)|null=null;
   dictation=new CompanionDictation({
     transcript(text,recognized){input.value=text;voiceDraft=Boolean(recognized&&text.trim());send.disabled=!controller.canSend||Boolean(dictation?.isListening);},
+    preparing(){
+      voiceStatus.textContent=t('Preparando el micrófono…');voiceStatus.hidden=false;delete voiceStatus.dataset.error;
+      voiceButton.setAttribute('aria-label',t(VOICE_LABELS.stop));voiceButton.replaceChildren(svg(ICONS.stop,11,{stroke:1.8}));
+      send.disabled=true;input.disabled=true;State.stateOverride='thinking';State.notify();onHeightChange();
+    },
     listening(active){
       body.classList.toggle('voice-listening',active);
       voiceButton.classList.toggle('listening',active);

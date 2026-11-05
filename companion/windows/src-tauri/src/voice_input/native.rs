@@ -292,8 +292,14 @@ fn run(app: &tauri::AppHandle, request: &Request) -> Result<String, String> {
     if !crate::voice::session_unlocked() {
         return Err("session_unavailable".into());
     }
-    emit(app, request, "listening", None, None);
-    let samples = record(request)?;
+    let language = app
+        .state::<crate::Shared>()
+        .settings
+        .lock()
+        .map_err(|_| "speech_unavailable")?
+        .voice_input_language
+        .code();
+    let samples = record(request, || emit(app, request, "listening", None, None))?;
     if request.cancelled.load(Ordering::SeqCst) {
         return Err("cancelled".into());
     }
@@ -314,7 +320,7 @@ fn run(app: &tauri::AppHandle, request: &Request) -> Result<String, String> {
         "--processors",
         "1",
         "--language",
-        "auto",
+        language,
         "--vad",
         "--no-prints",
         "--output-json-full",
@@ -388,7 +394,7 @@ impl Drop for Recording {
         eprintln!("MIC CLEANUP {} ms", started.elapsed().as_millis());
     }
 }
-fn record(request: &Request) -> Result<Vec<i16>, String> {
+fn record(request: &Request, ready: impl FnOnce()) -> Result<Vec<i16>, String> {
     unsafe {
         #[cfg(test)]
         let started = Instant::now();
@@ -426,7 +432,7 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
         #[cfg(test)]
         eprintln!("MIC OPEN {} ms", started.elapsed().as_millis());
         recording.handle = Some(handle);
-        for _ in 0..3 {
+        for _ in 0..CAPTURE_BUFFERS {
             let mut buffer = Box::new([0i16; 1600]);
             let mut header = Box::new(WAVEHDR {
                 lpData: PSTR(buffer.as_mut_ptr().cast()),
@@ -452,11 +458,13 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
         if waveInStart(handle) != 0 {
             return Err("microphone_unavailable".into());
         }
+        ready();
         #[cfg(test)]
         eprintln!("MIC STARTED {} ms", started.elapsed().as_millis());
         let started = Instant::now();
         let mut samples = Vec::with_capacity(MAX_SAMPLES);
         let mut gate = SignalGate::default();
+        let mut order = CaptureOrder::default();
         'capture: while started.elapsed() < Duration::from_secs(20) && samples.len() < MAX_SAMPLES {
             if request.cancelled.load(Ordering::SeqCst) {
                 #[cfg(test)]
@@ -469,11 +477,12 @@ fn record(request: &Request) -> Result<Vec<i16>, String> {
             if WaitForSingleObject(event, 25) == WAIT_FAILED {
                 return Err("microphone_unavailable".into());
             }
-            for i in 0..recording.headers.len() {
+            while let Some(i) = order.take(|i| {
+                std::ptr::read_volatile(std::ptr::addr_of!(recording.headers[i].dwFlags))
+                    & WHDR_DONE
+                    != 0
+            }) {
                 let ptr = &mut *recording.headers[i] as *mut WAVEHDR;
-                if std::ptr::read_volatile(std::ptr::addr_of!((*ptr).dwFlags)) & WHDR_DONE == 0 {
-                    continue;
-                }
                 let count = (std::ptr::read_volatile(std::ptr::addr_of!((*ptr).dwBytesRecorded))
                     as usize
                     / 2)
@@ -525,7 +534,7 @@ mod physical_acceptance {
         let _ = std::io::stdout().flush();
         std::thread::sleep(Duration::from_secs(4));
         let started = Instant::now();
-        let samples = record(&request).expect("physical microphone capture failed");
+        let samples = record(&request, || {}).expect("physical microphone capture failed");
         let capture_ms = started.elapsed().as_millis();
         let audio_ms = samples.len() as u128 * 1000 / 16_000;
         assert!(
@@ -663,7 +672,7 @@ mod physical_acceptance {
             reason: Mutex::new(None),
         });
         let capture = request.clone();
-        let worker = std::thread::spawn(move || record(&capture));
+        let worker = std::thread::spawn(move || record(&capture, || {}));
         std::thread::sleep(Duration::from_millis(500));
         let started = Instant::now();
         request.cancelled.store(true, Ordering::SeqCst);

@@ -2,7 +2,7 @@ import { SpeechDictation, type DictationError } from './speech-dictation';
 import { Bridge, onEvent } from './bridge';
 import { State } from './state';
 import { t } from '../i18n/i18n';
-interface Callbacks { transcript(text:string,recognized?:boolean):void; listening(active:boolean):void; processing?():void; error(code:DictationError):void }
+interface Callbacks { transcript(text:string,recognized?:boolean):void; listening(active:boolean):void; preparing?():void; processing?():void; error(code:DictationError):void }
 interface InputEvent { requestId:string; state:'listening'|'processing'|'finished'|'error'|'stopped'; text?:string; code?:string }
 const errors:Record<string,DictationError>={speech_memory_low:'memory',speech_resources_missing:'resources',speech_resources_invalid:'resources',microphone_unavailable:'permission',no_speech:'no-speech',speech_uncertain:'uncertain',speech_disabled:'disabled',speech_busy:'busy',session_unavailable:'session'};
 export function dictationMessage(code:DictationError):string {
@@ -48,7 +48,7 @@ export class CompanionDictation {
       if(!State.settings.voiceCloudConsent){this.callbacks.error('consent');return false;}
       return this.browser.start(draft);
     }
-    const id=crypto.randomUUID();this.id=id;this.base=draft;this.phase='starting';this.callbacks.listening(true);
+    const id=crypto.randomUUID();this.id=id;this.base=draft;this.phase='starting';this.callbacks.preparing?.();
     void this.ready.then(async()=>{
       if(this.disposed||this.id!==id)return;
       if(!this.available)throw new Error('speech_unavailable');

@@ -132,6 +132,7 @@ export interface Settings {
   /** Explicit opt-in because browser speech recognition may process audio online. */
   voiceCloudConsent: boolean;
   voiceInputMode: 'local'|'cloud'|'off';
+  voiceInputLanguage: 'auto'|'es'|'en';
   voiceLocalVoiceId: string;
   voiceSpokenReplies: boolean;
   /** Model server addresses once connected; empty means not connected. */
@@ -188,6 +189,7 @@ export const DEFAULT_SETTINGS: Settings = {
   desktopPolicy: {denyAll:false,entries:{}},
   voiceCloudConsent: false,
   voiceInputMode: 'local',
+  voiceInputLanguage: 'auto',
   voiceLocalVoiceId: '',
   voiceSpokenReplies: false,
   ollamaUrl: "",

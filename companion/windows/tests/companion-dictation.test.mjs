@@ -5,6 +5,18 @@ import { State, DEFAULT_SETTINGS } from '../src/core/state.ts';
 import { CompanionDictation } from '../src/core/companion-dictation.ts';
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
+test('local dictation does not announce listening before the native device is ready', async () => {
+  State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local' };
+  calls.length = 0; const phases = [];
+  const input = new CompanionDictation({ transcript() {}, preparing: () => phases.push('preparing'), listening: active => phases.push(active), error: assert.fail });
+  await tick(); input.start(''); await tick();
+  assert.deepEqual(phases, ['preparing']);
+  const requestId = calls.find(([name]) => name === 'voice_input_start')[1].requestId;
+  emit('novo-voice-input', { requestId, state: 'listening' });
+  assert.deepEqual(phases, ['preparing', true]);
+  input.dispose();
+});
+
 test('local speech fills the existing draft without cloud speech or sending chat', async () => {
   State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local', voiceCloudConsent: false };
   calls.length = 0; const texts = []; const phases = [];

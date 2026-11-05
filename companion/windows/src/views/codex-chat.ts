@@ -36,7 +36,12 @@ export function buildCodexPrompt(onHeightChange: () => void): ViewHost {
   const el = h('div', { class: 'view' }, h('div', { class: 'card wash chat-card' }, body));
   const dictation = new CompanionDictation({
     transcript(text) { input.value = text; controls(); },
+    preparing(){
+      status.textContent=t('Preparando el micrófono…');mic.setAttribute('aria-label',t('Stop dictation'));mic.replaceChildren(svg(ICONS.stop,14));
+      State.stateOverride='thinking';State.notify();controls();
+    },
     listening(active) {
+      status.textContent=active?t('Listening… press the microphone button again to stop'):'';
       body.classList.toggle('voice-listening', active);
       mic.classList.toggle('listening', active);
       mic.setAttribute('aria-label', active ? t("Stop dictation") : t("Start dictation"));
