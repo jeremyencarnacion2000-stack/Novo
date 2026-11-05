@@ -30,3 +30,8 @@ test('automatic speech is opt-in, stops when disabled and stays silent outside c
   State.settings.voiceSpokenReplies=true;State.view='overview';
   view.readReply();await flush();assert.equal(sent('voice_speak').length,1);
 });
+test('a dictated reply can be spoken even when automatic replies are off',async()=>{
+  calls.length=0;State.settings={...DEFAULT_SETTINGS,voiceSpokenReplies:false};State.view='prompt';
+  view=buildReplySpeech(()=>{});view.update('account/a','Listo');
+  view.readReply(true);await flush();assert.equal(sent('voice_speak').at(-1).text,'Listo');
+});

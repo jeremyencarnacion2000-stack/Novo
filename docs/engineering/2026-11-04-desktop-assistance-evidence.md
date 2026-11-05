@@ -76,3 +76,9 @@ cargo test --lib -p novo-companion physical_microphone_cancel_stops_capture --lo
 ```
 
 **Decisión:** conservar 0.2.17 como paquete local de diagnóstico; no instalarlo ni marcarlo listo. Resolver el rechazo y la latencia de voz, repetir calibración física, completar el recorrido unido y la revisión visual/reinicio antes de cambiar el estado del PR. No publicar ni fusionar sin autorización.
+
+## Respuesta hablada tras dictado — cambio incremental sin aceptación física
+
+El Companion marca sólo las transcripciones reconocidas como peticiones de voz; cancelar o restaurar un borrador no activa el modo de respuesta hablada. Tras enviar una petición dictada por el flujo normal, el lector local lee la respuesta final incluso con «leer respuestas en voz alta» desactivado. La apertura confirmada se expresa como «Listo, abrí [app]». El texto escrito sigue respetando la preferencia global.
+
+Comprobación automatizada tras el cambio: 15/15 pruebas dirigidas y 430/430 en la suite completa; TypeScript/Vite compila. Las pruebas simulan el evento de transcripción y verifican llamadas al lector; no prueban audio audible ni micrófono real. La palabra de activación «Novo» y la escucha permanente continúan sin implementar ni habilitar. No se regeneró el instalador candidato 0.2.17, no se instaló y no se publicó.

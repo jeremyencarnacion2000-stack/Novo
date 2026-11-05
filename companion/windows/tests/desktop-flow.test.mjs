@@ -14,6 +14,17 @@ test('Novo prefix and project continuation resolve as a single desktop intent',(
 test('registered names outside the old six-app list can be requested',()=>{
   assert.deepEqual(desktop.parseDesktopCommand('abre Obsidian'),{appId:'Obsidian',action:'open'});
 });
+test('opening acknowledgement matches the Windows receipt',async()=>{
+  const f=fixture();
+  const opened=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open'},()=>true);
+  assert.equal(opened.response,'Listo, abrí Visual Studio Code.');
+  f.api.desktopAppOpen=async()=>({kind:'focused'});
+  const focused=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open'},()=>true);
+  assert.equal(focused.response,'Listo, puse Visual Studio Code al frente.');
+  f.api.desktopAppOpen=async()=>({kind:'already_open'});
+  const existing=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open'},()=>true);
+  assert.equal(existing.response,'Listo, Visual Studio Code ya tiene una ventana abierta.');
+});
 test('verified opening without project evidence asks for context rather than inventing a continuation',async()=>{
   const f=fixture();const result=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open',projectName:'ClickHome'},()=>true);
   assert.deepEqual(f.calls,['vscode']);assert.match(result.response,/ClickHome/);assert.match(result.response,/carpeta|contexto/i);assert.equal(result.continuation,undefined);

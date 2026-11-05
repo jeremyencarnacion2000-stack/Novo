@@ -2,7 +2,7 @@ import { SpeechDictation, type DictationError } from './speech-dictation';
 import { Bridge, onEvent } from './bridge';
 import { State } from './state';
 import { t } from '../i18n/i18n';
-interface Callbacks { transcript(text:string):void; listening(active:boolean):void; processing?():void; error(code:DictationError):void }
+interface Callbacks { transcript(text:string,recognized?:boolean):void; listening(active:boolean):void; processing?():void; error(code:DictationError):void }
 interface InputEvent { requestId:string; state:'listening'|'processing'|'finished'|'error'|'stopped'; text?:string; code?:string }
 const errors:Record<string,DictationError>={speech_memory_low:'memory',speech_resources_missing:'resources',speech_resources_invalid:'resources',microphone_unavailable:'permission',no_speech:'no-speech',speech_uncertain:'uncertain',speech_disabled:'disabled',speech_busy:'busy',session_unavailable:'session'};
 export function dictationMessage(code:DictationError):string {
@@ -35,7 +35,7 @@ export class CompanionDictation {
       if(event.state==='finished'){
         const text=event.text?.trim();
         if(!text||text.length>12000||text.includes('\0')){this.callbacks.error('uncertain');return;}
-        this.callbacks.transcript(this.base+(this.base&&!/\s$/.test(this.base)?' ':'')+text);
+        this.callbacks.transcript(this.base+(this.base&&!/\s$/.test(this.base)?' ':'')+text,true);
       }else if(event.state==='error')this.callbacks.error(errors[event.code??'']??'failed');
     }).then(stop=>{if(this.disposed)stop();else this.unsubscribe=stop;}).catch(()=>{this.available=false;});
   }
@@ -68,7 +68,7 @@ export class CompanionDictation {
   }
   cancel(){
     const id=this.id;this.id=null;this.phase='idle';this.browser.cancel();
-    if(id){void Bridge.voiceInputCancel(id).catch(()=>{});this.callbacks.transcript(this.base);this.callbacks.listening(false);}
+    if(id){void Bridge.voiceInputCancel(id).catch(()=>{});this.callbacks.transcript(this.base,false);this.callbacks.listening(false);}
   }
   dispose(){if(this.disposed)return;this.cancel();this.disposed=true;this.browser.dispose();this.unsubscribe?.();}
 }

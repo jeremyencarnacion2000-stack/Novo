@@ -184,6 +184,12 @@ La revisión independiente produjo cuatro hallazgos importantes: corrupción de 
 
 Windows no tiene VS Code disponible y Antigravity conserva un registro sin ejecutable. El usuario confirmó que sólo usa Codex por espacio; no se instalaron más editores. El receptor de dictado manual pasó con transcripción inyectada y Enviar, sin acciones previas al envío; no certifica el micrófono. La instalación sigue en 0.2.16, esta candidata no está instalada y no se publicó a producción. [Evidencia y aceptación pendiente](2026-11-04-desktop-assistance-evidence.md).
 
+### Respuesta hablada después del dictado
+
+La transcripción final del micrófono ahora queda marcada como voz; cancelar o restaurar un borrador no activa esa marca. Al pulsar Enviar, Novo usa la misma intención de texto y, al terminar correctamente, lee su respuesta con la voz local aunque la lectura automática general esté apagada. Las aperturas confirmadas responden «Listo, abrí …». El dictado de texto manual y la preferencia general de lectura mantienen su comportamiento.
+
+Pruebas del Companion: 15/15 dirigidas y 430/430 en la suite completa; TypeScript/Vite compila. No se reprodujo audio físico ni se instaló el candidato. La activación por la palabra «Novo» aún no está implementada: la calibración física del reconocimiento anterior falló idioma/confianza, por lo que no se deja el micrófono abierto.
+
 ### Candidato 0.2.17 y aceptación física
 
 Se generaron localmente instaladores NSIS y MSI de 0.2.17. Son unsigned/not digitally signed; el usuario no los instaló. Se conservaron en `companion/windows/.tmp/candidates/0.2.17/` hashes y una reversión selectiva de ejecutables/recursos 0.2.16, sin configuración ni datos personales.

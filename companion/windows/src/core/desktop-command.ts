@@ -56,7 +56,7 @@ export async function executeDesktopCommand(api:DesktopApi,command:DesktopComman
     const receipt=await api.desktopAppOpen(app.id,requestId);
     if(!['opened','focused','already_open'].includes(receipt?.kind))throw new Error('Windows did not confirm the action');
     if(!current())return {response:'Acción terminada; la conversación cambió.'};
-    const response=receipt.kind==='already_open'?`${app.name} ya tiene una ventana abierta.`:`Windows confirmó una ventana de ${app.name}.`;
+    const response=receipt.kind==='already_open'?`Listo, ${app.name} ya tiene una ventana abierta.`:receipt.kind==='focused'?`Listo, puse ${app.name} al frente.`:`Listo, abrí ${app.name}.`;
     if(!command.projectName)return {response};
     const context=await api.contextSearch(command.projectName);
     if(!current())return {response};

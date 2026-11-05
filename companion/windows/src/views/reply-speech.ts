@@ -27,7 +27,7 @@ export function buildReplySpeech(beforeSpeak:()=>void) {
   button.addEventListener('click',()=>{if(speech.state.requestId)speech.stop();else play();});
   return {el:button,status,
     update(key:string,content:string){if(key!==context){context=key;speech.stop();}text=key?content:'';draw();},
-    readReply(){if(State.settings.voiceSpokenReplies&&State.view==='prompt')play();},
+    readReply(force=false){if((force||State.settings.voiceSpokenReplies)&&State.view==='prompt')play();},
     settingsChanged(){if(voice!==State.settings.voiceLocalVoiceId||!State.settings.voiceSpokenReplies)speech.stop();voice=State.settings.voiceLocalVoiceId;},
     stop:()=>speech.stop(),
     dispose(){if(disposed)return;speech.dispose();disposed=true;},
