@@ -4,6 +4,9 @@ mod codex;
 mod codex_plan;
 #[path = "../../../src-tauri/src/project_work/process.rs"]
 mod process;
+#[path = "../../../src-tauri/src/voice_metrics.rs"]
+mod voice_metrics;
+mod project_work { pub(crate) use crate::codex; }
 #[path = "../../../src-tauri/src/project_work/protocol.rs"]
 mod protocol;
 #[path = "../../../src-tauri/src/project_work/workspace.rs"]

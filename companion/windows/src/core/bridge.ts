@@ -20,7 +20,7 @@ export interface NovoWorkContext {
   canClear: boolean;
 }
 export interface NovoContextFolder {id:string;name:string}
-export interface DesktopAppChoice {id:string;name:string;available:boolean;allowed:boolean}
+export interface DesktopAppChoice {id:string;name:string;available:boolean;allowed:boolean;canOpen:boolean;canControl:boolean;canRead:boolean}
 export interface DesktopWindowChoice {id:string;appId:string;title:string;minimized:boolean;maximized:boolean}
 export interface LocalProjectArtifact {id:string;summary:string;baseCommit:string|null;changedPaths:string[];verificationStatus:'passed'|'failed'|'not_run'|null;modifiedAt:string|null;workspaceReady:boolean;patchReady:boolean}
 
@@ -95,11 +95,13 @@ export const Bridge = {
   openSettingsWindow: (section?:'account'|'assistant'|'connections'|'desktop') => call<void>("open_settings_window",{section:section??null}),
   openNovo: () => call<void>("companion_panel_open"),
   novoAccountStatus: () => IS_TAURI ? novoCall<NativeAccountStatus>('novo_account_status') : Promise.resolve<NativeAccountStatus>({state:'demo',authorization:null,lastVerifiedAt:null,revocationPending:false}),
-  desktopAppCatalog: () => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog'),
+  desktopAppCatalog: (refresh=false) => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog',{refresh}),
+  desktopAppPermissionsSet: (appId:string,permissions:{open:boolean;control:boolean;read:boolean}) => callOrThrow<{app:DesktopAppChoice;policy:Settings['desktopPolicy']}>('desktop_app_permissions_set',{appId,permissions}),
   desktopAppAllowedSet: (appId:string,enabled:boolean) => callOrThrow<string[]>('desktop_app_allowed_set',{appId,enabled}),
-  desktopAppOpen: (appId:string) => callOrThrow<void>('desktop_app_open',{appId}),
+  desktopAppOpen: (appId:string,requestId?:string) => callOrThrow<{kind:string}>('desktop_app_open',{appId,requestId:requestId??null}),
+  desktopActionCancel: (requestId:string) => callOrThrow<void>('desktop_action_cancel',{requestId}),
   desktopAppWindows: (appId:string) => callOrThrow<DesktopWindowChoice[]>('desktop_app_windows',{appId}),
-  desktopWindowAction: (windowId:string,action:'focus'|'minimize'|'maximize'|'restore') => callOrThrow<void>('desktop_window_action',{windowId,action}),
+  desktopWindowAction: (windowId:string,action:'focus'|'minimize'|'maximize'|'restore',requestId?:string) => callOrThrow<void>('desktop_window_action',{windowId,action,requestId:requestId??null}),
   novoChatModels: () => novoCall<NovoChatModel[]>('novo_chat_models'),
   projectWorkRuntimes: () => novoCall<import('./project-work').ProjectWorkRuntime[]>('project_work_runtimes'),
   projectWorkArtifacts: () => callOrThrow<LocalProjectArtifact[]>('project_work_artifacts'),

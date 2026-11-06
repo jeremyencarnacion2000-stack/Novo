@@ -2,8 +2,8 @@ import { SpeechDictation, type DictationError } from './speech-dictation';
 import { Bridge, onEvent } from './bridge';
 import { State } from './state';
 import { t } from '../i18n/i18n';
-interface Callbacks { transcript(text:string):void; listening(active:boolean):void; processing?():void; error(code:DictationError):void }
-interface InputEvent { requestId:string; state:'listening'|'processing'|'finished'|'error'|'stopped'; text?:string; code?:string }
+interface Callbacks { transcript(text:string,recognized?:boolean):void; listening(active:boolean):void; preparing?():void; processing?():void; error(code:DictationError):void }
+interface InputEvent { requestId:string; state:'listening'|'processing'|'finished'|'error'|'stopped'; text?:string; code?:string; emittedAtMs?:number }
 const errors:Record<string,DictationError>={speech_memory_low:'memory',speech_resources_missing:'resources',speech_resources_invalid:'resources',microphone_unavailable:'permission',no_speech:'no-speech',speech_uncertain:'uncertain',speech_disabled:'disabled',speech_busy:'busy',session_unavailable:'session'};
 export function dictationMessage(code:DictationError):string {
   switch(code){
@@ -24,6 +24,7 @@ export class CompanionDictation {
   private callbacks:Callbacks; private browser:SpeechDictation;
   private id:string|null=null; private base=''; private phase:'idle'|'starting'|'listening'|'processing'='idle';
   private disposed=false; private ready:Promise<void>; private unsubscribe:(()=>void)|null=null; private available=true;
+  private started=0;
   constructor(callbacks:Callbacks) {
     this.callbacks=callbacks;
     this.browser=new SpeechDictation(callbacks,undefined,'es-BO');
@@ -35,7 +36,10 @@ export class CompanionDictation {
       if(event.state==='finished'){
         const text=event.text?.trim();
         if(!text||text.length>12000||text.includes('\0')){this.callbacks.error('uncertain');return;}
-        this.callbacks.transcript(this.base+(this.base&&!/\s$/.test(this.base)?' ':'')+text);
+        this.callbacks.transcript(this.base+(this.base&&!/\s$/.test(this.base)?' ':'')+text,true);
+        const deliveryMs=Date.now()-(event.emittedAtMs??NaN);const requestToDraftMs=performance.now()-this.started;
+        if(Number.isFinite(deliveryMs)&&deliveryMs>=0&&deliveryMs<=60000&&requestToDraftMs>=0&&requestToDraftMs<=90000)
+          void Bridge.log('voice-draft '+JSON.stringify({requestId:event.requestId,deliveryMs,requestToDraftMs}));
       }else if(event.state==='error')this.callbacks.error(errors[event.code??'']??'failed');
     }).then(stop=>{if(this.disposed)stop();else this.unsubscribe=stop;}).catch(()=>{this.available=false;});
   }
@@ -48,7 +52,7 @@ export class CompanionDictation {
       if(!State.settings.voiceCloudConsent){this.callbacks.error('consent');return false;}
       return this.browser.start(draft);
     }
-    const id=crypto.randomUUID();this.id=id;this.base=draft;this.phase='starting';this.callbacks.listening(true);
+    const id=crypto.randomUUID();this.started=performance.now();this.id=id;this.base=draft;this.phase='starting';this.callbacks.preparing?.();
     void this.ready.then(async()=>{
       if(this.disposed||this.id!==id)return;
       if(!this.available)throw new Error('speech_unavailable');
@@ -68,7 +72,7 @@ export class CompanionDictation {
   }
   cancel(){
     const id=this.id;this.id=null;this.phase='idle';this.browser.cancel();
-    if(id){void Bridge.voiceInputCancel(id).catch(()=>{});this.callbacks.transcript(this.base);this.callbacks.listening(false);}
+    if(id){void Bridge.voiceInputCancel(id).catch(()=>{});this.callbacks.transcript(this.base,false);this.callbacks.listening(false);}
   }
   dispose(){if(this.disposed)return;this.cancel();this.disposed=true;this.browser.dispose();this.unsubscribe?.();}
 }

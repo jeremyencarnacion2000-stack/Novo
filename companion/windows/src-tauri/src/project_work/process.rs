@@ -78,6 +78,37 @@ pub fn run_guarded(
     limit: usize,
     cancel: Arc<AtomicBool>,
 ) -> Result<Output, String> {
+    run_impl(exe, args, dir, input, seconds, limit, cancel, false).map(|(out, _)| out)
+}
+fn read_bounded(
+    mut stream: impl Read,
+    limit: usize,
+    overflow: Arc<AtomicBool>,
+) -> Result<Vec<u8>, &'static str> {
+    let mut bytes = Vec::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let count = stream.read(&mut buf).map_err(|_| "execution_failed")?;
+        if count == 0 {
+            return Ok(bytes);
+        }
+        if bytes.len() + count > limit {
+            overflow.store(true, Ordering::SeqCst);
+            return Err("execution_failed");
+        }
+        bytes.extend_from_slice(&buf[..count]);
+    }
+}
+fn run_impl(
+    exe: &Path,
+    args: &[String],
+    dir: Option<&Path>,
+    input: Option<&[u8]>,
+    seconds: u64,
+    limit: usize,
+    cancel: Arc<AtomicBool>,
+    diagnostics: bool,
+) -> Result<(Output, Vec<u8>), String> {
     if cancel.load(Ordering::SeqCst) {
         return Err("execution_failed".into());
     }
@@ -86,7 +117,11 @@ pub fn run_guarded(
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(if diagnostics {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        });
     if let Some(dir) = dir {
         command.current_dir(dir);
     }
@@ -112,23 +147,12 @@ pub fn run_guarded(
     let stdout = child.stdout.take().ok_or("execution_failed")?;
     let overflow = Arc::new(AtomicBool::new(false));
     let too_large = overflow.clone();
-    let reader = std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut stream = stdout;
-        let mut buf = [0u8; 8192];
-        loop {
-            let count = stream.read(&mut buf).map_err(|_| "execution_failed")?;
-            if count == 0 {
-                break;
-            }
-            if bytes.len() + count > limit {
-                too_large.store(true, Ordering::SeqCst);
-                return Err("execution_failed");
-            }
-            bytes.extend_from_slice(&buf[..count]);
-        }
-        Ok::<_, &str>(bytes)
-    });
+    let reader = std::thread::spawn(move || read_bounded(stdout, limit, too_large));
+    let diagnostic_overflow = overflow.clone();
+    let diagnostic_reader = child
+        .stderr
+        .take()
+        .map(|stream| std::thread::spawn(move || read_bounded(stream, limit, diagnostic_overflow)));
     if let Some(input) = input {
         if input.len() > 8192
             || child
@@ -175,13 +199,67 @@ pub fn run_guarded(
         .join()
         .map_err(|_| "execution_failed")?
         .map_err(str::to_string)?;
+    let diagnostic = match diagnostic_reader {
+        Some(reader) => reader
+            .join()
+            .map_err(|_| "execution_failed")?
+            .map_err(str::to_string)?,
+        None => Vec::new(),
+    };
     if let Some(error) = error {
         return Err(error.into());
     }
     let status = status.ok_or("execution_failed")?;
-    Ok(Output {
-        bytes,
-        success: status.success(),
-        exit_code: status.code().unwrap_or(-1),
-    })
+    Ok((
+        Output {
+            bytes,
+            success: status.success(),
+            exit_code: status.code().unwrap_or(-1),
+        },
+        diagnostic,
+    ))
+}
+
+pub fn run_guarded_diagnostics(
+    exe: &Path,
+    args: &[String],
+    dir: Option<&Path>,
+    seconds: u64,
+    limit: usize,
+    cancel: Arc<AtomicBool>,
+) -> Result<(Output, Vec<u8>), String> {
+    run_impl(exe, args, dir, None, seconds, limit, cancel, true)
+}
+
+#[cfg(all(test, windows))]
+mod diagnostic_tests {
+    use super::*;
+    #[test]
+    fn voice_diagnostics_capture_both_streams_and_reject_stderr_overflow() {
+        let exe = crate::project_work::codex::system_powershell();
+        let run = |script: &str, limit| {
+            run_guarded_diagnostics(
+                &exe,
+                &[
+                    "-NoProfile".into(),
+                    "-NonInteractive".into(),
+                    "-Command".into(),
+                    script.into(),
+                ],
+                None,
+                10,
+                limit,
+                Arc::new(AtomicBool::new(false)),
+            )
+        };
+        let (out, diagnostic) = run(
+            "[Console]::Out.Write('draft'); [Console]::Error.Write('timing')",
+            100,
+        )
+        .unwrap();
+        assert!(out.success);
+        assert_eq!(out.bytes, b"draft");
+        assert_eq!(diagnostic, b"timing");
+        assert!(run("[Console]::Error.Write('x' * 2000)", 100).is_err());
+    }
 }

@@ -22,3 +22,7 @@ La [medición de interacción autenticada](../performance/2026-11-01-interaction
 ## Próximo tramo del Companion
 
 La salida hablada local está instalada: Windows Microsoft, español automático, selección de voz, control de leer/detener y opt-in de lectura automática. Sigue la validación física de audio/cancelación. El trabajador único de captura + whisper.cpp/Silero está instalado en 0.2.16 con recursos fijados y verificados; falta validar micrófono, precisión y rendimiento en hardware real. La espera «Novo» se mantiene deshabilitada hasta superar su piloto. Las confirmaciones de escrituras continúan siendo visuales y nunca se aceptarán desde el audio.
+
+## Desarrollo de asistencia de escritorio — 2026-11-04
+
+Etapa de escritorio desarrollada en `codex/companion-desktop-flow`: catálogo general con exclusiones; mismo Enviar para texto/dictado; apertura observada y continuación de proyecto en la orquestación existente. Windows no dispone de VS Code; el usuario usa Codex y no pidió instalar otro editor. Pruebas con Codex/Bloc de notas y ClickHome reales completadas. No instalada/publicada; queda aceptación visual y micrófono físico. [Evidencia](../engineering/2026-11-04-desktop-assistance-evidence.md).

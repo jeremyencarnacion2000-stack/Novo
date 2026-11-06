@@ -11,6 +11,6 @@ describe('local desktop command catalog',()=>{
     ['restaura el explorador de archivos',{appId:'explorer',action:'restore'}],
   ]) it(`matches complete supported utterance: ${input}`,()=>assert.deepEqual(parseDesktopCommand(input),expected))
 
-  for (const input of ['abre Chrome y busca vuelos','abre la terminal','minimiza la ventana','abre Google Calendar'])
+  for (const input of ['abre Chrome y busca vuelos','abre C:\\Windows\\cmd.exe','abre Chrome --incognito'])
     it(`does not guess unsupported command: ${input}`,()=>assert.equal(parseDesktopCommand(input),null))
 })

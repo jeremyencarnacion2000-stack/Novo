@@ -1,6 +1,10 @@
 # Matriz de capacidades
 
-Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+Actualización 2026-11-06: [revisión y contraste Small](../engineering/2026-11-06-voice-review.md). Corregida lectura de respuesta antigua tras fallar continuación; **CI 438 frontend/281 app/30 hooks/21 harness/6 Python y build aprobado**. Fuente `3ad0d09` empaquetada y NSIS cotejado; autorización solicitada, aún no instalada. Modelo/umbrales actuales conservados; circuito físico sigue pendiente.
+
+Fecha: 2026-11-05. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
+
+Voz: [140 ejecuciones automáticas y candidata `2b91b0d`](../engineering/2026-11-05-voice-optimization.md). Los ajustes rápidos pierden fiabilidad; no están habilitados en producto. Instrumentación y corrección del lector pasan CI, pero aún no están instaladas. Corpus humano/circuito unido/interrupción física siguen pendientes; la instalación actual es `c64098a`.
 
 | Capacidad | Estado observado | Evidencia / validación pendiente |
 | --- | --- | --- |
@@ -13,9 +17,9 @@ Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el 
 | Contexto Twin con procedencia/exclusiones | Implementada sin verificar | `signal-ledger`, `ambient-twin-runtime`, `twin-context` |
 | Gmail: búsqueda, cuerpo completo, propuesta de envío | Lectura real web confirmada tras renovar; envío sin probar | Google rechazaba el grant guardado; el usuario completó la renovación. La pregunta real sobre MESCyT devuelve mensajes concretos, fechas y contenido, con Gmail como fuente. No se envió correo; web/Companion aún tienen orquestaciones distintas |
 | Acciones con permisos, auditoría, retry seguro | Implementada sin verificar externamente | Executor/MCP y esquemas; verificar cada adaptador con cuenta de prueba |
-| Chat cuenta Novo en Companion | Cuenta OAuth verificada en 0.2.15; 0.2.16 instalada; turno real pendiente | El usuario confirmó la conexión y el servidor verificó el dispositivo con los permisos nuevos. No se revalidó un turno de chat tras actualizar |
-| Comandos directos de tareas y estado Twin en Companion | Servidor publicado y Companion 0.2.16 instalado; acciones con datos reales pendientes | Migración aplicada, con prueba sintética de idempotencia y propiedad. Listar tareas y snapshot cognitivo filtran propietario; crear tarea requiere aprobación visual. La conexión se autorizó en 0.2.15; falta aceptación extremo a extremo |
-| Control local de apps Windows | Implementado para lista de seis apps; no habilitado en la configuración local actual | Chrome, Edge, Firefox, VS Code, Bloc de notas y Explorador. Abrir/enfocar/minimizar/maximizar/restaurar; scopes separados; exe, rutas y HWND quedan locales. `desktopAllowedApps` está vacío en este PC. El usuario pide pasar a catálogo general con lista de exclusión; aún no implementado. Falta probar operaciones reales |
+| Chat cuenta Novo en Companion | Cuenta OAuth verificada en 0.2.15; candidata 0.2.17 instalada; turno de chat pendiente | El usuario confirmó la conexión y el servidor verificó el dispositivo con los permisos nuevos. No se revalidó un turno de chat tras actualizar |
+| Comandos directos de tareas y estado Twin en Companion | Servidor publicado y candidata Companion 0.2.17 instalada; tareas con datos reales pendientes | Migración aplicada, con prueba sintética de idempotencia y propiedad. Listar tareas y snapshot cognitivo filtran propietario; crear tarea requiere aprobación visual. La conexión se autorizó en 0.2.15; falta aceptación extremo a extremo |
+| Control local de apps Windows | Catálogo general y exclusiones instalados en candidata `c64098a`; apertura/enfoque de Codex por texto confirmada | Abrir/enfocar/minimizar/maximizar/restaurar con permisos separados de apertura/control/lectura; rutas y HWND quedan locales. Recuperación tras reinicio, matriz completa de permisos/exclusiones y circuito desde voz/Twin aún sin aceptación física completa |
 | Elegir Codex con plan ChatGPT | Verificada: runtime y respuesta en ventana instalada | Release 0.2.13 instalada; el usuario confirma respuesta y aporta captura de «hola» contestado en ChatGPT Codex. Sonda de producción: `NOVO_OK` en 8.5–11.7 s. CI: 261 pruebas de app, 30 de hooks y 19 del harness aprobadas. No carga documentos/herramientas locales ni hereda transportes del padre; Twin/historial Novo no se transfieren automáticamente. Resto de interacción/hardware todavía parcial |
 | Hooks de Codex/Claude y aprobaciones | Implementada sin verificar con evento real | `companion/windows/hook`, configuración de hooks; instalar no garantiza recibir eventos |
 | Carpetas autorizadas y contexto de agentes | Implementada sin verificar en vivo | Runtime de workspace/work-context, exclusiones y scopes |
@@ -23,10 +27,10 @@ Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el 
 | Widget Windows separado | Fuente inactiva | `widget.rs`/`widget.ts` no están conectados al runtime/build normal; la isla Tauri es la representación operativa existente |
 | Dictado manual | Implementada sin verificar por hardware | Dictado del chat/browser; disponibilidad depende del motor y permisos |
 | Dictado web al chat actual | Publicada; pruebas automatizadas y receptor real verificados, audio simulado | PR #32: transcripción al borrador, texto/adjuntos conservados y envío manual por el mismo chat. Cambio de cuenta/selección/cierre invalida resultados; sin ejecutor separado en `/chat` y `/ai`. QA con sesión: cero envíos/acciones/guardados al recibir dictado. No certifica STT físico |
-| Dictado manual en Companion | Implementado e instalado en 0.2.16; audio físico pendiente | whisper.cpp/Silero locales, modo local por defecto, límites de duración/memoria, texto al borrador y envío manual; modo nube separado con consentimiento explícito. EXE/MSI del run [41781602456](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/41781602456); todavía no es release público. |
-| Voz conversacional con VAD/interrupción | Parcial / planificada | El STT local usa VAD durante dictado manual; falta conversación manos libres y medición real ES/EN |
+| Dictado manual en Companion | Candidata local 0.2.17 `c64098a` instalada; aceptación física fallida | Cuatro muestras habladas independientes y un control sin habla; Tiny no alcanza precisión ES/EN, incluso español fijo. Correcciones FIFO, preparación e idioma instaladas; [mediciones](../engineering/2026-11-04-voice-calibration.md). Envío manual y consentimiento independiente de nube conservados |
+| Voz conversacional con VAD/interrupción | Parcial; mediciones ES/EN disponibles y aceptación pendiente | VAD y memoria medidos durante diagnóstico manual; falta circuito instalado, corpus suficiente, interrupción física y conversación manos libres |
 | Wake word local «Novo» | No implementada | No activar escucha continua hasta integrar detector local y aprobar medición física de falsos positivos, CPU, memoria y latencia |
-| Voz de respuesta | Implementada e instalada; síntesis española en memoria verificada | Windows Microsoft, español automático, leer/detener y lectura automática opcional en Novo/Codex. Falta comprobar audio audible y latencia de cancelación |
+| Voz de respuesta | SAPI ES/EN y lector del chat instalado confirmados por el usuario | Helena Desktop es-ES y David Desktop en-US reproducidos completos y claros. Faltan interrupción física y latencia de inicio; no hay es-DO/es-MX instalado en SAPI. Corrección posterior del corte al guardar ajustes probada en código, aún sin empaquetar |
 | Conversación manos libres | No implementada | Faltan captura nativa, STT/VAD y bucle de escucha; el dictado disponible es manual revisable |
 | Control general de Windows por UI Automation | No implementado; controles nativos acotados sí están en código | No hay automatización de formularios, shell, cierre de procesos ni UI Automation general |
 | Diagnóstico/preparación de arreglo de proyecto | Implementada; ejecución de código sin certificar en este Windows 10 | `project_work`, workspace aislado, proceso limitado, artefactos. El aislamiento legacy requiere lectura raíz que Novo no concede; no confundir una respuesta textual Codex con automatización local de código |
@@ -38,12 +42,16 @@ Fecha: 2026-11-04. «Implementada sin verificar» significa que se encontró el 
 
 No se certificó como «completa y verificada» una capacidad externa por mera presencia de código. Los fixtures/demo se mantienen fuera de la evidencia de uso real.
 
-## Reproducción local de respuestas — conservada en Companion 0.2.16
+## Reproducción local de respuestas — candidata instalada 0.2.17
 
 | Capacidad | Estado y evidencia |
 | --- | --- |
-| Voz Microsoft española | Helena instalada en este PC mediante Windows; síntesis fija en memoria comprobada sin altavoces |
-| Leer/detener respuesta en Novo y Codex | Instalado, con identidad de solicitud y cancelación al cambiar contexto; botón observado en la ventana actualizada |
+| Voz Microsoft española | Helena es-ES reproducida por SAPI; usuario confirma frase completa y clara en altavoces. David en-US también confirmado |
+| Leer/detener respuesta en Novo y Codex | Lectura del chat Novo confirmada por el usuario; cancelación cubierta en pruebas pero interrupción física pendiente. Se conservan identidad de solicitud y corte al cambiar contexto |
 | Lectura automática | Opt-in desactivado por defecto; el historial cargado permanece silencioso |
-| Micrófono manual / STT local / wake word | Dictado local implementado y empaquetado en CI; hardware pendiente / wake word no implementada | Modelo y binario fijados/verificados; todavía no se ha capturado audio real ni medido calidad, consumo o latencia |
+| Micrófono manual / STT local / wake word | Dictado local instalado; audio real medido con aceptación fallida. Wake word no implementada ni habilitada. [Calibración](../engineering/2026-11-04-voice-calibration.md) |
 | Cancelación ≤250 ms y calidad audible | Objetivos pendientes de medición; no se deducen de pruebas simuladas |
+
+## Desarrollo de asistencia de escritorio — 2026-11-04
+
+Catálogo dinámico, exclusiones, permisos locales independientes y continuidad de proyecto implementados en `codex/companion-desktop-flow`, candidata `c64098a` instalada. Verificados cuenta real, 73 apps, ventana de Codex, controles de Bloc de notas, contexto ClickHome y una respuesta real del chat en sondas anteriores. El usuario confirmó ahora «abre Codex» por texto y la lectura del resultado. La prueba con transcripción inyectada y Enviar pasa; el reconocimiento físico falla y no certifica el circuito completo. [Evidencia](../engineering/2026-11-04-voice-calibration.md).

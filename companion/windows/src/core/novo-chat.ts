@@ -159,7 +159,7 @@ export class NovoChatController {
     finally{if(this.isCurrent(generation)){this.state.actionBusyId=null;this.notify();}}
   }
   private streamResult(){return {metadata:this.metadata,terminal:this.terminal,error:this.streamError};}
-  async send(message:string,model:string,twinMode:boolean):Promise<void> {
+  async send(message:string,model:string,twinMode:boolean,preparedContext?:NovoLocalContext):Promise<void> {
     await this.ready;
     if(!this.canSend)return;
     const choice=this.state.models.find(candidate=>candidate.id===model);
@@ -171,9 +171,9 @@ export class NovoChatController {
     this.state.contextFilesUsed=0;
     this.metadata=null;this.terminal=null;this.streamError=null;this.notify();
     try {
-      if(this.api.contextSearch){
+      if(preparedContext||this.api.contextSearch){
         try {
-          const context=await this.api.contextSearch(input.message);
+          const context=preparedContext??await this.api.contextSearch!(input.message);
           if(!this.isCurrent(generation))return;
           input.localContext=context.text || undefined;
           input.projectHints=context.projectHints;
