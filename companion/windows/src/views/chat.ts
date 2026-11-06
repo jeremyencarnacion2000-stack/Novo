@@ -467,8 +467,15 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       if(result.continuation){
         const model=controller.state.models.find(m=>m.id===State.settings.novoChatModel)??controller.state.models[0];
         if(model){
+          const previousReplies=new Set(controller.state.conversation?.messages.filter(message=>message.role==='assistant').map(message=>message.id));
           localExchange={...exchange,continuing:true};
           await controller.send(result.continuation.message,model.id,Boolean(State.settings.novoTwinMode&&model.allowsTwinMode&&controller.state.account?.authorization?.capabilities.twinRead),result.continuation.context);
+          if(!currentSpeechTurn(turn))return;
+          const reply=controller.state.conversation?.messages.filter(message=>message.role==='assistant').at(-1);
+          if(controller.state.error||!reply?.content.trim()||previousReplies.has(reply.id)){
+            exchange.response+=` ${t('No pude continuar la consulta del proyecto. La apertura de la app sí fue confirmada.')}`;
+            localExchange=exchange;
+          }
         }
       }
     }catch{exchange.response=t('No pude confirmar el resultado en Windows. Revisa los permisos y la ventana; no repetí la acción.');if(currentSpeechTurn(turn))localWindows=[];}

@@ -8,20 +8,22 @@ const {State,DEFAULT_SETTINGS}=await import('../src/core/state.ts');
 const flush=()=>new Promise(resolve=>setTimeout(resolve,0));
 async function fixture(deferred=false,voiceSpokenReplies=true){
   calls.length=0;State.settings={...DEFAULT_SETTINGS,voiceSpokenReplies,novoLocalConnections:false};State.view='prompt';State.droppedFile=null;
-  let account='a';let finish;const original=internals.invoke;
+  let account='a';let finish;let continuation;const original=internals.invoke;
   internals.invoke=async(cmd,args)=>{
     const result=await original(cmd,args);
     if(cmd==='novo_account_status')return {state:'connected',authorization:{user:{id:account},capabilities:{aiChat:true}},revocationPending:false};
     if(cmd==='novo_chat_models')return [{id:'auto',label:'Auto',allowsTwinMode:false}];
     if(cmd==='novo_conversations')return [{id:'history-'+account,title:'History '+account,revision:1,updatedAt:''}];
-    if(cmd==='novo_conversation_get')return {id:args.id,revision:2,messages:[{id:'reply',role:'assistant',content:account==='b'?'Private history B':'Fresh server answer'}]};
-    if(cmd==='desktop_app_catalog')return [{id:'chrome',name:'Chrome',available:true,allowed:true,canOpen:true,canControl:true,canRead:false}];
+    if(cmd==='novo_conversation_get')return {id:args.id,revision:2,messages:[{id:continuation==='fresh'?'project-reply':'reply',role:'assistant',content:continuation==='fresh'?'Current ClickHome answer':account==='b'?'Private history B':'Fresh server answer'}]};
+    if(cmd==='desktop_app_catalog')return ['Chrome','Codex'].map(name=>({id:name.toLowerCase(),name,available:true,allowed:true,canOpen:true,canControl:true,canRead:false}));
     if(cmd==='desktop_app_open')return {kind:'opened'};
+    if(cmd==='companion_context_search')return {text:'Authorized ClickHome test context',matchedFiles:1,folders:['ClickHome'],projectHints:[{source:'folder',name:'ClickHome'}]};
     if(cmd==='novo_chat_start'){
+      if(continuation==='error')throw {code:'offline'};
       if(deferred)return new Promise(resolve=>finish=resolve);
       const requestId=args.input.requestId;
       emit('novo-chat-event',{type:'metadata',requestId,conversationId:'history-a',revision:1,userMessageId:'user'});
-      emit('novo-chat-event',{type:'complete',requestId,assistantMessageId:'reply',revision:2,modelId:'auto'});return;
+      emit('novo-chat-event',{type:'complete',requestId,assistantMessageId:continuation==='fresh'?'project-reply':'reply',revision:2,modelId:'auto'});return;
     }
     return result;
   };
@@ -30,7 +32,7 @@ async function fixture(deferred=false,voiceSpokenReplies=true){
   const send=async text=>{view.el.querySelector('.chat-input').value=text;view.el.querySelector('.send-btn').fire('click');await flush();await flush();};
   const sendDraft=async()=>{view.el.querySelector('.send-btn').fire('click');await flush();await flush();};
   const dictate=async text=>{view.el.querySelector('.chat-input').value='';view.el.querySelector('.novo-voice-button').fire('click');await flush();const requestId=sent('voice_input_start').at(-1).requestId;emit('novo-voice-input',{requestId,state:'listening'});emit('novo-voice-input',{requestId,state:'finished',text});await flush();};
-  return {view,send,sendDraft,dictate,switchAccount:async()=>{account='b';emit('novo-account-changed',null);await flush();await flush();view.el.find('BUTTON').find(button=>button.textContent==='History b').fire('click');await flush();},finish:()=>finish(),dispose:()=>{view.dispose();internals.invoke=original;State.settings={...DEFAULT_SETTINGS};}};
+  return {view,send,sendDraft,dictate,continueWith:outcome=>{continuation=outcome;},switchAccount:async()=>{account='b';emit('novo-account-changed',null);await flush();await flush();view.el.find('BUTTON').find(button=>button.textContent==='History b').fire('click');await flush();},finish:()=>finish(),dispose:()=>{view.dispose();internals.invoke=original;State.settings={...DEFAULT_SETTINGS};}};
 }
 test('a server reply replaces the last desktop result for spoken and manual playback',async()=>{
   const f=await fixture();
@@ -55,3 +57,19 @@ test('an old-account request completing cannot read the newly opened account his
     f.finish();await flush();await flush();assert.equal(sent('voice_speak').length,count);
   }finally{f.dispose();}
 });
+
+for(const [outcome,dictated] of [['error',false],['error',true],['unchanged',false],['fresh',true]]){
+  test(`project continuation reads only its own result: ${outcome}, dictated=${dictated}`,async()=>{
+    const f=await fixture(false,!dictated);
+    try{
+      await f.send('Previous question');const oldReads=sent('voice_speak').filter(call=>call.text==='Fresh server answer').length;
+      f.continueWith(outcome);
+      if(dictated){await f.dictate('abre Codex y continuemos con ClickHome');await f.sendDraft();}
+      else await f.send('abre Codex y continuemos con ClickHome');
+      assert.equal(sent('desktop_app_open').length,1);
+      assert.equal(sent('voice_speak').filter(call=>call.text==='Fresh server answer').length,oldReads,'must not speak a previous turn after continuation');
+      if(outcome==='fresh')assert.equal(sent('voice_speak').at(-1).text,'Current ClickHome answer');
+      else{assert.match(sent('voice_speak').at(-1).text,/Listo, abrí Codex/);assert.match(sent('voice_speak').at(-1).text,/No pude continuar/);}
+    }finally{f.dispose();}
+  });
+}
