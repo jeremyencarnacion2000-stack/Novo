@@ -1,5 +1,13 @@
 # Registro de implementación
 
+## 2026-11-06 — Revisión, respuesta de turno correcto y contraste Small
+
+La única revisión final independiente encontró que una apertura correcta seguida de fallo al consultar ClickHome podía reproducir una respuesta anterior. `3ad0d09` condiciona la lectura a una respuesta nueva sin error; si falla, conserva apertura verificada y avisa que la consulta no pudo continuar. Tres casos fallaron primero; ocho dirigidas pasan después, junto con **438/438 frontend**, TypeScript/Vite y **6/6 Python** locales. Los self-checks de calibración se añaden al workflow Windows existente. [CI 42164771978](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/42164771978) terminó aprobado: 438 frontend, 281 app, 30 hooks, 21 harness y seis Python; seis sondas físicas ignoradas.
+
+C: volvió a tener 17,6 GiB. El primer Small no arrancó por guardia de RAM (277,96 MiB); reiniciar sólo el kernel de diagnóstico del agente recuperó ~1 064 MiB. Cuatro procesos posteriores del mismo corpus sintético terminaron: ES 24 465→9 735 ms (texto exacto pero rechazado); EN 26 321 ms con `Open codecs` aceptado erróneamente →2 923 ms con `Open Codex` correcto y aceptado. Mínimo libre 530,37 MiB, manteniendo suelo 512. No se cerraron apps del usuario, activó micrófono ni cambió modelo/umbral. 144 procesos válidos entre ambos días; no nuevas muestras humanas. [Informe y métricas](2026-11-06-voice-review.md).
+
+Se cotejaron de nuevo instalación `c64098a`, 16 recursos de voz, 21 archivos de reversión, ambos paquetes `c64098a` y NSIS 0.2.16. Candidata `3ad0d09` descargada y cotejada con digest CI: NSIS SHA-256 `bf361fe522939f68bd99675a44a3b00efdf006fc280857248dc21ab4e766b51f`, 33 189 841 bytes, sin firma. Payload 0.2.17 extraído para cotejo y preferencias respaldadas. Se solicitó autorización específica; **instalador no ejecutado** y reversión real no realizada. PR permanece en borrador, sin merge ni producción.
+
 ## 2026-11-05 — Instrumentación, comparación automática y nueva candidata sin instalar
 
 `2b91b0d` añade métricas numéricas acotadas de captura, endpoint estimado, VAD, carga/inferencia, entrega al borrador y acuse SAPI. El runner conserva sus callers normales; stderr sólo se captura por opt-in para reducirlo a números, sin persistir audio/texto/rutas. Pruebas rojas/verdes de parser, runner y entrega; 434 frontend locales, build y 21 harness. CI Windows [41989046596](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/41989046596): 281 app, 30 hooks, 21 harness, 434 frontend, seis sondas físicas excluidas y NSIS/MSI generados. La suite nativa completa local no pudo terminar por falta de disco; se utilizó el workflow existente.

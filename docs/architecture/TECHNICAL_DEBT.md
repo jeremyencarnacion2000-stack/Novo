@@ -1,5 +1,7 @@
 # Deuda técnica priorizada
 
+Actualización 2026-11-06: `3ad0d09` corrige el hallazgo de revisión que leía contenido de un turno anterior al fallar la continuación del proyecto. Tres regresiones roja/verde y CI 438 frontend/281 app/30 hooks/21 harness/6 Python aprobados; candidata cotejada e instalación pendiente de autorización. Small sobre síntesis EN llega a 2,923 s; ES sigue rechazado a 9,735 s. No cierra la aceptación humana ni justifica cambiar modelo por defecto. [Resultados](../engineering/2026-11-06-voice-review.md).
+
 Actualización de voz 2026-11-05: [comparación automática y candidata](../engineering/2026-11-05-voice-optimization.md). Se instrumentaron captura/STT/entrega y acuses SAPI sin contenido privado. La candidata `2b91b0d` pasa CI; no instalada. Quedan P1: fiabilidad de nombres/órdenes ES/EN, medición física del circuito, interrupción audible y margen de almacenamiento. Contexto corto/Q8/BLAS/residencia no justifican cambiar valores predeterminados con los resultados actuales. Los tiempos de acuse de API no cierran la deuda de interrupción física.
 
 Auditoría de código del 2026-11-01. La prioridad combina efecto sobre uso real, coste y riesgo; no es un benchmark de producción.

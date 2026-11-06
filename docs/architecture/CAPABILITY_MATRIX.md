@@ -1,5 +1,7 @@
 # Matriz de capacidades
 
+Actualización 2026-11-06: [revisión y contraste Small](../engineering/2026-11-06-voice-review.md). Corregida lectura de respuesta antigua tras fallar continuación; **CI 438 frontend/281 app/30 hooks/21 harness/6 Python y build aprobado**. Fuente `3ad0d09` empaquetada y NSIS cotejado; autorización solicitada, aún no instalada. Modelo/umbrales actuales conservados; circuito físico sigue pendiente.
+
 Fecha: 2026-11-05. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
 
 Voz: [140 ejecuciones automáticas y candidata `2b91b0d`](../engineering/2026-11-05-voice-optimization.md). Los ajustes rápidos pierden fiabilidad; no están habilitados en producto. Instrumentación y corrección del lector pasan CI, pero aún no están instaladas. Corpus humano/circuito unido/interrupción física siguen pendientes; la instalación actual es `c64098a`.
