@@ -1,5 +1,11 @@
 # Registro de implementación
 
+## 2026-11-12 — Cierre de verificaciones autónomas de la candidata
+
+La 0.2.17 `3ad0d09` se instaló con autorización el 6 de noviembre, con coincidencia de ejecutable y 16 recursos. La instantánea de reversión de 21 archivos quedó cotejada. Dos frases completas con micrófono real dieron 0/2 borradores; 29 replays de estas mismas señales no resolvieron precisión. El usuario confirmó apertura de Codex por texto. La recuperación de ClickHome por el Twin sigue sin evidencia.
+
+Se repitieron 438 pruebas de Companion y pasaron todas. SAPI produjo voz ES/EN en memoria y confirmó la purga a 2,39 ms. Tres intentos de enumerar ventanas agotaron el tiempo de espera. Queda abierta la aceptación del lector, la cancelación y el circuito completo en la app instalada. Se eliminaron los tres WAV temporales y se conservan las métricas. [Informe](2026-11-06-physical-voice-acceptance.md).
+
 ## 2026-11-06 — Revisión, respuesta de turno correcto y contraste Small
 
 La única revisión final independiente encontró que una apertura correcta seguida de fallo al consultar ClickHome podía reproducir una respuesta anterior. `3ad0d09` condiciona la lectura a una respuesta nueva sin error; si falla, conserva apertura verificada y avisa que la consulta no pudo continuar. Tres casos fallaron primero; ocho dirigidas pasan después, junto con **438/438 frontend**, TypeScript/Vite y **6/6 Python** locales. Los self-checks de calibración se añaden al workflow Windows existente. [CI 42164771978](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/42164771978) terminó aprobado: 438 frontend, 281 app, 30 hooks, 21 harness y seis Python; seis sondas físicas ignoradas.
