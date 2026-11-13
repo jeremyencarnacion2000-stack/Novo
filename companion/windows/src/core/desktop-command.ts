@@ -61,7 +61,12 @@ export async function executeDesktopCommand(api:DesktopApi,command:DesktopComman
     if(!current())return {response:'Acción terminada; la conversación cambió.'};
     const response=receipt.kind==='already_open'?`Listo, ${app.name} ya tiene una ventana abierta.`:receipt.kind==='focused'?`Listo, puse ${app.name} al frente.`:`Listo, abrí ${app.name}.`;
     if(!command.projectName)return {response};
-    const context=await api.contextSearch(command.projectName);
+    let context:NovoLocalContext;
+    try{
+      context=await api.contextSearch(command.projectName);
+    }catch{
+      return {response:`${response} No pude consultar el contexto de ${command.projectName}.`};
+    }
     if(!current())return {response};
     const name=normalize(command.projectName);
     const projects=(context.projectHints??[]).filter(h=>normalize(h.name.split(/[\\/]/).pop()??'')===name||normalize(h.repository?.split('/').pop()??'')===name);

@@ -54,6 +54,15 @@ test('project evidence is forwarded once to the existing chat workflow',async()=
   const result=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open',projectName:'ClickHome'},()=>true);
   assert.deepEqual(f.calls,['vscode']);assert.equal(reads,1);assert.match(result.continuation.message,/ClickHome/);assert.equal(result.continuation.context,context);
 });
+test('context lookup failure preserves an already verified opening',async()=>{
+  const f=fixture();
+  f.api.contextSearch=async()=>{throw new Error('Private diagnostic');};
+  const result=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open',projectName:'ClickHome'},()=>true);
+  assert.deepEqual(f.calls,['vscode']);
+  assert.match(result.response,/Listo, abrí Visual Studio Code/);
+  assert.match(result.response,/No pude consultar.*ClickHome/);
+  assert.doesNotMatch(result.response,/Private diagnostic/);
+});
 test('exclusion and ambiguous app names cause no desktop side effects',async()=>{
   for(const apps of [[{...app,canOpen:false}],[app,{...app,id:'other'}]]){
     const f=fixture();f.api.desktopAppCatalog=async()=>apps;
