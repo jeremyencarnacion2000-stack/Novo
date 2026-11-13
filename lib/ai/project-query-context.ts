@@ -13,7 +13,7 @@ const devQuestion=(query:string)=>/proyect|project|repo|github|vercel|codex|depl
 const nameMatch=(query:string,name:string)=>name.length>=3&&query.toLowerCase().includes(name.toLowerCase())
 
 /** Live evidence and owned structured memory; never merges user project records. */
-export async function buildProjectQueryContext(userId:string,query:string,hints:ProjectHint[],access:Access,localConnections?:{github?:string;vercel?:string;codex?:string}){
+export async function buildProjectQueryContext(userId:string,query:string,hints:ProjectHint[],access:Access,localConnections?:{github?:string;vercel?:string;codex?:string}):Promise<{text:string;sources:string[];matchedProject?:boolean}>{
   try{
     const readProviders=access.integrations||access.development
     const canReadProjects=access.personal||access.projects
