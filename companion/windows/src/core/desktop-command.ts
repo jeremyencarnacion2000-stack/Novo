@@ -38,7 +38,7 @@ export function parseDesktopCommand(text:string):DesktopCommand|null {
 
 const normalize=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 export interface DesktopApi {
-  desktopAppCatalog():Promise<DesktopAppChoice[]>;
+  desktopAppCatalog(refresh?:boolean,codexOnly?:boolean):Promise<DesktopAppChoice[]>;
   desktopAppOpen(appId:string,requestId?:string):Promise<{kind:string;focus?:'not_confirmed'}>;
   desktopAppWindows(appId:string):Promise<DesktopWindowChoice[]>;
   desktopWindowAction(id:string,action:DesktopWindowAction,requestId?:string):Promise<void>;
@@ -65,7 +65,7 @@ function openingError(error:unknown):string{
 /** One deterministic desktop action on the Novo account chat Send path. */
 export async function executeDesktopCommand(api:DesktopApi,command:DesktopCommand,current:()=>boolean,requestId?:string):Promise<DesktopResult>{
   let apps:DesktopAppChoice[];
-  try{apps=await api.desktopAppCatalog();}
+  try{apps=await api.desktopAppCatalog(false,normalize(command.appId)==='codex');}
   catch{return {response:'No pude leer el catálogo de aplicaciones de Windows.'};}
   if(!current())return {response:'Acción cancelada.'};
   const matches=apps.filter(app=>app.id===command.appId||normalize(app.name)===normalize(command.appId)||aliases[normalize(app.name)]===command.appId);

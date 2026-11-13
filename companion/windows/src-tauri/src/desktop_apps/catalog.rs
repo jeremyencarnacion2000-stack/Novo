@@ -9,6 +9,26 @@ pub struct App {
     pub exe: Option<PathBuf>,
     pub package: Option<String>,
 }
+#[cfg(windows)]
+pub fn registered_codex() -> Result<Option<App>, String> {
+    let exe = PathBuf::from(std::env::var_os("WINDIR").unwrap_or_else(|| "C:\\Windows".into()))
+        .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let args = [
+        "-NoProfile", "-NonInteractive", "-Command",
+        r#"$ErrorActionPreference='Stop'; $shell=New-Object -ComObject Shell.Application; $app=$shell.Namespace('shell:AppsFolder').ParseName('OpenAI.Codex_2p2nqsd0c76g0!App'); if ($app -and $app.Path -ceq 'OpenAI.Codex_2p2nqsd0c76g0!App') {[Console]::Write('registered')}"#,
+    ].map(String::from);
+    let output = crate::project_work::process::capture(&exe, &args, None, 15, 1024)?;
+    if !output.success {
+        return Err("catalog_unavailable".into());
+    }
+    Ok((output.bytes == b"registered").then(|| App {
+        id: "codex".into(),
+        ids: vec!["codex".into()],
+        name: "Codex".into(),
+        exe: None,
+        package: Some("OpenAI.Codex_2p2nqsd0c76g0!App".into()),
+    }))
+}
 #[derive(Deserialize)]
 struct RegisteredApp {
     name: String,

@@ -129,6 +129,12 @@ fn safe_error() -> novo_account::SafeError {
     novo_account::SafeError::new("unavailable")
 }
 fn resolve_app(id: &str) -> Result<App, novo_account::SafeError> {
+    #[cfg(windows)]
+    if id == "codex" {
+        return catalog::registered_codex()
+            .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?
+            .ok_or_else(|| novo_account::SafeError::new("desktop_app_missing"));
+    }
     let apps = catalog::load(false)
         .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?;
     if let Some(app) = apps.iter().find(|app| app.id == id) {
@@ -172,12 +178,20 @@ fn choice(app: &App, p: AppPermissions) -> AppChoice {
 pub async fn desktop_app_catalog(
     shared: State<'_, Shared>,
     refresh: Option<bool>,
+    codex_only: Option<bool>,
 ) -> Result<Vec<AppChoice>, novo_account::SafeError> {
-    let apps =
-        tauri::async_runtime::spawn_blocking(move || catalog::load(refresh.unwrap_or(false)))
-            .await
-            .map_err(|_| safe_error())?
-            .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?;
+    let apps = tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(windows)]
+        if codex_only == Some(true) {
+            return catalog::registered_codex().map(|app| app.into_iter().collect());
+        }
+        #[cfg(not(windows))]
+        let _ = codex_only;
+        catalog::load(refresh.unwrap_or(false))
+    })
+    .await
+    .map_err(|_| safe_error())?
+    .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?;
     Ok(apps
         .iter()
         .map(|app| choice(app, permissions(&shared, app)))
@@ -285,7 +299,10 @@ async fn open_request(
             .await
             .map_err(|_| safe_error())??;
         authorize(shared, true).await?;
-        let p = require_local(shared, &app.id, false)?;
+        let p = permissions(shared, &app);
+        if !p.open {
+            return Err(novo_account::SafeError::new("permission_required"));
+        }
         if !shared
             .novo_account
             .lock()

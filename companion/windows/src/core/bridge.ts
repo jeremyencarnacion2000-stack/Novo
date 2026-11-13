@@ -95,7 +95,7 @@ export const Bridge = {
   openSettingsWindow: (section?:'account'|'assistant'|'connections'|'desktop') => call<void>("open_settings_window",{section:section??null}),
   openNovo: () => call<void>("companion_panel_open"),
   novoAccountStatus: () => IS_TAURI ? novoCall<NativeAccountStatus>('novo_account_status') : Promise.resolve<NativeAccountStatus>({state:'demo',authorization:null,lastVerifiedAt:null,revocationPending:false}),
-  desktopAppCatalog: (refresh=false) => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog',{refresh}),
+  desktopAppCatalog: (refresh=false,codexOnly=false) => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog',{refresh,codexOnly}),
   desktopAppPermissionsSet: (appId:string,permissions:{open:boolean;control:boolean;read:boolean}) => callOrThrow<{app:DesktopAppChoice;policy:Settings['desktopPolicy']}>('desktop_app_permissions_set',{appId,permissions}),
   desktopAppAllowedSet: (appId:string,enabled:boolean) => callOrThrow<string[]>('desktop_app_allowed_set',{appId,enabled}),
   desktopAppOpen: (appId:string,requestId?:string) => callOrThrow<{kind:string;focus?:'not_confirmed'}>('desktop_app_open',{appId,requestId:requestId??null}),

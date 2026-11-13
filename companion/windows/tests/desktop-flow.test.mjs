@@ -53,6 +53,14 @@ test('focus denial preserves the observed window and continues with project cont
   assert.match(result.response,/al frente/);
   assert.equal(result.continuation.context,context);
 });
+test('an explicit Codex opening requests its registered identity without loading the full catalog',async()=>{
+  const f=fixture();
+  const calls=[];
+  f.api.desktopAppCatalog=async(...args)=>{calls.push(args);return [{...app,id:'codex',name:'Codex'}];};
+  await desktop.executeDesktopCommand(f.api,{appId:'Codex',action:'open'},()=>true);
+  assert.deepEqual(calls,[[false,true]]);
+  assert.deepEqual(f.calls,['codex']);
+});
 test('open errors identify the stage without exposing raw diagnostics',async()=>{
   const f=fixture();
   const command={appId:'vscode',action:'open'};
