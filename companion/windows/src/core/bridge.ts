@@ -98,7 +98,7 @@ export const Bridge = {
   desktopAppCatalog: (refresh=false) => callOrThrow<DesktopAppChoice[]>('desktop_app_catalog',{refresh}),
   desktopAppPermissionsSet: (appId:string,permissions:{open:boolean;control:boolean;read:boolean}) => callOrThrow<{app:DesktopAppChoice;policy:Settings['desktopPolicy']}>('desktop_app_permissions_set',{appId,permissions}),
   desktopAppAllowedSet: (appId:string,enabled:boolean) => callOrThrow<string[]>('desktop_app_allowed_set',{appId,enabled}),
-  desktopAppOpen: (appId:string,requestId?:string) => callOrThrow<{kind:string}>('desktop_app_open',{appId,requestId:requestId??null}),
+  desktopAppOpen: (appId:string,requestId?:string) => callOrThrow<{kind:string;focus?:'not_confirmed'}>('desktop_app_open',{appId,requestId:requestId??null}),
   desktopActionCancel: (requestId:string) => callOrThrow<void>('desktop_action_cancel',{requestId}),
   desktopAppWindows: (appId:string) => callOrThrow<DesktopWindowChoice[]>('desktop_app_windows',{appId}),
   desktopWindowAction: (windowId:string,action:'focus'|'minimize'|'maximize'|'restore',requestId?:string) => callOrThrow<void>('desktop_window_action',{windowId,action,requestId:requestId??null}),

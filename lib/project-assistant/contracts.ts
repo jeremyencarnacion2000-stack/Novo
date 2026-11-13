@@ -27,7 +27,7 @@ export const projectObservationsSchema=z.object({observations:z.array(projectObs
 export const projectMemoryPatchSchema=z.object({revision:z.number().int().positive(),trackingMode:z.enum(['auto','on','off']).optional(),correction:safeAssistantText(480).nullable().optional()}).strict()
 export type ProjectMemoryPatch=z.infer<typeof projectMemoryPatchSchema>
 export const projectMemoryLinkSchema=z.object({revision:z.number().int().positive(),targetId:assistantId,targetRevision:z.number().int().positive()}).strict()
-export type ProjectAssistantAccess={personal:boolean;projects?:boolean;integrations:boolean;development?:boolean;currentWorkContext?:boolean}
+export type ProjectAssistantAccess={personal:boolean;projects?:boolean;tasks?:boolean;integrations:boolean;development?:boolean;currentWorkContext?:boolean}
 export type AssistantMemoryView={
   id:string;title:string;linkedProjectId:string|null;trackingMode:'auto'|'on'|'off';tracked:boolean;revision:number;correction:string|null;
   sources:Array<{kind:ProjectSourceKind;sourceKey:string;observedAt:string;fresh:boolean;available:boolean;repository?:string;vercelProjectId?:string;deviceId?:string}>;

@@ -70,7 +70,7 @@ export async function POST(request:Request):Promise<Response> {
     const serviceInput=parseNovoChatInput({message:input.message,model:input.model,twinMode:input.twinMode,history,localContext:input.localContext,projectHints:input.projectHints,localConnections:input.localConnections})!
     const abort=new AbortController()
     const signal=AbortSignal.any([request.signal,abort.signal])
-    const upstream=await streamNovoChat(serviceInput,{userId:actor.userId,surface:'companion',contextAccess:{personal:actor.scopes.has('account:context:read'),projects:actor.scopes.has('projects:read'),integrations:actor.scopes.has('integrations:read'),twin:actor.scopes.has('twin:read'),development:actor.scopes.has('development:read'),currentWorkContext:actor.scopes.has('device:work-context:read'),deviceActivityRead:actor.scopes.has('device:activity:read')}},signal,claim.lease)
+    const upstream=await streamNovoChat(serviceInput,{userId:actor.userId,surface:'companion',contextAccess:{personal:actor.scopes.has('account:context:read'),projects:actor.scopes.has('projects:read'),tasks:actor.scopes.has('tasks:read'),integrations:actor.scopes.has('integrations:read'),twin:actor.scopes.has('twin:read'),development:actor.scopes.has('development:read'),currentWorkContext:actor.scopes.has('device:work-context:read'),deviceActivityRead:actor.scopes.has('device:activity:read')}},signal,claim.lease)
     if(!upstream.ok || !upstream.body || !upstream.headers.get('Content-Type')?.includes('text/event-stream')){
       throw new CompanionError(upstream.status===409?409:503,upstream.status===409?'cancelled':'provider_unavailable')
     }

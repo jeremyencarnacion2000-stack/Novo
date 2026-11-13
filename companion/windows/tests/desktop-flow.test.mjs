@@ -44,6 +44,28 @@ test('opening acknowledgement matches the Windows receipt',async()=>{
   const existing=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open'},()=>true);
   assert.equal(existing.response,'Listo, Visual Studio Code ya tiene una ventana abierta.');
 });
+test('focus denial preserves the observed window and continues with project context',async()=>{
+  const context={text:'Authorized project evidence',folders:['ClickHome'],matchedFiles:1,projectHints:[{source:'folder',name:'ClickHome'}]};
+  const f=fixture(context);
+  f.api.desktopAppOpen=async()=>({kind:'already_open',focus:'not_confirmed'});
+  const result=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open',projectName:'ClickHome'},()=>true);
+  assert.match(result.response,/ventana abierta/);
+  assert.match(result.response,/al frente/);
+  assert.equal(result.continuation.context,context);
+});
+test('open errors identify the stage without exposing raw diagnostics',async()=>{
+  const f=fixture();
+  const command={appId:'vscode',action:'open'};
+  f.api.desktopAppCatalog=async()=>{throw new Error('private detail');};
+  assert.match((await desktop.executeDesktopCommand(f.api,command,()=>true)).response,/catálogo/);
+  f.api.desktopAppCatalog=async()=>[app];
+  for(const [code,message] of [['permission_required',/permisos/],['desktop_launch_failed',/iniciar/],['desktop_window_unconfirmed',/ventana visible/]]){
+    f.api.desktopAppOpen=async()=>{throw {code,message:'private detail'};};
+    const result=await desktop.executeDesktopCommand(f.api,command,()=>true);
+    assert.match(result.response,message);
+    assert.doesNotMatch(result.response,/private detail/);
+  }
+});
 test('verified opening without project evidence asks for context rather than inventing a continuation',async()=>{
   const f=fixture();const result=await desktop.executeDesktopCommand(f.api,{appId:'vscode',action:'open',projectName:'ClickHome'},()=>true);
   assert.deepEqual(f.calls,['vscode']);assert.match(result.response,/ClickHome/);assert.match(result.response,/carpeta|contexto/i);assert.equal(result.continuation,undefined);

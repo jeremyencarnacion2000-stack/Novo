@@ -102,6 +102,8 @@ pub struct WindowChoice {
 #[derive(Serialize)]
 pub struct OpenReceipt {
     kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    focus: Option<&'static str>,
 }
 #[derive(Serialize)]
 pub struct PolicyResult {
@@ -127,7 +129,8 @@ fn safe_error() -> novo_account::SafeError {
     novo_account::SafeError::new("unavailable")
 }
 fn resolve_app(id: &str) -> Result<App, novo_account::SafeError> {
-    let apps = catalog::load(false).map_err(|_| safe_error())?;
+    let apps = catalog::load(false)
+        .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?;
     if let Some(app) = apps.iter().find(|app| app.id == id) {
         return Ok(app.clone());
     }
@@ -143,7 +146,7 @@ fn resolve_app(id: &str) -> Result<App, novo_account::SafeError> {
                         .eq_ignore_ascii_case(old.to_string_lossy().as_ref())
                 })
         })
-        .ok_or_else(|| novo_account::SafeError::new("invalid_request"))
+        .ok_or_else(|| novo_account::SafeError::new("desktop_app_missing"))
 }
 
 fn permissions(shared: &Shared, app: &App) -> AppPermissions {
@@ -174,7 +177,7 @@ pub async fn desktop_app_catalog(
         tauri::async_runtime::spawn_blocking(move || catalog::load(refresh.unwrap_or(false)))
             .await
             .map_err(|_| safe_error())?
-            .map_err(|_| safe_error())?;
+            .map_err(|_| novo_account::SafeError::new("desktop_catalog_unavailable"))?;
     Ok(apps
         .iter()
         .map(|app| choice(app, permissions(&shared, app)))
@@ -345,11 +348,23 @@ async fn open_verified(
     let before = windows::list_for_app(app, false);
     if !before.is_empty() {
         if before.len() == 1 && p.control {
-            windows::act(before[0].0, app, "focus")?;
-            return Ok(OpenReceipt { kind: "focused" });
+            if windows::act(before[0].0, app, "focus").is_ok() {
+                return Ok(OpenReceipt {
+                    kind: "focused",
+                    focus: None,
+                });
+            }
+            if windows::list_for_app(app, false).is_empty() {
+                return Err(novo_account::SafeError::new("desktop_window_unconfirmed"));
+            }
+            return Ok(OpenReceipt {
+                kind: "already_open",
+                focus: Some("not_confirmed"),
+            });
         }
         return Ok(OpenReceipt {
             kind: "already_open",
+            focus: None,
         });
     }
     let mut cmd = if let Some(exe) = &app.exe {
@@ -367,14 +382,18 @@ async fn open_verified(
         ));
         cmd
     };
-    cmd.spawn().map_err(|_| safe_error())?;
+    cmd.spawn()
+        .map_err(|_| novo_account::SafeError::new("desktop_launch_failed"))?;
     for _ in 0..80 {
         if !windows::list_for_app(app, false).is_empty() {
-            return Ok(OpenReceipt { kind: "opened" });
+            return Ok(OpenReceipt {
+                kind: "opened",
+                focus: None,
+            });
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    Err(safe_error())
+    Err(novo_account::SafeError::new("desktop_window_unconfirmed"))
 }
 #[tauri::command]
 pub async fn desktop_app_windows(

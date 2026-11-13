@@ -39,16 +39,34 @@ export function parseDesktopCommand(text:string):DesktopCommand|null {
 const normalize=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 export interface DesktopApi {
   desktopAppCatalog():Promise<DesktopAppChoice[]>;
-  desktopAppOpen(appId:string,requestId?:string):Promise<{kind:string}>;
+  desktopAppOpen(appId:string,requestId?:string):Promise<{kind:string;focus?:'not_confirmed'}>;
   desktopAppWindows(appId:string):Promise<DesktopWindowChoice[]>;
   desktopWindowAction(id:string,action:DesktopWindowAction,requestId?:string):Promise<void>;
   contextSearch(query:string):Promise<NovoLocalContext>;
 }
 export interface DesktopResult {response:string;windows?:DesktopWindowChoice[];continuation?:{message:string;context:NovoLocalContext}}
 
+function openingError(error:unknown):string{
+  const code=error&&typeof error==='object'&&'code' in error?error.code:undefined;
+  switch(code){
+    case 'permission_required':return 'Faltan permisos para abrir esta app desde Novo.';
+    case 'expired':
+    case 'revoked':return 'Vuelve a autorizar este dispositivo en Novo para abrir la app.';
+    case 'offline':return 'No pude verificar los permisos de apertura porque Novo está sin conexión.';
+    case 'desktop_catalog_unavailable':return 'No pude leer el catálogo de aplicaciones de Windows.';
+    case 'desktop_app_missing':return 'La app ya no aparece en el catálogo de Windows.';
+    case 'desktop_launch_failed':return 'Windows no pudo iniciar la aplicación.';
+    case 'desktop_window_unconfirmed':return 'Windows no confirmó una ventana visible. No se repitió la apertura.';
+    case 'cancelled':return 'Acción cancelada.';
+    default:return 'No recibí una confirmación de apertura de Windows. No se repitió la acción.';
+  }
+}
+
 /** One deterministic desktop action on the Novo account chat Send path. */
 export async function executeDesktopCommand(api:DesktopApi,command:DesktopCommand,current:()=>boolean,requestId?:string):Promise<DesktopResult>{
-  const apps=await api.desktopAppCatalog();
+  let apps:DesktopAppChoice[];
+  try{apps=await api.desktopAppCatalog();}
+  catch{return {response:'No pude leer el catálogo de aplicaciones de Windows.'};}
   if(!current())return {response:'Acción cancelada.'};
   const matches=apps.filter(app=>app.id===command.appId||normalize(app.name)===normalize(command.appId)||aliases[normalize(app.name)]===command.appId);
   if(matches.length!==1)return {response:matches.length?'Hay varias apps con ese nombre. Indica cuál quieres abrir.':'No encontré esa app instalada. Revisa su nombre o instálala antes de continuar.'};
@@ -56,10 +74,14 @@ export async function executeDesktopCommand(api:DesktopApi,command:DesktopComman
   if(!app.available)return {response:'Esa app no está instalada en este PC.'};
   if(command.action==='open'?!app.canOpen:!app.canControl)return {response:'Esta acción está excluida para esa app. Puedes cambiarla en Configuración → Asistente.'};
   if(command.action==='open'){
-    const receipt=await api.desktopAppOpen(app.id,requestId);
-    if(!['opened','focused','already_open'].includes(receipt?.kind))throw new Error('Windows did not confirm the action');
+    let receipt:Awaited<ReturnType<DesktopApi['desktopAppOpen']>>;
+    try{receipt=await api.desktopAppOpen(app.id,requestId);}
+    catch(error){return {response:openingError(error)};}
+    if(!['opened','focused','already_open'].includes(receipt?.kind))return {response:openingError(null)};
     if(!current())return {response:'Acción terminada; la conversación cambió.'};
-    const response=receipt.kind==='already_open'?`Listo, ${app.name} ya tiene una ventana abierta.`:receipt.kind==='focused'?`Listo, puse ${app.name} al frente.`:`Listo, abrí ${app.name}.`;
+    const response=receipt.kind==='already_open'
+      ? `Listo, ${app.name} ya tiene una ventana abierta.${receipt.focus==='not_confirmed'?' Windows no confirmó que quedara al frente.':''}`
+      : receipt.kind==='focused'?`Listo, puse ${app.name} al frente.`:`Listo, abrí ${app.name}.`;
     if(!command.projectName)return {response};
     let context:NovoLocalContext;
     try{

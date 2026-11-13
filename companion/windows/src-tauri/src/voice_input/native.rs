@@ -430,6 +430,22 @@ impl Drop for Recording {
         eprintln!("MIC CLEANUP {} ms", started.elapsed().as_millis());
     }
 }
+impl Recording {
+    fn ready_chunk(&self, order: &mut CaptureOrder, remaining: usize) -> Option<(usize, &[i16])> {
+        let index = order.take(|i| unsafe {
+            std::ptr::read_volatile(std::ptr::addr_of!(self.headers[i].dwFlags)) & WHDR_DONE != 0
+        })?;
+        let bytes = unsafe {
+            std::ptr::read_volatile(std::ptr::addr_of!(self.headers[index].dwBytesRecorded))
+        } as usize;
+        let buffer = &self.buffers[index];
+        Some((
+            index,
+            &buffer[..(bytes / 2).min(buffer.len()).min(remaining)],
+        ))
+    }
+}
+
 fn record(
     request: &Request,
     ready: impl FnOnce(),
@@ -514,28 +530,37 @@ fn record(
             }
             if request.finish.load(Ordering::SeqCst) {
                 endpoint = "manual";
+                // WaveIn returns the in-progress buffer on stop. Do not requeue or
+                // run auto-endpointing while draining the already recorded tail.
+                if waveInStop(handle) != 0 {
+                    return Err("microphone_unavailable".into());
+                }
+                while samples.len() < MAX_SAMPLES {
+                    if request.cancelled.load(Ordering::SeqCst) {
+                        return Err("cancelled".into());
+                    }
+                    let Some((_, chunk)) =
+                        recording.ready_chunk(&mut order, MAX_SAMPLES - samples.len())
+                    else {
+                        break;
+                    };
+                    samples.extend_from_slice(chunk);
+                    gate.push(chunk);
+                }
                 break;
             }
             if WaitForSingleObject(event, 25) == WAIT_FAILED {
                 return Err("microphone_unavailable".into());
             }
-            while let Some(i) = order.take(|i| {
-                std::ptr::read_volatile(std::ptr::addr_of!(recording.headers[i].dwFlags))
-                    & WHDR_DONE
-                    != 0
-            }) {
-                let ptr = &mut *recording.headers[i] as *mut WAVEHDR;
-                let count = (std::ptr::read_volatile(std::ptr::addr_of!((*ptr).dwBytesRecorded))
-                    as usize
-                    / 2)
-                .min(1600)
-                .min(MAX_SAMPLES - samples.len());
-                let chunk = &recording.buffers[i][..count];
+            while let Some((i, chunk)) =
+                recording.ready_chunk(&mut order, MAX_SAMPLES - samples.len())
+            {
                 samples.extend_from_slice(chunk);
                 if gate.push(chunk) {
                     endpoint = "energy_silence";
                     break 'capture;
                 }
+                let ptr = &mut *recording.headers[i] as *mut WAVEHDR;
                 (*ptr).dwBytesRecorded = 0;
                 if waveInAddBuffer(handle, ptr, std::mem::size_of::<WAVEHDR>() as u32) != 0 {
                     return Err("microphone_unavailable".into());
@@ -562,6 +587,42 @@ fn record(
 mod physical_acceptance {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn ready_chunks_preserve_fifo_and_partial_tail_without_padding() {
+        let mut recording = std::mem::ManuallyDrop::new(Recording {
+            handle: None,
+            event: HANDLE::default(),
+            headers: vec![
+                Box::new(WAVEHDR {
+                    dwFlags: WHDR_DONE,
+                    dwBytesRecorded: 3200,
+                    ..Default::default()
+                }),
+                Box::new(WAVEHDR {
+                    dwFlags: WHDR_DONE,
+                    dwBytesRecorded: 6,
+                    ..Default::default()
+                }),
+                Box::new(WAVEHDR::default()),
+            ],
+            buffers: vec![
+                Box::new([10; 1600]),
+                Box::new([20; 1600]),
+                Box::new([30; 1600]),
+            ],
+            prepared: 0,
+        });
+        let mut order = CaptureOrder::default();
+        assert_eq!(
+            recording.ready_chunk(&mut order, 2000).unwrap().1,
+            &[10; 1600]
+        );
+        assert_eq!(recording.ready_chunk(&mut order, 2).unwrap().1, &[20; 2]);
+        assert!(recording.ready_chunk(&mut order, 400).is_none());
+        recording.headers.clear();
+        recording.buffers.clear();
+    }
 
     fn normalized(value: &str) -> String {
         value

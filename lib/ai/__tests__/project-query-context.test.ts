@@ -24,3 +24,23 @@ test('excluded GitHub source is removed before any provider lookup, including lo
   expect(prisma.integrationAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{userId:'owner',provider:{in:['vercel']}}}))
   expect(result.text).not.toContain('hidden/repo');expect(result.text).not.toContain('hidden summary')
 })
+test('a single owned project exposes only confirmed open tasks with bounded coverage',async()=>{
+  ;(prisma.project.findMany as jest.Mock).mockResolvedValue([{id:'p1',title:'ClickHome',status:'in-progress',progress:10,priority:'medium',tasks:[
+    {id:'t1',title:'Verify checkout',status:'todo',priority:'high',dueDate:null},
+    {id:'t2',title:'Completed work',status:'done',priority:'medium',dueDate:null},
+  ]}])
+  const result=await buildProjectQueryContext('owner','¿Qué tareas pendientes de ClickHome puedes confirmar?',[],{personal:false,projects:true,tasks:true,integrations:false})
+  expect(result).toMatchObject({matchedProject:true,sources:['novo']})
+  expect(result.text).toContain('Verify checkout')
+  expect(result.text).toContain('confirmedOpenTasks')
+  expect(result.text).not.toContain('Completed work')
+  const noTasks=await buildProjectQueryContext('owner','¿Qué tareas pendientes de ClickHome puedes confirmar?',[],{personal:false,projects:true,tasks:false,integrations:false})
+  expect(prisma.project.findMany).toHaveBeenLastCalledWith(expect.objectContaining({select:expect.objectContaining({tasks:false})}))
+  expect(noTasks.text).not.toContain('confirmedOpenTasks')
+})
+test('project and task exclusions apply before retrieving live task evidence',async()=>{
+  ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{source:'projects'},{source:'tasks'}])
+  const result=await buildProjectQueryContext('owner','tareas pendientes de ClickHome',[],{personal:false,projects:true,integrations:false})
+  expect(prisma.project.findMany).not.toHaveBeenCalled()
+  expect(result.text).not.toContain('confirmedOpenTasks')
+})

@@ -117,7 +117,8 @@ pub fn load(refresh: bool) -> Result<Vec<App>, String> {
             include_str!("catalog.ps1"),
         ]
         .map(String::from);
-        let output = crate::project_work::process::capture(&exe, &args, None, 8, 1024 * 1024)?;
+        // AppsFolder has taken over 13 seconds on a cold Windows session.
+        let output = crate::project_work::process::capture(&exe, &args, None, 20, 1024 * 1024)?;
         if !output.success {
             return Err("catalog_unavailable".into());
         }

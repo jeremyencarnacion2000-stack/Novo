@@ -9,6 +9,8 @@ import {buildUserContext} from '@/lib/ai/context-builder'
 import {finishActivityRun,isActivityCancelled} from '@/lib/ai/activity'
 import {acquireUserChatLease,releaseUserChatLease} from '@/lib/ai/chat-lease'
 import {isCompanionTurnCancelled} from '@/lib/companion/chat-turns'
+import {buildProjectQueryContext} from '../project-query-context'
+jest.mock('../project-query-context',()=>({buildProjectQueryContext:jest.fn().mockResolvedValue({text:'',sources:[]})}))
 const web:NovoChatPrincipal = {userId:'owner',surface:'web',contextAccess:{personal:true,integrations:true}}
 const native:NovoChatPrincipal = {...web,surface:'companion',contextAccess:{personal:false,integrations:false}}
 const input = () => parseNovoChatInput({message:'Hola',model:'openai/gpt-oss-20b'})!
@@ -33,6 +35,25 @@ it('passes native context capabilities to the existing builder and never starts 
   await result.text()
   expect(buildUserContext).toHaveBeenCalledWith('owner',expect.objectContaining({contextAccess:{personal:false,integrations:false}}))
   expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+it('runs the contextual budget in shadow on an authorized read without changing the provider prompt or sources',async()=>{
+  process.env.NOVO_PROJECT_CONTEXT_SHADOW='1'
+  const sources=[{id:'source:novo',kind:'novo',provider:'novo',label:'Novo',detail:'Owned project data'}]
+  const structured={activeSignal:null,twinContext:null,sources,metrics:{focusTimeToday:null},todaySchedule:[{title:'unrelated calendar item'}],
+    state:{tasksList:[{title:'generic task'}]},retrieval:{status:'partial',unavailable:['calendar']}}
+  ;(buildUserContext as jest.Mock).mockResolvedValueOnce({summary:'Partial evidence\n'+JSON.stringify(structured),structured})
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({text:'AUTHORIZED PROJECT: fixture project. Task record: verify checkout.',sources:[],matchedProject:true})
+  const log=jest.spyOn(console,'info').mockImplementation(()=>{})
+  try{
+    const result=await streamNovoChat(parseNovoChatInput({message:'¿Qué tareas pendientes de Fixture Project puedes confirmar?',model:'openai/gpt-oss-20b'})!,native,new AbortController().signal)
+    expect(await result.text()).toContain('source:novo')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const prompt=JSON.parse(fetchMock.mock.calls[0][1].body).messages[0].content
+    expect(prompt).toContain('unrelated calendar item')
+    expect(prompt).toContain('AUTHORIZED PROJECT')
+    expect(log).toHaveBeenCalledWith('[Novo Context Shadow]',expect.objectContaining({removedSections:expect.arrayContaining(['todaySchedule']),unavailableCount:1}))
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/fixture project|calendar item|verify checkout/i)
+  }finally{log.mockRestore()}
 })
 it.each([web,native])('prepares a reviewed mail action for an address-only send on $surface',async(principal)=>{
   const proposal={type:'SEND_EMAIL',payload:{to:'team@example.test',subject:'Review',body:'Please review the project.'}}
