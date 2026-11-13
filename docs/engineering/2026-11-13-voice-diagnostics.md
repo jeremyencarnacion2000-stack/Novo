@@ -43,6 +43,8 @@ El segundo intento, «Abre Codex y continuemos con ClickHome», llegó al flujo 
 
 ## Cambios verificados y siguiente medición
 
+En una sonda posterior, una instancia independiente de SAPI reprodujo frases de prueba hacia cada dispositivo seleccionado sólo para ese proceso. SAPI informó finalización a 2 388 ms en FxSound y a 3 072 ms en Realtek. No se cambió la salida predeterminada de Windows. Sin confirmación auditiva de esta sonda, el resultado queda limitado al estado que reportó el motor.
+
 - PR #41 registra ahora código de error, amplitud PCM, clipping y conteo de segmentos Silero sin guardar audio, transcripción ni salida cruda del motor. La candidata instalada todavía no incluye esa instrumentación. El algoritmo, el umbral y el modelo siguen iguales.
 - El parser distingue la consulta de tareas de una apertura sola o una continuación genérica y pide evidencia de la fuente. Si la búsqueda de contexto falla después de una apertura confirmada, conserva el recibo y muestra el fallo de contexto por separado. Ambas regresiones se reprodujeron antes de corregirlas. Pasaron 440 pruebas frontend, compilación TypeScript/Vite, 23 pruebas del harness Rust y 6 pruebas Python. No se instaló otro binario.
 - Para la siguiente comparación física, el operador de cada toma controla el comienzo, con un aviso visible persistente y confirmación antes de avanzar. Registrar el formato nativo, convertir una copia con `ffmpeg -i input.wav -ac 1 -ar 16000 -c:a pcm_s16le output.wav` y reutilizar el mismo PCM en cada motor. Alternar orden de grabación y probar inicio y final completos, estéreo por canal, y pérdidas tras Detener. La toma independiente de hoy no se usa como línea base del micrófono.
