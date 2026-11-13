@@ -2,7 +2,7 @@
 
 ## 2026-11-13 — Auditoría de captura y comparación OpenJarvis
 
-Una frase humana confirmada grabada con Realtek y Novo produjo siete errores de nueve palabras en Whisper, con y sin Silero. Vosk produjo seis errores sobre el mismo PCM. La segunda toma de DirectShow confirmó el formato de Windows, pero no tiene una frase confirmada. Se borraron ambos WAV. Se añadieron métricas PCM y de segmentos, y dos regresiones del recorrido por texto. La instalación sigue en 0.2.17 `3ad0d09`. En el último control, Windows aceptó síntesis y el usuario no oyó la respuesta. [Diagnóstico](2026-11-13-voice-diagnostics.md).
+Una frase humana confirmada grabada con Realtek y Novo produjo siete errores de nueve palabras en Whisper, con y sin Silero. Vosk produjo seis errores sobre el mismo PCM. La segunda toma de DirectShow confirmó el formato de Windows, pero no tiene una frase confirmada. Se borraron ambos WAV. Se añadieron métricas PCM y de segmentos, y dos regresiones del recorrido por texto. La instalación sigue en 0.2.17 `3ad0d09`. Tras ajustar el audio, el usuario confirmó que el lector manual reprodujo la respuesta actual. [Diagnóstico](2026-11-13-voice-diagnostics.md).
 
 La sonda aislada de OpenJarvis conservó las 16 fuentes requeridas en un corpus sintético con recuperador de prueba. El enrutador acertó cuatro de ocho consultas españolas y ocho de ocho inglesas. Se recomienda probar presupuesto de contexto en sombra dentro del chat de Novo. [Matriz y prueba](../research/2026-11-13-openjarvis-novo.md).
 
