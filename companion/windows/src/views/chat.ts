@@ -19,7 +19,7 @@ import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 import { NovoChatController } from '../core/novo-chat';
 import { CompanionDictation, dictationMessage } from "../core/companion-dictation";
-import {parseDesktopCommand,type DesktopWindowAction} from '../core/desktop-command';
+import {parseDesktopCommand,executeDesktopCommand,type DesktopWindowAction} from '../core/desktop-command';
 import { buildCodexPrompt } from './codex-chat';
 import { buildReplySpeech } from './reply-speech';
 
@@ -329,7 +329,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   let dictation: CompanionDictation | null = null;
   const playback=buildReplySpeech(()=>dictation?.cancel());
-  const conversations=buildChoiceMenu('novo-conversations',t('Conversación de Novo'),value=>{++speechTurn;playback.stop();localExchange=null;localWindows=[];void controller.selectConversation(value);},open=>{body.classList.toggle('history-open',open);});
+  const conversations=buildChoiceMenu('novo-conversations',t('Conversación de Novo'),value=>{++speechTurn;playback.stop();voiceDraft=false;speakLocalResult=false;localExchange=null;localWindows=[];void controller.selectConversation(value);},open=>{body.classList.toggle('history-open',open);});
   const settingsButton=h('button',{type:'button',class:'novo-chat-settings','aria-label':tl('Configuración del chat'),title:tl('Configuración del chat'),onclick:()=>void Bridge.openSettingsWindow('assistant')},svg(ICONS.gear,12));
   const connect=h('button',{type:'button',class:'novo-chat-link',text:tl('Conectar'),onclick:()=>void Bridge.openNovo()});
   const header=h('div',{class:'novo-chat-heading'},conversations.el,connect,playback.el,settingsButton);
@@ -341,22 +341,29 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   const input=h('input',{class:'chat-input',type:'text',maxlength:12000,'aria-label':tl('Mensaje para Novo'),placeholder:tl('Habla con Novo…')});
   const send=h('button',{class:'send-btn','aria-label':tl('Enviar mensaje')},svg(ICONS.arrowUp,11));
   const voiceButton=h("button",{type:"button",class:"novo-voice-button","aria-label":tl(VOICE_LABELS.start),title:tl("The speech service may process audio outside Novo. Novo receives only the text you send."),"aria-description":tl("The speech service may process audio outside Novo. Novo receives only the text you send.")},svg(ICONS.mic,14,{stroke:1.8}));
-  const cancel=h('button',{class:'novo-chat-link',text:tl('Cancelar respuesta'),onclick:()=>void controller.cancel()});
+  const cancel=h('button',{class:'novo-chat-link',text:tl('Cancelar respuesta'),onclick:()=>{cancelDesktop();void controller.cancel();}});
   const bar=h('div',{class:'chat-bar'},input,cancel,voiceButton,send);
   const body=h('div',{class:'chat-body novo-chat-body'},header,chip,log,actionPanel,error,voiceStatus,playback.status,bar);
   const el=h('div',{class:'view'},h('div',{class:'card wash chat-card'},body));
   (el.querySelector('.card') as HTMLElement).style.setProperty('--wash','rgba(99,102,241,0.5)');
   let renderedConversation:unknown=null;let renderedPending='';let renderedActive:string|null=null;
-  let localExchange:{request:string;response:string}|null=null;
+  let localExchange:{request:string;response:string;continuing?:boolean}|null=null;
   let localWindows:DesktopWindowChoice[]=[];
+  let voiceDraft=false;let speakLocalResult=false;
   let localWindowAction:DesktopWindowAction='focus';
-  let localBusy=false;
+  let localBusy=false;let localRequestId:string|null=null;
+  function cancelDesktop(){if(localRequestId){++speechTurn;void Bridge.desktopActionCancel(localRequestId).catch(()=>{});}}
   let live:HTMLElement|null=null;let disposed=false;
   let speechTurn=0;let speechAccount='';
   const currentSpeechTurn=(turn:number)=>!disposed&&turn===speechTurn&&State.view==='prompt';
   let stopSettings:(()=>void)|null=null;
   dictation=new CompanionDictation({
-    transcript(text){input.value=text;send.disabled=!controller.canSend||Boolean(dictation?.isListening);},
+    transcript(text,recognized){input.value=text;voiceDraft=Boolean(recognized&&text.trim());send.disabled=!controller.canSend||Boolean(dictation?.isListening);},
+    preparing(){
+      voiceStatus.textContent=t('Preparando el micrófono…');voiceStatus.hidden=false;delete voiceStatus.dataset.error;
+      voiceButton.setAttribute('aria-label',t(VOICE_LABELS.stop));voiceButton.replaceChildren(svg(ICONS.stop,11,{stroke:1.8}));
+      send.disabled=true;input.disabled=true;State.stateOverride='thinking';State.notify();onHeightChange();
+    },
     listening(active){
       body.classList.toggle('voice-listening',active);
       voiceButton.classList.toggle('listening',active);
@@ -387,7 +394,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     return context;
   }},onEvent,draw);
   void onEvent<Settings>('settings-changed',settings=>{
-    State.settings={...State.settings,...settings};
+    cancelDesktop();State.settings={...State.settings,...settings};
     playback.settingsChanged();
     dictation?.cancel();
   }).then(stop=>{if(disposed)stop();else stopSettings=stop;});
@@ -396,12 +403,12 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     if(disposed)return;
     const state=controller.state;const busy=state.activeRequestId!==null;
     const accountKey=state.account?.state==='connected'?state.account.authorization?.user.id??'':'';
-    if(accountKey!==speechAccount){speechAccount=accountKey;++speechTurn;playback.stop();dictation?.cancel();localExchange=null;localWindows=[];}
+    if(accountKey!==speechAccount){cancelDesktop();speechAccount=accountKey;++speechTurn;playback.stop();dictation?.cancel();voiceDraft=false;speakLocalResult=false;localExchange=null;localWindows=[];}
     const replies=(state.conversation?.messages??[]).filter(m=>m.role==='assistant');
-    playback.update(state.account?.state==='connected'?`${state.account.authorization?.user.id}/${state.conversation?.id??''}`:'',localExchange?.response??replies[replies.length-1]?.content??'');
+    playback.update(state.account?.state==='connected'?`${state.account.authorization?.user.id}/${state.conversation?.id??''}`:'',(!localExchange?.continuing?localExchange?.response:undefined)??replies[replies.length-1]?.content??'');
     connect.hidden=state.account?.state==='connected'||state.phase==='loading';
     conversations.setOptions([{value:'',label:t('Nueva conversación')},...state.conversations.map(c=>({value:c.id,label:c.title}))],state.conversation?.id??'',busy||localBusy||state.phase==='loading');
-    send.disabled=!controller.canSend||Boolean(dictation?.isListening)||localBusy;input.disabled=busy||localBusy||Boolean(dictation?.isListening);cancel.hidden=!busy;voiceButton.disabled=busy||localBusy;
+    send.disabled=!controller.canSend||Boolean(dictation?.isListening)||localBusy;input.disabled=busy||localBusy||Boolean(dictation?.isListening);cancel.hidden=!busy&&!localBusy;voiceButton.disabled=busy||localBusy;
     error.textContent=state.error?.message??(state.phase==='loading'?'Verificando cuenta…':'');
     error.hidden=!error.textContent;
     if(renderedConversation!==state.conversation||renderedPending!==state.pendingMessage||renderedActive!==state.activeRequestId){
@@ -450,41 +457,47 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     syncFile();
   }
   function syncFile(){const name=State.droppedFile?.name??'';chip.textContent=name?`${name} · archivo local, no compartido`:'';chip.hidden=!name;}
-  async function runDesktopCommand(text:string,command:NonNullable<ReturnType<typeof parseDesktopCommand>>,turn:number){
-    if(localBusy)return;const exchange={request:text,response:t('Comprobando la autorización y la app en este PC…')};localBusy=true;localExchange=exchange;localWindows=[];draw();
+  async function runDesktopCommand(text:string,command:NonNullable<ReturnType<typeof parseDesktopCommand>>,turn:number,speakReply:boolean){
+    if(localBusy)return;const exchange={request:text,response:t('Comprobando la autorización y la app en este PC…')};localBusy=true;localRequestId=crypto.randomUUID();localExchange=exchange;localWindows=[];draw();
     try{
-      const apps=await Bridge.desktopAppCatalog();const app=apps.find(item=>item.id===command.appId);
+      const result=await executeDesktopCommand(Bridge,command,()=>currentSpeechTurn(turn),localRequestId??undefined);
       if(!currentSpeechTurn(turn))return;
-      if(!app?.available)exchange.response=t('Esa app no está instalada en este PC.');
-      else if(!app.allowed)exchange.response=t('Activa esta app en Configuración → Asistente de Novo antes de usarla.');
-      else if(command.action==='open'){
-        await Bridge.desktopAppOpen(command.appId);exchange.response=t('Listo. Confirmé que la ventana se abrió en este PC.');
-      }else{
-        const windows=await Bridge.desktopAppWindows(command.appId);
-        if(!currentSpeechTurn(turn))return;
-        if(!windows.length)exchange.response=t('No encontré una ventana visible de esa app.');
-        else if(windows.length>1){localWindows=windows;localWindowAction=command.action;exchange.response=t('Hay varias ventanas abiertas. Elige dónde aplicar la acción.');}
-        else {await Bridge.desktopWindowAction(windows[0].id,command.action);exchange.response=t('Listo. Windows confirmó el cambio de ventana.');}
+      exchange.response=result.response;localWindows=result.windows??[];
+      if(command.action!=='open')localWindowAction=command.action;
+      if(result.continuation){
+        const model=controller.state.models.find(m=>m.id===State.settings.novoChatModel)??controller.state.models[0];
+        if(model){
+          const previousReplies=new Set(controller.state.conversation?.messages.filter(message=>message.role==='assistant').map(message=>message.id));
+          localExchange={...exchange,continuing:true};
+          await controller.send(result.continuation.message,model.id,Boolean(State.settings.novoTwinMode&&model.allowsTwinMode&&controller.state.account?.authorization?.capabilities.twinRead),result.continuation.context);
+          if(!currentSpeechTurn(turn))return;
+          const reply=controller.state.conversation?.messages.filter(message=>message.role==='assistant').at(-1);
+          if(controller.state.error||!reply?.content.trim()||previousReplies.has(reply.id)){
+            exchange.response+=` ${t('No pude continuar la consulta del proyecto. La apertura de la app sí fue confirmada.')}`;
+            localExchange=exchange;
+          }
+        }
       }
-    }catch{exchange.response=t('No se pudo realizar la acción. Revisa que el Companion esté conectado y tenga permiso para controlar apps.');if(currentSpeechTurn(turn))localWindows=[];}
-    finally{localBusy=false;if(!disposed){draw();if(currentSpeechTurn(turn))playback.readReply();onHeightChange();}}
+    }catch{exchange.response=t('No pude confirmar el resultado en Windows. Revisa los permisos y la ventana; no repetí la acción.');if(currentSpeechTurn(turn))localWindows=[];}
+    finally{localBusy=false;localRequestId=null;if(!disposed){draw();if(currentSpeechTurn(turn))playback.readReply(speakReply);onHeightChange();}}
   }
   async function applyWindowAction(window:DesktopWindowChoice){
-    if(localBusy)return;const turn=++speechTurn;localBusy=true;draw();
-    try{await Bridge.desktopWindowAction(window.id,localWindowAction);if(currentSpeechTurn(turn)){localExchange={request:localExchange?.request??'',response:t('Listo. Windows confirmó el cambio de ventana.')};localWindows=[];}}
+    if(localBusy)return;const turn=++speechTurn;localBusy=true;localRequestId=crypto.randomUUID();draw();
+    try{await Bridge.desktopWindowAction(window.id,localWindowAction,localRequestId??undefined);if(currentSpeechTurn(turn)){localExchange={request:localExchange?.request??'',response:t('Listo. Windows confirmó el cambio de ventana.')};localWindows=[];}}
     catch{if(currentSpeechTurn(turn)){localExchange={request:localExchange?.request??'',response:t('Windows no permitió cambiar esta ventana. No se aplicaron más acciones.')};localWindows=[];}}
-    finally{localBusy=false;if(!disposed){draw();if(currentSpeechTurn(turn))playback.readReply();onHeightChange();}}
+    finally{localBusy=false;localRequestId=null;if(!disposed){draw();if(currentSpeechTurn(turn))playback.readReply(speakLocalResult);onHeightChange();}}
   }
   async function submit(){if(dictation?.isListening){dictation.stop();return;}if(!input.value.trim()||!controller.canSend||localBusy)return;const text=input.value;
     const turn=++speechTurn;playback.stop();
     const desktopCommand=parseDesktopCommand(text);
-    if(desktopCommand){input.value='';void runDesktopCommand(text,desktopCommand,turn);return;}
+    if(desktopCommand){const speakReply=voiceDraft;voiceDraft=false;speakLocalResult=speakReply;input.value='';void runDesktopCommand(text,desktopCommand,turn,speakReply);return;}
     localExchange=null;localWindows=[];
     const model=controller.state.models.find(m=>m.id===State.settings.novoChatModel)??controller.state.models.find(m=>m.id==='auto')??controller.state.models[0];
     if(!model)return;
     const twinMode=Boolean(State.settings.novoTwinMode&&model.allowsTwinMode&&controller.state.account?.authorization?.capabilities.twinRead);
+    const speakReply=voiceDraft;voiceDraft=false;
     const sending=controller.send(text,model.id,twinMode);input.value='';Sound.play('send');await sending;
-    if(currentSpeechTurn(turn)){if(controller.state.error)Sound.play('error');else{Sound.play('finish');playback.readReply();}input.focus();}}
+    if(currentSpeechTurn(turn)){if(controller.state.error)Sound.play('error');else{Sound.play('finish');playback.readReply(speakReply);}input.focus();}}
   send.addEventListener('click',()=>void submit());
   voiceButton.addEventListener('click',()=>{
     playback.stop();
@@ -501,10 +514,10 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
   conversations.el.addEventListener('click',()=>{playback.stop();dictation?.cancel();});
   input.addEventListener('input',()=>{send.disabled=!controller.canSend||Boolean(dictation?.isListening);});
   input.addEventListener('keydown',event=>{const key=(event as KeyboardEvent).key;if(key==='Escape'&&dictation?.isListening){event.preventDefault();dictation.cancel();voiceStatus.hidden=true;delete voiceStatus.dataset.error;}else if(key==='Enter'){event.preventDefault();void submit();}event.stopPropagation();});
-  const stop=()=>{if(disposed)return;disposed=true;stopSettings?.();dictation?.dispose();playback.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
+  const stop=()=>{if(disposed)return;cancelDesktop();disposed=true;stopSettings?.();dictation?.dispose();playback.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
   window.addEventListener('beforeunload',stop);
   void controller.loadAccount();
-  return {el,sync(){syncFile();if(State.view!=='prompt'){++speechTurn;playback.stop();dictation?.cancel();}},focus:()=>input.focus(),dispose:stop};
+  return {el,sync(){syncFile();if(State.view!=='prompt'){cancelDesktop();++speechTurn;playback.stop();dictation?.cancel();}},focus:()=>input.focus(),dispose:stop};
 }
 
 // Explicit legacy fixture/advanced adapter; never a fallback for Novo account errors.

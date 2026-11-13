@@ -1,0 +1,2095 @@
+{
+  "date": "2026-11-06",
+  "runtimeSource": "3ad0d0999f364802e730d2c1c8bc29249de90701",
+  "installation": {
+    "installedExeSHA256": "44285c92106e22bd3a61189124f2923e2d1f6fd06d53f8091592eb7df0be7295",
+    "installedPayloadMatch": "exact",
+    "installerExitCode": 0,
+    "preferencesUnchangedBeforeLaunch": true,
+    "rollbackFilesVerified": 21,
+    "installedVoiceResourcesVerified": 16
+  },
+  "configurationPreserved": {
+    "voiceInputMode": "local",
+    "voiceInputLanguage": "es",
+    "voiceCloudConsent": false,
+    "voiceSpokenReplies": false
+  },
+  "rawAudioRetainedTemporarilyForActiveDiagnosis": false,
+  "independentConfirmedHumanSamples": 2,
+  "otherAttemptsWithUnknownSpokenReference": 4,
+  "samples": [
+    {
+      "spokenLanguage": "es",
+      "installedRecognitionLanguage": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "userConfirmedCompletePhrase": true,
+      "userConfirmedPlayback": {
+        "complete": true,
+        "normalSpeed": true,
+        "lowVolume": true
+      },
+      "pcm": {
+        "audio_ms": 5800.0,
+        "rms_dbfs": -40.37675155911657,
+        "peak": 2185,
+        "clipped_ratio": 0.0,
+        "energy_gate_cutoff_s": 5.8
+      },
+      "native": {
+        "outcome": "rejected",
+        "timings": {
+          "resourceValidationMs": 1286,
+          "microphonePrepareMs": 96,
+          "captureWallMs": 5932,
+          "captureCleanupMs": 17,
+          "audioMs": 5800,
+          "endpointQuietMs": 1200,
+          "endpointReason": "energy_silence",
+          "processMs": 4339,
+          "transcriptValidationMs": 1,
+          "nativeTotalMs": 11707,
+          "engine": {
+            "modelLoadMs": 133.24,
+            "vadMs": 52.63,
+            "melMs": 20.45,
+            "encodeMs": 2875.32,
+            "decodeMs": 0.0,
+            "sampleMs": 218.94,
+            "batchDecodeMs": 795.85,
+            "promptMs": 0.0,
+            "engineTotalMs": 4162.96
+          }
+        },
+        "attempt": 5
+      },
+      "workerObservation": {
+        "status": "completed",
+        "parent": 7440,
+        "worker": 10772,
+        "wallMs": 4313.3691,
+        "peakWorkingSetMiB": 154.84375,
+        "cpuMsLastSample": 8109.375,
+        "sampleMs": 25,
+        "fixtureCaptured": true
+      },
+      "workerCPUPercentLowerBound": 47.00139735317342,
+      "attempt": 5
+    },
+    {
+      "spokenLanguage": "en",
+      "installedRecognitionLanguage": "es",
+      "expected": "Novo, open Codex and continue with ClickHome",
+      "userConfirmedCompletePhrase": true,
+      "userConfirmedPlayback": null,
+      "pcm": {
+        "audio_ms": 9000.0,
+        "rms_dbfs": -31.93228760048442,
+        "peak": 9229,
+        "clipped_ratio": 0.0,
+        "energy_gate_cutoff_s": 9.0
+      },
+      "native": {
+        "outcome": "rejected",
+        "timings": {
+          "resourceValidationMs": 635,
+          "microphonePrepareMs": 52,
+          "captureWallMs": 9021,
+          "captureCleanupMs": 27,
+          "audioMs": 9000,
+          "endpointQuietMs": 1200,
+          "endpointReason": "energy_silence",
+          "processMs": 11464,
+          "transcriptValidationMs": 1,
+          "nativeTotalMs": 21236,
+          "engine": {
+            "modelLoadMs": 129.99,
+            "vadMs": 142.87,
+            "melMs": 23.01,
+            "encodeMs": 3598.42,
+            "decodeMs": 0.0,
+            "sampleMs": 1501.38,
+            "batchDecodeMs": 5880.47,
+            "promptMs": 0.0,
+            "engineTotalMs": 11329.68
+          }
+        },
+        "attempt": 6
+      },
+      "workerObservation": {
+        "status": "completed",
+        "parent": 7440,
+        "worker": 11692,
+        "wallMs": 11442.726200000001,
+        "peakWorkingSetMiB": 157.36328125,
+        "cpuMsLastSample": 20265.625,
+        "sampleMs": 25,
+        "fixtureCaptured": true
+      },
+      "workerCPUPercentLowerBound": 44.27621671136376,
+      "attempt": 6
+    }
+  ],
+  "allInstalledAttempts": [
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 1056,
+        "microphonePrepareMs": 1845,
+        "captureWallMs": 6594,
+        "captureCleanupMs": 3069,
+        "audioMs": 6200,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": null,
+        "transcriptValidationMs": null,
+        "nativeTotalMs": 12574,
+        "engine": {
+          "modelLoadMs": null,
+          "vadMs": null,
+          "melMs": null,
+          "encodeMs": null,
+          "decodeMs": null,
+          "sampleMs": null,
+          "batchDecodeMs": null,
+          "promptMs": null,
+          "engineTotalMs": null
+        }
+      },
+      "attempt": 1
+    },
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 1382,
+        "microphonePrepareMs": 106,
+        "captureWallMs": 6211,
+        "captureCleanupMs": 18,
+        "audioMs": 6200,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": 1865,
+        "transcriptValidationMs": 0,
+        "nativeTotalMs": 9601,
+        "engine": {
+          "modelLoadMs": 458.97,
+          "vadMs": 863.97,
+          "melMs": 0.0,
+          "encodeMs": 0.0,
+          "decodeMs": 0.0,
+          "sampleMs": 0.0,
+          "batchDecodeMs": 0.0,
+          "promptMs": 0.0,
+          "engineTotalMs": 1463.64
+        }
+      },
+      "attempt": 2
+    },
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 1007,
+        "microphonePrepareMs": 42,
+        "captureWallMs": 9010,
+        "captureCleanupMs": 16,
+        "audioMs": 9000,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": 6360,
+        "transcriptValidationMs": 1,
+        "nativeTotalMs": 16468,
+        "engine": {
+          "modelLoadMs": 236.64,
+          "vadMs": 273.4,
+          "melMs": 54.98,
+          "encodeMs": 4065.53,
+          "decodeMs": 11.52,
+          "sampleMs": 284.47,
+          "batchDecodeMs": 1150.78,
+          "promptMs": 0.0,
+          "engineTotalMs": 6158.77
+        }
+      },
+      "attempt": 3
+    },
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 804,
+        "microphonePrepareMs": 44,
+        "captureWallMs": 3112,
+        "captureCleanupMs": 13,
+        "audioMs": 3100,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": 5523,
+        "transcriptValidationMs": 0,
+        "nativeTotalMs": 9528,
+        "engine": {
+          "modelLoadMs": 195.16,
+          "vadMs": 76.85,
+          "melMs": 17.0,
+          "encodeMs": 4394.6,
+          "decodeMs": 12.29,
+          "sampleMs": 125.18,
+          "batchDecodeMs": 462.86,
+          "promptMs": 0.0,
+          "engineTotalMs": 5351.55
+        }
+      },
+      "attempt": 4
+    },
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 1286,
+        "microphonePrepareMs": 96,
+        "captureWallMs": 5932,
+        "captureCleanupMs": 17,
+        "audioMs": 5800,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": 4339,
+        "transcriptValidationMs": 1,
+        "nativeTotalMs": 11707,
+        "engine": {
+          "modelLoadMs": 133.24,
+          "vadMs": 52.63,
+          "melMs": 20.45,
+          "encodeMs": 2875.32,
+          "decodeMs": 0.0,
+          "sampleMs": 218.94,
+          "batchDecodeMs": 795.85,
+          "promptMs": 0.0,
+          "engineTotalMs": 4162.96
+        }
+      },
+      "attempt": 5
+    },
+    {
+      "outcome": "rejected",
+      "timings": {
+        "resourceValidationMs": 635,
+        "microphonePrepareMs": 52,
+        "captureWallMs": 9021,
+        "captureCleanupMs": 27,
+        "audioMs": 9000,
+        "endpointQuietMs": 1200,
+        "endpointReason": "energy_silence",
+        "processMs": 11464,
+        "transcriptValidationMs": 1,
+        "nativeTotalMs": 21236,
+        "engine": {
+          "modelLoadMs": 129.99,
+          "vadMs": 142.87,
+          "melMs": 23.01,
+          "encodeMs": 3598.42,
+          "decodeMs": 0.0,
+          "sampleMs": 1501.38,
+          "batchDecodeMs": 5880.47,
+          "promptMs": 0.0,
+          "engineTotalMs": 11329.68
+        }
+      },
+      "attempt": 6
+    }
+  ],
+  "operationalMetrics": {
+    "attempts": 6,
+    "acceptedDrafts": 0,
+    "terminalFailureP50Ms": 12140.5,
+    "terminalFailureP95DescriptiveMs": 20044.0,
+    "successfulTranscriptionP50Ms": null,
+    "successfulTranscriptionP95Ms": null,
+    "note": "Six failed requests, four references unconfirmed. Terminal-error timing is not successful transcription latency; small n is not an acceptance p95."
+  },
+  "offlineReplays": [
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-real-es-tiny.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "completed",
+          "elapsed_ms": 15491,
+          "peak_working_set_mib": 155.12890625,
+          "minimum_free_mib": 830.91015625,
+          "exit_code": 0,
+          "cpu_ms": 17781.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "auto",
+          "vad": true,
+          "extra": [],
+          "configuration": "current",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.147843909366729,
+          "average_machine_cpu_percent": 28.696097734168223,
+          "detected_language": "it",
+          "confidence": 0.1880697121121824,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 15,
+          "reference_words": 7,
+          "wer": 2.142857142857143,
+          "stages_ms": {
+            "vad_ms": 105.11,
+            "model_load_ms": 209.2,
+            "mel_ms": 27.35,
+            "sample_ms": 1066.26,
+            "encode_ms": 8743.64,
+            "decode_ms": 14.58,
+            "batch_decode_ms": 4951.19,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 15197.8
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "fixed-language-run-1",
+          "status": "completed",
+          "elapsed_ms": 10859,
+          "peak_working_set_mib": 154.57421875,
+          "minimum_free_mib": 735.01171875,
+          "exit_code": 0,
+          "cpu_ms": 10281.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "fixed-language",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 0.9467952850170366,
+          "average_machine_cpu_percent": 23.669882125425914,
+          "detected_language": "es",
+          "confidence": 0.1970319781895669,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 282.38,
+            "model_load_ms": 193.1,
+            "mel_ms": 40.44,
+            "sample_ms": 880.53,
+            "encode_ms": 4679.55,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 4327.84,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 10611.58
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "without-vad-run-1",
+          "status": "completed",
+          "elapsed_ms": 10189,
+          "peak_working_set_mib": 147.6484375,
+          "minimum_free_mib": 610.39453125,
+          "exit_code": 0,
+          "cpu_ms": 10140.625,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": false,
+          "extra": [],
+          "configuration": "without-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 0.9952522328000785,
+          "average_machine_cpu_percent": 24.881305820001963,
+          "detected_language": "es",
+          "confidence": 0.15623104609584085,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "model_load_ms": 325.19,
+            "mel_ms": 129.39,
+            "sample_ms": 679.97,
+            "encode_ms": 5429.7,
+            "decode_ms": 23.2,
+            "batch_decode_ms": 2463.21,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 9151.81
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "greedy-run-1",
+          "status": "insufficient_memory",
+          "free_mib": 762.00390625
+        }
+      ]
+    },
+    {
+      "model": "ggml-small-q5_1.bin",
+      "model_sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-real-es-small.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "timeout",
+          "elapsed_ms": 60180,
+          "peak_working_set_mib": 368.84375,
+          "minimum_free_mib": 682.59375,
+          "exit_code": 1,
+          "cpu_ms": 89093.75,
+          "threads": 2,
+          "beam": 5,
+          "language": "auto",
+          "vad": true,
+          "extra": [],
+          "configuration": "current",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.4804544699235627,
+          "average_machine_cpu_percent": 37.011361748089065,
+          "stages_ms": {
+            "vad_ms": 145.84
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "fixed-language-run-1",
+          "status": "completed",
+          "elapsed_ms": 43997,
+          "peak_working_set_mib": 486.65234375,
+          "minimum_free_mib": 530.80078125,
+          "exit_code": 0,
+          "cpu_ms": 64812.5,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "fixed-language",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.4731118030774826,
+          "average_machine_cpu_percent": 36.827795076937065,
+          "detected_language": "es",
+          "confidence": 0.24080169138259375,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 89.82,
+            "model_load_ms": 491.34,
+            "mel_ms": 28.82,
+            "sample_ms": 301.65,
+            "encode_ms": 33656.14,
+            "decode_ms": 107.4,
+            "batch_decode_ms": 8853.68,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 43705.66
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "without-vad-run-1",
+          "status": "memory_guard",
+          "elapsed_ms": 14124,
+          "peak_working_set_mib": 357.34765625,
+          "minimum_free_mib": 503.7265625,
+          "exit_code": 1,
+          "cpu_ms": 18625.0,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": false,
+          "extra": [],
+          "configuration": "without-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.3186774284905125,
+          "average_machine_cpu_percent": 32.96693571226281,
+          "stages_ms": {},
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "greedy-run-1",
+          "status": "insufficient_memory",
+          "free_mib": 867.578125
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-real-es-gain-tiny.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "insufficient_memory",
+          "free_mib": 379.95703125
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-real-es-gain-tiny-retry.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "completed",
+          "elapsed_ms": 8909,
+          "peak_working_set_mib": 121.140625,
+          "minimum_free_mib": 1582.4453125,
+          "exit_code": 0,
+          "cpu_ms": 15843.75,
+          "threads": 2,
+          "beam": 5,
+          "language": "auto",
+          "vad": true,
+          "extra": [],
+          "configuration": "current",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.778398248961724,
+          "average_machine_cpu_percent": 44.459956224043104,
+          "detected_language": "cs",
+          "confidence": 0.34328954549820184,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 10,
+          "reference_words": 7,
+          "wer": 1.4285714285714286,
+          "stages_ms": {
+            "vad_ms": 48.31,
+            "model_load_ms": 97.1,
+            "mel_ms": 23.39,
+            "sample_ms": 410.68,
+            "encode_ms": 6460.16,
+            "decode_ms": 39.68,
+            "batch_decode_ms": 1625.21,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 8759.75
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "fixed-language-run-1",
+          "status": "completed",
+          "elapsed_ms": 4033,
+          "peak_working_set_mib": 154.85546875,
+          "minimum_free_mib": 1902.49609375,
+          "exit_code": 0,
+          "cpu_ms": 7796.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "fixed-language",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.9332692784527648,
+          "average_machine_cpu_percent": 48.33173196131912,
+          "detected_language": "es",
+          "confidence": 0.1788363324790742,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 78.09,
+            "model_load_ms": 138.14,
+            "mel_ms": 26.58,
+            "sample_ms": 196.68,
+            "encode_ms": 2759.08,
+            "decode_ms": 26.8,
+            "batch_decode_ms": 598.71,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3885.27
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "without-vad-run-1",
+          "status": "completed",
+          "elapsed_ms": 8646,
+          "peak_working_set_mib": 145.06640625,
+          "minimum_free_mib": 1224.171875,
+          "exit_code": 0,
+          "cpu_ms": 9890.625,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": false,
+          "extra": [],
+          "configuration": "without-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.1439538514920193,
+          "average_machine_cpu_percent": 28.598846287300482,
+          "detected_language": "es",
+          "confidence": 0.14875128763124143,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "model_load_ms": 231.16,
+            "mel_ms": 53.99,
+            "sample_ms": 345.06,
+            "encode_ms": 5775.84,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 1940.05,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 8449.54
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "greedy-run-1",
+          "status": "completed",
+          "elapsed_ms": 4657,
+          "peak_working_set_mib": 121.9140625,
+          "minimum_free_mib": 1517.72265625,
+          "exit_code": 0,
+          "cpu_ms": 7093.75,
+          "threads": 2,
+          "beam": 1,
+          "language": "es",
+          "vad": false,
+          "extra": [],
+          "configuration": "greedy",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.5232445780545416,
+          "average_machine_cpu_percent": 38.08111445136354,
+          "detected_language": "es",
+          "confidence": 0.1294998586325726,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 7,
+          "reference_words": 7,
+          "wer": 1.0,
+          "stages_ms": {
+            "model_load_ms": 179.27,
+            "mel_ms": 29.06,
+            "sample_ms": 18.68,
+            "encode_ms": 4003.62,
+            "decode_ms": 105.05,
+            "batch_decode_ms": 24.77,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 4401.75
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "en",
+      "expected": "Novo, open Codex and continue with ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-real-en-tiny.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "insufficient_memory",
+          "free_mib": 690.8046875
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "en",
+      "expected": "Novo, open Codex and continue with ClickHome",
+      "profile": "baseline",
+      "repeats": 1,
+      "file": "2026-11-06-case-en-tiny.json",
+      "variants": [
+        {
+          "variant": "current-run-1",
+          "status": "completed",
+          "elapsed_ms": 7209,
+          "peak_working_set_mib": 154.38671875,
+          "minimum_free_mib": 1218.19140625,
+          "exit_code": 0,
+          "cpu_ms": 13718.75,
+          "threads": 2,
+          "beam": 5,
+          "language": "auto",
+          "vad": true,
+          "extra": [],
+          "configuration": "current",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.903003190456374,
+          "average_machine_cpu_percent": 47.57507976140935,
+          "detected_language": "en",
+          "confidence": 0.17934158698909153,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 7,
+          "reference_words": 7,
+          "wer": 1.0,
+          "stages_ms": {
+            "vad_ms": 132.7,
+            "model_load_ms": 100.61,
+            "mel_ms": 15.01,
+            "sample_ms": 120.82,
+            "encode_ms": 6216.68,
+            "decode_ms": 31.92,
+            "batch_decode_ms": 394.99,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 7057.84
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "fixed-language-run-1",
+          "status": "completed",
+          "elapsed_ms": 3779,
+          "peak_working_set_mib": 153.796875,
+          "minimum_free_mib": 1167.54296875,
+          "exit_code": 0,
+          "cpu_ms": 7171.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": true,
+          "extra": [],
+          "configuration": "fixed-language",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8978234982799682,
+          "average_machine_cpu_percent": 47.445587456999206,
+          "detected_language": "en",
+          "confidence": 0.17934158698909153,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 7,
+          "reference_words": 7,
+          "wer": 1.0,
+          "stages_ms": {
+            "vad_ms": 137.08,
+            "model_load_ms": 115.68,
+            "mel_ms": 21.32,
+            "sample_ms": 118.04,
+            "encode_ms": 2761.73,
+            "decode_ms": 17.35,
+            "batch_decode_ms": 433.05,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3650.3
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "without-vad-run-1",
+          "status": "completed",
+          "elapsed_ms": 3821,
+          "peak_working_set_mib": 148.67578125,
+          "minimum_free_mib": 1145.61328125,
+          "exit_code": 0,
+          "cpu_ms": 7312.5,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": false,
+          "extra": [],
+          "configuration": "without-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.9137660298351218,
+          "average_machine_cpu_percent": 47.844150745878046,
+          "detected_language": "en",
+          "confidence": 0.24045929548574355,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 16,
+          "reference_words": 7,
+          "wer": 2.2857142857142856,
+          "stages_ms": {
+            "model_load_ms": 125.61,
+            "mel_ms": 35.11,
+            "sample_ms": 202.8,
+            "encode_ms": 2535.87,
+            "decode_ms": 30.35,
+            "batch_decode_ms": 700.89,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3683.26
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "greedy-run-1",
+          "status": "completed",
+          "elapsed_ms": 2936,
+          "peak_working_set_mib": 122.44921875,
+          "minimum_free_mib": 1175.671875,
+          "exit_code": 0,
+          "cpu_ms": 5312.5,
+          "threads": 2,
+          "beam": 1,
+          "language": "en",
+          "vad": false,
+          "extra": [],
+          "configuration": "greedy",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8094346049046321,
+          "average_machine_cpu_percent": 45.235865122615806,
+          "detected_language": "en",
+          "confidence": 0.18569271299699477,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 7,
+          "reference_words": 7,
+          "wer": 1.0,
+          "stages_ms": {
+            "model_load_ms": 111.29,
+            "mel_ms": 33.56,
+            "sample_ms": 7.68,
+            "encode_ms": 2461.04,
+            "decode_ms": 35.88,
+            "batch_decode_ms": 21.6,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 2708.39
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q5_1.bin",
+      "model_sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "performance",
+      "repeats": 1,
+      "file": "2026-11-06-case-es-threads.json",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 5298,
+          "peak_working_set_mib": 154.5078125,
+          "minimum_free_mib": 842.68359375,
+          "exit_code": 0,
+          "cpu_ms": 9359.375,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.7665864477161193,
+          "average_machine_cpu_percent": 44.16466119290298,
+          "detected_language": "es",
+          "confidence": 0.1970319781895669,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 73.88,
+            "model_load_ms": 127.14,
+            "mel_ms": 23.44,
+            "sample_ms": 272.65,
+            "encode_ms": 3534.83,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 1044.91,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 5140.69
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 2300,
+          "peak_working_set_mib": 131.96875,
+          "minimum_free_mib": 847.19921875,
+          "exit_code": 0,
+          "cpu_ms": 3781.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "384"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.6440217391304348,
+          "average_machine_cpu_percent": 41.10054347826087,
+          "detected_language": "es",
+          "confidence": 0.19444616796230993,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "vad_ms": 138.01,
+            "model_load_ms": 278.09,
+            "mel_ms": 32.57,
+            "sample_ms": 196.07,
+            "encode_ms": 906.25,
+            "decode_ms": 5.98,
+            "batch_decode_ms": 514.46,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 2139.3
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "one-thread-run-1",
+          "status": "completed",
+          "elapsed_ms": 5486,
+          "peak_working_set_mib": 152.828125,
+          "minimum_free_mib": 889.4375,
+          "exit_code": 0,
+          "cpu_ms": 5843.75,
+          "threads": 1,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "one-thread",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.0652114473204521,
+          "average_machine_cpu_percent": 26.630286183011304,
+          "detected_language": "es",
+          "confidence": 0.1970319781895669,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 57.43,
+            "model_load_ms": 129.05,
+            "mel_ms": 43.31,
+            "sample_ms": 198.55,
+            "encode_ms": 3867.43,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 1002.66,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 5353.65
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "four-threads-run-1",
+          "status": "completed",
+          "elapsed_ms": 4020,
+          "peak_working_set_mib": 155.73046875,
+          "minimum_free_mib": 956.0625,
+          "exit_code": 0,
+          "cpu_ms": 11078.125,
+          "threads": 4,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "four-threads",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 2.755752487562189,
+          "average_machine_cpu_percent": 68.89381218905473,
+          "detected_language": "es",
+          "confidence": 0.1970319781895669,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 49.2,
+            "model_load_ms": 110.91,
+            "mel_ms": 16.35,
+            "sample_ms": 257.03,
+            "encode_ms": 2367.79,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 996.29,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3858.01
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "greedy-four-run-1",
+          "status": "completed",
+          "elapsed_ms": 3527,
+          "peak_working_set_mib": 128.546875,
+          "minimum_free_mib": 952.94140625,
+          "exit_code": 0,
+          "cpu_ms": 9062.5,
+          "threads": 4,
+          "beam": 1,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "greedy-four",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 2.56946413382478,
+          "average_machine_cpu_percent": 64.2366033456195,
+          "detected_language": "es",
+          "confidence": 0.2126414329334336,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 105.94,
+            "model_load_ms": 228.64,
+            "mel_ms": 18.41,
+            "sample_ms": 44.58,
+            "encode_ms": 2549.53,
+            "decode_ms": 275.59,
+            "batch_decode_ms": 33.36,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3310.35
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-fast-run-1",
+          "status": "completed",
+          "elapsed_ms": 1363,
+          "peak_working_set_mib": 105.87890625,
+          "minimum_free_mib": 944.875,
+          "exit_code": 0,
+          "cpu_ms": 3171.875,
+          "threads": 4,
+          "beam": 1,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "384"
+          ],
+          "configuration": "bounded-fast",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 2.327127659574468,
+          "average_machine_cpu_percent": 58.178191489361694,
+          "detected_language": "es",
+          "confidence": 0.2712334469942444,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "vad_ms": 118.51,
+            "model_load_ms": 194.91,
+            "mel_ms": 29.59,
+            "sample_ms": 41.4,
+            "encode_ms": 639.39,
+            "decode_ms": 104.29,
+            "batch_decode_ms": 17.51,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 1195.09
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "padded-merged-vad-run-1",
+          "status": "completed",
+          "elapsed_ms": 3925,
+          "peak_working_set_mib": 154.3828125,
+          "minimum_free_mib": 918.890625,
+          "exit_code": 0,
+          "cpu_ms": 7671.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--vad-speech-pad-ms",
+            "150",
+            "--vad-min-silence-duration-ms",
+            "300"
+          ],
+          "configuration": "padded-merged-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.9546178343949046,
+          "average_machine_cpu_percent": 48.865445859872615,
+          "detected_language": "es",
+          "confidence": 0.20088294409267674,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 11,
+          "reference_words": 7,
+          "wer": 1.5714285714285714,
+          "stages_ms": {
+            "vad_ms": 73.13,
+            "model_load_ms": 124.15,
+            "mel_ms": 28.06,
+            "sample_ms": 187.73,
+            "encode_ms": 2546.89,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 673.77,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3689.2
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "no-vad-run-1",
+          "status": "completed",
+          "elapsed_ms": 4063,
+          "peak_working_set_mib": 147.9140625,
+          "minimum_free_mib": 862.01953125,
+          "exit_code": 0,
+          "cpu_ms": 7328.125,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": false,
+          "extra": [],
+          "configuration": "no-vad",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.803624169333005,
+          "average_machine_cpu_percent": 45.090604233325124,
+          "detected_language": "es",
+          "confidence": 0.15623104609584085,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "model_load_ms": 116.23,
+            "mel_ms": 26.05,
+            "sample_ms": 234.37,
+            "encode_ms": 2568.8,
+            "decode_ms": 11.78,
+            "batch_decode_ms": 929.68,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3935.67
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "flash-off-run-1",
+          "status": "completed",
+          "elapsed_ms": 6330,
+          "peak_working_set_mib": 222.70703125,
+          "minimum_free_mib": 736.5,
+          "exit_code": 0,
+          "cpu_ms": 11718.75,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--no-flash-attn"
+          ],
+          "configuration": "flash-off",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8513033175355451,
+          "average_machine_cpu_percent": 46.28258293838863,
+          "detected_language": "es",
+          "confidence": 0.2158820962387745,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 11,
+          "reference_words": 7,
+          "wer": 1.5714285714285714,
+          "stages_ms": {
+            "vad_ms": 155.47,
+            "model_load_ms": 157.92,
+            "mel_ms": 29.02,
+            "sample_ms": 184.13,
+            "encode_ms": 5086.81,
+            "decode_ms": 7.57,
+            "batch_decode_ms": 486.69,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 6168.78
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "gpu-auto-run-1",
+          "status": "completed",
+          "elapsed_ms": 3762,
+          "peak_working_set_mib": 154.5859375,
+          "minimum_free_mib": 874.79296875,
+          "exit_code": 0,
+          "cpu_ms": 7484.375,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "gpu-auto",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.989467038809144,
+          "average_machine_cpu_percent": 49.7366759702286,
+          "detected_language": "es",
+          "confidence": 0.1970319781895669,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 53.1,
+            "model_load_ms": 116.65,
+            "mel_ms": 25.44,
+            "sample_ms": 210.41,
+            "encode_ms": 2486.32,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 694.07,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 3638.23
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-tiny-q8_0.bin",
+      "model_sha256": "c2085835d3f50733e2ff6e4b41ae8a2b8d8110461e18821b09a15c40c42d1cca",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "screen",
+      "repeats": 1,
+      "file": "2026-11-06-case-es-q8.json",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 2086,
+          "peak_working_set_mib": 164.89453125,
+          "minimum_free_mib": 1396.18359375,
+          "exit_code": 0,
+          "cpu_ms": 3890.625,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8651126558005753,
+          "average_machine_cpu_percent": 46.627816395014385,
+          "detected_language": "es",
+          "confidence": 0.22176629298873807,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 42.55,
+            "model_load_ms": 97.94,
+            "mel_ms": 18.18,
+            "sample_ms": 129.39,
+            "encode_ms": 1229.42,
+            "decode_ms": 7.28,
+            "batch_decode_ms": 364.84,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 1923.54
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 1274,
+          "peak_working_set_mib": 142.30859375,
+          "minimum_free_mib": 1608.859375,
+          "exit_code": 0,
+          "cpu_ms": 2484.375,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "384"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.950058869701727,
+          "average_machine_cpu_percent": 48.751471742543174,
+          "detected_language": "es",
+          "confidence": 0.20749580064554743,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 8,
+          "reference_words": 7,
+          "wer": 1.1428571428571428,
+          "stages_ms": {
+            "vad_ms": 58.19,
+            "model_load_ms": 122.75,
+            "mel_ms": 24.46,
+            "sample_ms": 176.78,
+            "encode_ms": 388.01,
+            "decode_ms": 4.97,
+            "batch_decode_ms": 337.38,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 1161.24
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-small-q5_1.bin",
+      "model_sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "screen",
+      "repeats": 1,
+      "file": "2026-11-06-case-es-small-gain.json",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 28981,
+          "peak_working_set_mib": 487.08203125,
+          "minimum_free_mib": 1057.40234375,
+          "exit_code": 0,
+          "cpu_ms": 54421.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8778466926607087,
+          "average_machine_cpu_percent": 46.946167316517716,
+          "detected_language": "es",
+          "confidence": 0.27139737454041907,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 9,
+          "reference_words": 7,
+          "wer": 1.2857142857142858,
+          "stages_ms": {
+            "vad_ms": 34.37,
+            "model_load_ms": 217.63,
+            "mel_ms": 17.9,
+            "sample_ms": 187.07,
+            "encode_ms": 24714.97,
+            "decode_ms": 31.61,
+            "batch_decode_ms": 3373.93,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 28688.39
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 7975,
+          "peak_working_set_mib": 443.97265625,
+          "minimum_free_mib": 1061.2109375,
+          "exit_code": 0,
+          "cpu_ms": 15296.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "384"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.918103448275862,
+          "average_machine_cpu_percent": 47.952586206896555,
+          "detected_language": "es",
+          "confidence": 0.23810846743298295,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 7,
+          "reference_words": 7,
+          "wer": 1.0,
+          "stages_ms": {
+            "vad_ms": 56.56,
+            "model_load_ms": 321.36,
+            "mel_ms": 25.44,
+            "sample_ms": 139.16,
+            "encode_ms": 5324.54,
+            "decode_ms": 71.81,
+            "batch_decode_ms": 1600.04,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 7649.1
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-small-q5_1.bin",
+      "model_sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "language": "en",
+      "expected": "Novo, open Codex and continue with ClickHome",
+      "profile": "screen",
+      "repeats": 1,
+      "file": "2026-11-06-case-en-small.json",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 32256,
+          "peak_working_set_mib": 486.640625,
+          "minimum_free_mib": 784.8984375,
+          "exit_code": 0,
+          "cpu_ms": 57406.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.7797076512896826,
+          "average_machine_cpu_percent": 44.49269128224206,
+          "detected_language": "en",
+          "confidence": 0.4462631154475564,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 6,
+          "reference_words": 7,
+          "wer": 0.8571428571428571,
+          "stages_ms": {
+            "vad_ms": 57.15,
+            "model_load_ms": 233.11,
+            "mel_ms": 14.59,
+            "sample_ms": 202.86,
+            "encode_ms": 27967.25,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 3520.91,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 32108.45
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 9450,
+          "peak_working_set_mib": 450.25390625,
+          "minimum_free_mib": 888.08984375,
+          "exit_code": 0,
+          "cpu_ms": 18531.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "512"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.960978835978836,
+          "average_machine_cpu_percent": 49.0244708994709,
+          "detected_language": "en",
+          "confidence": 0.38807391880521136,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 6,
+          "reference_words": 7,
+          "wer": 0.8571428571428571,
+          "stages_ms": {
+            "vad_ms": 74.49,
+            "model_load_ms": 324.39,
+            "mel_ms": 19.58,
+            "sample_ms": 129.68,
+            "encode_ms": 7072.12,
+            "decode_ms": 0.0,
+            "batch_decode_ms": 1542.42,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 9274.51
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "model": "ggml-small-q5_1.bin",
+      "model_sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "language": "es",
+      "expected": "Novo, abre Codex y continuemos con ClickHome",
+      "profile": "context",
+      "repeats": 1,
+      "file": "2026-11-06-case-es-small-hints.json",
+      "variants": [
+        {
+          "variant": "context-512-run-1",
+          "status": "completed",
+          "elapsed_ms": 9657,
+          "peak_working_set_mib": 337.94140625,
+          "minimum_free_mib": 977.671875,
+          "exit_code": 0,
+          "cpu_ms": 27265.625,
+          "threads": 4,
+          "beam": 1,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--prompt",
+            "Novo, Codex, ClickHome.",
+            "--vad-speech-pad-ms",
+            "150",
+            "--audio-ctx",
+            "512"
+          ],
+          "configuration": "context-512",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 2.823405301853578,
+          "average_machine_cpu_percent": 70.58513254633945,
+          "detected_language": "es",
+          "confidence": 0.42162834581179987,
+          "passes_confidence_gate": false,
+          "exact_phrase": false,
+          "word_errors": 4,
+          "reference_words": 7,
+          "wer": 0.5714285714285714,
+          "stages_ms": {
+            "vad_ms": 102.63,
+            "model_load_ms": 418.64,
+            "mel_ms": 24.73,
+            "sample_ms": 65.24,
+            "encode_ms": 7061.52,
+            "decode_ms": 1183.18,
+            "batch_decode_ms": 417.42,
+            "prompt_ms": 0.0,
+            "engine_total_ms": 9440.34
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "status": "not_started_memory",
+      "availableMiB": 848.46875,
+      "requiredMiB": 1400.0,
+      "case": "en-small-hints",
+      "file": "2026-11-06-case-en-small-hints.json",
+      "variants": []
+    }
+  ],
+  "offlineReplayCount": 29,
+  "installedWindowsAlternative": {
+    "status": "completed",
+    "wallMs": 4841,
+    "cpuMs": 7062.5,
+    "peakWorkingSetMiB": 148.72265625,
+    "minimumFreeMiB": 1793.47265625,
+    "exitCode": 0,
+    "microphoneOpened": false,
+    "actionsExecuted": false,
+    "scope": "offline installed English recognizer only; no Spanish recognizer installed",
+    "recognition": {
+      "setupMs": 336,
+      "totalMs": 1281,
+      "actionsExecuted": false,
+      "confidence": 0.146563545,
+      "input": "existing local English WAV",
+      "engine": "installed Windows en-US dictation",
+      "microphoneOpened": false
+    },
+    "wordErrors": {
+      "word_errors": 7,
+      "reference_words": 7,
+      "wer": 1.0
+    }
+  },
+  "speechInventory": {
+    "voices": [
+      {
+        "culture": "en-US",
+        "name": "Microsoft David Desktop",
+        "enabled": true
+      },
+      {
+        "culture": "en-US",
+        "name": "Microsoft Zira Desktop",
+        "enabled": true
+      },
+      {
+        "culture": "es-ES",
+        "name": "Microsoft Helena Desktop",
+        "enabled": true
+      }
+    ],
+    "recognizers": [
+      {
+        "culture": "en-US",
+        "name": "MS-1033-80-DESK",
+        "id": "MS-1033-80-DESK"
+      }
+    ],
+    "audioPlayed": false,
+    "microphoneOpened": false
+  },
+  "physicalLoopStatus": {
+    "microphoneCapture": "observed; controlled ES/EN phrases confirmed",
+    "draftDelivery": "failed in both controlled samples",
+    "sendCodexTwin": "user confirmed Codex opened by typed Send; exact follow-up and Twin recovery unverified",
+    "readerAudible": "unverified for this candidate; standalone WAV playback previously heard",
+    "interruptionPhysicalLatency": "unmeasured; separate in-memory SAPI purge verified",
+    "cancellationPhysical": "unverified; automated regression tests pass",
+    "staleReplyPhysical": "unverified; automated regression tests pass"
+  },
+  "provenance": "Real microphone PCM, original and diagnostic copies; offline repeats are not independent speech samples. CPU/RAM observations cover the child worker, not total app or physical power. No audio, transcript of private context, tokens or provider output included.",
+  "audioCleanup": {
+    "removedDiagnosticWavs": 3,
+    "remainingNativeRequestWavs": 0
+  },
+  "autonomousFollowUp": {
+    "date": "2026-11-12",
+    "frontendTests": {
+      "passed": 438,
+      "failed": 0
+    },
+    "desktopWindowEnumerationTimeouts": 3,
+    "windowsSapiMemoryProbe": {
+      "languageResults": [
+        {
+          "language": "es-ES",
+          "voice": "Microsoft Helena Desktop",
+          "pcmBytes": 193742,
+          "renderMs": 149.35
+        },
+        {
+          "language": "en-US",
+          "voice": "Microsoft David Desktop",
+          "pcmBytes": 200604,
+          "renderMs": 141.29
+        }
+      ],
+      "purgeWasActive": true,
+      "purgeDone": true,
+      "purgeMs": 2.39,
+      "speakerOutput": false,
+      "microphoneOpened": false
+    }
+  }
+}

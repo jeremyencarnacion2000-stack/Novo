@@ -45,7 +45,7 @@ function friendlyError(code: string | undefined): DictationError {
 
 export class SpeechDictation {
   private readonly callbacks: {
-    transcript(text: string): void;
+    transcript(text: string, recognized?: boolean): void;
     listening(active: boolean): void;
     error(error: DictationError): void;
   };
@@ -60,7 +60,7 @@ export class SpeechDictation {
 
   constructor(
     callbacks: {
-      transcript(text: string): void;
+      transcript(text: string, recognized?: boolean): void;
       listening(active: boolean): void;
       error(error: DictationError): void;
     },
@@ -100,7 +100,7 @@ export class SpeechDictation {
       if (!spoken.trim()) return;
       this.hasTranscript = true;
       const separator = this.baseText && !/\s$/.test(this.baseText) ? " " : "";
-      this.callbacks.transcript(`${this.baseText}${separator}${spoken.trimStart()}`);
+      this.callbacks.transcript(`${this.baseText}${separator}${spoken.trimStart()}`, true);
     };
     recognition.onerror = (event) => {
       if (generation !== this.generation || event.error === "aborted") return;
@@ -148,7 +148,7 @@ export class SpeechDictation {
     this.recognition = null;
     this.listening = false;
     try { recognition?.abort(); } catch { /* the browser may already have closed the mic */ }
-    this.callbacks.transcript(this.baseText);
+    this.callbacks.transcript(this.baseText, false);
     if (wasListening) this.callbacks.listening(false);
   }
 

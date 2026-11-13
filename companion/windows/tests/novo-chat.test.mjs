@@ -102,3 +102,15 @@ test('disposal removes listeners including late subscriptions and cancels curren
   f.controller.dispose();finish();await sending;
   assert.equal(f.listeners.size,0);assert.equal(f.cancellations.length,1);
 });
+
+test('an authorized project continuation reuses prepared context without scanning twice',async()=>{
+  const f=fixture();let scans=0;f.api.contextSearch=async()=>{scans++;throw new Error('duplicate scan');};
+  f.api.novoChatStart=async input=>{
+    f.sends.push(input);
+    f.event('novo-chat-event',{type:'metadata',requestId:input.requestId,conversationId:id,revision:1,userMessageId:'user'});
+    f.event('novo-chat-event',{type:'complete',requestId:input.requestId,assistantMessageId:'assistant',revision:2,modelId:'auto'});
+  };
+  await f.controller.loadAccount();
+  await f.controller.send('Continuemos con ClickHome','auto',false,{text:'Authorized ClickHome excerpt',matchedFiles:1,folders:['ClickHome'],projectHints:[{source:'folder',name:'ClickHome'}]});
+  assert.equal(scans,0);assert.equal(f.sends.length,1);assert.equal(f.sends[0].localContext,'Authorized ClickHome excerpt');assert.equal(f.controller.state.error,null);f.controller.dispose();
+});

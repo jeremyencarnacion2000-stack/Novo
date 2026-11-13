@@ -3,6 +3,22 @@ use serde_json::Value;
 const MAX_SAMPLES: usize = 16_000 * 20;
 const MEMORY_FLOOR: u64 = 512 * 1024 * 1024;
 const MODEL_BUDGET: u64 = 400 * 1024 * 1024;
+const CAPTURE_BUFFERS: usize = 3;
+
+#[derive(Default)]
+struct CaptureOrder {
+    next: usize,
+}
+impl CaptureOrder {
+    fn take(&mut self, ready: impl Fn(usize) -> bool) -> Option<usize> {
+        if !ready(self.next) {
+            return None;
+        }
+        let index = self.next;
+        self.next = (self.next + 1) % CAPTURE_BUFFERS;
+        Some(index)
+    }
+}
 
 fn wav(samples: &[i16]) -> Result<Vec<u8>, String> {
     if samples.is_empty() || samples.len() > MAX_SAMPLES {
@@ -151,6 +167,23 @@ pub fn initialize() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn delayed_audio_poll_keeps_submission_order_across_buffer_wrap() {
+        let mut order = CaptureOrder::default();
+        let mut ready = [true, true, false];
+        assert_eq!(order.take(|i| ready[i]), Some(0));
+        ready[0] = false;
+        assert_eq!(order.take(|i| ready[i]), Some(1));
+        // Buffer 2 was queued first; a delayed poll also finds newer 0 and 1 ready.
+        ready = [true, true, true];
+        assert_eq!(order.take(|i| ready[i]), Some(2));
+        ready[2] = false;
+        assert_eq!(order.take(|i| ready[i]), Some(0));
+        ready[0] = false;
+        assert_eq!(order.take(|i| ready[i]), Some(1));
+        ready = [true, false, false];
+        assert_eq!(order.take(|i| ready[i]), None);
+    }
     #[test]
     fn pcm_is_bounded_and_encoded_as_mono_16khz_wav() {
         let data = wav(&[0, 32767, -32768]).unwrap();

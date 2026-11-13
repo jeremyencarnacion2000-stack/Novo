@@ -1,0 +1,183 @@
+{
+  "fixture_rows": [
+    {
+      "language": "es",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 163,
+      "stage_ms": 1.4709
+    },
+    {
+      "language": "en",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 163,
+      "stage_ms": 0.468
+    },
+    {
+      "language": "es",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.6007
+    },
+    {
+      "language": "en",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.4884
+    },
+    {
+      "language": "es",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 165,
+      "stage_ms": 0.3688
+    },
+    {
+      "language": "en",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 165,
+      "stage_ms": 0.405
+    },
+    {
+      "language": "es",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.4759
+    },
+    {
+      "language": "en",
+      "expected": "simple",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.4686
+    },
+    {
+      "language": "es",
+      "expected": "complex",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.5683
+    },
+    {
+      "language": "en",
+      "expected": "complex",
+      "selected": "complex",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.6168
+    },
+    {
+      "language": "es",
+      "expected": "complex",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 165,
+      "stage_ms": 0.5312
+    },
+    {
+      "language": "en",
+      "expected": "complex",
+      "selected": "complex",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 165,
+      "stage_ms": 0.5157
+    },
+    {
+      "language": "es",
+      "expected": "complex",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.5071
+    },
+    {
+      "language": "en",
+      "expected": "complex",
+      "selected": "complex",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.4629
+    },
+    {
+      "language": "es",
+      "expected": "complex",
+      "selected": "simple",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.6067
+    },
+    {
+      "language": "en",
+      "expected": "complex",
+      "selected": "complex",
+      "source_preserved": true,
+      "baseline_source_preserved": true,
+      "baseline_tokens": 3216,
+      "candidate_tokens": 182,
+      "stage_ms": 0.8798
+    }
+  ],
+  "context_source_accuracy": 16,
+  "routing_accuracy": {
+    "es": 4,
+    "en": 8
+  },
+  "input_context_tokens_before": 51456,
+  "input_context_tokens_after": 2806,
+  "pricing_assumption_usd_per_million_input_tokens": 0.5,
+  "illustrative_cost_per_1000_queries_before_usd": 1.608,
+  "illustrative_cost_per_1000_queries_after_usd": 0.0876875,
+  "local_provider_spend_usd": 0,
+  "timed_repetitions": 560,
+  "stage_p50_ms": 0.47995,
+  "stage_p95_ms": 1.0432249999999998,
+  "python_allocation_peak_kib": 135.783203125,
+  "tokenizer": "o200k_base",
+  "live_model_calls": 0,
+  "source_commit": "afdbd5b35cb21f51564588c8cdbf6b74889c4f1f",
+  "fixture_type": "synthetic"
+}

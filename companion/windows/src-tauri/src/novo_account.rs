@@ -47,6 +47,10 @@ impl SafeError {
                 "El chat del compañero aún no está activado en este servidor.",
             ),
             "cancelled" => ("cancelled", "Solicitud cancelada."),
+            "desktop_catalog_unavailable" => (code, "No se pudo leer el catálogo de Windows."),
+            "desktop_app_missing" => (code, "La aplicación ya no aparece en el catálogo."),
+            "desktop_launch_failed" => (code, "Windows no pudo iniciar la aplicación."),
+            "desktop_window_unconfirmed" => (code, "Windows no confirmó una ventana visible."),
             "pending" => (
                 "pending",
                 "Esta solicitud ya está en curso. No se inició otra generación.",

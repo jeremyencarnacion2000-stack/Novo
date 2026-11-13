@@ -27,6 +27,12 @@ jobs:
         run: node scripts/voice-resources.mjs
       - name: Frontend checks
         run: node --import ./tests/setup.mjs --test --test-concurrency=1 "tests/**/*.test.mjs"
+      - name: Calibration self-checks
+        run: |
+          python -m unittest discover -s tests -p voice_calibration_test.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/voice-calibration.py --self-test
+          exit $LASTEXITCODE
       - name: Build registered hook resource
         run: cargo build -p coucou-hook --release --locked
       - name: Native and protocol checks
