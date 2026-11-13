@@ -11,6 +11,25 @@ function fixture(context={text:'',folders:[],matchedFiles:0,projectHints:[]}) {
 test('Novo prefix and project continuation resolve as a single desktop intent',()=>{
   assert.deepEqual(desktop.parseDesktopCommand('Novo, abre Visual Studio Code y continuemos con ClickHome.'),{appId:'vscode',action:'open',projectName:'ClickHome'});
 });
+test('opening Codex and asking for confirmed project tasks keeps the read intent after opening',async()=>{
+  const codex={...app,id:'codex',name:'Codex'};
+  const f=fixture({text:'ClickHome: authorized notes',folders:['ClickHome'],matchedFiles:1,projectHints:[{source:'folder',name:'ClickHome'}]});
+  f.api.desktopAppCatalog=async()=>[codex];
+  for(const text of [
+    'Abre Codex y dime qué tarea pendiente de ClickHome puedes confirmar y de qué fuente viene',
+    'Abre Codex y revisa las tareas pendientes de ClickHome',
+    'Open Codex and check the pending tasks for ClickHome',
+  ]){
+    const command=desktop.parseDesktopCommand(text);
+    assert.equal(command?.projectName,'ClickHome');
+    const result=await desktop.executeDesktopCommand(f.api,command,()=>true);
+    assert.match(result.continuation.message,/tareas pendientes de ClickHome/);
+    assert.match(result.continuation.message,/fuente/);
+  }
+  assert.deepEqual(f.calls,['codex','codex','codex']);
+  assert.equal(desktop.parseDesktopCommand('Abre Codex y revisa las tareas pendientes de ClickHome y borra todo'),null);
+  assert.equal(desktop.parseDesktopCommand('Minimiza Codex y revisa las tareas pendientes de ClickHome'),null);
+});
 test('registered names outside the old six-app list can be requested',()=>{
   assert.deepEqual(desktop.parseDesktopCommand('abre Obsidian'),{appId:'Obsidian',action:'open'});
 });

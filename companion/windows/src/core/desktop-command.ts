@@ -2,7 +2,7 @@ import type {DesktopAppChoice,DesktopWindowChoice} from './bridge';
 import type {NovoLocalContext} from './novo-chat';
 export type DesktopAppId=string
 export type DesktopWindowAction='focus'|'minimize'|'maximize'|'restore'
-export type DesktopCommand={appId:DesktopAppId;action:'open'|DesktopWindowAction;projectName?:string}
+export type DesktopCommand={appId:DesktopAppId;action:'open'|DesktopWindowAction;projectName?:string;projectQuery?:'pendingTasks'}
 
 const aliases:Record<string,DesktopAppId>={
   'chrome':'chrome','google chrome':'chrome','edge':'edge','microsoft edge':'edge',
@@ -23,12 +23,15 @@ export function parseDesktopCommand(text:string):DesktopCommand|null {
   for(const [prefix,action] of actions){
     const match=input.toLocaleLowerCase().match(prefix)
     if(!match)continue
-    const parts=input.slice(match[0].length).split(/\s+(?:y\s+continuemos\s+con|and\s+(?:let's\s+)?continue\s+with)\s+/i);
+    const target=input.slice(match[0].length);
+    const taskQuery=target.match(/^(.+?)\s+(?:y\s+(?:revisa\s+las\s+tareas\s+pendientes\s+de|dime\s+qu[eé]\s+tarea\s+pendiente\s+de)|and\s+check\s+the\s+pending\s+tasks\s+for)\s+([\p{L}\p{N}][\p{L}\p{N}_. -]*?)(?:\s+puedes\s+confirmar\s+y\s+de\s+qu[eé]\s+fuente\s+viene)?$/iu);
+    const parts=taskQuery?taskQuery.slice(1):target.split(/\s+(?:y\s+continuemos\s+con|and\s+(?:let's\s+)?continue\s+with)\s+/i);
     if(parts.length>2||(parts.length===2&&action!=='open'))return null;
     const name=parts[0].trim();const projectName=parts[1]?.trim();
-    if(!name||name.length>120||/\s+y\s+|\s+and\s+|[\\/:;|&<>]|--/i.test(name)||projectName&&(!projectName||projectName.length>120))return null;
+    if(!name||name.length>120||/\s+y\s+|\s+and\s+|[\\/:;|&<>]|--/i.test(name)||projectName&&projectName.length>120)return null;
+    if(taskQuery&&(!projectName||/\b(?:y|and)\b/i.test(projectName)))return null;
     const appId=aliases[normalize(name)]??name;
-    return {appId,action,...(projectName?{projectName}:{})};
+    return {appId,action,...(projectName?{projectName}:{}),...(taskQuery?{projectQuery:'pendingTasks' as const}:{})};
   }
   return null
 }
@@ -65,7 +68,10 @@ export async function executeDesktopCommand(api:DesktopApi,command:DesktopComman
     const local=projects.filter(project=>project.source==='folder');
     const identities=new Set((local.length?local:projects).map(project=>normalize(project.repository??project.name)));
     if(local.length>1||identities.size!==1||!context.text||context.matchedFiles===0)return {response:`${response} Necesito contexto de ${command.projectName}: elige su carpeta en Configuración → Asistente o dime qué tarea quieres retomar. No tengo información suficiente para continuar ese proyecto.`};
-    return {response,continuation:{message:`Continuemos con ${command.projectName}. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.`,context}};
+    const message=command.projectQuery==='pendingTasks'
+      ? `¿Qué tareas pendientes de ${command.projectName} puedes confirmar y de qué fuente viene cada una? Usa sólo el contexto autorizado. Si ninguna está confirmada, indícalo.`
+      : `Continuemos con ${command.projectName}. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.`;
+    return {response,continuation:{message,context}};
   }
   const windows=await api.desktopAppWindows(app.id);
   if(!current())return {response:'Acción cancelada.'};

@@ -180,6 +180,7 @@ pub(super) fn start(app: tauri::AppHandle, id: String) -> Result<(), String> {
             crate::log::line(format!("voice-input {}", serde_json::json!({
                 "requestId":&worker.id,
                 "outcome":if cancelled {"cancelled"} else if result.is_ok() && reason.is_none() {"accepted"} else {"rejected"},
+                "code":reason.or_else(|| if cancelled {None} else {result.as_ref().err().map(String::as_str)}),
                 "timings":timings,
             })));
             registry().lock().unwrap_or_else(|e| e.into_inner()).active = None;
@@ -331,7 +332,6 @@ fn run(
             Some((started.elapsed().as_millis() as u64).saturating_sub(prepare + capture));
     }
     let samples = captured?;
-    timings.audio_ms = Some(samples.len() as u64 * 1000 / 16000);
     if request.cancelled.load(Ordering::SeqCst) {
         return Err("cancelled".into());
     }
@@ -549,6 +549,8 @@ fn record(
         timings.capture_wall_ms = Some(started.elapsed().as_millis() as u64);
         timings.endpoint_reason = Some(endpoint);
         timings.endpoint_quiet_ms = Some(gate.quiet as u64 * 1000 / 16000);
+        timings.audio_ms = Some(samples.len() as u64 * 1000 / 16000);
+        timings.pcm = crate::voice_metrics::pcm_levels(&samples);
         if !gate.has_speech() {
             return Err("no_speech".into());
         }
