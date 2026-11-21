@@ -26,7 +26,7 @@ export async function prepareVoiceResources() {
   await mkdir(dest, { recursive: true }); await mkdir(cache, { recursive: true });
   for (const asset of lock.downloads) await download(asset, join(cache, asset.name));
   const quote = value => `'${value.replaceAll("'", "''")}'`;
-  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath ${quote(join(cache, 'whisper.zip'))} -DestinationPath ${quote(join(cache, 'extracted'))} -Force`], { windowsHide: true, stdio: 'pipe' });
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath ${quote(join(cache, 'whisper.zip'))} -DestinationPath ${quote(join(cache, 'extracted'))} -Force`], { windowsHide: true, stdio: 'pipe' });
   const extracted = await readdir(join(cache, 'extracted'), { recursive: true });
   const binaries = extracted.filter(name => /(^|[\\/])(whisper-cli\.exe|whisper\.dll|ggml(?:-base|-cpu-[a-z0-9]+)?\.dll)$/.test(name));
   for (const name of binaries) await copyFile(join(cache, 'extracted', name), join(dest, name.split(/[\\/]/).pop()));
