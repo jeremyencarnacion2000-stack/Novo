@@ -22,7 +22,7 @@ export async function buildProjectQueryContext(userId:string,query:string,hints:
     const readTasks=Boolean(canReadProjects&&(access.tasks??access.personal)&&!excludedSources.has('projects')&&!excludedSources.has('tasks'))
     const projects=canReadProjects&&!excludedSources.has('projects')?await prisma.project.findMany({where:{userId},select:{id:true,title:true,status:true,progress:true,priority:true,version:true,description:true,notes:true,tags:true,tasks:readTasks?{where:{userId},select:{id:true,title:true,status:true,priority:true,dueDate:true},take:100}:false},orderBy:{updatedAt:'desc'},take:100}):[]
     const observedAt=new Date()
-    const observations:ProjectObservation[]=createNovoProjectObservations(projects,observedAt)
+    const observations:ProjectObservation[]=readTasks?createNovoProjectObservations(projects,observedAt):[]
     if(!hints.length&&!Object.keys(localConnections??{}).length&&!devQuestion(query)&&!projects.some(p=>nameMatch(query,p.title))){
       if(observations.length)await recordProjectObservations(userId,observations).catch(()=>undefined)
       return buildProjectAssistantContext(userId,query,access)

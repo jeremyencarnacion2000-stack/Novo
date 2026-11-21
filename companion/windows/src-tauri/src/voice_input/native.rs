@@ -431,6 +431,24 @@ impl Drop for Recording {
     }
 }
 impl Recording {
+    fn drain_stopped(
+        &self,
+        order: &mut CaptureOrder,
+        samples: &mut Vec<i16>,
+        gate: &mut SignalGate,
+    ) {
+        // Stopped headers remain marked DONE. Traverse the ring only once.
+        for _ in 0..CAPTURE_BUFFERS {
+            if samples.len() == MAX_SAMPLES {
+                break;
+            }
+            let Some((_, chunk)) = self.ready_chunk(order, MAX_SAMPLES - samples.len()) else {
+                break;
+            };
+            samples.extend_from_slice(chunk);
+            gate.push(chunk);
+        }
+    }
     fn ready_chunk(&self, order: &mut CaptureOrder, remaining: usize) -> Option<(usize, &[i16])> {
         let index = order.take(|i| unsafe {
             std::ptr::read_volatile(std::ptr::addr_of!(self.headers[i].dwFlags)) & WHDR_DONE != 0
@@ -535,18 +553,7 @@ fn record(
                 if waveInStop(handle) != 0 {
                     return Err("microphone_unavailable".into());
                 }
-                while samples.len() < MAX_SAMPLES {
-                    if request.cancelled.load(Ordering::SeqCst) {
-                        return Err("cancelled".into());
-                    }
-                    let Some((_, chunk)) =
-                        recording.ready_chunk(&mut order, MAX_SAMPLES - samples.len())
-                    else {
-                        break;
-                    };
-                    samples.extend_from_slice(chunk);
-                    gate.push(chunk);
-                }
+                recording.drain_stopped(&mut order, &mut samples, &mut gate);
                 break;
             }
             if WaitForSingleObject(event, 25) == WAIT_FAILED {
@@ -620,6 +627,17 @@ mod physical_acceptance {
         );
         assert_eq!(recording.ready_chunk(&mut order, 2).unwrap().1, &[20; 2]);
         assert!(recording.ready_chunk(&mut order, 400).is_none());
+        recording.headers[2].dwFlags = WHDR_DONE;
+        recording.headers[2].dwBytesRecorded = 2;
+        let mut order = CaptureOrder::default();
+        let mut tail = Vec::new();
+        recording.drain_stopped(&mut order, &mut tail, &mut SignalGate::default());
+        assert_eq!(tail.len(), 1604, "each completed block is consumed once");
+        assert_eq!(&tail[1600..], &[20, 20, 20, 30]);
+        let mut order = CaptureOrder::default();
+        let mut bounded = vec![0; MAX_SAMPLES - 1];
+        recording.drain_stopped(&mut order, &mut bounded, &mut SignalGate::default());
+        assert_eq!(bounded.len(), MAX_SAMPLES);
         recording.headers.clear();
         recording.buffers.clear();
     }
