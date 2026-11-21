@@ -26,7 +26,8 @@ export async function prepareVoiceResources() {
   await mkdir(dest, { recursive: true }); await mkdir(cache, { recursive: true });
   for (const asset of lock.downloads) await download(asset, join(cache, asset.name));
   const quote = value => `'${value.replaceAll("'", "''")}'`;
-  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath ${quote(join(cache, 'whisper.zip'))} -DestinationPath ${quote(join(cache, 'extracted'))} -Force`], { windowsHide: true, stdio: 'pipe' });
+  // CI can inherit PowerShell 7 modules; load Archive from the invoked host.
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Archive/Microsoft.PowerShell.Archive.psd1') -Force; Expand-Archive -LiteralPath ${quote(join(cache, 'whisper.zip'))} -DestinationPath ${quote(join(cache, 'extracted'))} -Force`], { windowsHide: true, stdio: 'pipe' });
   const extracted = await readdir(join(cache, 'extracted'), { recursive: true });
   const binaries = extracted.filter(name => /(^|[\\/])(whisper-cli\.exe|whisper\.dll|ggml(?:-base|-cpu-[a-z0-9]+)?\.dll)$/.test(name));
   for (const name of binaries) await copyFile(join(cache, 'extracted', name), join(dest, name.split(/[\\/]/).pop()));
@@ -44,7 +45,7 @@ export async function prepareVoiceResources() {
     }
     files.push(file);
   }
-  if (lock.files.length && files.length !== lock.files.length) throw new Error(`Missing speech resource: ${lock.files.filter(item => !files.some(file => file.name === item.name)).map(item => item.name).join(', ')}; archive entries: ${JSON.stringify(extracted)}`);
+  if (lock.files.length && files.length !== lock.files.length) throw new Error(`Missing speech resource: ${lock.files.filter(item => !files.some(file => file.name === item.name)).map(item => item.name).join(', ')}`);
   return files;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) console.log(JSON.stringify(await prepareVoiceResources(), null, 2));
