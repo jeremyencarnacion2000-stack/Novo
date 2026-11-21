@@ -1,5 +1,17 @@
 # Registro de implementación
 
+## 2026-11-21 — Drenado acotado y memoria protegida ante permisos restringidos
+
+`2ff0acd` evita copiar repetidamente los buffers marcados DONE tras Detener: una vuelta al anillo conserva 1 604 muestras del caso de regresión, frente a 320 000 con el bucle anterior. También evita sustituir tareas persistidas por una observación vacía cuando la lectura no tiene permiso de tareas. Pasan 51 pruebas dirigidas y la [revisión completa de servidor](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949668646): TypeScript, lint, 331 suites / 1 368 pruebas y validación OAuth entre bundles. `dab3d44` resuelve un fallo del empaquetado: Windows PowerShell podía heredar un módulo Archive incompatible. Regresión local roja/verde y [CI Windows aprobada](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949663671): 444 frontend, seis Python, 284 app, 30 hooks, 23 harness, seis sondas físicas ignoradas y NSIS/MSI generados. Hashes y modelos fijados se conservan.
+
+Se cotejaron el ejecutable instalado `3ad0d09`, los 21 archivos de reversión y el instalador anterior. No se ejecutó una restauración ni se cambió la instalación. Sin capturas nuevas por decisión del usuario. El presupuesto de contexto continúa en sombra y apagado tras observar omisiones en el corpus sintético. [Informe, fechas y límites](2026-11-13-novo-increment.md).
+
+## 2026-11-13 — Recibos de escritorio y presupuesto de contexto en sombra
+
+Se reprodujo el timeout de AppsFolder con el límite de 8 s. La consulta directa identificó Codex en tres pruebas y una sonda Windows confirmó su ventana al frente. El PR conserva la ventana observada aunque Windows no confirme enfoque y distingue los fallos de apertura de los de contexto. Una lectura de la cuenta encontró la carpeta ClickHome seleccionada en el dispositivo, sin proyecto Novo por título exacto ni memoria activa coincidente en la base consultada.
+
+La comparación en sombra conserva la evidencia autorizada. En cuatro pares sintéticos con el proveedor real, la entrada pasó de 8 784 a 1 128 tokens. La alternativa omitió un aviso de fuente que apareció en la referencia. Ambas variantes respondieron en español a los casos ingleses, por lo que el selector sigue apagado. Se corrigió el drenado del último bloque PCM al detener manualmente. La 0.2.17 sigue instalada y no se abrió el micrófono. [Informe y evidencia](2026-11-13-novo-increment.md).
+
 ## 2026-11-13 — Auditoría de captura y comparación OpenJarvis
 
 Una frase humana confirmada grabada con Realtek y Novo produjo siete errores de nueve palabras en Whisper, con y sin Silero. Vosk produjo seis errores sobre el mismo PCM. La segunda toma de DirectShow confirmó el formato de Windows, pero no tiene una frase confirmada. Se borraron ambos WAV. Se añadieron métricas PCM y de segmentos, y dos regresiones del recorrido por texto. La instalación sigue en 0.2.17 `3ad0d09`. Tras ajustar el audio, el usuario confirmó que el lector manual reprodujo la respuesta actual. [Diagnóstico](2026-11-13-voice-diagnostics.md).

@@ -1,10 +1,12 @@
 # Matriz de capacidades
 
+Actualización 2026-11-21: instalada 0.2.17 `3ad0d09`, con reversión cotejada. El lector manual actual fue confirmado por el usuario el 13 de noviembre. El PR #41 añade recibos parciales de escritorio, consulta directa de Codex, tareas con permiso explícito y drenado PCM acotado. Las sondas del 13 de noviembre confirmaron enfoque de Codex y recuperación de la carpeta ClickHome; no certifican el circuito integrado. El presupuesto contextual está implementado en sombra, apagado por omisiones observadas en casos sintéticos. [Evidencia y límites actuales](../engineering/2026-11-13-novo-increment.md).
+
 Actualización 2026-11-12: candidata 0.2.17 `3ad0d09` instalada. [Aceptación física](../engineering/2026-11-06-physical-voice-acceptance.md) registra apertura de Codex por texto confirmada por el usuario y 0/2 dictados controlados entregados. Pasaron 438 pruebas automatizadas de Companion.
 
 Fecha: 2026-11-05. «Implementada sin verificar» significa que se encontró el camino de código, pero no se ejecutó de extremo a extremo en esta auditoría. Las pruebas unitarias no certifican un servicio externo. Consultar el [registro de implementación](../engineering/IMPLEMENTATION_LOG.md) para evidencia nueva.
 
-Voz: el ajuste seleccionado sigue en modo local español. El Twin no tiene recuperación de ClickHome comprobada en este flujo. La prueba SAPI produjo PCM ES/EN y confirmó la purga en memoria. El lector instalado, el corte audible y la cancelación física siguen pendientes.
+Voz: el ajuste seleccionado sigue en modo local español. El Twin no tiene recuperación de ClickHome comprobada en este flujo. La prueba SAPI produjo PCM ES/EN y confirmó la purga en memoria. El lector instalado se oyó según confirmó el usuario; el corte audible y la cancelación física siguen pendientes.
 
 | Capacidad | Estado observado | Evidencia / validación pendiente |
 | --- | --- | --- |
