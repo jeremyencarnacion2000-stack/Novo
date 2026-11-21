@@ -44,7 +44,7 @@ export async function prepareVoiceResources() {
     }
     files.push(file);
   }
-  if (lock.files.length && files.length !== lock.files.length) throw new Error('Missing speech resource');
+  if (lock.files.length && files.length !== lock.files.length) throw new Error(`Missing speech resource: ${lock.files.filter(item => !files.some(file => file.name === item.name)).map(item => item.name).join(', ')}`);
   return files;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) console.log(JSON.stringify(await prepareVoiceResources(), null, 2));
