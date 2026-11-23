@@ -20,6 +20,7 @@ import { N_, t, tl } from "../i18n/i18n";
 import { NovoChatController } from '../core/novo-chat';
 import { CompanionDictation, dictationMessage } from "../core/companion-dictation";
 import {parseDesktopCommand,executeDesktopCommand,type DesktopWindowAction} from '../core/desktop-command';
+import {NOVO_WAKE_EVENT} from '../island/voice-wake';
 import { buildCodexPrompt } from './codex-chat';
 import { buildReplySpeech } from './reply-speech';
 
@@ -499,7 +500,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     const sending=controller.send(text,model.id,twinMode);input.value='';Sound.play('send');await sending;
     if(currentSpeechTurn(turn)){if(controller.state.error)Sound.play('error');else{Sound.play('finish');playback.readReply(speakReply);}input.focus();}}
   send.addEventListener('click',()=>void submit());
-  voiceButton.addEventListener('click',()=>{
+  function startVoiceDraft(){
     playback.stop();
     if(dictation?.isListening){dictation.stop();return;}
     if(State.settings.voiceInputMode==='cloud'&&!State.settings.voiceCloudConsent){
@@ -510,11 +511,16 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     }
     voiceStatus.hidden=true;delete voiceStatus.dataset.error;
     dictation?.start(input.value);
-  });
+  }
+  voiceButton.addEventListener('click', startVoiceDraft);
+  const onWake = () => {
+    if (!disposed && State.view === 'prompt' && !controller.state.activeRequestId && !localBusy && !dictation?.isListening) startVoiceDraft();
+  };
+  window.addEventListener(NOVO_WAKE_EVENT, onWake);
   conversations.el.addEventListener('click',()=>{playback.stop();dictation?.cancel();});
   input.addEventListener('input',()=>{send.disabled=!controller.canSend||Boolean(dictation?.isListening);});
   input.addEventListener('keydown',event=>{const key=(event as KeyboardEvent).key;if(key==='Escape'&&dictation?.isListening){event.preventDefault();dictation.cancel();voiceStatus.hidden=true;delete voiceStatus.dataset.error;}else if(key==='Enter'){event.preventDefault();void submit();}event.stopPropagation();});
-  const stop=()=>{if(disposed)return;cancelDesktop();disposed=true;stopSettings?.();dictation?.dispose();playback.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);};
+  const stop=()=>{if(disposed)return;cancelDesktop();disposed=true;stopSettings?.();dictation?.dispose();playback.dispose();if(State.stateOverride==='listening'){State.stateOverride=null;State.notify();}controller.dispose();conversations.dispose();window.removeEventListener('beforeunload',stop);window.removeEventListener(NOVO_WAKE_EVENT,onWake);};
   window.addEventListener('beforeunload',stop);
   void controller.loadAccount();
   return {el,sync(){syncFile();if(State.view!=='prompt'){cancelDesktop();++speechTurn;playback.stop();dictation?.cancel();}},focus:()=>input.focus(),dispose:stop};

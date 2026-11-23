@@ -24,7 +24,8 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   const localLanguage=h('div',{class:'row',hidden:inputMode.value!=='local'},h('label',{text:t('Idioma del dictado local')}),inputLanguage);
   const cloudConsent=h('div',{hidden:inputMode.value!=='cloud'},h('label',{class:'row'},voiceConsent,h('span',{text:t('Allow')})),h('p',{class:'hint',text:t('The speech service may process audio outside Novo. Novo receives only the text you send.')}));
   const spokenReplies=h('input',{type:'checkbox',checked:settings.voiceSpokenReplies,'aria-label':t("Read replies aloud")});
-  const localVoice=h('select',{'aria-label':t("Windows voice")},h('option',{value:'',text:t("Spanish (automatic)")}));
+  const wake=h('input',{type:'checkbox',checked:settings.voiceWakeEnabled,disabled:inputMode.value!=='local','aria-label':'Activar al decir Novo'});
+  const localVoice=h('select',{'aria-label':'Voz de Novo'},h('option',{value:'',text:t("Spanish (automatic)")}));
   const localVoiceStatus=h('p',{class:'hint',role:'status',text:t("Audio is generated on this PC.")});
   const folderList=h('div',{class:'novo-settings-folders'});
   const desktopApps=h('div',{class:'novo-desktop-apps'});
@@ -99,7 +100,8 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     settings.voiceInputMode=inputMode.value==='cloud'?'cloud':inputMode.value==='off'?'off':'local';
     cloudConsent.hidden=settings.voiceInputMode!=='cloud';
     localLanguage.hidden=settings.voiceInputMode!=='local';
-    void save().catch(()=>{settings.voiceInputMode=previous;inputMode.value=previous;cloudConsent.hidden=previous!=='cloud';localLanguage.hidden=previous!=='local';failure();});
+    wake.disabled=settings.voiceInputMode!=='local';
+    void save().catch(()=>{settings.voiceInputMode=previous;inputMode.value=previous;cloudConsent.hidden=previous!=='cloud';localLanguage.hidden=previous!=='local';wake.disabled=previous!=='local';failure();});
   });
   inputLanguage.addEventListener('change',()=>{
     const previous=settings.voiceInputLanguage;settings.voiceInputLanguage=inputLanguage.value==='es'?'es':inputLanguage.value==='en'?'en':'auto';
@@ -108,6 +110,10 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   spokenReplies.addEventListener('change',()=>{
     const previous=settings.voiceSpokenReplies;settings.voiceSpokenReplies=spokenReplies.checked;
     void save().catch(()=>{settings.voiceSpokenReplies=previous;spokenReplies.checked=previous;failure();});
+  });
+  wake.addEventListener('change',()=>{
+    const previous=settings.voiceWakeEnabled;settings.voiceWakeEnabled=wake.checked;
+    void save().catch(()=>{settings.voiceWakeEnabled=previous;wake.checked=previous;failure();});
   });
   localVoice.addEventListener('change',()=>{
     const previous=settings.voiceLocalVoiceId;settings.voiceLocalVoiceId=localVoice.value;
@@ -122,9 +128,11 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
     h('h2',{text:t('Voz y privacidad')}),
     h('div',{class:'row'},h('label',{text:t("Voice input")}),inputMode),
     localLanguage,
+    h('label',{class:'row'},wake,h('span',{text:'Activar al decir «Novo»'})),
+    h('p',{class:'hint',text:'Activación experimental con el Companion plegado. Di «Novo», espera la señal y luego dicta. El texto queda en el borrador.'}),
     h('p',{class:'hint',text:t("Local dictation starts only when you press the microphone. Review the text before sending. Audio stays on this PC; low memory stops recognition.")}),cloudConsent,
     h('label',{class:'row'},spokenReplies,h('span',{text:t("Read replies aloud")})),
-    h('div',{class:'row'},h('label',{text:t("Windows voice")}),localVoice),localVoiceStatus,
+    h('div',{class:'row'},h('label',{text:'Voz de Novo'}),localVoice),localVoiceStatus,
     h('div',{class:'row'},h('label',{text:t("Response source")}),source),status,accountOptions,
     h('label',{class:'row'},connections,h('span',{text:t('Consultar conexiones locales')})),
     h('p',{class:'hint',text:t('Al preguntar, Novo consulta GitHub y Vercel conectados a este PC y usa el estado de agentes como Codex. Los resúmenes se envían a tu cuenta Novo; las claves permanecen en este PC.')}),
@@ -137,8 +145,15 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   void verify();void Bridge.contextFoldersList().then(items=>{if(disposed)return;folders=normalize(items);drawFolders();}).catch(()=>{if(!disposed)failure();});
   void Bridge.voiceChoices().then(items=>{
     if(disposed)return;const voices=Array.isArray(items)?items:[];
-    for(const voice of voices)localVoice.append(h('option',{value:voice.id,text:voice.name}));
-    localVoice.value=settings.voiceLocalVoiceId??'';
+    const novoVoices=h('optgroup',{label:'Voces de Novo'});
+    const windowsVoices=h('optgroup',{label:t('Windows voice')});
+    for(const voice of voices){
+      const neural=voice.id.startsWith('kokoro:');
+      (neural?novoVoices:windowsVoices).append(h('option',{value:voice.id,text:neural?`${voice.name} · ${voice.spanish?'Español':'English'}`:voice.name}));
+    }
+    if(novoVoices.childElementCount)localVoice.append(novoVoices);
+    if(windowsVoices.childElementCount)localVoice.append(windowsVoices);
+    localVoice.value=voices.some(voice=>voice.id===settings.voiceLocalVoiceId)?settings.voiceLocalVoiceId:'';
     if(!voices.some(voice=>voice.spanish)&&!settings.voiceLocalVoiceId)localVoiceStatus.textContent=t("No local Spanish voice. Install one in Windows Settings → Time & language → Speech.");
   }).catch(()=>{if(disposed)return;localVoice.disabled=true;localVoiceStatus.textContent=t("Local speech is unavailable. Check your Windows voice settings.");});
   void Bridge.desktopAppCatalog().then(items=>{if(!disposed)drawDesktopApps(items);}).catch(()=>{if(!disposed)desktopStatus.textContent=t('No se pudo consultar la lista local de apps.');});

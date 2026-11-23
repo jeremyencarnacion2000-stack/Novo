@@ -134,6 +134,7 @@ export interface Settings {
   voiceInputMode: 'local'|'cloud'|'off';
   voiceInputLanguage: 'auto'|'es'|'en';
   voiceLocalVoiceId: string;
+  voiceWakeEnabled: boolean;
   voiceSpokenReplies: boolean;
   /** Model server addresses once connected; empty means not connected. */
   ollamaUrl: string;
@@ -191,6 +192,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceInputMode: 'local',
   voiceInputLanguage: 'auto',
   voiceLocalVoiceId: '',
+  voiceWakeEnabled: false,
   voiceSpokenReplies: false,
   ollamaUrl: "",
   lmstudioUrl: "",

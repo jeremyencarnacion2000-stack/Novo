@@ -9,6 +9,7 @@ import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
 import { registerShortcutHandlers } from "./island/shortcuts";
+import { registerVoiceWake } from "./island/voice-wake";
 import { Recap } from "./recap/recap";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
@@ -102,6 +103,7 @@ async function main() {
   await onEvent<null>("recap-check", checkRecap);
 
   island.launch();
+  if (IS_TAURI && State.os === 'windows') registerVoiceWake(() => island.alert('prompt'));
   void Bridge.log("Novo island ready: Coucou interaction engine active");
 
   // In a plain browser there is no wake strip behind the cursor: make the whole

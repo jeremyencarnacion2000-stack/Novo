@@ -5,6 +5,7 @@ import {internals,sent,emit,calls} from './tauri.mjs';
 installFakeDom();
 const {buildPrompt}=await import('../src/views/chat.ts');
 const {State,DEFAULT_SETTINGS}=await import('../src/core/state.ts');
+const {NOVO_WAKE_EVENT}=await import('../src/island/voice-wake.ts');
 const flush=()=>new Promise(resolve=>setTimeout(resolve,0));
 async function fixture(deferred=false,voiceSpokenReplies=true){
   calls.length=0;State.settings={...DEFAULT_SETTINGS,voiceSpokenReplies,novoLocalConnections:false};State.view='prompt';State.droppedFile=null;
@@ -50,6 +51,24 @@ test('a dictated assistant request speaks the returned answer with replies other
   const f=await fixture(false,false);
   try{await f.dictate('hola Novo');await f.sendDraft();assert.equal(sent('voice_speak').at(-1).text,'Fresh server answer');}
   finally{f.dispose();}
+});
+test('activation by name uses the microphone draft and requires Send before replying',async()=>{
+  const f=await fixture(false,false);
+  try{
+    f.view.el.querySelector('.chat-input').value='';
+    window.dispatchEvent(new Event(NOVO_WAKE_EVENT));await flush();
+    const request=sent('voice_input_start').at(-1);
+    assert.ok(request);
+    emit('novo-voice-input',{requestId:request.requestId,state:'listening'});
+    emit('novo-voice-input',{requestId:request.requestId,state:'finished',text:'Abre Chrome'});
+    await flush();
+    assert.equal(f.view.el.querySelector('.chat-input').value,'Abre Chrome');
+    assert.equal(sent('desktop_app_open').length,0);
+    assert.equal(sent('voice_speak').length,0);
+    await f.sendDraft();
+    assert.equal(sent('desktop_app_open').length,1);
+    assert.match(sent('voice_speak').at(-1).text,/Listo/);
+  }finally{f.dispose();}
 });
 test('an old-account request completing cannot read the newly opened account history',async()=>{
   const f=await fixture(true);

@@ -18,6 +18,7 @@ mod query_context;
 mod desktop;
 mod desktop_apps;
 mod voice;
+mod voice_wake;
 mod voice_input;
 mod voice_metrics;
 mod files;
@@ -718,6 +719,8 @@ pub fn run() {
             voice::voice_choices,
             voice::voice_speak,
             voice::voice_stop,
+            voice_wake::voice_wake_wait,
+            voice_wake::voice_wake_cancel,
             voice_input::voice_input_start,
             voice_input::voice_input_finish,
             voice_input::voice_input_cancel,

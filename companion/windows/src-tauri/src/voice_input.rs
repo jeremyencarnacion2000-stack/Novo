@@ -129,6 +129,7 @@ pub async fn voice_input_start(app: tauri::AppHandle, request_id: String) -> Res
     }
     #[cfg(windows)]
     {
+        crate::voice_wake::release_microphone().await?;
         native::start(app, request_id)
     }
     #[cfg(not(windows))]
