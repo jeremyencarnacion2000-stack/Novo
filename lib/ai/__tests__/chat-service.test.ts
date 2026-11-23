@@ -83,6 +83,22 @@ it('falls back to the existing provider for unavailable or untrusted inference',
   }
 })
 
+it('discards a cancelled OpenJarvis turn without calling a fallback provider', async () => {
+  enableOpenJarvis()
+  const cancel = new AbortController()
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  fetchMock.mockImplementationOnce(async (_url, request) => {
+    cancel.abort()
+    expect(request.signal.aborted).toBe(true)
+    throw new DOMException('Aborted', 'AbortError')
+  })
+  const result = await streamNovoChat(continuation(), native, cancel.signal)
+  expect(result.status).toBe(409)
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
 it('preserves the web metadata/content/DONE contract and selected model routing',async()=>{
   const result=await streamNovoChat(input(),web,new AbortController().signal)
   const events=(await result.text()).split('\n\n').filter(Boolean).map(s=>s.slice(6))

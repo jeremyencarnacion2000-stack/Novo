@@ -1,5 +1,9 @@
 # Registro de implementación
 
+## 2026-11-23 — OpenJarvis en el flujo de continuación de proyectos
+
+PR #41 incorpora un servicio de inferencia separado ligado al checkout OpenJarvis `484de90`. La API del Companion conserva sus scopes y deriva una instantánea del proyecto para una herramienta MCP interna. El agente responde sobre esa instantánea y Novo conserva la ejecución Windows y el historial. El motor anterior sigue como respaldo en el chat. El servidor local, los dos casos con proveedor real, la sonda de Codex, el consumo y la comparación de los dos reconocedores están documentados en el [servicio OpenJarvis](../../services/openjarvis/README.md). El circuito físico completo y la integración de síntesis y navegador quedan abiertos.
+
 ## 2026-11-21 — Drenado acotado y memoria protegida ante permisos restringidos
 
 `2ff0acd` evita copiar repetidamente los buffers marcados DONE tras Detener: una vuelta al anillo conserva 1 604 muestras del caso de regresión, frente a 320 000 con el bucle anterior. También evita sustituir tareas persistidas por una observación vacía cuando la lectura no tiene permiso de tareas. Pasan 51 pruebas dirigidas y la [revisión completa de servidor](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949668646): TypeScript, lint, 331 suites / 1 368 pruebas y validación OAuth entre bundles. `dab3d44` resuelve un fallo del empaquetado: Windows PowerShell podía heredar un módulo Archive incompatible. Regresión local roja/verde y [CI Windows aprobada](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949663671): 444 frontend, seis Python, 284 app, 30 hooks, 23 harness, seis sondas físicas ignoradas y NSIS/MSI generados. Hashes y modelos fijados se conservan.
