@@ -13,7 +13,7 @@ def main():
     root = Path(sys.argv[1])
     payload = json.loads(sys.stdin.buffer.read(32_001))
     voice, text = payload["voice"], payload["text"]
-    if voice not in VOICES or not isinstance(text, str) or not 0 < len(text) <= 6000:
+    if voice not in VOICES or not isinstance(text, str) or not 0 < len(text) <= 600:
         raise ValueError("invalid speech input")
     from psutil import virtual_memory
     if virtual_memory().available < 700 * 1024**2:

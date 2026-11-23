@@ -198,7 +198,11 @@ mod native {
         voice: &str,
         text: &str,
     ) -> Option<Vec<u8>> {
-        if !unlocked() || !KOKORO_VOICES.iter().any(|(key, _, _)| key == &voice) {
+        // Long answers go straight to Windows so synthesis never buffers them in full.
+        if !unlocked()
+            || text.chars().count() > 600
+            || !KOKORO_VOICES.iter().any(|(key, _, _)| key == &voice)
+        {
             return None;
         }
         let dir = kokoro_dir()?;

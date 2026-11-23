@@ -146,7 +146,7 @@ export function novoChatSection(settings:Settings, save:()=>Promise<void>):{el:H
   void Bridge.voiceChoices().then(items=>{
     if(disposed)return;const voices=Array.isArray(items)?items:[];
     const novoVoices=h('optgroup',{label:'Voces de Novo'});
-    const windowsVoices=h('optgroup',{label:t('Windows voice')});
+    const windowsVoices=h('optgroup',{label:t("Windows voice")});
     for(const voice of voices){
       const neural=voice.id.startsWith('kokoro:');
       (neural?novoVoices:windowsVoices).append(h('option',{value:voice.id,text:neural?`${voice.name} · ${voice.spanish?'Español':'English'}`:voice.name}));
