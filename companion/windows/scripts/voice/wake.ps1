@@ -20,7 +20,7 @@ try {
     if ($ProbeWave -and $result) {
         [Console]::Error.WriteLine(('recognized={0} confidence={1:F3}' -f $result.Text, $result.Confidence))
     }
-    if ($result -and $result.Text -ieq 'Novo' -and $result.Confidence -ge 0.91) {
+    if ($result -and $result.Text -ieq 'Novo' -and $result.Confidence -ge 0.915) {
         [Console]::Write('novo')
     }
 } finally {

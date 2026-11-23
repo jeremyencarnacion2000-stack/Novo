@@ -1,5 +1,13 @@
 # Registro de implementación
 
+## 2026-11-23 — Candidata Companion 0.2.18, voces de Novo y activación
+
+El selector de voz de Novo incorpora siete voces Kokoro en español e inglés. Es la familia de voces que usa OpenJarvis. Novo ejecuta los pesos cuantizados con ONNX en un proceso local por respuesta. Las respuestas largas, archivos ausentes o memoria insuficiente pasan al lector Windows. La API de audio y el botón de detener son compartidos. El dictado conserva Whisper/Silero, revisión en el borrador y envío manual.
+
+La activación experimental «Novo» usa el reconocedor de Windows con el Companion plegado. La gramática libera el micrófono antes del dictado y se pausa al bloquear Windows. Este equipo sólo ofrece reconocimiento `en-US`. Las pruebas iniciales con voz sintética detectaron confusiones entre «nuevo» y «Novo», incluso al reducir la amplitud. El umbral se ajustó a 0,915 con estas muestras. El detector permanece optativo y requiere validación física antes de considerarse fiable.
+
+La provisión opcional se hace con `companion/windows/scripts/install-neural-voice.ps1` y Python 3.12. Verifica los SHA-256 de los dos archivos de [Kokoro ONNX v1.0](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) y conserva sus dependencias en un entorno privado. Kokoro ONNX publica su código bajo MIT y el [proyecto Kokoro](https://github.com/hexgrad/kokoro) bajo Apache 2.0. El asistente conserva la voz de Windows cuando este entorno no está disponible. La prueba instalada del entorno generó 2,13 segundos de Dora en unos 5 segundos, con 271 MiB de pico. Una sonda por la misma API de Windows completó la reproducción y confirmó la purga a 293 ms. La sonda no midió corte audible ni abrió el micrófono.
+
 ## 2026-11-23 — OpenJarvis en el flujo de continuación de proyectos
 
 PR #41 incorpora un servicio de inferencia separado ligado al checkout OpenJarvis `484de90`. La API del Companion conserva sus scopes y deriva una instantánea del proyecto para una herramienta MCP interna. El agente responde sobre esa instantánea y Novo conserva la ejecución Windows y el historial. El motor anterior sigue como respaldo en el chat. El servidor local, los dos casos con proveedor real, la sonda de Codex, el consumo y la comparación de los dos reconocedores están documentados en el [servicio OpenJarvis](../../services/openjarvis/README.md). El circuito físico completo y la integración de síntesis y navegador quedan abiertos.
