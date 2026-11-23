@@ -509,6 +509,9 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         } else if (jarvis && projects.runtimeEvidence && await checkCancelled(true)) {
             await finishActivityRun(userId,activityRunId,'cancelled',{errorCode:'user_cancelled',errorMessage:'La ejecución fue detenida.'});
             return Response.json({error:'Run cancelled'},{status:409});
+        } else if (jarvis?.engine === 'ollama') {
+            await finishActivityRun(userId,activityRunId,'failed',{errorCode:'provider_unavailable',errorMessage:'La inferencia local para el proyecto no está disponible.'});
+            return Response.json({error:'provider_unavailable'},{status:503});
         } else if (finalModel === 'gemini-flash-latest' && geminiKey) {
             // Vision/general intent routed to Gemini directly via its
             // OpenAI-compatible endpoint (same SSE shape as Groq).

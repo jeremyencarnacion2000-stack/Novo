@@ -28,6 +28,7 @@ const enableOpenJarvis = () => {
   process.env.NOVO_OPENJARVIS_URL = localRuntime
   process.env.NOVO_OPENJARVIS_TOKEN = 'fixture-inference-credential-32-characters'
   process.env.NOVO_OPENJARVIS_MODEL = 'openai/gpt-oss-20b'
+  process.env.NOVO_OPENJARVIS_ENGINE = 'groq'
 }
 const continuation = () => parseNovoChatInput({
   message: 'Continuemos con ClickHome. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.',
@@ -97,6 +98,21 @@ it('discards a cancelled OpenJarvis turn without calling a fallback provider', a
   const result = await streamNovoChat(continuation(), native, cancel.signal)
   expect(result.status).toBe(409)
   expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+it('keeps local inference failures from sending project evidence to a cloud fallback', async () => {
+  enableOpenJarvis()
+  process.env.NOVO_OPENJARVIS_ENGINE = 'ollama'
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  fetchMock.mockResolvedValueOnce(Response.json({error:'inference_unavailable'}, {status:503}))
+  const result = await streamNovoChat(continuation(), native, new AbortController().signal)
+  expect(result.status).toBe(503)
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, request] = fetchMock.mock.calls[0]
+  expect(url.href).toBe(localRuntime + '/v1/novo/answer')
+  expect(JSON.parse(request.body).engine).toBe('ollama')
 })
 
 it('preserves the web metadata/content/DONE contract and selected model routing',async()=>{

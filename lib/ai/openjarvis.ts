@@ -21,12 +21,14 @@ export function openJarvisConfig() {
   const token = process.env.NOVO_OPENJARVIS_TOKEN
   const model = process.env.NOVO_OPENJARVIS_MODEL
   const address = process.env.NOVO_OPENJARVIS_URL
+  const engine = process.env.NOVO_OPENJARVIS_ENGINE
   if (!address || !token || !/^[\x21-\x7e]{32,256}$/.test(token) || !model) return null
+  if (engine !== 'groq' && engine !== 'ollama') return null
   try {
     const url = new URL(address)
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port ||
         url.pathname !== '/' || url.username || url.password || url.search || url.hash) return null
-    return { url: new URL('/v1/novo/answer', url), token, model }
+    return { url: new URL('/v1/novo/answer', url), token, model, engine }
   } catch {
     return null
   }
@@ -43,7 +45,7 @@ export async function requestOpenJarvis(
   evidence: string,
   signal: AbortSignal,
 ) {
-  const body = JSON.stringify({ system, message, evidence, model: config.model })
+  const body = JSON.stringify({ system, message, evidence, model: config.model, engine: config.engine })
   if (Buffer.byteLength(body) > 32_768 || signal.aborted) return null
   try {
     const response = await fetch(config.url, {

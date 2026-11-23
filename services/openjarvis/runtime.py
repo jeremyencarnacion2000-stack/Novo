@@ -133,8 +133,9 @@ class InferenceHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length))
             if (
                 not isinstance(payload, dict)
-                or set(payload) != {"system", "message", "model", "evidence"}
+                or set(payload) != {"system", "message", "model", "evidence", "engine"}
                 or payload["model"] != self.server.model
+                or payload["engine"] != self.server.engine
                 or not all(isinstance(payload[key], str) and payload[key].strip()
                            for key in ("system", "message", "evidence"))
                 or not len(payload["message"]) <= 1_024

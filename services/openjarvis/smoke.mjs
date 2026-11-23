@@ -28,7 +28,7 @@ const worker = spawn(python, ['-I', '-B', fileURLToPath(new URL('./runtime.py', 
     NOVO_OPENJARVIS_PORT: port,
     NOVO_OPENJARVIS_TOKEN: token,
     NOVO_OPENJARVIS_MODEL: config.model,
-    NOVO_OPENJARVIS_ENGINE: process.env.NOVO_OPENJARVIS_ENGINE,
+    NOVO_OPENJARVIS_ENGINE: config.engine,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
   },
   stdio: ['ignore', 'ignore', 'inherit'],
@@ -49,7 +49,7 @@ try {
   const rejected = await fetch(config.url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.token}` },
-    body: JSON.stringify({ system: 'test', message: 'test', evidence: '{}', model: 'unapproved' }),
+    body: JSON.stringify({ system: 'test', message: 'test', evidence: '{}', model: 'unapproved', engine: config.engine }),
   })
   assert.equal(rejected.status, 400)
   const confirmed = { source: 'novo', records: [{ title: 'Revisar checkout', status: 'todo' }] }
