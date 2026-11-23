@@ -21,6 +21,7 @@ import {assertNovoChatModelAllowed} from './chat-catalog';
 import {CompanionError} from '@/lib/companion/auth';
 import {acquireUserChatLease,releaseUserChatLease,type UserChatLease} from './chat-lease';
 import {isCompanionTurnCancelled} from '@/lib/companion/chat-turns';
+import {isProjectContinuation,openJarvisConfig,projectContinuationPrompt,requestOpenJarvis} from './openjarvis';
 
 
 const MAX_ATTACHMENT_URL_CHARS = 2_500_000;
@@ -343,9 +344,14 @@ async function generateNovoChat(input:NovoChatInput, principal:NovoChatPrincipal
         const groqKey = process.env.GROQ_API_KEY;
         const geminiKey = process.env.GEMINI_API_KEY;
         const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const projectRuntime = principal.surface === 'companion' && !attachments?.length && !useWebSearch &&
+            !contextOptions.includeGmail && !isMailSendRequest(message) &&
+            isProjectContinuation(message) ? openJarvisConfig() : null;
+        const jarvis = projectRuntime && (requestedModel === 'auto' || requestedModel === projectRuntime.model)
+            ? projectRuntime : null;
         const hasAnyKey = Boolean(groqKey || geminiKey || openRouterKey);
 
-        if (!hasAnyKey) {
+        if (!hasAnyKey && !jarvis) {
             await finishActivityRun(userId, activityRunId, 'failed', { errorCode: 'provider_not_configured', errorMessage: 'No hay un proveedor AI configurado.' });
             return new Response(new ReadableStream({
                 start(controller) {
@@ -486,8 +492,24 @@ Generate the complete HTML/CSS code that matches this visual specification exact
             await finishActivityRun(userId,activityRunId,'cancelled',{errorCode:'user_cancelled',errorMessage:'La ejecución fue detenida.'});
             return new Response(JSON.stringify({ error: 'Run cancelled' }), { status: 409 });
         }
+        let projectAnswer: Response | null = null;
+        if (jarvis && projects.runtimeEvidence) {
+            const poll = setInterval(() => void checkCancelled().catch(() => undefined), 2_000);
+            try {
+                projectAnswer = await requestOpenJarvis(jarvis, projectContinuationPrompt, message, projects.runtimeEvidence, transportSignal);
+            } finally {
+                clearInterval(poll);
+            }
+        }
         let groqResponse: Response;
-        if (finalModel === 'gemini-flash-latest' && geminiKey) {
+        if (projectAnswer && jarvis) {
+            finalModel = jarvis.model;
+            modelLabel = 'Novo';
+            groqResponse = projectAnswer;
+        } else if (jarvis && projects.runtimeEvidence && await checkCancelled(true)) {
+            await finishActivityRun(userId,activityRunId,'cancelled',{errorCode:'user_cancelled',errorMessage:'La ejecución fue detenida.'});
+            return Response.json({error:'Run cancelled'},{status:409});
+        } else if (finalModel === 'gemini-flash-latest' && geminiKey) {
             // Vision/general intent routed to Gemini directly via its
             // OpenAI-compatible endpoint (same SSE shape as Groq).
             groqResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
@@ -506,6 +528,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
         } else if (groqKey) {
             groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
+                signal: transportSignal,
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${groqKey}`
@@ -709,7 +732,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                 // with a permanent, alarming, technical note baked into the chat
                 // transcript itself, as if the assistant were apologizing.
                 const currentLabel = modelLabel || (isFallbackUsed ? (finalModel === 'openai/gpt-oss-20b' ? '⚡ GPT-OSS 20B (Respaldo Estable)' : '⚡ GPT-OSS 120B (Respaldo)') : modelLabel);
-                await appendActivityEvent(userId, { runId: activityRunId, phase: 'composing_response', label: 'Preparando la respuesta', toolName: finalModel.includes('gpt-oss') || finalModel.includes('llama') || finalModel.includes('qwen') ? 'groq' : undefined });
+                await appendActivityEvent(userId, { runId: activityRunId, phase: 'composing_response', label: 'Preparando la respuesta', toolName: projectAnswer ? 'openjarvis' : finalModel.includes('gpt-oss') || finalModel.includes('llama') || finalModel.includes('qwen') ? 'groq' : undefined });
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ meta: { runId: activityRunId, model: finalModel, label: currentLabel, intent: classification.type, fallback: isFallbackUsed, sources: context.structured.sources } })}\n\n`));
 
                 try {
@@ -779,7 +802,7 @@ Generate the complete HTML/CSS code that matches this visual specification exact
                     const agentProvider = groqKey ? { url: 'https://api.groq.com/openai/v1/chat/completions', key: groqKey, model: 'openai/gpt-oss-120b' }
                         : geminiKey ? { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: geminiKey, model: 'gemini-flash-latest' }
                             : openRouterKey ? { url: 'https://openrouter.ai/api/v1/chat/completions', key: openRouterKey, model: 'openai/gpt-oss-120b' } : null;
-                    if (((principal.surface === 'web' && actionIntents.includes(classification.type)) || wantsMailSend) && agentProvider) {
+                    if (!projectAnswer && ((principal.surface === 'web' && actionIntents.includes(classification.type)) || wantsMailSend) && agentProvider) {
                         try {
                             console.log('[Novo Brain] Triggering System Agent for:', classification.type);
 

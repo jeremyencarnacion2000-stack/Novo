@@ -37,9 +37,15 @@ test('a single owned project exposes only confirmed open tasks with bounded cove
   expect(result.text).toContain('Verify checkout')
   expect(result.text).toContain('confirmedOpenTasks')
   expect(result.text).not.toContain('Completed work')
+  expect(JSON.parse(result.runtimeEvidence!)).toEqual({
+    identities: [{source:'novo',name:'ClickHome'}],
+    openTasks: {source:'novo',records:[{title:'Verify checkout',status:'todo'}],bounded:false},
+    unavailable: [],
+  })
   const noTasks=await buildProjectQueryContext('owner','¿Qué tareas pendientes de ClickHome puedes confirmar?',[],{personal:false,projects:true,tasks:false,integrations:false})
   expect(prisma.project.findMany).toHaveBeenLastCalledWith(expect.objectContaining({select:expect.objectContaining({tasks:false})}))
   expect(noTasks.text).not.toContain('confirmedOpenTasks')
+  expect(JSON.parse(noTasks.runtimeEvidence!).openTasks).toBeNull()
 })
 test('project and task exclusions apply before retrieving live task evidence',async()=>{
   ;(prisma.novoSignalSourcePreference.findMany as jest.Mock).mockResolvedValue([{source:'projects'},{source:'tasks'}])

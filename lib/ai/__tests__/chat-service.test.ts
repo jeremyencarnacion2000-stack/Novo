@@ -22,6 +22,67 @@ beforeEach(()=>{
   fetchMock=jest.spyOn(global,'fetch').mockImplementation(async()=>new Response('data: {"choices":[{"delta":{"content":"Hola, Ángel"}}]}\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}}))
 })
 afterEach(()=>{fetchMock.mockRestore();process.env=saved})
+
+const localRuntime = 'http://127.0.0.1:8764'
+const enableOpenJarvis = () => {
+  process.env.NOVO_OPENJARVIS_URL = localRuntime
+  process.env.NOVO_OPENJARVIS_TOKEN = 'fixture-inference-credential-32-characters'
+  process.env.NOVO_OPENJARVIS_MODEL = 'openai/gpt-oss-20b'
+}
+const continuation = () => parseNovoChatInput({
+  message: 'Continuemos con ClickHome. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.',
+  model: 'auto',
+  localContext: 'PRIVATE unrelated raw folder text',
+})!
+
+it('routes the authorized continuation through OpenJarvis without sending unrelated personal context or exposing tools', async () => {
+  enableOpenJarvis()
+  ;(buildUserContext as jest.Mock).mockResolvedValueOnce({
+    summary: 'PRIVATE mailbox and personal schedule',
+    structured: { sources: [], activeSignal: null, twinContext: null },
+  })
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'PRIVATE unrelated project', sources: ['novo'], matchedProject: true,
+    runtimeEvidence: '{"identities":[{"source":"folder","name":"ClickHome"}],"openTasks":{"source":"novo","records":[{"title":"Revisar checkout","status":"todo"}]},"unavailable":[]}',
+  })
+  fetchMock.mockResolvedValueOnce(Response.json({
+    content: 'En Novo consta «Revisar checkout». ¿Quieres retomarla?',
+    inputTokens: 154, outputTokens: 22, elapsedMs: 510, cpuMs: 22, rssBytes: 52_000_000,
+  }))
+  const response = await streamNovoChat(continuation(), native, new AbortController().signal)
+  const responseText = await response.text()
+  expect(responseText).toContain('Revisar checkout')
+  expect(responseText).toContain('source:novo')
+  expect(responseText).toContain('[DONE]')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, request] = fetchMock.mock.calls[0]
+  expect(url.href).toBe(localRuntime + '/v1/novo/answer')
+  expect(request.redirect).toBe('error')
+  expect(request.body).toContain('ClickHome')
+  expect(request.body).not.toMatch(/PRIVATE|tools|Authorization/)
+})
+
+it('falls back to the existing provider for unavailable or untrusted inference', async () => {
+  enableOpenJarvis()
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValue({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  try {
+    fetchMock.mockResolvedValueOnce(Response.json({ content: 'fake', tool_calls: [{ name: 'open' }] }))
+    const failed = await streamNovoChat(continuation(), native, new AbortController().signal)
+    expect(await failed.text()).toContain('Hola, Ángel')
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.groq.com/openai/v1/chat/completions')
+
+    process.env.NOVO_OPENJARVIS_URL = 'https://example.test'
+    const rejected = await streamNovoChat(continuation(), native, new AbortController().signal)
+    expect(await rejected.text()).toContain('Hola, Ángel')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[2][0]).toBe('https://api.groq.com/openai/v1/chat/completions')
+  } finally {
+    ;(buildProjectQueryContext as jest.Mock).mockResolvedValue({ text: '', sources: [] })
+  }
+})
+
 it('preserves the web metadata/content/DONE contract and selected model routing',async()=>{
   const result=await streamNovoChat(input(),web,new AbortController().signal)
   const events=(await result.text()).split('\n\n').filter(Boolean).map(s=>s.slice(6))
