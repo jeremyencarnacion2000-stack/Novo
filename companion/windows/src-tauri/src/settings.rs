@@ -456,6 +456,7 @@ mod tests {
   "voiceInputMode": "local",
   "voiceInputLanguage": "es",
   "voiceLocalVoiceId": "windows-voice-test",
+  "voiceWakeEnabled": true,
   "voiceSpokenReplies": true,
   "ollamaUrl": "http://127.0.0.1:11434",
   "lmstudioUrl": "http://127.0.0.1:1234",
@@ -638,6 +639,14 @@ mod tests {
     }
 
     #[test]
+    fn upgrading_old_settings_never_enables_the_wake_microphone() {
+        let loaded = shown(&parse(&custom_with("voiceWakeEnabled", None)).unwrap());
+        let mut expected = custom();
+        expected["voiceWakeEnabled"] = json!(false);
+        assert_eq!(loaded, expected);
+    }
+
+    #[test]
     fn a_file_from_before_the_wardrobe_uses_novos_own_identity() {
         let loaded = parse(&custom_with("mochiOutfit", None)).unwrap();
         assert_eq!(loaded.mochi_outfit, "none");
@@ -731,6 +740,7 @@ mod tests {
             ("voiceInputMode", json!("unsupported")),
             ("voiceInputLanguage", json!("fr")),
             ("voiceLocalVoiceId", json!(false)),
+            ("voiceWakeEnabled", json!("yes")),
             ("voiceSpokenReplies", json!(1)),
             ("companionCaptureEnabled", json!("yes")),
             ("companionCapturePaused", json!([])),
