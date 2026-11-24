@@ -25,14 +25,19 @@ export class CompanionDictation {
   private id:string|null=null; private base=''; private phase:'idle'|'starting'|'listening'|'processing'='idle';
   private disposed=false; private ready:Promise<void>; private unsubscribe:(()=>void)|null=null; private available=true;
   private started=0;
+  private onReady?:()=>void;
   constructor(callbacks:Callbacks) {
     this.callbacks=callbacks;
     this.browser=new SpeechDictation(callbacks,undefined,'es-BO');
     this.ready=onEvent<InputEvent>('novo-voice-input',event=>{
       if(this.disposed||event.requestId!==this.id)return;
-      if(event.state==='listening'){this.phase='listening';this.callbacks.listening(true);return;}
+      if(event.state==='listening'){
+        if(this.phase!=='starting')return;
+        const onReady=this.onReady;this.onReady=undefined;
+        this.phase='listening';this.callbacks.listening(true);onReady?.();return;
+      }
       if(event.state==='processing'){this.phase='processing';this.callbacks.processing?.();return;}
-      this.id=null;this.phase='idle';this.callbacks.listening(false);
+      this.id=null;this.phase='idle';this.onReady=undefined;this.callbacks.listening(false);
       if(event.state==='finished'){
         const text=event.text?.trim();
         if(!text||text.length>12000||text.includes('\0')){this.callbacks.error('uncertain');return;}
@@ -44,7 +49,7 @@ export class CompanionDictation {
     }).then(stop=>{if(this.disposed)stop();else this.unsubscribe=stop;}).catch(()=>{this.available=false;});
   }
   get isListening(){return this.phase!=='idle'||this.browser.isListening;}
-  start(draft:string){
+  start(draft:string,onReady?:()=>void){
     if(this.disposed||this.isListening)return false;
     const mode=State.settings.voiceInputMode??'local';
     if(mode==='off'){this.callbacks.error('disabled');return false;}
@@ -52,14 +57,14 @@ export class CompanionDictation {
       if(!State.settings.voiceCloudConsent){this.callbacks.error('consent');return false;}
       return this.browser.start(draft);
     }
-    const id=crypto.randomUUID();this.started=performance.now();this.id=id;this.base=draft;this.phase='starting';this.callbacks.preparing?.();
+    const id=crypto.randomUUID();this.started=performance.now();this.id=id;this.base=draft;this.phase='starting';this.onReady=onReady;this.callbacks.preparing?.();
     void this.ready.then(async()=>{
       if(this.disposed||this.id!==id)return;
       if(!this.available)throw new Error('speech_unavailable');
       await Bridge.voiceInputStart(id);
     }).catch(error=>{
       if(this.disposed||this.id!==id)return;
-      this.id=null;this.phase='idle';this.callbacks.listening(false);
+      this.id=null;this.phase='idle';this.onReady=undefined;this.callbacks.listening(false);
       this.callbacks.error(errors[String(error).replace(/^Error:\s*/,'')]??'failed');
     });
     return true;
@@ -71,7 +76,7 @@ export class CompanionDictation {
     }else this.browser.stop();
   }
   cancel(){
-    const id=this.id;this.id=null;this.phase='idle';this.browser.cancel();
+    const id=this.id;this.id=null;this.phase='idle';this.onReady=undefined;this.browser.cancel();
     if(id){void Bridge.voiceInputCancel(id).catch(()=>{});this.callbacks.transcript(this.base,false);this.callbacks.listening(false);}
   }
   dispose(){if(this.disposed)return;this.cancel();this.disposed=true;this.browser.dispose();this.unsubscribe?.();}

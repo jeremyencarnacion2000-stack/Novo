@@ -500,7 +500,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     const sending=controller.send(text,model.id,twinMode);input.value='';Sound.play('send');await sending;
     if(currentSpeechTurn(turn)){if(controller.state.error)Sound.play('error');else{Sound.play('finish');playback.readReply(speakReply);}input.focus();}}
   send.addEventListener('click',()=>void submit());
-  function startVoiceDraft(){
+  function startVoiceDraft(onReady?:()=>void){
     playback.stop();
     if(dictation?.isListening){dictation.stop();return;}
     if(State.settings.voiceInputMode==='cloud'&&!State.settings.voiceCloudConsent){
@@ -510,11 +510,13 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       return;
     }
     voiceStatus.hidden=true;delete voiceStatus.dataset.error;
-    dictation?.start(input.value);
+    dictation?.start(input.value,onReady);
   }
-  voiceButton.addEventListener('click', startVoiceDraft);
+  voiceButton.addEventListener('click', () => startVoiceDraft());
   const onWake = () => {
-    if (!disposed && State.view === 'prompt' && !controller.state.activeRequestId && !localBusy && !dictation?.isListening) startVoiceDraft();
+    if (!disposed && State.view === 'prompt' && !controller.state.activeRequestId && !localBusy && !dictation?.isListening) {
+      startVoiceDraft(() => Sound.play('voice-ready'));
+    }
   };
   window.addEventListener(NOVO_WAKE_EVENT, onWake);
   conversations.el.addEventListener('click',()=>{playback.stop();dictation?.cancel();});

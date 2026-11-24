@@ -1,5 +1,4 @@
 import { Bridge } from '../core/bridge'
-import { Sound } from '../core/sound'
 import { State } from '../core/state'
 
 export const NOVO_WAKE_EVENT = 'novo-start-wake-dictation'
@@ -12,6 +11,7 @@ export function registerVoiceWake(openChat: () => void) {
   const enabled = () => !stopped && State.settings.voiceWakeEnabled
     && State.settings.voiceInputMode === 'local' && State.settings.chatProvider !== 'codex'
     && !State.paused && State.mode !== 'expanded' && !State.pendingApproval
+    && State.stateOverride !== 'listening' && State.stateOverride !== 'thinking'
   function sync() {
     if (!enabled()) {
       clearTimeout(retry)
@@ -25,13 +25,10 @@ export function registerVoiceWake(openChat: () => void) {
     void Bridge.voiceWakeWait(id).then(detected => {
       if (!detected || !enabled() || pending !== id) return
       openChat()
-      Sound.play('blip')
-      setTimeout(() => {
-        if (!stopped && !State.paused && State.mode === 'expanded' && State.view === 'prompt'
-          && State.settings.voiceWakeEnabled && State.settings.voiceInputMode === 'local') {
-          window.dispatchEvent(new Event(NOVO_WAKE_EVENT))
-        }
-      }, 300)
+      if (!stopped && !State.paused && State.mode === 'expanded' && State.view === 'prompt'
+        && State.settings.voiceWakeEnabled && State.settings.voiceInputMode === 'local') {
+        window.dispatchEvent(new Event(NOVO_WAKE_EVENT))
+      }
     }).catch(() => {
       if (enabled()) retry = setTimeout(() => { retry = undefined; sync() }, 8_000)
     }).finally(() => {

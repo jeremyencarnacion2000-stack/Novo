@@ -103,7 +103,7 @@ async function main() {
   await onEvent<null>("recap-check", checkRecap);
 
   island.launch();
-  if (IS_TAURI && State.os === 'windows') registerVoiceWake(() => island.alert('prompt'));
+  if (IS_TAURI && State.os === 'windows') registerVoiceWake(() => island.alert('prompt', { quiet: true }));
   void Bridge.log("Novo island ready: Coucou interaction engine active");
 
   // In a plain browser there is no wake strip behind the cursor: make the whole

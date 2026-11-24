@@ -4,7 +4,7 @@ export const SOUND_NAMES = [
   "peek", "open", "close", "hover", "blip", "slap", "annoyed", "dizzy", "greet",
   "work", "finish", "error", "approval", "question", "approve", "gulp", "tick",
   "send", "love", "pop", "proud", "wink", "yawn", "attach", "think", "search",
-  "rate", "sleep", "greeting",
+  "rate", "sleep", "greeting", "voice-ready",
 ] as const;
 
 export type SoundName = (typeof SOUND_NAMES)[number];
@@ -35,7 +35,8 @@ class SoundEngine {
       this.master = master;
       // Original Novo chimes, generated locally; no Coucou/Mochi WAV assets.
       for (const [index, name] of SOUND_NAMES.entries()) {
-        const duration = name === "greeting" ? 1.1 : name === "sleep" ? .45 : .16 + (index % 3) * .04;
+        const duration = name === "voice-ready" ? .075
+          : name === "greeting" ? 1.1 : name === "sleep" ? .45 : .16 + (index % 3) * .04;
         const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
         const samples = buffer.getChannelData(0);
         const descending = ["close", "sleep", "yawn", "annoyed", "error"].includes(name);

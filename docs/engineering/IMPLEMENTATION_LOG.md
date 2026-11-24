@@ -1,5 +1,13 @@
 # Registro de implementación
 
+## 2026-11-23 — Señal de dictado tras decir «Novo»
+
+En la 0.2.18 el aviso sonaba al abrir el chat. Antes de grabar transcurrían una espera fija de 300 ms y la preparación nativa. En tres intentos recientes, las métricas locales mostraron 512–568 ms de validación de recursos y 38–102 ms de preparación del micrófono. Los registros contienen tiempos y niveles, sin audio ni texto crudo.
+
+El PR quita la espera fija y emite un único aviso breve al recibir «Escuchando» de Windows. Abrir el chat por voz queda en silencio hasta ese aviso. Plegar el Companion durante la captura o el procesamiento ya no rearma el detector en paralelo. El texto permanece en el borrador hasta Enviar. Las regresiones reprodujeron el aviso temprano y el rearme, y pasan con la corrección. La suite del Companion aprueba 446 pruebas.
+
+El reconocedor instalado detectó «Novo» aislado con dos voces sintéticas y descartó ambas frases con el comando pegado. Una prueba con el mismo Whisper en archivos sintéticos recortados mostró pérdida de palabras iniciales. Subir 12 dB no corrigió «Abre Codex». Se conserva el motor y se necesita esperar la señal tras decir el nombre. El patrón exacto «no, no» y la precisión con la voz del usuario siguen pendientes de reproducir.
+
 ## 2026-11-23 — Candidata Companion 0.2.18, voces de Novo y activación
 
 El selector de voz de Novo incorpora siete voces Kokoro en español e inglés. Es la familia de voces que usa OpenJarvis. Novo ejecuta los pesos cuantizados con ONNX en un proceso local por respuesta. Las respuestas largas, archivos ausentes o memoria insuficiente pasan al lector Windows. La API de audio y el botón de detener son compartidos. El dictado conserva Whisper/Silero, revisión en el borrador y envío manual.

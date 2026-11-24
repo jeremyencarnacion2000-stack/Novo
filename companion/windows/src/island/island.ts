@@ -83,6 +83,7 @@ export class Island {
   private collapsed = false;
   private collapseTimer: number | null = null;
   private wasInIsland = false;
+  private quietOpen = false;
   /** Last shape handed to Rust for the click-through test. */
   private pushedRect = { x: -1, y: -1, w: -1, h: -1 };
 
@@ -344,7 +345,7 @@ export class Island {
     const prev = State.mode;
     if (mode === prev) return;
     State.mode = mode;
-    if (mode === "expanded") Sound.play("open");
+    if (mode === "expanded" && !this.quietOpen) Sound.play("open");
     if (prev === "expanded") {
       Sound.play("close");
       // A folded card is still waiting: it keeps the island pinned.
@@ -416,10 +417,16 @@ export class Island {
   }
 
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
-  alert(view: IslandViewName) {
-    this.fsm.pinned = State.isPinned;
-    this.fsm.forceHome();
-    this.expand(view);
+  alert(view: IslandViewName, { quiet = false } = {}) {
+    const previous = this.quietOpen;
+    this.quietOpen ||= quiet;
+    try {
+      this.fsm.pinned = State.isPinned;
+      this.fsm.forceHome();
+      this.expand(view);
+    } finally {
+      this.quietOpen = previous;
+    }
   }
 
   reveal() {
