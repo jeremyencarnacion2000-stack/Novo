@@ -365,7 +365,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       voiceButton.setAttribute('aria-label',t(VOICE_LABELS.stop));voiceButton.replaceChildren(svg(ICONS.stop,11,{stroke:1.8}));
       send.disabled=true;input.disabled=true;State.stateOverride='thinking';State.notify();onHeightChange();
     },
-    listening(active){
+    listening(active,source){
       body.classList.toggle('voice-listening',active);
       voiceButton.classList.toggle('listening',active);
       voiceButton.setAttribute("aria-label",t(active?VOICE_LABELS.stop:VOICE_LABELS.start));
@@ -378,6 +378,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       send.disabled=!controller.canSend||active;
       input.disabled=active||localBusy||Boolean(controller.state.activeRequestId);
       onHeightChange();
+      if(active&&source==='wake')Sound.play('voice-ready');
     },
     processing(){voiceStatus.textContent=t("Transcribing on this PC…");voiceStatus.hidden=false;State.stateOverride='thinking';State.notify();onHeightChange();},
     error(kind){
@@ -500,7 +501,7 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
     const sending=controller.send(text,model.id,twinMode);input.value='';Sound.play('send');await sending;
     if(currentSpeechTurn(turn)){if(controller.state.error)Sound.play('error');else{Sound.play('finish');playback.readReply(speakReply);}input.focus();}}
   send.addEventListener('click',()=>void submit());
-  function startVoiceDraft(onReady?:()=>void){
+  function startVoiceDraft(source:'manual'|'wake'='manual'){
     playback.stop();
     if(dictation?.isListening){dictation.stop();return;}
     if(State.settings.voiceInputMode==='cloud'&&!State.settings.voiceCloudConsent){
@@ -510,12 +511,12 @@ function buildAccountPrompt(onHeightChange: () => void): ViewHost {
       return;
     }
     voiceStatus.hidden=true;delete voiceStatus.dataset.error;
-    dictation?.start(input.value,onReady);
+    dictation?.start(input.value,source);
   }
   voiceButton.addEventListener('click', () => startVoiceDraft());
   const onWake = () => {
     if (!disposed && State.view === 'prompt' && !controller.state.activeRequestId && !localBusy && !dictation?.isListening) {
-      startVoiceDraft(() => Sound.play('voice-ready'));
+      startVoiceDraft('wake');
     }
   };
   window.addEventListener(NOVO_WAKE_EVENT, onWake);

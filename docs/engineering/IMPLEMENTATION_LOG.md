@@ -4,9 +4,11 @@
 
 En la 0.2.18 el aviso sonaba al abrir el chat. Antes de grabar transcurrían una espera fija de 300 ms y la preparación nativa. En tres intentos recientes, las métricas locales mostraron 512–568 ms de validación de recursos y 38–102 ms de preparación del micrófono. Los registros contienen tiempos y niveles, sin audio ni texto crudo.
 
-El PR quita la espera fija y emite un único aviso breve al recibir «Escuchando» de Windows. Abrir el chat por voz queda en silencio hasta ese aviso. Plegar el Companion durante la captura o el procesamiento ya no rearma el detector en paralelo. El texto permanece en el borrador hasta Enviar. Las regresiones reprodujeron el aviso temprano y el rearme, y pasan con la corrección. La suite del Companion aprueba 446 pruebas.
+El PR quita la espera fija y emite un único aviso breve al recibir «Escuchando» de Windows. Abrir el chat por voz queda en silencio hasta ese aviso. Plegar el Companion durante la captura o el procesamiento ya no rearma el detector en paralelo. El texto permanece en el borrador hasta Enviar. Las regresiones reprodujeron el aviso temprano y el rearme.
 
-El reconocedor instalado detectó «Novo» aislado con dos voces sintéticas y descartó ambas frases con el comando pegado. Una prueba con el mismo Whisper en archivos sintéticos recortados mostró pérdida de palabras iniciales. Subir 12 dB no corrigió «Abre Codex». Se conserva el motor y se necesita esperar la señal tras decir el nombre. El patrón exacto «no, no» y la precisión con la voz del usuario siguen pendientes de reproducir.
+El reconocedor instalado detectó «Novo» aislado con dos voces sintéticas y descartó ambas frases con el comando pegado. Una prueba con el mismo Whisper en archivos sintéticos recortados mostró pérdida de palabras iniciales. Subir 12 dB no corrigió «Abre Codex». Se conserva el motor y se necesita esperar la señal tras decir el nombre.
+
+Dos copias de un fragmento sintético de «Novo» produjeron «No, no, no, no» con confianza 0,449 y fueron rechazadas por la validación anterior. Dos copias de la palabra completa produjeron «¡Nobo! ¡Nobo!» con confianza 0,615 y fueron aceptadas. Cuando el dictado empieza por nombre y la salida consiste sólo en estas repeticiones, Novo muestra el aviso de voz incierta y conserva el borrador. Una negación dictada manualmente y las frases con más contenido siguen llegando al borrador. La reproducción exacta con la voz del usuario quedó pendiente.
 
 ## 2026-11-23 — Candidata Companion 0.2.18, voces de Novo y activación
 

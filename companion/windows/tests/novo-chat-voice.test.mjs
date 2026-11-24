@@ -7,7 +7,7 @@ installFakeDom();
 const { buildPrompt } = await import("../src/views/chat.ts");
 const { State, DEFAULT_SETTINGS } = await import("../src/core/state.ts");
 const { Sound } = await import("../src/core/sound.ts");
-const { registerVoiceWake } = await import("../src/island/voice-wake.ts");
+const { NOVO_WAKE_EVENT, registerVoiceWake } = await import("../src/island/voice-wake.ts");
 
 test('saying Novo opens the draft without sounding ready before native capture starts', async (testContext) => {
   const original = internals.invoke;
@@ -70,6 +70,42 @@ test('Novo uses native local dictation without granting cloud consent', async ()
     assert.equal(input.value,'Revisar los proyectos');
     assert.equal(calls.some(([name])=>name==='novo_chat_start'),false);
   } finally {view.dispose();State.settings.voiceInputMode='cloud';}
+});
+
+test('wake-only repetitions leave the draft intact while manual negation and full phrases are kept', async () => {
+  const originalSettings = State.settings;
+  const originalView = State.view;
+  State.settings = { ...DEFAULT_SETTINGS, voiceWakeEnabled: true, voiceInputMode: 'local' };
+  State.view = 'prompt';
+  calls.length = 0;
+  const view = buildPrompt(() => {});
+  const input = view.el.querySelector('.chat-input');
+  input.value = 'Borrador';
+  const finishDictation = async (text, source) => {
+    if (source === 'wake') window.dispatchEvent(new Event(NOVO_WAKE_EVENT));
+    else view.el.querySelector('.novo-voice-button').fire('click');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const requestId = calls.findLast(([name]) => name === 'voice_input_start')?.[1].requestId;
+    assert.ok(requestId);
+    emit('novo-voice-input', { requestId, state: 'listening' });
+    emit('novo-voice-input', { requestId, state: 'finished', text });
+  };
+  try {
+    await finishDictation('No, no, no, no.', 'wake');
+    assert.equal(input.value, 'Borrador');
+    assert.match(view.el.querySelector('.novo-voice-status').textContent, /could not understand/i);
+    await finishDictation('¡Nobo! ¡Nobo!', 'wake');
+    assert.equal(input.value, 'Borrador');
+    await finishDictation('No, no quiero borrarlo.', 'wake');
+    assert.equal(input.value, 'Borrador No, no quiero borrarlo.');
+    input.value = '';
+    await finishDictation('No, no.', 'manual');
+    assert.equal(input.value, 'No, no.');
+  } finally {
+    view.dispose();
+    State.settings = originalSettings;
+    State.view = originalView;
+  }
 });
 
 class FakeRecognition {
