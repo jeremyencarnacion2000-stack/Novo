@@ -1,5 +1,93 @@
 # Registro de implementación
 
+## 2026-11-25 — Revisión local del reconocimiento tras decir «Novo»
+
+Se instaló, con autorización, el artefacto de Windows de `8de174a`. El SHA-256 del archivo coincide con la descarga autenticada de CI. El instalador terminó con código 0 y el Companion 0.2.18 inició una vez. Se conservó la configuración actual, incluida la preferencia de activación, y se confirmó el respaldo del instalador 0.2.17. Recursos Kokoro y la voz de despertar están presentes. Esta iteración usa la versión de producto 0.2.18 existente.
+
+La compilación aprueba 447 pruebas de interfaz, seis de calibración, 285 pruebas de la aplicación, 30 de hooks y 23 del protocolo; seis pruebas físicas permanecen excluidas. TypeScript, lint y regresiones del servidor también pasaron. La suite completa local del Companion pasó 447/447.
+
+La prueba de activación encuentra la causa temporal del aviso: en 0.2.18 sonaba al abrir el chat, antes de preparar la grabación nativa. La corrección abre el dictado al despertar y suena sólo cuando Windows informa «Escuchando». Se reprodujeron además salidas sintéticas con repetición de «Novo» como «no, no» y «Nobo, Nobo». Si una activación genera únicamente esas repeticiones, el dictado despierto ahora pide repetir y deja intacto el borrador. La misma negación dictada con el botón y las frases con contenido no se descartan.
+
+No se grabó audio del usuario. La corrección y la respuesta con su voz siguen pendientes de una validación real. CI Windows: https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45299893493. CI servidor: https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45299899206.
+
+## 2026-11-23 — Señal de dictado tras decir «Novo»
+
+En la 0.2.18 el aviso sonaba al abrir el chat. Antes de grabar transcurrían una espera fija de 300 ms y la preparación nativa. En tres intentos recientes, las métricas locales mostraron 512–568 ms de validación de recursos y 38–102 ms de preparación del micrófono. Los registros contienen tiempos y niveles, sin audio ni texto crudo.
+
+El PR quita la espera fija y emite un único aviso breve al recibir «Escuchando» de Windows. Abrir el chat por voz queda en silencio hasta ese aviso. Plegar el Companion durante la captura o el procesamiento ya no rearma el detector en paralelo. El texto permanece en el borrador hasta Enviar. Las regresiones reprodujeron el aviso temprano y el rearme.
+
+El reconocedor instalado detectó «Novo» aislado con dos voces sintéticas y descartó ambas frases con el comando pegado. Una prueba con el mismo Whisper en archivos sintéticos recortados mostró pérdida de palabras iniciales. Subir 12 dB no corrigió «Abre Codex». Se conserva el motor y se necesita esperar la señal tras decir el nombre.
+
+Dos copias de un fragmento sintético de «Novo» produjeron «No, no, no, no» con confianza 0,449 y fueron rechazadas por la validación anterior. Dos copias de la palabra completa produjeron «¡Nobo! ¡Nobo!» con confianza 0,615 y fueron aceptadas. Cuando el dictado empieza por nombre y la salida consiste sólo en estas repeticiones, Novo muestra el aviso de voz incierta y conserva el borrador. Una negación dictada manualmente y las frases con más contenido siguen llegando al borrador. La reproducción exacta con la voz del usuario quedó pendiente.
+
+## 2026-11-23 — Candidata Companion 0.2.18, voces de Novo y activación
+
+El selector de voz de Novo incorpora siete voces Kokoro en español e inglés. Es la familia de voces que usa OpenJarvis. Novo ejecuta los pesos cuantizados con ONNX en un proceso local por respuesta. Las respuestas largas, archivos ausentes o memoria insuficiente pasan al lector Windows. La API de audio y el botón de detener son compartidos. El dictado conserva Whisper/Silero, revisión en el borrador y envío manual.
+
+La activación experimental «Novo» usa el reconocedor de Windows con el Companion plegado. La gramática libera el micrófono antes del dictado y se pausa al bloquear Windows. Este equipo sólo ofrece reconocimiento `en-US`. Las pruebas iniciales con voz sintética detectaron confusiones entre «nuevo» y «Novo», incluso al reducir la amplitud. El umbral se ajustó a 0,915 con estas muestras. El detector permanece optativo y requiere validación física antes de considerarse fiable.
+
+La provisión opcional se hace con `companion/windows/scripts/install-neural-voice.ps1` y Python 3.12. Verifica los SHA-256 de los dos archivos de [Kokoro ONNX v1.0](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) y conserva sus dependencias en un entorno privado. Kokoro ONNX publica su código bajo MIT y el [proyecto Kokoro](https://github.com/hexgrad/kokoro) bajo Apache 2.0. El asistente conserva la voz de Windows cuando este entorno no está disponible. La prueba instalada del entorno generó 2,13 segundos de Dora en unos 5 segundos, con 271 MiB de pico. Una sonda por la misma API de Windows completó la reproducción y confirmó la purga a 293 ms. La sonda no midió corte audible ni abrió el micrófono.
+
+El 23 de noviembre se instaló en este PC la candidata de `e0b7a7d`, con el archivo de CI cotejado por SHA-256. El instalador terminó con código 0 y se verificaron el proceso 0.2.18, la apertura del chat, sus recursos de voz y la coincidencia de las preferencias con el respaldo. Se conserva el instalador 0.2.17 de `3ad0d09` para volver atrás. La activación por nombre quedó apagada. El SHA-256 del instalador es `eea10be7918815735dc691df44d4a94dc4a1e3746223a99d1b38a5fe1f1529d0`.
+
+La compilación aprueba 445 pruebas de interfaz, seis de calibración, 285 de la aplicación nativa, 30 de hooks y 23 del protocolo. Seis sondas físicas quedaron fuera de CI. La automatización de Windows pudo leer los controles del chat instalado y no pudo abrir el panel de ajustes. Sigue pendiente confirmar con voz humana el recorrido completo desde «Novo» hasta la respuesta audible. [Compilación Windows](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45288487681) · [Verificación del servidor](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45288501975).
+
+## 2026-11-23 — OpenJarvis en el flujo de continuación de proyectos
+
+PR #41 incorpora un servicio de inferencia separado ligado al checkout OpenJarvis `484de90`. La API del Companion conserva sus scopes y deriva una instantánea del proyecto para una herramienta MCP interna. El agente responde sobre esa instantánea y Novo conserva la ejecución Windows y el historial. El motor anterior sigue como respaldo en el chat. El servidor local, los dos casos con proveedor real, la sonda de Codex, el consumo y la comparación de los dos reconocedores están documentados en el [servicio OpenJarvis](../../services/openjarvis/README.md). El orquestador con varias herramientas, el puente autenticado para otros dispositivos y la integración de navegador quedan pendientes.
+
+## 2026-11-21 — Drenado acotado y memoria protegida ante permisos restringidos
+
+`2ff0acd` evita copiar repetidamente los buffers marcados DONE tras Detener: una vuelta al anillo conserva 1 604 muestras del caso de regresión, frente a 320 000 con el bucle anterior. También evita sustituir tareas persistidas por una observación vacía cuando la lectura no tiene permiso de tareas. Pasan 51 pruebas dirigidas y la [revisión completa de servidor](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949668646): TypeScript, lint, 331 suites / 1 368 pruebas y validación OAuth entre bundles. `dab3d44` resuelve un fallo del empaquetado: Windows PowerShell podía heredar un módulo Archive incompatible. Regresión local roja/verde y [CI Windows aprobada](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949663671): 444 frontend, seis Python, 284 app, 30 hooks, 23 harness, seis sondas físicas ignoradas y NSIS/MSI generados. Hashes y modelos fijados se conservan.
+
+Se cotejaron el ejecutable instalado `3ad0d09`, los 21 archivos de reversión y el instalador anterior. No se ejecutó una restauración ni se cambió la instalación. Sin capturas nuevas por decisión del usuario. El presupuesto de contexto continúa en sombra y apagado tras observar omisiones en el corpus sintético. [Informe, fechas y límites](2026-11-13-novo-increment.md).
+
+## 2026-11-13 — Recibos de escritorio y presupuesto de contexto en sombra
+
+Se reprodujo el timeout de AppsFolder con el límite de 8 s. La consulta directa identificó Codex en tres pruebas y una sonda Windows confirmó su ventana al frente. El PR conserva la ventana observada aunque Windows no confirme enfoque y distingue los fallos de apertura de los de contexto. Una lectura de la cuenta encontró la carpeta ClickHome seleccionada en el dispositivo, sin proyecto Novo por título exacto ni memoria activa coincidente en la base consultada.
+
+La comparación en sombra conserva la evidencia autorizada. En cuatro pares sintéticos con el proveedor real, la entrada pasó de 8 784 a 1 128 tokens. La alternativa omitió un aviso de fuente que apareció en la referencia. Ambas variantes respondieron en español a los casos ingleses, por lo que el selector sigue apagado. Se corrigió el drenado del último bloque PCM al detener manualmente. La 0.2.17 sigue instalada y no se abrió el micrófono. [Informe y evidencia](2026-11-13-novo-increment.md).
+
+## 2026-11-13 — Auditoría de captura y comparación OpenJarvis
+
+Una frase humana confirmada grabada con Realtek y Novo produjo siete errores de nueve palabras en Whisper, con y sin Silero. Vosk produjo seis errores sobre el mismo PCM. La segunda toma de DirectShow confirmó el formato de Windows, pero no tiene una frase confirmada. Se borraron ambos WAV. Se añadieron métricas PCM y de segmentos, y dos regresiones del recorrido por texto. La instalación sigue en 0.2.17 `3ad0d09`. Tras ajustar el audio, el usuario confirmó que el lector manual reprodujo la respuesta actual. [Diagnóstico](2026-11-13-voice-diagnostics.md).
+
+La sonda aislada de OpenJarvis conservó las 16 fuentes requeridas en un corpus sintético con recuperador de prueba. El enrutador acertó cuatro de ocho consultas españolas y ocho de ocho inglesas. Se recomienda probar presupuesto de contexto en sombra dentro del chat de Novo. [Matriz y prueba](../research/2026-11-13-openjarvis-novo.md).
+
+## 2026-11-12 — Cierre de verificaciones autónomas de la candidata
+
+La 0.2.17 `3ad0d09` se instaló con autorización el 6 de noviembre, con coincidencia de ejecutable y 16 recursos. La instantánea de reversión de 21 archivos quedó cotejada. Dos frases completas con micrófono real dieron 0/2 borradores; 29 replays de estas mismas señales no resolvieron precisión. El usuario confirmó apertura de Codex por texto. La recuperación de ClickHome por el Twin sigue sin evidencia.
+
+Se repitieron 438 pruebas de Companion y pasaron todas. SAPI produjo voz ES/EN en memoria y confirmó la purga a 2,39 ms. Tres intentos de enumerar ventanas agotaron el tiempo de espera. Queda abierta la aceptación del lector, la cancelación y el circuito completo en la app instalada. Se eliminaron los tres WAV temporales y se conservan las métricas. [Informe](2026-11-06-physical-voice-acceptance.md).
+
+## 2026-11-06 — Revisión, respuesta de turno correcto y contraste Small
+
+La única revisión final independiente encontró que una apertura correcta seguida de fallo al consultar ClickHome podía reproducir una respuesta anterior. `3ad0d09` condiciona la lectura a una respuesta nueva sin error; si falla, conserva apertura verificada y avisa que la consulta no pudo continuar. Tres casos fallaron primero; ocho dirigidas pasan después, junto con **438/438 frontend**, TypeScript/Vite y **6/6 Python** locales. Los self-checks de calibración se añaden al workflow Windows existente. [CI 42164771978](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/42164771978) terminó aprobado: 438 frontend, 281 app, 30 hooks, 21 harness y seis Python; seis sondas físicas ignoradas.
+
+C: volvió a tener 17,6 GiB. El primer Small no arrancó por guardia de RAM (277,96 MiB); reiniciar sólo el kernel de diagnóstico del agente recuperó ~1 064 MiB. Cuatro procesos posteriores del mismo corpus sintético terminaron: ES 24 465→9 735 ms (texto exacto pero rechazado); EN 26 321 ms con `Open codecs` aceptado erróneamente →2 923 ms con `Open Codex` correcto y aceptado. Mínimo libre 530,37 MiB, manteniendo suelo 512. No se cerraron apps del usuario, activó micrófono ni cambió modelo/umbral. 144 procesos válidos entre ambos días; no nuevas muestras humanas. [Informe y métricas](2026-11-06-voice-review.md).
+
+Se cotejaron de nuevo instalación `c64098a`, 16 recursos de voz, 21 archivos de reversión, ambos paquetes `c64098a` y NSIS 0.2.16. Candidata `3ad0d09` descargada y cotejada con digest CI: NSIS SHA-256 `bf361fe522939f68bd99675a44a3b00efdf006fc280857248dc21ab4e766b51f`, 33 189 841 bytes, sin firma. Payload 0.2.17 extraído para cotejo y preferencias respaldadas. Se solicitó autorización específica; **instalador no ejecutado** y reversión real no realizada. PR permanece en borrador, sin merge ni producción.
+
+## 2026-11-05 — Instrumentación, comparación automática y nueva candidata sin instalar
+
+`2b91b0d` añade métricas numéricas acotadas de captura, endpoint estimado, VAD, carga/inferencia, entrega al borrador y acuse SAPI. El runner conserva sus callers normales; stderr sólo se captura por opt-in para reducirlo a números, sin persistir audio/texto/rutas. Pruebas rojas/verdes de parser, runner y entrega; 434 frontend locales, build y 21 harness. CI Windows [41989046596](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/41989046596): 281 app, 30 hooks, 21 harness, 434 frontend, seis sondas físicas excluidas y NSIS/MSI generados. La suite nativa completa local no pudo terminar por falta de disco; se utilizó el workflow existente.
+
+`112e864b` extiende la calibración existente, sin dependencias: repetición, CPU/RAM, perfiles de hilos/contexto/VAD/flash, reutilización de modelo, prefijos PCM reales y recursos diagnósticos fijados. Seis pruebas Python y self-check aprobados. 140 procesos válidos con 12 controles sintéticos; no hubo captura ni reproducción física nueva, como pidió el usuario. Tiny Q5_1 actual/acotado: mediana 3 938/1 501 ms, pero coincidencias aceptadas 10/20→8/20 y regresiones de texto; no se cambian parámetros ni filtros del producto. Q8, BLAS y reutilización no resuelven conjuntamente fiabilidad/latencia. Se excluyen seis ensayos iniciales de prefijos con método inválido; descarga de Small bloqueada por disco. [Informe completo y datos sanitizados](2026-11-05-voice-optimization.md).
+
+Candidata `2b91b0d`, que incluye `2d85284` del lector, cotejada con el ZIP CI SHA-256 `7408a0ac3243084fba116e25c103cbd3c467a46f186fb929781c5ad4b75b65c5`. NSIS guardado (33 299 600 bytes), SHA-256 `1d67991f1193aad79460080dd587061372b721f2af9632adb93298384d4f1fa1`. Sigue **preparada, sin instalar**: C: alcanzó cero bytes y faltan margen/autorización concretos. Se conservan instaladores `c64098a`, respaldo 0.2.16 y su NSIS; formatos duplicados/obsoletos y cachés regenerables retirados. No hay merge ni producción. Escucha permanente apagada; recorrido físico y cancelación audible pendientes.
+
+## 2026-11-05 — Estado de candidata y control de texto/lector
+
+La candidata 0.2.17 `c64098a` se compiló e instaló con autorización: instalador salida 0, versión/hash del ejecutable y 16 recursos verificados. Preferencias idénticas antes del primer lanzamiento; después se cambió únicamente idioma a `es` con respaldo local. Se conserva reversión 0.2.16. El botón real volvió a rechazar «abre Codex»: PCM 2,3 s, RMS −39,96 dBFS, proceso 7 904,7 ms y 150,9 MiB. Small diagnóstico recuperó el texto correcto a 27 963 ms pero confianza 0,182; no se incorporó. El primer ensayo de contexto se detuvo por memoria insuficiente; al repetirlo con margen reconoció la misma frase a 12 370 ms y confianza 0,565, todavía fuera de latencia. Ningún ajuste diagnóstico se instaló.
+
+El usuario confirmó la acción al escribir «abre Codex» y Enviar; la interfaz mostró «Listo, puse Codex al frente». Tras rectificar el primer aviso de fallo, confirmó que la lectura del chat funciona. No se certifican interrupción física ni circuito completo desde micrófono. Una prueba nueva reprodujo que guardar otros ajustes cortaba la lectura manual con lectura automática apagada; el componente compartido se corrige sin cambiar consentimiento. Prueba roja/verde, 14 dirigidas, **433/433 frontend** y TypeScript/Vite pasan. Este último cambio aún no está instalado. PR #41 sigue en borrador; sin merge ni publicación. [Informe y métricas](2026-11-04-voice-calibration.md).
+
+## 2026-11-04 — Calibración de voz desde `d981ad6`
+
+Se hicieron tres intentos hablados con micrófono Realtek y un control de ambiente que el usuario confirmó sin habla; este último no se cuenta en precisión EN. El usuario escuchó su primera grabación ES completa y a velocidad normal y confirmó frases SAPI de Helena es-ES y David en-US claras en altavoces. Tiny falla idioma/nombres; Base diagnóstico recupera una orden inglesa pero tarda 7–10 s. El vocabulario puede devolver nombres con confianza alta y orden incorrecta; no se adoptó. Reducir contexto acelera pero vuelve a introducir errores. [Método y métricas](2026-11-04-voice-calibration.md).
+
+`c64098a` corrige dos problemas reproducidos: buffers desordenados tras una consulta atrasada y aviso de escucha antes de abrir el micrófono. Añade elección local Auto/es/en y conserva borrador/Enviar, límites y nube opt-in. Pasan 432 pruebas frontend, 279 nativas, 20 dirigidas, build TypeScript/Vite y formato de captura. Los 21 archivos de reversión y los instaladores originales 0.2.16 se cotejaron con sus hashes de CI. El usuario autorizó compilar/instalar candidata local; todavía no se certifica el circuito unido ni se publica o fusiona nada. Kokoro/Piper sólo se evaluaron documentalmente; no se instalaron motores TTS adicionales.
+
 ## 2026-11-01 — Auditoría y primera entrega incremental
 
 Solicitud: reducir pesadez y evolucionar el Cognitive OS conservando el producto. Base: worktree `companion-accessibility`, `cd0af5f`. Se preservan 14 archivos de cambios locales de Codex/accesibilidad de la sesión anterior y el checkout principal con sus modificaciones propias.
@@ -171,3 +259,29 @@ La aceptación acredita la reconexión. No se ejecutaron todavía tareas o cambi
 - El transcriptor acepta sólo es/en y JSON acotado con texto y confianza suficientes. Novo y Codex insertan el resultado en el borrador activo; no envían ni crean tareas automáticamente. Nube y modo apagado son opciones explícitas; nube requiere consentimiento independiente.
 - Verificación local: Companion frontend 417/417, TypeScript/Vite correcto, cuatro pruebas nativas de audio/silencio/memoria/parser correctas y recursos completos con sus hashes. La versión está alineada como 0.2.16 en npm, Tauri y Cargo.
 - No se abrió el micrófono ni se calibró voz real. En un chequeo temprano había 754 MiB libres; antes de la instalación se observaron 1014 MiB, por encima del umbral de 912 MiB del motor. El CI Windows [41781602456](https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/41781602456), sobre `e4259e6a5bb3d3721e1f4fb224c78d04f3d3a523`, generó EXE/MSI. SHA-256: setup EXE `690C3641F92E5FD1E9D63521F6672A0643A2D800B66B7A4A48234DAC1E9BC2EB`; MSI `6DB5AA8E0EC686A55939E0DA03AD9FA89E57ABF7D1AFE578C21C871BAAF952E9`. Los alias rolling coinciden respectivamente con ambos hashes. El usuario completó la instalación; el registro, ejecutable y proceso activo confirman 0.2.16. No es un release público. La activación «Novo», precisión ES/EN, latencia, CPU/memoria bajo audio real y las operaciones de ventana siguen sin aceptación física. El `desktopAllowedApps` local está vacío; el modelo de catálogo general con lista de exclusión está pendiente de implementación.
+
+## 2026-11-04 — asistencia de escritorio en desarrollo desde 0.2.16
+
+Rama `codex/companion-desktop-flow`, base `ea7b2d6`. Se implementaron catálogo general de apps registradas por Windows, exclusiones y permisos locales de abrir/controlar/leer títulos. Las rutas y destinos permanecen locales; las solicitudes reutilizan autorización, cancelación y épocas de cuenta. Preferencias generales no pueden cambiar la política; registros equivalentes comparten exclusiones y los IDs siguen el registro de app, no la versión del ejecutable.
+
+El parser acepta prefijo «Novo» y continuación explícita de proyecto. Ejecuta primero la acción observada y consulta contexto una vez; sin contexto o ante raíces ambiguas pregunta. El contexto preparado entra al controlador y orquestación existentes. Una prueba real detectó y permitió corregir el presupuesto de búsqueda que dejaba fuera ClickHome: ahora produce 1 identidad y 12 archivos con fragmentos relacionados.
+
+Verificación final: frontend completo 426 aprobadas, TypeScript/Vite aprobado, nativas 278 aprobadas y 4 sondas manuales excluidas. Sondas reales adicionales: cuenta con permiso de control confirmado, 73 apps utilizables, Codex `already_open`, apertura excluida rechazada, Bloc de notas minimizar/maximizar/restaurar verificados, títulos ocultos y HWND de otra app rechazado. La continuación real del chat completó 12 856 caracteres y una pregunta; se respetó `allowsTwinMode:false` del modelo de la cuenta. No se enviaron correos ni se cambiaron planes.
+
+La revisión independiente produjo cuatro hallazgos importantes: corrupción de archivo que abría permisos, edición rápida que revertía exclusiones, IDs asociados al directorio del ejecutable y proyectos homónimos que se confundían. Cada fallo se reprodujo antes de arreglarlo; después se pasó la regresión completa. El cambio de IDs hizo necesario además agrupar accesos al mismo ejecutable, con prueba roja/verde de exclusión por alias.
+
+Windows no tiene VS Code disponible y Antigravity conserva un registro sin ejecutable. El usuario confirmó que sólo usa Codex por espacio; no se instalaron más editores. El receptor de dictado manual pasó con transcripción inyectada y Enviar, sin acciones previas al envío; no certifica el micrófono. La instalación sigue en 0.2.16, esta candidata no está instalada y no se publicó a producción. [Evidencia y aceptación pendiente](2026-11-04-desktop-assistance-evidence.md).
+
+### Respuesta hablada después del dictado
+
+La transcripción final del micrófono ahora queda marcada como voz; cancelar o restaurar un borrador no activa esa marca. Al pulsar Enviar, Novo usa la misma intención de texto y, al terminar correctamente, lee su respuesta con la voz local aunque la lectura automática general esté apagada. Las aperturas confirmadas responden «Listo, abrí …». El dictado de texto manual y la preferencia general de lectura mantienen su comportamiento.
+
+Pruebas del Companion: 15/15 dirigidas y 430/430 en la suite completa; TypeScript/Vite compila. No se reprodujo audio físico ni se instaló el candidato. La activación por la palabra «Novo» aún no está implementada: la calibración física del reconocimiento anterior falló idioma/confianza, por lo que no se deja el micrófono abierto.
+
+### Candidato 0.2.17 y aceptación física
+
+Se generaron localmente instaladores NSIS y MSI de 0.2.17. Son unsigned/not digitally signed; el usuario no los instaló. Se conservaron en `companion/windows/.tmp/candidates/0.2.17/` hashes y una reversión selectiva de ejecutables/recursos 0.2.16, sin configuración ni datos personales.
+
+El usuario pronunció las frases de prueba en español e inglés. La muestra española llegó a 4.8 s, sin segmentos; la inglesa detectó idioma `en` pero la confianza geométrica fue 0.218 y se rechazó bajo el umbral 0.5. La inferencia inglesa tardó 12 367 ms para 1.9 s de audio. Pico de working set muestreado: 150.9 MiB, con sondeo cada 25 ms. No se guardó audio ni texto. Una comparación en las nuevas capturas con auto/2 hilos/beam 5 y es/en fijado/4 hilos/beam 1 tampoco produjo segmentos; no permite medir rendimiento de voz ni declarar mejora. La cancelación quedó entre 19 y 44 ms en seis ensayos, con un primer outlier de 10 518 ms. La aceptación de voz no pasa; no se activó acción ni conversación por voz.
+
+La captura visual de la ventana de Companion hizo timeout, la cadena física completa dictado→Enviar→acción→Twin no se certificó y la recuperación tras reinicio sigue sin prueba real. El candidato queda local y sin instalar; PR #41 continúa en borrador, sin merge ni publicación.

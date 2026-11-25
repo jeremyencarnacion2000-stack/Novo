@@ -1,0 +1,463 @@
+{
+  "measurementDate": "2026-11-13",
+  "followUpDate": "2026-11-21",
+  "providerExperiment": {
+    "model": "openai/gpt-oss-20b",
+    "corpus": "four invented fixtures, no personal information",
+    "successfulCalls": 8,
+    "initialRateLimitedCalls": 2,
+    "summary": {
+      "baseline": {
+        "inputTokens": 8784,
+        "outputTokens": 323,
+        "medianMs": 539.5,
+        "confirmedTaskAndSourceCases": 2,
+        "namedUnavailableSourceCases": 1,
+        "englishResponses": 0
+      },
+      "budget": {
+        "inputTokens": 1128,
+        "outputTokens": 269,
+        "medianMs": 455.5,
+        "confirmedTaskAndSourceCases": 2,
+        "namedUnavailableSourceCases": 0,
+        "englishResponses": 0
+      }
+    },
+    "cases": [
+      {
+        "id": "es-confirmada",
+        "mode": "baseline",
+        "ms": 3805,
+        "input": 2206,
+        "output": 70,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "Las tareas pendientes de **Fixture Alpha** que puedo confirmar son:\n\n1. **Verificar pago** – pendiente (status “todo”)【source:novo】.  \nNo hay otras tareas abiertas registradas en la evidencia del proyecto."
+      },
+      {
+        "id": "es-confirmada",
+        "mode": "budget",
+        "ms": 383,
+        "input": 292,
+        "output": 67,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "Las tareas pendientes de **Fixture Alpha** que puedo confirmar son:\n\n1. **Verificar pago** – pendiente (estado *todo*).  \n   Fuente: **Novo** (confirmado en la evidencia del proyecto)."
+      },
+      {
+        "id": "es-incompleta",
+        "mode": "budget",
+        "ms": 442,
+        "input": 275,
+        "output": 69,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "No hay tareas pendientes confirmadas para **Fixture Beta**.  \nLa información proviene de la fuente **Novo** (ver evidencia del proyecto)."
+      },
+      {
+        "id": "es-incompleta",
+        "mode": "baseline",
+        "ms": 514,
+        "input": 2189,
+        "output": 77,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "No hay tareas pendientes confirmadas para **Fixture Beta**.  \nLa información proviene de la evidencia del proyecto “Fixture Beta” (source: novo).  \nNo se dispone de tareas abiertas ni de detalles adicionales."
+      },
+      {
+        "id": "en-confirmada",
+        "mode": "baseline",
+        "ms": 445,
+        "input": 2203,
+        "output": 78,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "Para el proyecto **Fixture Gamma** puedo confirmar que hay una tarea pendiente titulada **“Verify checkout”** que está en progreso. Esta información proviene de la evidencia del proyecto confirmada por **Novo**. No hay otras tareas pendientes registradas en la evidencia disponible."
+      },
+      {
+        "id": "en-confirmada",
+        "mode": "budget",
+        "ms": 469,
+        "input": 289,
+        "output": 69,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "Para **Fixture Gamma** puedo confirmar la tarea pendiente **“Verify checkout”** que está en progreso.  \nEsta información proviene de la fuente **Novo**.  \nNo hay otras tareas pendientes registradas en los datos disponibles."
+      },
+      {
+        "id": "en-incompleta",
+        "mode": "budget",
+        "ms": 1022,
+        "input": 272,
+        "output": 64,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "No hay tareas pendientes confirmadas para **Fixture Delta**. No se dispone de información de tareas en las fuentes disponibles."
+      },
+      {
+        "id": "en-incompleta",
+        "mode": "baseline",
+        "ms": 565,
+        "input": 2186,
+        "output": 98,
+        "finish": "stop",
+        "required": true,
+        "unavailableMentioned": false,
+        "forbidden": false,
+        "answer": "No hay tareas pendientes confirmadas para **Fixture Delta**. La evidencia del proyecto indica que no se encontraron tareas abiertas confirmadas y que el único fallo registrado es la indisponibilidad de Vercel. Por lo tanto, la información sobre tareas pendientes es desconocida. (Fuente: “Fixture Delta” del proyecto)"
+      }
+    ],
+    "request": {
+      "temperature": 0,
+      "reasoning_effort": "low",
+      "max_completion_tokens": 550,
+      "timeoutMs": 25000,
+      "systemRules": "You are Novo. Reply in the user language in up to four short sentences. Use the project evidence. Cite the source for confirmed tasks. An unavailable or partial source is unknown. Do not invent tasks. The context contains synthetic data.",
+      "projectPrefix": "\nAUTHORIZED PROJECT EVIDENCE\n",
+      "baselinePrefix": "Some context could not be retrieved. Missing information is unknown.\n",
+      "localEvidence": ""
+    },
+    "sharedStructuredInput": {
+      "system": {
+        "timezone": "America/La_Paz"
+      },
+      "preferences": {
+        "language": "es"
+      },
+      "sources": [
+        {
+          "id": "source:novo",
+          "label": "Novo"
+        },
+        {
+          "id": "source:github",
+          "label": "GitHub"
+        }
+      ],
+      "retrieval": {
+        "status": "partial",
+        "unavailable": [
+          "vercel"
+        ]
+      },
+      "providerHealth": [
+        {
+          "provider": "vercel",
+          "status": "error"
+        }
+      ],
+      "todaySchedule": [
+        {
+          "title": "Synthetic unrelated meeting 0",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 1",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 2",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 3",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 4",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 5",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 6",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 7",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 8",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 9",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 10",
+          "time": "09:00",
+          "source": "calendar"
+        },
+        {
+          "title": "Synthetic unrelated meeting 11",
+          "time": "09:00",
+          "source": "calendar"
+        }
+      ],
+      "state": {
+        "tasksList": [
+          {
+            "title": "Unrelated synthetic backlog 0",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 1",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 2",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 3",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 4",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 5",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 6",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 7",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 8",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 9",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 10",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 11",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 12",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 13",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          },
+          {
+            "title": "Unrelated synthetic backlog 14",
+            "description": "General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. General account notes about a different project and team. "
+          }
+        ]
+      },
+      "activeSignal": null,
+      "twinContext": null
+    },
+    "fixtures": [
+      {
+        "id": "es-confirmada",
+        "query": "¿Qué tareas pendientes de Fixture Alpha puedes confirmar y de qué fuente viene cada una?",
+        "projectEvidence": {
+          "title": "Fixture Alpha",
+          "confirmedOpenTasks": {
+            "source": "Novo",
+            "records": [
+              {
+                "title": "Verificar pago",
+                "status": "todo"
+              }
+            ]
+          },
+          "repository": "example/alpha",
+          "failures": [
+            "Vercel no disponible"
+          ]
+        }
+      },
+      {
+        "id": "es-incompleta",
+        "query": "¿Qué tareas pendientes de Fixture Beta puedes confirmar y de qué fuente viene cada una?",
+        "projectEvidence": {
+          "title": "Fixture Beta",
+          "repository": "example/beta",
+          "confirmedOpenTasks": null,
+          "failures": [
+            "Vercel no disponible"
+          ]
+        }
+      },
+      {
+        "id": "en-confirmada",
+        "query": "Which pending tasks can you confirm for Fixture Gamma and from which source?",
+        "projectEvidence": {
+          "title": "Fixture Gamma",
+          "confirmedOpenTasks": {
+            "source": "Novo",
+            "records": [
+              {
+                "title": "Verify checkout",
+                "status": "in-progress"
+              }
+            ]
+          },
+          "repository": "example/gamma",
+          "failures": [
+            "Vercel unavailable"
+          ]
+        }
+      },
+      {
+        "id": "en-incompleta",
+        "query": "Which pending tasks can you confirm for Fixture Delta and from which source?",
+        "projectEvidence": {
+          "title": "Fixture Delta",
+          "repository": "example/delta",
+          "confirmedOpenTasks": null,
+          "failures": [
+            "Vercel unavailable"
+          ]
+        }
+      }
+    ],
+    "limitations": [
+      "Single completed pair per fixture; OS/network cache not controlled",
+      "Shared context language es conflicts with English queries",
+      "required is a coarse regex check, not an independent quality score",
+      "No complete production prompt, private project comparison or invoiced cost measurement",
+      "Byte budget is not a hard token limit"
+    ]
+  },
+  "native": {
+    "catalogOldTimeoutMs": 8000,
+    "catalogRunsMs": [
+      13331,
+      11109,
+      10106
+    ],
+    "registeredAppsSample": 123,
+    "codexMatches": 1,
+    "selectedClickHomeFolderCount": 1,
+    "windowsProbe": {
+      "visibleWindows": 1,
+      "receipt": "focused",
+      "titlesRead": false
+    },
+    "accountReadOnly": {
+      "exactOwnedClickHomeProjects": 0,
+      "confirmedOpenTaskCount": null,
+      "planAllowsTwin": true,
+      "activeMatchingMemories": 0,
+      "usableMemorySources": 0
+    },
+    "boundedCatalogRuns": [
+      {
+        "limitMs": 8000,
+        "elapsedMs": 8381,
+        "completed": false
+      },
+      {
+        "limitMs": 20000,
+        "elapsedMs": 20126,
+        "completed": false
+      }
+    ],
+    "exactCodexRegistryRunsMs": [
+      6364,
+      7296,
+      5688
+    ],
+    "authorizedFolderProbe": {
+      "exactIdentities": 1,
+      "githubRepositoryIdentifiers": 0,
+      "vercelProjectIdentifiers": 1,
+      "excerptFiles": 12,
+      "contentsLogged": false
+    }
+  },
+  "voice": {
+    "newHumanRecordings": 0,
+    "engineDefaultChanged": false,
+    "cloudEnabled": false,
+    "stoppedRingRegression": {
+      "observedBeforeSamples": 320000,
+      "expectedTailSamples": 1604,
+      "afterSamples": 1604,
+      "usesMicrophone": false
+    }
+  },
+  "verification": {
+    "source": "dab3d44c6518aa6dfd23671d9fe3405cac613359",
+    "serverRun": "https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949668646",
+    "serverSuites": 331,
+    "serverTests": 1368,
+    "targetedTests": 51,
+    "serverTypeScript": "passed",
+    "serverLint": "passed",
+    "oauthCompiledBundles": "passed",
+    "nativeWindows": "passed",
+    "installedSource": "3ad0d09",
+    "installedHashMatched": true,
+    "rollbackFileCount": 21,
+    "rollbackHashMismatches": 0,
+    "rollbackInstallerHashMatched": true,
+    "rollbackExecuted": false,
+    "integratedPhysicalCircuit": "not verified",
+    "nativeWindowsRun": "https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949663671",
+    "speechPackagingRegression": "failed with inherited module; passed using host module",
+    "speechFilesVerified": 16,
+    "frontendTests": 444,
+    "nativeAppTests": 284,
+    "ignoredPhysicalTests": 6,
+    "hookTests": 30,
+    "harnessTests": 23,
+    "pythonTests": 6,
+    "installersGenerated": [
+      "NSIS",
+      "MSI"
+    ],
+    "artifact": {
+      "url": "https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/44949663671/artifacts/14725895221",
+      "zipSha256": "db63148190d2f759e30d2f34f69a3ae2b2c85692dfb361e60a1bcbd3a4535d6c",
+      "bytes": 142975702,
+      "expiresAt": "2026-11-24T21:18:06Z",
+      "installed": false
+    }
+  }
+}

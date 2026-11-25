@@ -128,10 +128,13 @@ export interface Settings {
   novoLocalConnections: boolean;
   /** Local user opt-in; only IDs from the native allowlist are accepted. */
   desktopAllowedApps: string[];
+  desktopPolicy: {denyAll:boolean;entries:Record<string,{open:boolean;control:boolean;read:boolean}>};
   /** Explicit opt-in because browser speech recognition may process audio online. */
   voiceCloudConsent: boolean;
   voiceInputMode: 'local'|'cloud'|'off';
+  voiceInputLanguage: 'auto'|'es'|'en';
   voiceLocalVoiceId: string;
+  voiceWakeEnabled: boolean;
   voiceSpokenReplies: boolean;
   /** Model server addresses once connected; empty means not connected. */
   ollamaUrl: string;
@@ -184,9 +187,12 @@ export const DEFAULT_SETTINGS: Settings = {
   novoTwinMode: true,
   novoLocalConnections: true,
   desktopAllowedApps: [],
+  desktopPolicy: {denyAll:false,entries:{}},
   voiceCloudConsent: false,
   voiceInputMode: 'local',
+  voiceInputLanguage: 'auto',
   voiceLocalVoiceId: '',
+  voiceWakeEnabled: false,
   voiceSpokenReplies: false,
   ollamaUrl: "",
   lmstudioUrl: "",

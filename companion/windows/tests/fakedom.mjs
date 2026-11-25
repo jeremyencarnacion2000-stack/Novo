@@ -126,6 +126,7 @@ export function installFakeDom() {
   const documentEvents = new EventTarget();
   globalThis.addEventListener = windowEvents.addEventListener.bind(windowEvents);
   globalThis.removeEventListener = windowEvents.removeEventListener.bind(windowEvents);
+  globalThis.dispatchEvent = windowEvents.dispatchEvent.bind(windowEvents);
   globalThis.requestAnimationFrame = (fn) => fn();
   globalThis.document = {
     createElement: (tag) => new FakeElement(tag),

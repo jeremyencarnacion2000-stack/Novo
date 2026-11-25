@@ -9,6 +9,8 @@ import {buildUserContext} from '@/lib/ai/context-builder'
 import {finishActivityRun,isActivityCancelled} from '@/lib/ai/activity'
 import {acquireUserChatLease,releaseUserChatLease} from '@/lib/ai/chat-lease'
 import {isCompanionTurnCancelled} from '@/lib/companion/chat-turns'
+import {buildProjectQueryContext} from '../project-query-context'
+jest.mock('../project-query-context',()=>({buildProjectQueryContext:jest.fn().mockResolvedValue({text:'',sources:[]})}))
 const web:NovoChatPrincipal = {userId:'owner',surface:'web',contextAccess:{personal:true,integrations:true}}
 const native:NovoChatPrincipal = {...web,surface:'companion',contextAccess:{personal:false,integrations:false}}
 const input = () => parseNovoChatInput({message:'Hola',model:'openai/gpt-oss-20b'})!
@@ -20,6 +22,99 @@ beforeEach(()=>{
   fetchMock=jest.spyOn(global,'fetch').mockImplementation(async()=>new Response('data: {"choices":[{"delta":{"content":"Hola, Ángel"}}]}\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}}))
 })
 afterEach(()=>{fetchMock.mockRestore();process.env=saved})
+
+const localRuntime = 'http://127.0.0.1:8764'
+const enableOpenJarvis = () => {
+  process.env.NOVO_OPENJARVIS_URL = localRuntime
+  process.env.NOVO_OPENJARVIS_TOKEN = 'fixture-inference-credential-32-characters'
+  process.env.NOVO_OPENJARVIS_MODEL = 'openai/gpt-oss-20b'
+  process.env.NOVO_OPENJARVIS_ENGINE = 'groq'
+}
+const continuation = () => parseNovoChatInput({
+  message: 'Continuemos con ClickHome. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.',
+  model: 'auto',
+  localContext: 'PRIVATE unrelated raw folder text',
+})!
+
+it('routes the authorized continuation through OpenJarvis without sending unrelated personal context or exposing tools', async () => {
+  enableOpenJarvis()
+  ;(buildUserContext as jest.Mock).mockResolvedValueOnce({
+    summary: 'PRIVATE mailbox and personal schedule',
+    structured: { sources: [], activeSignal: null, twinContext: null },
+  })
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'PRIVATE unrelated project', sources: ['novo'], matchedProject: true,
+    runtimeEvidence: '{"identities":[{"source":"folder","name":"ClickHome"}],"openTasks":{"source":"novo","records":[{"title":"Revisar checkout","status":"todo"}]},"unavailable":[]}',
+  })
+  fetchMock.mockResolvedValueOnce(Response.json({
+    content: 'En Novo consta «Revisar checkout». ¿Quieres retomarla?',
+    inputTokens: 154, outputTokens: 22, elapsedMs: 510, cpuMs: 22, rssBytes: 52_000_000,
+  }))
+  const response = await streamNovoChat(continuation(), native, new AbortController().signal)
+  const responseText = await response.text()
+  expect(responseText).toContain('Revisar checkout')
+  expect(responseText).toContain('source:novo')
+  expect(responseText).toContain('[DONE]')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, request] = fetchMock.mock.calls[0]
+  expect(url.href).toBe(localRuntime + '/v1/novo/answer')
+  expect(request.redirect).toBe('error')
+  expect(request.body).toContain('ClickHome')
+  expect(request.body).not.toMatch(/PRIVATE|tools|Authorization/)
+})
+
+it('falls back to the existing provider for unavailable or untrusted inference', async () => {
+  enableOpenJarvis()
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValue({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  try {
+    fetchMock.mockResolvedValueOnce(Response.json({ content: 'fake', tool_calls: [{ name: 'open' }] }))
+    const failed = await streamNovoChat(continuation(), native, new AbortController().signal)
+    expect(await failed.text()).toContain('Hola, Ángel')
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.groq.com/openai/v1/chat/completions')
+
+    process.env.NOVO_OPENJARVIS_URL = 'https://example.test'
+    const rejected = await streamNovoChat(continuation(), native, new AbortController().signal)
+    expect(await rejected.text()).toContain('Hola, Ángel')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[2][0]).toBe('https://api.groq.com/openai/v1/chat/completions')
+  } finally {
+    ;(buildProjectQueryContext as jest.Mock).mockResolvedValue({ text: '', sources: [] })
+  }
+})
+
+it('discards a cancelled OpenJarvis turn without calling a fallback provider', async () => {
+  enableOpenJarvis()
+  const cancel = new AbortController()
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  fetchMock.mockImplementationOnce(async (_url, request) => {
+    cancel.abort()
+    expect(request.signal.aborted).toBe(true)
+    throw new DOMException('Aborted', 'AbortError')
+  })
+  const result = await streamNovoChat(continuation(), native, cancel.signal)
+  expect(result.status).toBe(409)
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+it('keeps local inference failures from sending project evidence to a cloud fallback', async () => {
+  enableOpenJarvis()
+  process.env.NOVO_OPENJARVIS_ENGINE = 'ollama'
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({
+    text: 'Authorized project', sources: [], matchedProject: true, runtimeEvidence: '{"identities":[]}',
+  })
+  fetchMock.mockResolvedValueOnce(Response.json({error:'inference_unavailable'}, {status:503}))
+  const result = await streamNovoChat(continuation(), native, new AbortController().signal)
+  expect(result.status).toBe(503)
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, request] = fetchMock.mock.calls[0]
+  expect(url.href).toBe(localRuntime + '/v1/novo/answer')
+  expect(JSON.parse(request.body).engine).toBe('ollama')
+})
+
 it('preserves the web metadata/content/DONE contract and selected model routing',async()=>{
   const result=await streamNovoChat(input(),web,new AbortController().signal)
   const events=(await result.text()).split('\n\n').filter(Boolean).map(s=>s.slice(6))
@@ -33,6 +128,25 @@ it('passes native context capabilities to the existing builder and never starts 
   await result.text()
   expect(buildUserContext).toHaveBeenCalledWith('owner',expect.objectContaining({contextAccess:{personal:false,integrations:false}}))
   expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+it('runs the contextual budget in shadow on an authorized read without changing the provider prompt or sources',async()=>{
+  process.env.NOVO_PROJECT_CONTEXT_SHADOW='1'
+  const sources=[{id:'source:novo',kind:'novo',provider:'novo',label:'Novo',detail:'Owned project data'}]
+  const structured={activeSignal:null,twinContext:null,sources,metrics:{focusTimeToday:null},todaySchedule:[{title:'unrelated calendar item'}],
+    state:{tasksList:[{title:'generic task'}]},retrieval:{status:'partial',unavailable:['calendar']}}
+  ;(buildUserContext as jest.Mock).mockResolvedValueOnce({summary:'Partial evidence\n'+JSON.stringify(structured),structured})
+  ;(buildProjectQueryContext as jest.Mock).mockResolvedValueOnce({text:'AUTHORIZED PROJECT: fixture project. Task record: verify checkout.',sources:[],matchedProject:true})
+  const log=jest.spyOn(console,'info').mockImplementation(()=>{})
+  try{
+    const result=await streamNovoChat(parseNovoChatInput({message:'¿Qué tareas pendientes de Fixture Project puedes confirmar?',model:'openai/gpt-oss-20b'})!,native,new AbortController().signal)
+    expect(await result.text()).toContain('source:novo')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const prompt=JSON.parse(fetchMock.mock.calls[0][1].body).messages[0].content
+    expect(prompt).toContain('unrelated calendar item')
+    expect(prompt).toContain('AUTHORIZED PROJECT')
+    expect(log).toHaveBeenCalledWith('[Novo Context Shadow]',expect.objectContaining({removedSections:expect.arrayContaining(['todaySchedule']),unavailableCount:1}))
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/fixture project|calendar item|verify checkout/i)
+  }finally{log.mockRestore()}
 })
 it.each([web,native])('prepares a reviewed mail action for an address-only send on $surface',async(principal)=>{
   const proposal={type:'SEND_EMAIL',payload:{to:'team@example.test',subject:'Review',body:'Please review the project.'}}

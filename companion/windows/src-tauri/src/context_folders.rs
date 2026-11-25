@@ -230,7 +230,7 @@ fn collect_files(dir: &Path, depth: usize, entry_budget: &mut usize, files: &mut
     if depth > MAX_DEPTH || *entry_budget >= MAX_ENTRIES || files.len() >= MAX_FILES { return; }
     let Ok(read_dir) = fs::read_dir(dir) else { return };
     let mut entries: Vec<_> = read_dir.filter_map(Result::ok).collect();
-    entries.sort_by_key(|entry| entry.file_name());
+    entries.sort_by_key(|entry| (entry.file_type().is_ok_and(|kind|kind.is_dir()),entry.file_name()));
     for entry in entries {
         if *entry_budget >= MAX_ENTRIES || files.len() >= MAX_FILES { return; }
         *entry_budget += 1;
@@ -260,11 +260,13 @@ fn query_terms(query: &str) -> Vec<String> {
         .take(8).collect()
 }
 
-fn search_folders(folders: Vec<SavedFolder>, query: String) -> LocalContextResult {
+fn search_folders(mut folders: Vec<SavedFolder>, query: String) -> LocalContextResult {
+    let terms = query_terms(&query);
+    // Named selected roots get the bounded scan before unrelated large folders.
+    folders.sort_by_key(|folder|!terms.iter().any(|term|view(folder).name.to_lowercase().contains(term)));
     let mut project_hints=Vec::new();let mut project_budget=0;
     for folder in &folders {if let Ok(root)=folder.path.canonicalize(){collect_projects(&root,&root,0,&mut project_budget,&mut project_hints);}}
     let names: Vec<String> = folders.iter().map(|folder| view(folder).name).collect();
-    let terms = query_terms(&query);
     let mut budget = 0;
     let mut all_files = Vec::new();
     for folder in &folders {
@@ -400,4 +402,66 @@ mod tests {
         assert_eq!(files, vec![root.join("docs/plan.md")]);
         let _ = std::fs::remove_dir_all(root);
     }
+}
+
+#[cfg(test)]
+mod desktop_context_acceptance {
+    use super::*;
+    #[test]
+    fn named_authorized_project_is_not_starved_by_an_earlier_large_folder(){
+        let root=std::env::temp_dir().join(format!("novo-desktop-context-{}",Uuid::new_v4()));
+        let other=root.join("other");let project=root.join("ClickHome");
+        fs::create_dir_all(&other).unwrap();fs::create_dir_all(&project).unwrap();
+        for n in 0..MAX_ENTRIES+1{fs::write(other.join(format!("{n}.txt")),"unrelated").unwrap();}
+        fs::write(project.join("package.json"),r#"{"name":"clickhome"}"#).unwrap();
+        fs::write(project.join("README.md"),"ClickHome is the selected project.").unwrap();
+        let result=search_folders(vec![SavedFolder{id:"other".into(),path:other},SavedFolder{id:"project".into(),path:project}],"ClickHome".into());
+        fs::remove_dir_all(root).unwrap();
+        assert!(result.project_hints.iter().any(|hint|hint.name=="ClickHome"));
+        assert!(result.matched_files>0,"named project excerpts must be available");
+    }
+    #[test]
+    #[ignore="reads only the user's already-authorized project folders; prints counts, never contents"]
+    fn real_clickhome_authorized_context(){
+        let result=search_folders(read_saved().unwrap(),"ClickHome".into());
+        let exact=result.project_hints.iter().filter(|hint|hint.name.split('/').last().is_some_and(|name|name.eq_ignore_ascii_case("clickhome"))).count();
+        assert!(exact>0,"No authorized ClickHome project evidence");
+        println!("Authorized ClickHome project hints: {exact}; matching excerpt files: {}",result.matched_files);
+    }
+    #[tokio::test(flavor="current_thread")]
+    #[ignore="one real account chat turn using authorized ClickHome context; no raw context or answer is logged"]
+    async fn real_clickhome_continuation_via_existing_chat(){
+        let context=search_folders(read_saved().unwrap(),"ClickHome".into());
+        assert!(context.matched_files>0);
+        let shared=crate::Shared{
+            settings:std::sync::Mutex::new(crate::settings::load()),gate:std::sync::Arc::new(crate::island::PollGate::new()),
+            activity:std::sync::Mutex::new(crate::companion::ActivityRecorder::default()),activity_history_lock:tokio::sync::Mutex::new(()),
+            pending_companion_authorization:tokio::sync::Mutex::new(None),companion_auth_lock:tokio::sync::Mutex::new(()),
+            novo_account:std::sync::Mutex::new(crate::novo_account::AccountRuntime::default()),
+        };
+        let auth=crate::novo_account::verify_account(&shared).await.expect("live account");assert!(auth.capabilities.twin_read);
+        let access=crate::novo_account::access_context(&shared).await.unwrap();
+        let client=reqwest::Client::builder().timeout(std::time::Duration::from_secs(90)).build().unwrap();
+        let models:serde_json::Value=client.get(format!("{}/api/companion/models",access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",&access.device_id).send().await.unwrap().json().await.unwrap();
+        let model=models["models"].as_array().and_then(|items|items.iter().find(|item|item["id"]=="auto")).expect("allowed automatic model");
+        let twin=model["allowsTwinMode"].as_bool().unwrap_or(false)&&auth.capabilities.twin_read;
+        println!("Current account allows Twin personalization: {twin}");
+        let id=Uuid::new_v4().to_string();
+        let response=reqwest::Client::builder().timeout(std::time::Duration::from_secs(90)).build().unwrap()
+            .post(format!("{}/api/companion/chat",access.origin)).bearer_auth(&access.token).header("X-Novo-Device-Id",&access.device_id)
+            .json(&serde_json::json!({"requestId":id,"conversationId":null,"conversationRevision":null,"message":"Continuemos con ClickHome. Usa sólo el contexto autorizado disponible; si falta la tarea o el siguiente paso, pregúntame.","model":"auto","twinMode":twin,"localContext":context.text,"projectHints":context.project_hints}))
+            .send().await.expect("chat transport");
+        let status=response.status().as_u16();
+        let text=response.text().await.expect("chat stream");
+        if status!=200 {let safe:serde_json::Value=serde_json::from_str(&text).unwrap_or_default();let code=safe["error"].as_str().filter(|s|s.len()<80&&s.chars().all(|c|c.is_ascii_lowercase()||c=='_')).unwrap_or("unavailable");panic!("live chat status {status}, safe code {code}");}assert!(text.len()<256*1024);
+        let mut complete=false;let mut chars=0;let mut question=false;
+        for line in text.lines(){if let Some(data)=line.strip_prefix("data: "){let event:serde_json::Value=serde_json::from_str(data).unwrap();
+            if event["type"]=="error"{panic!("live chat returned a safe error code: {}",event["code"]);}
+            if event["type"]=="complete"{complete=true;}
+            if event["type"]=="delta"{let delta=event["text"].as_str().unwrap_or("");chars+=delta.chars().count();question|=delta.contains('?');}
+        }}
+        assert!(complete&&chars>0,"no completed grounded reply");
+        println!("Live Novo/Twin continuation completed: {chars} response characters; clarification question present: {question}; authorized excerpt files: {}",context.matched_files);
+    }
+
 }

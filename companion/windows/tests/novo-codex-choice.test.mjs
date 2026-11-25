@@ -170,3 +170,18 @@ test('Assistant settings default to local voice and require separate consent for
     view = null;
   }
 });
+
+test('local dictation language is explicit and a failed save restores the prior choice', async () => {
+  const settings = { ...DEFAULT_SETTINGS };
+  let fail = false;
+  view = novoChatSection(settings, async () => { if (fail) throw new Error('offline'); });
+  const language = view.el.find('SELECT').find(element => element.getAttribute('aria-label') === 'Idioma del dictado local');
+  assert.ok(language);
+  assert.equal(language.value, 'auto');
+  language.value = 'es'; language.fire('change'); await flush();
+  assert.equal(settings.voiceInputLanguage, 'es');
+  fail = true;
+  language.value = 'en'; language.fire('change'); await flush();
+  assert.equal(settings.voiceInputLanguage, 'es');
+  assert.equal(language.value, 'es');
+});

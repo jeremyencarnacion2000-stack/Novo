@@ -3779,6 +3779,72 @@
    "pt-BR": "Transcrevendo neste PC…",
    "ru": "Распознавание речи на этом ПК…",
    "id": "Mentranskripsikan di PC ini…"
+  },
+  "Search installed apps": {
+   "zh-Hans": "搜索已安装的应用",
+   "hi": "इंस्टॉल किए गए ऐप खोजें",
+   "es": "Buscar aplicaciones instaladas",
+   "ar": "البحث في التطبيقات المثبتة",
+   "fr": "Rechercher les applications installées",
+   "bn": "ইনস্টল করা অ্যাপ খুঁজুন",
+   "pt-BR": "Buscar aplicativos instalados",
+   "ru": "Поиск установленных приложений",
+   "id": "Cari aplikasi terpasang"
+  },
+  "Refresh apps": {
+   "zh-Hans": "刷新应用列表",
+   "hi": "ऐप सूची रीफ़्रेश करें",
+   "es": "Actualizar aplicaciones",
+   "ar": "تحديث التطبيقات",
+   "fr": "Actualiser les applications",
+   "bn": "অ্যাপ তালিকা হালনাগাদ করুন",
+   "pt-BR": "Atualizar aplicativos",
+   "ru": "Обновить список приложений",
+   "id": "Perbarui aplikasi"
+  },
+  "Control windows": {
+   "zh-Hans": "控制窗口",
+   "hi": "विंडो नियंत्रित करें",
+   "es": "Controlar ventanas",
+   "ar": "التحكم بالنوافذ",
+   "fr": "Contrôler les fenêtres",
+   "bn": "উইন্ডো নিয়ন্ত্রণ করুন",
+   "pt-BR": "Controlar janelas",
+   "ru": "Управлять окнами",
+   "id": "Kendalikan jendela"
+  },
+  "Read window titles": {
+   "zh-Hans": "读取窗口标题",
+   "hi": "विंडो के शीर्षक पढ़ें",
+   "es": "Leer títulos de ventanas",
+   "ar": "قراءة عناوين النوافذ",
+   "fr": "Lire les titres des fenêtres",
+   "bn": "উইন্ডোর শিরোনাম পড়ুন",
+   "pt-BR": "Ler títulos das janelas",
+   "ru": "Читать заголовки окон",
+   "id": "Baca judul jendela"
+  },
+  "Installed apps": {
+   "zh-Hans": "已安装的应用",
+   "hi": "इंस्टॉल किए गए ऐप",
+   "es": "Aplicaciones instaladas",
+   "ar": "التطبيقات المثبتة",
+   "fr": "Applications installées",
+   "bn": "ইনস্টল করা অ্যাপ",
+   "pt-BR": "Aplicativos instalados",
+   "ru": "Установленные приложения",
+   "id": "Aplikasi terpasang"
+  },
+  "Installed apps can be opened and controlled when you ask. Turn off either permission to exclude an app. Reading window titles is separate and starts off; this never grants reading app contents.": {
+   "zh-Hans": "你提出请求时，Novo 可以打开和控制已安装的应用。关闭相应权限即可排除应用。读取窗口标题是独立权限，默认关闭；这不会授予读取应用内容的权限。",
+   "hi": "आपके कहने पर Novo इंस्टॉल किए गए ऐप खोल और उनकी विंडो नियंत्रित कर सकता है। किसी ऐप को बाहर रखने के लिए संबंधित अनुमति बंद करें। विंडो के शीर्षक पढ़ने की अनुमति अलग है और शुरू में बंद रहती है; इससे ऐप की सामग्री पढ़ने की अनुमति नहीं मिलती।",
+   "es": "Puedes pedir a Novo que abra y controle las apps instaladas. Desactiva cada permiso para excluir una app. Leer títulos de ventanas es un permiso independiente, apagado al inicio; no permite leer el contenido de las apps.",
+   "ar": "يمكن لـ Novo فتح التطبيقات المثبتة والتحكم بنوافذها عند طلبك. عطّل الإذن المناسب لاستثناء تطبيق. قراءة عناوين النوافذ إذن منفصل ومعطّل في البداية؛ ولا يمنح قراءة محتوى التطبيقات.",
+   "fr": "Novo peut ouvrir les applications installées et contrôler leurs fenêtres à votre demande. Désactivez chaque autorisation pour exclure une application. La lecture des titres est indépendante et désactivée au départ ; elle ne permet pas de lire le contenu des applications.",
+   "bn": "আপনার অনুরোধে Novo ইনস্টল করা অ্যাপ খুলতে ও উইন্ডো নিয়ন্ত্রণ করতে পারে। কোনো অ্যাপ বাদ দিতে সংশ্লিষ্ট অনুমতি বন্ধ করুন। উইন্ডোর শিরোনাম পড়ার অনুমতি আলাদা এবং শুরুতে বন্ধ থাকে; এতে অ্যাপের বিষয়বস্তু পড়ার অনুমতি দেওয়া হয় না।",
+   "pt-BR": "Novo pode abrir aplicativos instalados e controlar suas janelas quando você pedir. Desative cada permissão para excluir um aplicativo. A leitura dos títulos é separada e começa desativada; ela não permite ler o conteúdo dos aplicativos.",
+   "ru": "По вашей просьбе Novo может открывать установленные приложения и управлять их окнами. Отключите нужное разрешение, чтобы исключить приложение. Чтение заголовков окон разрешается отдельно и изначально отключено; оно не даёт доступа к содержимому приложений.",
+   "id": "Novo dapat membuka aplikasi terpasang dan mengendalikan jendelanya saat diminta. Matikan izin terkait untuk mengecualikan aplikasi. Izin membaca judul jendela terpisah dan awalnya nonaktif; izin ini tidak memberikan akses ke isi aplikasi."
   }
  }
 }

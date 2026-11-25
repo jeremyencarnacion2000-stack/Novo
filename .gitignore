@@ -28,6 +28,7 @@ tmp/
 # Local data, generated exports and browser review artifacts
 out/
 *.db
+__pycache__/
 .codex/
 .gstack-*
 .tmp/

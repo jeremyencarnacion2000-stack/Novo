@@ -1,4 +1,4 @@
-// Local Windows SAPI only. Text never reaches a model or network service.
+// Local synthesis and playback. Text never leaves this PC.
 use serde::Serialize;
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -135,17 +135,25 @@ mod native {
     use super::*;
     use sha2::{Digest, Sha256};
     use std::{
-        sync::{mpsc, Mutex, OnceLock},
+        path::PathBuf,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            mpsc, Arc, Mutex, OnceLock,
+        },
         time::Duration,
     };
-    use tauri::Emitter;
+    use tauri::{path::BaseDirectory, Emitter, Manager};
     use tokio::sync::oneshot;
     use windows::{
-        core::{w, PCWSTR, PWSTR},
+        core::{w, GUID, PCWSTR, PWSTR},
         Win32::{
-            Foundation::{WAIT_FAILED, WAIT_OBJECT_0},
-            Media::Speech::*,
-            System::{Com::*, RemoteDesktop::*, Threading::WaitForSingleObject},
+            Foundation::{HGLOBAL, WAIT_FAILED, WAIT_OBJECT_0},
+            Media::{Audio::WAVEFORMATEX, Speech::*},
+            System::{
+                Com::{StructuredStorage::CreateStreamOnHGlobal, *},
+                RemoteDesktop::*,
+                Threading::WaitForSingleObject,
+            },
         },
     };
 
@@ -156,12 +164,124 @@ mod native {
             id: String,
             text: String,
             voice_id: String,
+            pcm: Option<Vec<u8>>,
             reply: oneshot::Sender<Result<(), String>>,
         },
         Stop(String, oneshot::Sender<()>),
     }
     static WORKER: OnceLock<Result<mpsc::SyncSender<Command>, String>> = OnceLock::new();
     static CANCELLED: OnceLock<Mutex<Cancellations>> = OnceLock::new();
+    static SYNTHESIS: Mutex<Option<(String, Arc<AtomicBool>)>> = Mutex::new(None);
+    const KOKORO_VOICES: [(&str, &str, bool); 7] = [
+        ("kokoro:ef_dora", "Dora", true),
+        ("kokoro:em_alex", "Álex", true),
+        ("kokoro:em_santa", "Santa", true),
+        ("kokoro:af_heart", "Heart", false),
+        ("kokoro:am_michael", "Michael", false),
+        ("kokoro:bf_emma", "Emma", false),
+        ("kokoro:bm_george", "George", false),
+    ];
+    const PCM_LIMIT: usize = 24_000 * 2 * 60;
+    const SPEAK_STREAM_FLAGS: u32 = (SPF_ASYNC.0 | SPF_PURGEBEFORESPEAK.0) as u32;
+    fn kokoro_dir() -> Option<PathBuf> {
+        let dir =
+            PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Novo Companion/voice-extra");
+        (dir.join("runtime/Scripts/python.exe").is_file()
+            && dir.join("kokoro-v1.0.int8.onnx").is_file()
+            && dir.join("voices-v1.0.bin").is_file())
+        .then_some(dir)
+    }
+
+    async fn synthesize(
+        app: &tauri::AppHandle,
+        id: &str,
+        voice: &str,
+        text: &str,
+    ) -> Option<Vec<u8>> {
+        // Long answers go straight to Windows so synthesis never buffers them in full.
+        if !unlocked()
+            || text.chars().count() > 600
+            || !KOKORO_VOICES.iter().any(|(key, _, _)| key == &voice)
+        {
+            return None;
+        }
+        let dir = kokoro_dir()?;
+        let script = app
+            .path()
+            .resolve("voice-tools/kokoro.py", BaseDirectory::Resource)
+            .ok()?;
+        let input = serde_json::to_vec(
+            &serde_json::json!({"voice":voice.strip_prefix("kokoro:")?, "text":text}),
+        )
+        .ok()?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        {
+            let mut pending = SYNTHESIS.lock().ok()?;
+            if pending.is_some() || cancellations().contains(id) {
+                return None;
+            }
+            *pending = Some((id.into(), cancel.clone()));
+        }
+        let child_cancel = cancel.clone();
+        let mut task = tauri::async_runtime::spawn_blocking(move || {
+            let exe = dir.join("runtime/Scripts/python.exe");
+            let args = vec![
+                "-I".into(),
+                "-B".into(),
+                script.to_string_lossy().into_owned(),
+                dir.to_string_lossy().into_owned(),
+            ];
+            crate::project_work::process::run_guarded(
+                &exe,
+                &args,
+                None,
+                Some(&input),
+                32,
+                PCM_LIMIT,
+                child_cancel,
+            )
+        });
+        let mut tick = tokio::time::interval(Duration::from_millis(250));
+        let result = loop {
+            tokio::select! {
+                value = &mut task => break value,
+                _ = tick.tick() => {
+                    if !unlocked() { cancel.store(true, Ordering::SeqCst); }
+                }
+            }
+        };
+        *SYNTHESIS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        let output = result.ok()?.ok()?;
+        (!cancel.load(Ordering::SeqCst)
+            && output.success
+            && !output.bytes.is_empty()
+            && output.bytes.len() % 2 == 0)
+            .then_some(output.bytes)
+    }
+
+    fn speak_pcm(voice: &ISpVoice, pcm: &[u8]) -> windows::core::Result<ISpStream> {
+        const WAVE_FORMAT: GUID = GUID::from_u128(0xc31adbae_527f_4ff5_a230_f62bb61ff70c);
+        let format = WAVEFORMATEX {
+            wFormatTag: 1,
+            nChannels: 1,
+            nSamplesPerSec: 24_000,
+            nAvgBytesPerSec: 48_000,
+            nBlockAlign: 2,
+            wBitsPerSample: 16,
+            cbSize: 0,
+        };
+        unsafe {
+            let bytes = CreateStreamOnHGlobal(HGLOBAL::default(), true)?;
+            bytes
+                .Write(pcm.as_ptr().cast(), pcm.len() as u32, None)
+                .ok()?;
+            bytes.Seek(0, STREAM_SEEK_SET, None)?;
+            let stream: ISpStream = CoCreateInstance(&SpStream, None, CLSCTX_INPROC_SERVER)?;
+            stream.SetBaseStream(&bytes, &WAVE_FORMAT, &format)?;
+            voice.SpeakStream(&stream, SPEAK_STREAM_FLAGS, None)?;
+            Ok(stream)
+        }
+    }
     fn cancellation_state() -> &'static Mutex<Cancellations> {
         CANCELLED.get_or_init(|| Mutex::new(Cancellations::default()))
     }
@@ -196,25 +316,53 @@ mod native {
         text: String,
         voice_id: String,
     ) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        let metric_id = id.clone();
+        let pcm = if voice_id.starts_with("kokoro:") {
+            synthesize(&app, &id, &voice_id, &text).await
+        } else {
+            None
+        };
         let (tx, rx) = oneshot::channel();
         dispatch(Command::Speak {
             app,
             id,
             text,
             voice_id,
+            pcm,
             reply: tx,
         })?;
-        rx.await.map_err(|_| "speech_unavailable".to_string())?
+        let result = rx.await.map_err(|_| "speech_unavailable".to_string())?;
+        crate::log::line(format!(
+            "voice-tts {}",
+            serde_json::json!({"requestId":metric_id,"operation":"start_ack","elapsedMs":started.elapsed().as_millis(),"ok":result.is_ok()})
+        ));
+        result
     }
     pub async fn stop(id: String) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        let metric_id = id.clone();
         // Mark before enqueueing: cancellation wins even when a start arrives late.
         cancellations().cancel(id.clone());
+        if let Some((_, cancel)) = SYNTHESIS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .filter(|(current, _)| current == &id)
+        {
+            cancel.store(true, Ordering::SeqCst);
+        }
         if WORKER.get().is_none() {
             return Ok(());
         }
         let (tx, rx) = oneshot::channel();
         dispatch(Command::Stop(id, tx))?;
-        rx.await.map_err(|_| "speech_unavailable".into())
+        let result = rx.await.map_err(|_| "speech_unavailable".into());
+        crate::log::line(format!(
+            "voice-tts {}",
+            serde_json::json!({"requestId":metric_id,"operation":"stop_ack","elapsedMs":started.elapsed().as_millis(),"ok":result.is_ok()})
+        ));
+        result
     }
     #[derive(Clone, Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -343,6 +491,7 @@ mod native {
             None
         };
         let mut active: Option<(tauri::AppHandle, String)> = None;
+        let mut active_stream = None;
         loop {
             let command = if active.is_some() {
                 match rx.recv_timeout(Duration::from_millis(40)) {
@@ -359,14 +508,23 @@ mod native {
             if let Some(command) = command {
                 match command {
                     Command::Choices(reply) => {
-                        let result = if initialized {
+                        let mut found: Vec<_> = if initialized {
                             unsafe { voices() }
-                                .map(|v| v.into_iter().map(|(choice, _)| choice).collect())
-                                .map_err(|_| "speech_unavailable".into())
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|(choice, _)| choice)
+                                .collect()
                         } else {
-                            Err("speech_unavailable".into())
+                            Vec::new()
                         };
-                        let _ = reply.send(result);
+                        if kokoro_dir().is_some() {
+                            found.extend(KOKORO_VOICES.map(|(id, name, spanish)| VoiceChoice {
+                                id: id.into(),
+                                name: name.into(),
+                                spanish,
+                            }));
+                        }
+                        let _ = reply.send(Ok(found));
                     }
                     Command::Stop(id, reply) => {
                         if active.as_ref().is_some_and(|(_, current)| current == &id) {
@@ -376,6 +534,7 @@ mod native {
                             if let Some((app, id)) = active.take() {
                                 emit(&app, &id, "stopped", None);
                             }
+                            active_stream = None;
                         }
                         let _ = reply.send(());
                     }
@@ -384,6 +543,7 @@ mod native {
                         id,
                         text,
                         voice_id,
+                        pcm,
                         reply,
                     } => {
                         if cancellations().contains(&id) {
@@ -395,6 +555,31 @@ mod native {
                         }
                         if let Some((old_app, old_id)) = active.take() {
                             emit(&old_app, &old_id, "stopped", None);
+                        }
+                        active_stream = None;
+                        if let Some(pcm) = pcm {
+                            let result = prepare_and_speak(
+                                cancellation_state(),
+                                &id,
+                                || Ok(pcm),
+                                unlocked,
+                                |pcm| {
+                                    active_stream = Some(
+                                        speak_pcm(
+                                            voice.as_ref().ok_or("speech_unavailable")?,
+                                            &pcm,
+                                        )
+                                        .map_err(|_| "speech_unavailable".to_string())?,
+                                    );
+                                    Ok(())
+                                },
+                            );
+                            if result.is_ok() {
+                                emit(&app, &id, "speaking", None);
+                                active = Some((app, id));
+                                let _ = reply.send(Ok(()));
+                                continue;
+                            }
                         }
                         let result = prepare_and_speak(
                             cancellation_state(),
@@ -408,6 +593,10 @@ mod native {
                                     .find(|(v, _)| {
                                         if voice_id.is_empty() {
                                             v.spanish
+                                        } else if let Some((_, _, spanish)) =
+                                            KOKORO_VOICES.iter().find(|(id, _, _)| *id == voice_id)
+                                        {
+                                            v.spanish == *spanish
                                         } else {
                                             v.id == voice_id
                                         }
@@ -464,12 +653,14 @@ mod native {
                 if let Some((state, code)) = state {
                     emit(app, id, state, code);
                     active = None;
+                    active_stream = None;
                 }
             }
         }
         if let Some(voice) = &voice {
             purge(voice);
         }
+        drop(active_stream);
     }
 }
 #[cfg(test)]

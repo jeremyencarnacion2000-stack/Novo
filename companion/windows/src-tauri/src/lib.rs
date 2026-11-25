@@ -18,7 +18,9 @@ mod query_context;
 mod desktop;
 mod desktop_apps;
 mod voice;
+mod voice_wake;
 mod voice_input;
+mod voice_metrics;
 mod files;
 mod github;
 mod hooks;
@@ -106,6 +108,8 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         // Where Mochi sits on the desktop is desktop.rs's to say, not a webview's.
         let mut settings = settings.clone();
         settings.desktop_mochi = current.desktop_mochi.clone();
+        settings.desktop_policy = current.desktop_policy.clone();
+        settings.desktop_allowed_apps = current.desktop_allowed_apps.clone();
         // The legacy island/settings editor owns appearance, not Novo's
         // device connection or capture consent. Its stale copy must not
         // reset those values after the account surface changes them.
@@ -715,6 +719,8 @@ pub fn run() {
             voice::voice_choices,
             voice::voice_speak,
             voice::voice_stop,
+            voice_wake::voice_wake_wait,
+            voice_wake::voice_wake_cancel,
             voice_input::voice_input_start,
             voice_input::voice_input_finish,
             voice_input::voice_input_cancel,
@@ -819,7 +825,9 @@ pub fn run() {
             desktop::desktop_mochi_set_asleep,
             desktop_apps::desktop_app_catalog,
             desktop_apps::desktop_app_allowed_set,
+            desktop_apps::desktop_app_permissions_set,
             desktop_apps::desktop_app_open,
+            desktop_apps::desktop_action_cancel,
             desktop_apps::desktop_app_windows,
             desktop_apps::desktop_window_action,
         ])

@@ -103,7 +103,7 @@ export async function readProjectAssistantRecords(userId:string,access:ProjectAs
   ])
   const excluded=new Set(preferences.map(row=>row.source)),activeDevices=new Set(devices.map(row=>row.deviceId))
   return rows.flatMap(row=>{
-    const sources=row.sources.filter(source=>allowedSource(source.kind,access,excluded)&&(!source.deviceId||activeDevices.has(source.deviceId))).map(source=>source.kind==='novo'&&excluded.has('tasks')?{...source,facts:{...(source.facts as object),tasks:[]}}:source)
+    const sources=row.sources.filter(source=>allowedSource(source.kind,access,excluded)&&(!source.deviceId||activeDevices.has(source.deviceId))).map(source=>source.kind==='novo'&&(excluded.has('tasks')||access.tasks===false)?{...source,facts:{...(source.facts as object),tasks:[]}}:source)
     return sources.length?[{...row,projectId:access.personal||access.projects?row.projectId:null,title:access.personal||access.projects?row.title:sources[0].title,correction:access.personal||access.projects?row.correction:null,sources}]:[]
   })
 }

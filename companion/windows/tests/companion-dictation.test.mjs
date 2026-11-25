@@ -5,6 +5,18 @@ import { State, DEFAULT_SETTINGS } from '../src/core/state.ts';
 import { CompanionDictation } from '../src/core/companion-dictation.ts';
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
+test('local dictation does not announce listening before the native device is ready', async () => {
+  State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local' };
+  calls.length = 0; const phases = [];
+  const input = new CompanionDictation({ transcript() {}, preparing: () => phases.push('preparing'), listening: active => phases.push(active), error: assert.fail });
+  await tick(); input.start(''); await tick();
+  assert.deepEqual(phases, ['preparing']);
+  const requestId = calls.find(([name]) => name === 'voice_input_start')[1].requestId;
+  emit('novo-voice-input', { requestId, state: 'listening' });
+  assert.deepEqual(phases, ['preparing', true]);
+  input.dispose();
+});
+
 test('local speech fills the existing draft without cloud speech or sending chat', async () => {
   State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local', voiceCloudConsent: false };
   calls.length = 0; const texts = []; const phases = [];
@@ -51,5 +63,24 @@ test('off mode never opens a microphone and cloud mode still requires consent', 
   assert.equal(input.start(''), false);
   assert.deepEqual(errors, ['disabled', 'consent']);
   assert.equal(calls.some(([name]) => name === 'voice_input_start'), false);
+  input.dispose();
+});
+
+test('draft delivery records only bounded timing metadata after the current final transcript', async () => {
+  State.settings = { ...DEFAULT_SETTINGS, voiceInputMode: 'local' }; calls.length = 0;
+  const texts = [];
+  const input = new CompanionDictation({transcript:text=>texts.push(text),listening(){},error:assert.fail});
+  await tick(); input.start(''); await tick();
+  const requestId=calls.find(([name])=>name==='voice_input_start')[1].requestId;
+  emit('novo-voice-input',{requestId,state:'finished',text:'private spoken request',emittedAtMs:Date.now()-40});
+  await tick();
+  assert.deepEqual(texts,['private spoken request']);
+  const record=calls.find(([name])=>name==='log_line');
+  assert.ok(record,'the final draft must have delivery timing');
+  assert.ok(!record[1].message.includes('private spoken request'));
+  const measured=JSON.parse(record[1].message.replace(/^voice-draft /,''));
+  assert.equal(measured.requestId,requestId);
+  assert.ok(measured.deliveryMs>=40&&measured.deliveryMs<60000);
+  assert.ok(measured.requestToDraftMs>=0);
   input.dispose();
 });

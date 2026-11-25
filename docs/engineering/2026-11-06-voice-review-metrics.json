@@ -1,0 +1,253 @@
+{
+  "date": "2026-11-06",
+  "runtimeSource": "3ad0d0999f364802e730d2c1c8bc29249de90701",
+  "provenance": "Existing synthetic Helena es-ES and David en-US Codex commands, not new human speech. Manual Send/default recognition unchanged. Available-memory guard prevented the first ES launch; four later processes completed after resetting the agent-owned JS diagnostic kernel. No microphone/speaker actions.",
+  "independentHumanSamples": 0,
+  "reports": [
+    {
+      "report": "2026-11-06-small-es-project.json",
+      "reportSHA256": "03d02046ab827dc5d926e4af878cd84b4947ee9d6cf91f579d5ce99f0f79d591",
+      "model": "ggml-small-q5_1.bin",
+      "modelSHA256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "audioMs": 1615,
+      "expected": "Abre Codex.",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "insufficient_memory",
+          "free_mib": 277.96484375
+        }
+      ]
+    },
+    {
+      "report": "2026-11-06-small-es-project-retry.json",
+      "reportSHA256": "00c0e53423ac381ccbc2fdfc937651752f88b37c67842d16eb0bcd28ba29bff6",
+      "model": "ggml-small-q5_1.bin",
+      "modelSHA256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "audioMs": 1615,
+      "expected": "Abre Codex.",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 24465,
+          "peak_working_set_mib": 486.41796875,
+          "minimum_free_mib": 530.37109375,
+          "exit_code": 0,
+          "cpu_ms": 44531.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8202023298589822,
+          "average_machine_cpu_percent": 45.505058246474555,
+          "text": "Abre codex.",
+          "detected_language": "es",
+          "confidence": 0.4240346233812157,
+          "passes_confidence_gate": false,
+          "exact_phrase": true,
+          "word_errors": 0,
+          "reference_words": 2,
+          "wer": 0,
+          "stages_ms": {
+            "vad_ms": 9.36,
+            "model_load_ms": 220.74,
+            "mel_ms": 5.61,
+            "sample_ms": 72.14,
+            "encode_ms": 22747.76,
+            "decode_ms": 0,
+            "batch_decode_ms": 1136.35,
+            "prompt_ms": 0,
+            "engine_total_ms": 24281.32
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 9735,
+          "peak_working_set_mib": 431.44140625,
+          "minimum_free_mib": 575.11328125,
+          "exit_code": 0,
+          "cpu_ms": 17859.375,
+          "threads": 2,
+          "beam": 5,
+          "language": "es",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "128"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8345531587057011,
+          "average_machine_cpu_percent": 45.863828967642526,
+          "text": "Abre codex.",
+          "detected_language": "es",
+          "confidence": 0.353739615163834,
+          "passes_confidence_gate": false,
+          "exact_phrase": true,
+          "word_errors": 0,
+          "reference_words": 2,
+          "wer": 0,
+          "stages_ms": {
+            "vad_ms": 12.98,
+            "model_load_ms": 334.39,
+            "mel_ms": 7.81,
+            "sample_ms": 713.97,
+            "encode_ms": 1796.39,
+            "decode_ms": 5580.37,
+            "batch_decode_ms": 906.77,
+            "prompt_ms": 0,
+            "engine_total_ms": 9449.07
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    },
+    {
+      "report": "2026-11-06-small-en-project.json",
+      "reportSHA256": "71f973d7dd34f9ca86112a145c90c9f0cf24c37779eb3cffac3f8eb2e656d14e",
+      "model": "ggml-small-q5_1.bin",
+      "modelSHA256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "audioMs": 1785,
+      "expected": "Open Codex.",
+      "variants": [
+        {
+          "variant": "baseline-run-1",
+          "status": "completed",
+          "elapsed_ms": 26321,
+          "peak_working_set_mib": 486.12109375,
+          "minimum_free_mib": 542.3984375,
+          "exit_code": 0,
+          "cpu_ms": 47921.875,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": true,
+          "extra": [],
+          "configuration": "baseline",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.8206707571900764,
+          "average_machine_cpu_percent": 45.51676892975191,
+          "text": "Open codecs",
+          "detected_language": "en",
+          "confidence": 0.5310004772150079,
+          "passes_confidence_gate": true,
+          "exact_phrase": false,
+          "word_errors": 1,
+          "reference_words": 2,
+          "wer": 0.5,
+          "stages_ms": {
+            "vad_ms": 14.25,
+            "model_load_ms": 269.49,
+            "mel_ms": 8.22,
+            "sample_ms": 48.44,
+            "encode_ms": 24904.96,
+            "decode_ms": 39.74,
+            "batch_decode_ms": 792.94,
+            "prompt_ms": 0,
+            "engine_total_ms": 26168.52
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        },
+        {
+          "variant": "bounded-context-run-1",
+          "status": "completed",
+          "elapsed_ms": 2923,
+          "peak_working_set_mib": 432,
+          "minimum_free_mib": 593.84375,
+          "exit_code": 0,
+          "cpu_ms": 5156.25,
+          "threads": 2,
+          "beam": 5,
+          "language": "en",
+          "vad": true,
+          "extra": [
+            "--audio-ctx",
+            "128"
+          ],
+          "configuration": "bounded-context",
+          "iteration": 1,
+          "fresh_process": true,
+          "partial_hypothesis_only": false,
+          "average_cpu_core_equivalents": 1.7640266849127608,
+          "average_machine_cpu_percent": 44.10066712281902,
+          "text": "Open Codex.",
+          "detected_language": "en",
+          "confidence": 0.5962291529934598,
+          "passes_confidence_gate": true,
+          "exact_phrase": true,
+          "word_errors": 0,
+          "reference_words": 2,
+          "wer": 0,
+          "stages_ms": {
+            "vad_ms": 15.82,
+            "model_load_ms": 318.09,
+            "mel_ms": 9.5,
+            "sample_ms": 47.98,
+            "encode_ms": 1730.52,
+            "decode_ms": 0,
+            "batch_decode_ms": 532.68,
+            "prompt_ms": 0,
+            "engine_total_ms": 2749.09
+          },
+          "loaded_backends": [
+            "CPU"
+          ],
+          "backend_features": {
+            "OPENVINO": 0,
+            "SSE3": 1,
+            "SSSE3": 1,
+            "AVX": 1,
+            "AVX2": 1,
+            "F16C": 1,
+            "FMA": 1
+          }
+        }
+      ]
+    }
+  ]
+}

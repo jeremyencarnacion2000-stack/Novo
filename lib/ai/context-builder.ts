@@ -88,7 +88,7 @@ export async function buildUserContext(userId: string, options?: {
     twinMode?: boolean;
     includeGmail?: boolean;
     gmailRequest?: { message: string; history?: Array<{role: string; content: string}>; signal?: AbortSignal };
-    contextAccess?: { personal: boolean; integrations: boolean; twin?: boolean; development?: boolean; currentWorkContext?: boolean; deviceActivityRead?: boolean };
+    contextAccess?: { personal: boolean; integrations: boolean; tasks?: boolean; twin?: boolean; development?: boolean; currentWorkContext?: boolean; deviceActivityRead?: boolean };
 }): Promise<UserContext> {
     try {
         const personal = options?.contextAccess?.personal ?? true;
@@ -107,6 +107,7 @@ export async function buildUserContext(userId: string, options?: {
             where: { userId, excludedAt: { not: null } }, select: { source: true },
         }) : [];
         const excludedSignalSources = new Set(signalSourcePreferences.map((item) => item.source));
+        const ownTasks = personal && options?.contextAccess?.tasks !== false && !excludedSignalSources.has('tasks');
         const unavailable = new Set<string>();
         const read = async <T, F>(field: string, operation: () => PromiseLike<T>, fallback: F): Promise<T | F> => {
             try { return await operation(); }
@@ -143,18 +144,18 @@ export async function buildUserContext(userId: string, options?: {
         ] = await Promise.all([
             personal ? read('preferences', () => prisma.userSettings.findUnique({ where: { userId } }), null) : null,
             personal ? read('metrics', () => prisma.userCognitiveSnapshot.findUnique({ where: { userId } }), null) : null,
-            personal ? read('state.activeTasks', () => prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }), null) : 0,
-            personal ? read('state.overdueTasks', () => prisma.task.count({
+            ownTasks ? read('state.activeTasks', () => prisma.task.count({ where: { userId, status: { in: ['todo', 'in-progress'] } } }), null) : null,
+            ownTasks ? read('state.overdueTasks', () => prisma.task.count({
                 where: {
                     userId,
                     status: { in: ['todo', 'in-progress'] },
                     dueDate: { lt: new Date().toISOString() } // simplified check
                 }
-            }), null) : 0,
+            }), null) : null,
             personal ? read('state.activeRoutines', () => prisma.routine.count({ where: { userId, isActive: true } }), null) : 0,
             personal ? read('state.activeProjects', () => prisma.project.count({ where: { userId, status: 'in-progress' } }), null) : 0,
             calendarSources.length ? read('todaySchedule', () => CalendarAggregator.getEventsForRange(userId, start, end, calendarSources, () => { unavailable.add('todaySchedule'); }), null) : [],
-            personal ? read('state.tasksList', () => prisma.task.findMany({
+            ownTasks ? read('state.tasksList', () => prisma.task.findMany({
                 where: { userId, status: { in: ['todo', 'in-progress'] } },
                 orderBy: { updatedAt: 'desc' },
                 take: CONTEXT_LIMITS.tasks
