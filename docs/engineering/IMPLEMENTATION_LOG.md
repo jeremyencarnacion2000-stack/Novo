@@ -1,5 +1,15 @@
 # Registro de implementación
 
+## 2026-11-25 — Revisión local del reconocimiento tras decir «Novo»
+
+Se instaló, con autorización, el artefacto de Windows de `8de174a`. El SHA-256 del archivo coincide con la descarga autenticada de CI. El instalador terminó con código 0 y el Companion 0.2.18 inició una vez. Se conservó la configuración actual, incluida la preferencia de activación, y se confirmó el respaldo del instalador 0.2.17. Recursos Kokoro y la voz de despertar están presentes. Esta iteración usa la versión de producto 0.2.18 existente.
+
+La compilación aprueba 447 pruebas de interfaz, seis de calibración, 285 pruebas de la aplicación, 30 de hooks y 23 del protocolo; seis pruebas físicas permanecen excluidas. TypeScript, lint y regresiones del servidor también pasaron. La suite completa local del Companion pasó 447/447.
+
+La prueba de activación encuentra la causa temporal del aviso: en 0.2.18 sonaba al abrir el chat, antes de preparar la grabación nativa. La corrección abre el dictado al despertar y suena sólo cuando Windows informa «Escuchando». Se reprodujeron además salidas sintéticas con repetición de «Novo» como «no, no» y «Nobo, Nobo». Si una activación genera únicamente esas repeticiones, el dictado despierto ahora pide repetir y deja intacto el borrador. La misma negación dictada con el botón y las frases con contenido no se descartan.
+
+No se grabó audio del usuario. La corrección y la respuesta con su voz siguen pendientes de una validación real. CI Windows: https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45299893493. CI servidor: https://github.com/jeremyencarnacion2000-stack/Novo/actions/runs/45299899206.
+
 ## 2026-11-23 — Señal de dictado tras decir «Novo»
 
 En la 0.2.18 el aviso sonaba al abrir el chat. Antes de grabar transcurrían una espera fija de 300 ms y la preparación nativa. En tres intentos recientes, las métricas locales mostraron 512–568 ms de validación de recursos y 38–102 ms de preparación del micrófono. Los registros contienen tiempos y niveles, sin audio ni texto crudo.
